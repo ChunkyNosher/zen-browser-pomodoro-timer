@@ -271,11 +271,19 @@
         // Focus period complete, determine break type
         // Long breaks occur after completing N focus cycles (where N = longBreakInterval)
         // Example: if longBreakInterval=4, long breaks occur after cycles 4, 8, 12, etc.
-        // We only show long break if there are more cycles remaining after this one
-        const isLongBreakCycle = (this.currentCycle % this.config.longBreakInterval === 0);
-        const hasMoreCyclesRemaining = (this.currentCycle < this.totalCycles);
+        // LOGIC FIX: Check if this is the last cycle
+        const isLastCycle = (this.currentCycle >= this.totalCycles);
         
-        if (isLongBreakCycle && hasMoreCyclesRemaining) {
+        if (isLastCycle) {
+          // Last focus cycle complete - end session without break
+          this.completeTimer();
+          return;
+        }
+        
+        // Not the last cycle, so give appropriate break
+        const isLongBreakCycle = (this.currentCycle % this.config.longBreakInterval === 0);
+        
+        if (isLongBreakCycle) {
           // Long break after completing N cycles
           this.currentPhase = 'long-break';
           this.remainingTime = this.config.longBreakDuration * 60;
@@ -285,7 +293,7 @@
           this.remainingTime = this.config.breakDuration * 60;
         }
       } else {
-        // Break complete
+        // Break complete, move to next cycle
         this.currentCycle++;
         
         if (this.currentCycle > this.totalCycles) {
@@ -455,6 +463,7 @@
     /**
      * Check if current workspace is blocked
      * LOGIC FIX: Reload config to get latest blocked workspaces
+     * EDGE CASE FIX: Validate and clean up deleted workspaces
      */
     isCurrentWorkspaceBlocked() {
       // Reload config to avoid stale data
@@ -462,6 +471,22 @@
       
       const activeWorkspace = this.getActiveWorkspace();
       if (!activeWorkspace) return false;
+      
+      // EDGE CASE FIX: Validate blocked workspaces and remove deleted ones
+      const existingWorkspaces = this.getAllWorkspaces();
+      const existingWorkspaceIds = existingWorkspaces.map(ws => ws.id);
+      const originalLength = this.config.blockedWorkspaces.length;
+      
+      // Filter out deleted workspaces
+      this.config.blockedWorkspaces = this.config.blockedWorkspaces.filter(
+        wsId => existingWorkspaceIds.includes(wsId)
+      );
+      
+      // Save config if we removed any deleted workspaces
+      if (this.config.blockedWorkspaces.length !== originalLength) {
+        console.log('Removed deleted workspaces from blocked list');
+        saveConfig(this.config);
+      }
       
       return this.config.blockedWorkspaces.includes(activeWorkspace);
     }
