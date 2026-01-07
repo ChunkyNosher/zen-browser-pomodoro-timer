@@ -582,7 +582,8 @@
       this.indicator = null;
       this.config = getConfig();
       this.isVisible = false;
-      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles sizing with 100% width/height
+      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles responsive sizing
+      // The overlay uses position: fixed with width: 100% and height: 100% to fill viewport
     }
 
     /**
@@ -1260,7 +1261,7 @@
     constructor() {
       this.lockScreen = null;
       this.lockIntervalId = null; // Store interval for cleanup
-      this.lockTimerElement = null; // PERFORMANCE FIX: Cache timer element reference
+      this.lockTimerElement = null; // PERFORMANCE FIX: Initialize timer element reference for caching
       this.holdDuration = 3000;
     }
 
@@ -1531,6 +1532,7 @@
      * Called when browser is ready
      */
     onReady() {
+      // Double-check guard since init() already checks, but safer for edge cases
       if (this.initialized) {
         return;
       }

@@ -369,10 +369,10 @@
    Workspace Selection UI
    MISSING FEATURE FIX: Added styles for workspace selection
    ============================================ */
-/* Workspace row with vertical layout */
-.zen-pomodoro-workspace-row {
-  flex-direction: column !important;
-  align-items: flex-start !important;
+/* Workspace row with vertical layout - override .zen-pomodoro-config-row default flex-direction */
+.zen-pomodoro-config-row.zen-pomodoro-workspace-row {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .zen-pomodoro-workspace-row label {
