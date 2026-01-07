@@ -1,2 +1,325 @@
-# zen-browser-pomodoro-timer
-A Zen Mod that works similar to LeechBlock or Opal where you're able to set a timer where during its duration, certain workspaces will be blocked so that you can better focus on your work.
+# Zen Pomodoro Focus Blocker
+
+Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
+
+![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+
+## ✨ Features
+
+- ⏱️ **Flexible Timer Modes**: 
+  - Simple one-phase timer for quick focus sessions
+  - Traditional Pomodoro cycles with focus/break periods
+  - Customizable long breaks every N cycles
+
+- 🚫 **Workspace-Based Blocking**: 
+  - Block specific workspaces during focus periods
+  - Full-screen opaque overlay prevents distractions
+  - Automatically adapts when switching workspaces
+
+- ⚙️ **Highly Customizable**:
+  - Configurable timer durations (focus, break, long break)
+  - Custom overlay colors for different phases
+  - Personalized motivational messages
+  - Security features to prevent mid-session changes
+
+- 🔒 **Anti-Cheating Security**:
+  - Settings lock with wait timer (when idle)
+  - Code entry requirement during active timers
+  - Hold-to-start button to prevent impulsive starts
+
+- 📱 **Responsive Design**:
+  - Overlay adapts to sidebar collapse/expansion
+  - Works with extension sidebars
+  - Supports different screen sizes
+
+- 🎨 **Visual Feedback**:
+  - Different colors for focus, break, and long break phases
+  - Persistent corner indicator shows timer status
+  - Smooth phase transitions with animations
+
+## 📦 Installation
+
+### Via Sine Mod Manager (Recommended)
+
+1. Install [Sine Mod Manager](https://github.com/CosmoCreeper/Sine) if you haven't already
+2. Open Zen Browser Settings → Sine Mods
+3. Click "Install from Repository"
+4. Paste this URL: `https://github.com/ChunkyNosher/zen-browser-pomodoro-timer`
+5. Click "Install"
+6. Restart Zen Browser when prompted
+
+### Manual Installation
+
+1. Download or clone this repository
+2. Locate your Zen Browser profile folder:
+   - **Windows**: `%APPDATA%\Zen\Profiles\[your-profile]\chrome\`
+   - **macOS**: `~/Library/Application Support/Zen/Profiles/[your-profile]/chrome/`
+   - **Linux**: `~/.zen/[your-profile]/chrome/`
+3. Create the `chrome` folder if it doesn't exist
+4. Copy `userChrome.css` and `userChrome.cjs` to the chrome folder
+5. Restart Zen Browser
+
+## 🚀 Usage
+
+### Starting a Timer
+
+1. **Right-click** on the sidebar or any workspace button
+2. Select **"Start Pomodoro Timer"** from the context menu
+3. Choose your timer mode:
+   - **Simple Timer**: Single countdown, no breaks
+   - **Pomodoro Cycles**: Multiple focus/break periods
+4. If Pomodoro mode, specify the number of cycles (default: 4)
+5. Click **"Start Timer"**
+
+The timer will begin immediately, and if you're on a blocked workspace, the full-screen overlay will appear.
+
+### During a Timer Session
+
+- **Timer Display**: Large countdown shows remaining time
+- **Phase Indicator**: Shows whether you're in focus or break mode
+- **Cycle Progress**: Displays current cycle number (e.g., "Cycle 2 of 4")
+- **Corner Indicator**: Persistent small indicator in top-right corner
+- **Controls**: 
+  - Pause/Resume button to temporarily stop the timer
+  - Stop button to end the session (requires confirmation)
+
+### Switching Workspaces
+
+- Switch to a **blocked workspace**: Overlay appears immediately
+- Switch to a **non-blocked workspace**: Overlay disappears, timer continues
+- This allows you to work in approved spaces while still tracking time
+
+## ⚙️ Configuration
+
+### Accessing Settings
+
+1. Right-click on sidebar or workspace button
+2. Select **"Timer Settings"**
+3. Wait for settings lock (if configured)
+4. Modify your preferences
+
+### Available Settings
+
+#### Timer Durations
+- **Focus Duration**: Time for focus periods (default: 25 minutes)
+  - Range: 1-120 minutes
+- **Break Duration**: Time for short breaks (default: 5 minutes)
+  - Range: 1-30 minutes
+- **Long Break Duration**: Time for extended breaks (default: 15 minutes)
+  - Range: 5-60 minutes
+- **Long Break Interval**: Cycles between long breaks (default: every 4 cycles)
+
+#### Overlay Customization
+- **Overlay Color**: Background color during blocking
+  - Default: `#808080` (medium gray)
+  - Focus: `#2180cd` (blue)
+  - Break: `#2ec491` (green)
+- **Motivational Message**: Text displayed on overlay
+  - Default: "Get back to work."
+  - Examples: "Stay focused!", "You got this!", "Focus mode activated"
+
+#### Workspace Selection
+- Choose which workspaces should be blocked during timers
+- Unblocked workspaces remain accessible during focus periods
+- Changes take effect on next timer start
+
+#### Security Features
+- **Settings Lock (Idle)**: Wait time before accessing settings when no timer is active
+  - Default: 20 seconds
+  - Range: 5-300 seconds
+  - Prevents quick settings changes
+  
+- **Settings Lock (Active)**: Code entry required during active timer
+  - Default: 64 character code
+  - Range: 8-128 characters
+  - Character sets: alphanumeric or all typeable characters
+  - Prevents cheating mid-session
+
+- **Hold-to-Start Duration**: Time to hold start button
+  - Default: 3 seconds (3000ms)
+  - Prevents accidental timer starts
+
+#### Notifications
+- **Enable Notifications**: Show phase change alerts
+- **Enable Audio Alerts**: Play sound on phase transitions (requires audio file)
+
+## 🔧 Advanced Configuration
+
+For power users, settings are stored in Firefox preferences under the `zen-pomodoro` namespace. You can manually edit these via `about:config`:
+
+```
+zen-pomodoro.config - JSON configuration object
+zen-pomodoro.timer-state - Current timer state (for crash recovery)
+```
+
+### Configuration JSON Structure
+
+```json
+{
+  "timerMode": "pomodoro",
+  "simpleDuration": 25,
+  "focusDuration": 25,
+  "breakDuration": 5,
+  "longBreakDuration": 15,
+  "longBreakInterval": 4,
+  "cycles": 4,
+  "blockedWorkspaces": ["workspace-uuid-1", "workspace-uuid-2"],
+  "overlayColor": "#808080",
+  "motivationalMessage": "Get back to work.",
+  "settingsLockIdleDuration": 20,
+  "settingsLockActiveCodeLength": 64,
+  "settingsLockActiveCharacterSet": "all-typeable",
+  "holdToStartDuration": 3000,
+  "enableNotifications": true,
+  "enableAudioAlerts": false
+}
+```
+
+## 🎯 Use Cases
+
+### Focused Work Sessions
+Block social media or entertainment workspaces while working on important tasks. Set a 25-minute focus period with 5-minute breaks.
+
+### Deep Work Marathons
+Use extended focus periods (50-90 minutes) with longer breaks (15-20 minutes) for complex projects requiring sustained concentration.
+
+### Time-Boxed Learning
+Block all non-educational workspaces during study sessions. Use Pomodoro cycles to maintain engagement while learning new material.
+
+### Meeting Preparation
+Set a simple timer for 15 minutes to prepare for meetings without getting distracted by other browser tabs.
+
+## 🐛 Troubleshooting
+
+### Overlay Not Appearing
+
+**Issue**: Timer starts but no overlay appears
+
+**Solutions**:
+1. Verify the current workspace is marked as "blocked" in settings
+2. Clear Zen Browser startup cache:
+   - Navigate to `about:support`
+   - Click "Clear Startup Cache"
+   - Restart browser
+3. Check browser console for JavaScript errors (F12 → Console)
+4. Ensure `userChrome.cjs` and `userChrome.css` are in the correct location
+
+### Timer Inaccuracy
+
+**Issue**: Timer doesn't count down accurately
+
+**Solutions**:
+1. Verify system clock is correct
+2. Check for high CPU usage from other processes
+3. Close unnecessary browser tabs/extensions
+4. Report issue on GitHub with details
+
+### Settings Not Persisting
+
+**Issue**: Configuration changes don't save after browser restart
+
+**Solutions**:
+1. Check Firefox preferences: `about:config` → search for `zen-pomodoro`
+2. Verify write permissions for profile directory
+3. Try manually saving config via browser console:
+   ```javascript
+   Services.prefs.setCharPref('zen-pomodoro.config', JSON.stringify({...}))
+   ```
+4. Check for conflicting mods or extensions
+
+### Context Menu Not Showing
+
+**Issue**: Right-click doesn't show "Start Pomodoro Timer" option
+
+**Solutions**:
+1. Verify `userChrome.cjs` is loaded (check browser console on startup)
+2. Try right-clicking directly on workspace buttons (not tabs)
+3. Restart browser completely
+4. Check for JavaScript errors in console
+
+### Overlay Covers Everything
+
+**Issue**: Can't access any workspace during timer
+
+**Solutions**:
+- This is intended behavior for blocked workspaces during focus periods
+- Switch to a non-blocked workspace to continue other work
+- Stop the timer if you need immediate access (requires confirmation)
+- Configure which workspaces should be blocked in settings before starting timer
+
+## 🔐 Privacy & Security
+
+### Data Storage
+- All configuration stored locally using Firefox Services.prefs
+- No data transmitted to external servers
+- No tracking or analytics
+- Timer state saved to recover from browser crashes
+
+### Security Features
+- Settings locks prevent unauthorized configuration changes
+- Code generation uses cryptographically secure random values
+- Hold-to-start prevents accidental timer activation
+
+### Limitations
+- **Browser-Level Only**: Blocking works only within Zen Browser. Users can open other browsers.
+- **Developer Tools Access**: Users with DevTools knowledge could theoretically bypass the overlay.
+- **Single Timer Per Window**: One active timer per browser window (multiple windows can have independent timers).
+- **Workspace-Specific**: Blocking is per-workspace, not per-window.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+
+### Development Setup
+
+1. Clone the repository
+2. Make changes to `userChrome.cjs` or `userChrome.css`
+3. Test in Zen Browser by copying files to your profile chrome folder
+4. Submit a pull request with clear description of changes
+
+### Reporting Issues
+
+When reporting bugs, please include:
+- Zen Browser version
+- Operating system
+- Steps to reproduce
+- Expected vs actual behavior
+- Browser console errors (if any)
+
+## 📜 License
+
+This project is licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
+
+See [LICENSE](LICENSE) file for full details.
+
+## 🙏 Acknowledgments
+
+- **Zen Browser Team**: For creating an amazing browser
+- **Sine Mod Manager**: For making mod installation seamless
+- **Pomodoro Technique**: Francesco Cirillo's time management method
+- **Contributors**: Everyone who helps improve this mod
+
+## 📞 Support
+
+- 📝 **Report Bugs**: [GitHub Issues](https://github.com/ChunkyNosher/zen-browser-pomodoro-timer/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/ChunkyNosher/zen-browser-pomodoro-timer/discussions)
+- 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
+
+## 📊 Changelog
+
+### Version 1.0.0 (Initial Release)
+- ✅ Simple and Pomodoro timer modes
+- ✅ Full-screen workspace blocking overlay
+- ✅ Customizable timer durations
+- ✅ Phase-specific overlay colors
+- ✅ Persistent corner indicator
+- ✅ Settings lock mechanisms
+- ✅ Hold-to-start security feature
+- ✅ Responsive design
+- ✅ Context menu integration
+- ✅ Configuration persistence
+
+---
+
+**Built with ❤️ for productivity and focus**

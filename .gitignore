@@ -1,0 +1,22 @@
+# Node.js
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+*.tgz
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

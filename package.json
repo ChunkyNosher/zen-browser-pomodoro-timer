@@ -1,0 +1,23 @@
+{
+  "name": "zen-pomodoro-blocker",
+  "version": "1.0.0",
+  "description": "A productivity mod implementing Pomodoro timer with workspace blocking",
+  "main": "userChrome.cjs",
+  "scripts": {
+    "lint": "eslint . && stylelint '**/*.css'",
+    "lint:fix": "eslint --fix . && stylelint --fix '**/*.css' && prettier --write .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^8.56.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-mozilla": "^1.2.0",
+    "eslint-plugin-no-unsanitized": "^4.0.2",
+    "prettier": "^3.1.0",
+    "stylelint": "^16.0.0",
+    "stylelint-config-standard": "^35.0.0"
+  },
+  "keywords": ["zen-browser", "pomodoro", "productivity", "focus", "timer"],
+  "author": "ChunkyNosher",
+  "license": "MPL-2.0"
+}
