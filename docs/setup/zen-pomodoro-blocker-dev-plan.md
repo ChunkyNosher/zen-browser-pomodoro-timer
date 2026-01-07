@@ -28,8 +28,8 @@ Zen Browser mods operate within Firefox's XUL/XHTML framework and use a modular 
 
 ```
 mod-folder/
-├── userChrome.cjs          (Main JavaScript controller)
-├── userChrome.css          (Styling for overlay and UI components)
+├── userChrome.uc.mjs       (Main JavaScript controller)
+├── chrome.css              (Styling for overlay and UI components)
 ├── manifest.json           (Mod metadata - name, version, description)
 └── [OPTIONAL] locale/      (Localization files if needed)
 ```
@@ -334,7 +334,7 @@ Allow user to configure emergency bypass (with warning):
 
 ### Core Modules
 
-**1. Timer Engine Module** (`timerEngine.js` or embedded in userChrome.cjs)
+**1. Timer Engine Module** (`timerEngine.js` or embedded in userChrome.uc.mjs)
 - Manages countdown logic
 - Handles phase transitions
 - Emits events for UI updates
@@ -405,7 +405,7 @@ Overlay Removed, Timer Engine Reset
 
 ### CSS Architecture
 
-**userChrome.css** structure:
+**chrome.css** structure:
 - Root variables for colors, dimensions, timing
 - Overlay element styles (position fixed, fullscreen, pointer-events all)
 - Overlay content styling (centered, large fonts)
@@ -572,8 +572,8 @@ Logging:
 ## Deliverables and Success Criteria
 
 ### Core Deliverables
-- ✅ userChrome.cjs with full functionality
-- ✅ userChrome.css with complete styling
+- ✅ userChrome.uc.mjs with full functionality
+- ✅ chrome.css with complete styling
 - ✅ manifest.json with proper metadata
 - ✅ README with usage instructions
 - ✅ Settings documentation
@@ -601,9 +601,9 @@ Logging:
 zen-pomodoro-blocker/
 ├── README.md                    (User-facing documentation)
 ├── DEVELOPMENT.md              (This file - for developers)
-├── manifest.json               (Mod metadata)
-├── userChrome.cjs              (Main mod logic)
-├── userChrome.css              (Styling)
+├── theme.json                  (Mod metadata)
+├── userChrome.uc.mjs           (Main mod logic)
+├── chrome.css                  (Styling)
 ├── LICENSE                     (MPL-2.0 recommended)
 ├── docs/
 │   ├── CONFIGURATION.md        (Settings explanation)

@@ -1,0 +1,19 @@
+{
+    "id": "zen-pomodoro-focus-blocker",
+    "name": "Zen Pomodoro Focus Blocker",
+    "description": "A productivity mod implementing customizable Pomodoro timer with workspace blocking to enhance focus and prevent distractions",
+    "homepage": "https://github.com/ChunkyNosher/zen-browser-pomodoro-timer",
+    "style": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/chrome.css",
+    "readme": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/README.md",
+    "author": "ChunkyNosher",
+    "version": "1.0.0",
+    "script": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/userChrome.uc.mjs",
+    "tags": [
+        "productivity",
+        "pomodoro",
+        "timer",
+        "focus"
+    ],
+    "createdAt": "2024-01-01",
+    "updatedAt": "2026-01-07"
+}
