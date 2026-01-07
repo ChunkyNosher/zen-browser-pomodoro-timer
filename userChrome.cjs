@@ -54,8 +54,8 @@
     phase: 'focus'
   };
 
-  // Save state every 10 seconds instead of every second for performance
-  const SAVE_STATE_INTERVAL = 10;
+  // Save state every 10 seconds instead of every second for performance (in seconds)
+  const SAVE_STATE_INTERVAL_SECONDS = 10;
 
   // ============================================
   // Utility Functions
@@ -246,7 +246,7 @@
 
           // PERFORMANCE FIX: Save state every 10 seconds instead of every second
           this.tickCounter++;
-          if (this.tickCounter >= SAVE_STATE_INTERVAL) {
+          if (this.tickCounter >= SAVE_STATE_INTERVAL_SECONDS) {
             this.saveState();
             this.tickCounter = 0;
           }
@@ -266,8 +266,8 @@
       // Pomodoro mode phase transitions
       if (this.currentPhase === 'focus') {
         // Focus period complete, start break
-        // LOGIC FIX: Use OR instead of AND for long break condition
-        if (this.currentCycle % this.config.longBreakInterval === 0 || this.currentCycle === this.totalCycles) {
+        // Check if this is a long break cycle (not the final cycle)
+        if (this.currentCycle % this.config.longBreakInterval === 0 && this.currentCycle < this.totalCycles) {
           // Long break condition
           this.currentPhase = 'long-break';
           this.remainingTime = this.config.longBreakDuration * 60;
@@ -1118,9 +1118,8 @@
         checkbox.checked = config.blockedWorkspaces.includes(workspace.id);
         
         const label = document.createElement('label');
-        label.htmlFor = `workspace-${workspace.id}`;
+        label.setAttribute('for', `workspace-${workspace.id}`);
         label.textContent = workspace.name;
-        label.style.cursor = 'pointer';
         
         checkboxWrapper.appendChild(checkbox);
         checkboxWrapper.appendChild(label);
@@ -1413,8 +1412,7 @@
       
       const progressBar = document.createElement('div');
       progressBar.id = 'zen-pomodoro-hold-progress';
-      buttonElement.style.position = 'relative';
-      buttonElement.style.overflow = 'hidden';
+      buttonElement.classList.add('zen-pomodoro-hold-button-wrapper');
       buttonElement.appendChild(progressBar);
       
       const startHold = () => {

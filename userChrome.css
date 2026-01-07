@@ -388,12 +388,19 @@
   font-size: 14px;
   font-weight: 400;
   margin: 0;
+  cursor: pointer;
 }
 
 /* ============================================
    Hold-to-Start Button
    ============================================ */
 #zen-pomodoro-hold-to-start {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hold-to-Start Button Container */
+.zen-pomodoro-hold-button-wrapper {
   position: relative;
   overflow: hidden;
 }
