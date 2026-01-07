@@ -102,6 +102,24 @@
   }
 
   /**
+   * Parse an integer preference with validation
+   * @param {string} key - Preference key
+   * @param {number} min - Minimum allowed value
+   * @param {number} max - Maximum allowed value
+   * @returns {number|null} Parsed value or null if not set/invalid
+   */
+  function parseIntPref(key, min, max) {
+    const value = getPref(key, null);
+    if (value === null) return null;
+    
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < min || parsed > max) {
+      return null;
+    }
+    return parsed;
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
@@ -121,40 +139,28 @@
     
     // Override with individual Sine preferences if set
     // These are set by Sine's preferences.json options page
-    const focusDuration = getPref('focusDuration', null);
+    const focusDuration = parseIntPref('focusDuration', 1, 120);
     if (focusDuration !== null) {
-      const parsed = parseInt(focusDuration, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 120) {
-        config.focusDuration = parsed;
-      }
+      config.focusDuration = focusDuration;
     }
     
-    const breakDuration = getPref('breakDuration', null);
+    const breakDuration = parseIntPref('breakDuration', 1, 30);
     if (breakDuration !== null) {
-      const parsed = parseInt(breakDuration, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
-        config.breakDuration = parsed;
-      }
+      config.breakDuration = breakDuration;
     }
     
-    const longBreakDuration = getPref('longBreakDuration', null);
+    const longBreakDuration = parseIntPref('longBreakDuration', 5, 60);
     if (longBreakDuration !== null) {
-      const parsed = parseInt(longBreakDuration, 10);
-      if (!isNaN(parsed) && parsed >= 5 && parsed <= 60) {
-        config.longBreakDuration = parsed;
-      }
+      config.longBreakDuration = longBreakDuration;
     }
     
-    const cycles = getPref('cycles', null);
+    const cycles = parseIntPref('cycles', 1, 10);
     if (cycles !== null) {
-      const parsed = parseInt(cycles, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) {
-        config.cycles = parsed;
-      }
+      config.cycles = cycles;
     }
     
     const motivationalMessage = getPref('motivationalMessage', null);
-    if (motivationalMessage !== null && typeof motivationalMessage === 'string') {
+    if (motivationalMessage !== null) {
       config.motivationalMessage = motivationalMessage;
     }
     
