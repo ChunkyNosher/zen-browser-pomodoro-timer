@@ -2,6 +2,16 @@
  * Zen Pomodoro Focus Blocker - CSS Styling
  * Version: 1.0.0
  * License: MPL-2.0
+ * 
+ * ACCESSIBILITY FIXES:
+ * - Added prefers-reduced-motion support for animations
+ * - Removed cursor:pointer from non-interactive indicator
+ * 
+ * UI/UX FIXES:
+ * - Added styles for inline styles moved to CSS classes
+ * - Added workspace selection UI styles
+ * - Added context menu styles
+ * - Added lock screen code display styles
  */
 
 /* ============================================
@@ -164,14 +174,25 @@
   letter-spacing: 0.05em;
 }
 
-.zen-pomodoro-button:hover {
-  background-color: var(--zen-pomodoro-button-hover-bg);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
+/* ACCESSIBILITY FIX: Wrap button hover/active transitions in prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  .zen-pomodoro-button:hover {
+    background-color: var(--zen-pomodoro-button-hover-bg);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .zen-pomodoro-button:active {
+    transform: translateY(0);
+  }
 }
 
-.zen-pomodoro-button:active {
-  transform: translateY(0);
+/* Fallback for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .zen-pomodoro-button:hover {
+    background-color: var(--zen-pomodoro-button-hover-bg);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
 }
 
 /* ============================================
@@ -192,7 +213,7 @@
   display: none;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
+  /* ACCESSIBILITY FIX: Removed cursor:pointer as there's no click handler */
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
@@ -201,17 +222,18 @@
   display: flex;
 }
 
-#zen-pomodoro-indicator:hover {
-  background-color: rgba(0, 0, 0, 0.85);
-  transform: scale(1.05);
-}
-
 #zen-pomodoro-indicator-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background-color: #2ec491;
-  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ACCESSIBILITY FIX: Wrap pulse animation in prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  #zen-pomodoro-indicator-dot {
+    animation: pulse 2s ease-in-out infinite;
+  }
 }
 
 #zen-pomodoro-indicator[data-phase="focus"] #zen-pomodoro-indicator-dot {
@@ -260,6 +282,11 @@
   margin: 0 0 16px 0;
   font-size: 24px;
   font-weight: 700;
+}
+
+#zen-pomodoro-config-dialog p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .zen-pomodoro-config-section {
@@ -329,6 +356,41 @@
 }
 
 /* ============================================
+   Workspace Selection UI
+   MISSING FEATURE FIX: Added styles for workspace selection
+   ============================================ */
+.zen-pomodoro-workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: #1e1d26;
+  border-radius: 6px;
+  border: 1px solid #3a3944;
+  width: 100%;
+}
+
+.zen-pomodoro-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+}
+
+.zen-pomodoro-checkbox-row input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.zen-pomodoro-checkbox-row label {
+  font-size: 14px;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ============================================
    Hold-to-Start Button
    ============================================ */
 #zen-pomodoro-hold-to-start {
@@ -348,7 +410,19 @@
 
 /* ============================================
    Context Menu Items
+   UI/UX FIX: Moved inline styles to CSS classes
    ============================================ */
+.zen-pomodoro-context-menu {
+  position: fixed;
+  background: #2b2a33;
+  border: 1px solid #3a3944;
+  border-radius: 6px;
+  padding: 4px 0;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 200px;
+}
+
 .zen-pomodoro-context-menu-item {
   display: flex;
   align-items: center;
@@ -356,6 +430,7 @@
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  color: #ffffff;
 }
 
 .zen-pomodoro-context-menu-item:hover {
@@ -397,11 +472,34 @@
   max-width: 500px;
 }
 
+#zen-pomodoro-lock-content h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+#zen-pomodoro-lock-content p {
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
 #zen-pomodoro-lock-timer {
   font-size: 48px;
   font-weight: 700;
   margin: 16px 0;
   color: #2180cd;
+}
+
+/* UI/UX FIX: Moved inline styles to CSS class */
+.zen-pomodoro-lock-code-display {
+  background: #1e1d26;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 16px 0;
+  font-family: monospace;
+  word-break: break-all;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 #zen-pomodoro-lock-code {
@@ -464,6 +562,7 @@
 
 /* ============================================
    Animations
+   ACCESSIBILITY FIX: Wrap animations in prefers-reduced-motion
    ============================================ */
 @keyframes fadeIn {
   from {
@@ -474,13 +573,16 @@
   }
 }
 
-#zen-pomodoro-overlay.active {
-  animation: fadeIn 0.3s ease;
-}
+/* ACCESSIBILITY FIX: Only animate if user has no motion preference */
+@media (prefers-reduced-motion: no-preference) {
+  #zen-pomodoro-overlay.active {
+    animation: fadeIn 0.3s ease;
+  }
 
-/* Phase transition animation */
-#zen-pomodoro-overlay[data-transitioning="true"] {
-  animation: phaseTransition 0.5s ease;
+  /* Phase transition animation */
+  #zen-pomodoro-overlay[data-transitioning="true"] {
+    animation: phaseTransition 0.5s ease;
+  }
 }
 
 @keyframes phaseTransition {
@@ -494,5 +596,16 @@
   100% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Fallback for reduced motion - no animations */
+@media (prefers-reduced-motion: reduce) {
+  #zen-pomodoro-overlay.active {
+    animation: none;
+  }
+
+  #zen-pomodoro-overlay[data-transitioning="true"] {
+    animation: none;
   }
 }
