@@ -105,15 +105,65 @@
    * Get configuration object from preferences
    */
   function getConfig() {
+    // Start with default config
+    let config = { ...DEFAULT_CONFIG };
+    
+    // Load from stored JSON config (legacy support)
     const configStr = getPref('config', null);
     if (configStr) {
       try {
-        return JSON.parse(configStr);
+        const storedConfig = JSON.parse(configStr);
+        config = { ...config, ...storedConfig };
       } catch (e) {
         console.error('Failed to parse config:', e);
       }
     }
-    return { ...DEFAULT_CONFIG };
+    
+    // Override with individual Sine preferences if set
+    // These are set by Sine's preferences.json options page
+    const focusDuration = getPref('focusDuration', null);
+    if (focusDuration !== null) {
+      const parsed = parseInt(focusDuration, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 120) {
+        config.focusDuration = parsed;
+      }
+    }
+    
+    const breakDuration = getPref('breakDuration', null);
+    if (breakDuration !== null) {
+      const parsed = parseInt(breakDuration, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 30) {
+        config.breakDuration = parsed;
+      }
+    }
+    
+    const longBreakDuration = getPref('longBreakDuration', null);
+    if (longBreakDuration !== null) {
+      const parsed = parseInt(longBreakDuration, 10);
+      if (!isNaN(parsed) && parsed >= 5 && parsed <= 60) {
+        config.longBreakDuration = parsed;
+      }
+    }
+    
+    const cycles = getPref('cycles', null);
+    if (cycles !== null) {
+      const parsed = parseInt(cycles, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 10) {
+        config.cycles = parsed;
+      }
+    }
+    
+    const motivationalMessage = getPref('motivationalMessage', null);
+    if (motivationalMessage !== null && typeof motivationalMessage === 'string') {
+      config.motivationalMessage = motivationalMessage;
+    }
+    
+    const enableNotifications = getPref('enableNotifications', null);
+    if (enableNotifications !== null) {
+      config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
+    }
+    
+    return config;
   }
 
   /**
