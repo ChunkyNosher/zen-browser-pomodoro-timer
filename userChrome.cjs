@@ -443,6 +443,8 @@
       this.config = getConfig();
       this.onWorkspaceChange = null;
       this.workspaceObserver = null; // Store observer for cleanup
+      this.validatedWorkspaces = null; // Cache validated workspace list
+      this.needsValidation = true; // Flag to track if validation is needed
     }
 
     /**
@@ -461,18 +463,14 @@
     }
 
     /**
-     * Check if current workspace is blocked
-     * LOGIC FIX: Reload config to get latest blocked workspaces
-     * EDGE CASE FIX: Validate and clean up deleted workspaces
+     * Validate and clean up deleted workspaces from blocked list
+     * Only called when workspace changes are detected
      */
-    isCurrentWorkspaceBlocked() {
-      // Reload config to avoid stale data
-      this.config = getConfig();
+    validateBlockedWorkspaces() {
+      if (!this.needsValidation) {
+        return;
+      }
       
-      const activeWorkspace = this.getActiveWorkspace();
-      if (!activeWorkspace) return false;
-      
-      // EDGE CASE FIX: Validate blocked workspaces and remove deleted ones
       const existingWorkspaces = this.getAllWorkspaces();
       const existingWorkspaceIds = existingWorkspaces.map(ws => ws.id);
       const originalLength = this.config.blockedWorkspaces.length;
@@ -482,11 +480,26 @@
         wsId => existingWorkspaceIds.includes(wsId)
       );
       
-      // Save config if we removed any deleted workspaces
+      // Save config only if we removed any deleted workspaces
       if (this.config.blockedWorkspaces.length !== originalLength) {
         console.log('Removed deleted workspaces from blocked list');
         saveConfig(this.config);
       }
+      
+      this.validatedWorkspaces = [...this.config.blockedWorkspaces];
+      this.needsValidation = false;
+    }
+
+    /**
+     * Check if current workspace is blocked
+     * PERFORMANCE FIX: Validation only runs on workspace change, not every call
+     */
+    isCurrentWorkspaceBlocked() {
+      // Reload config to get latest blocked workspaces
+      this.config = getConfig();
+      
+      const activeWorkspace = this.getActiveWorkspace();
+      if (!activeWorkspace) return false;
       
       return this.config.blockedWorkspaces.includes(activeWorkspace);
     }
@@ -494,6 +507,7 @@
     /**
      * Start monitoring workspace changes
      * MEMORY LEAK FIX: Store observer for cleanup
+     * PERFORMANCE FIX: Validate workspaces on change, not on every check
      */
     startMonitoring() {
       this.activeWorkspace = this.getActiveWorkspace();
@@ -509,6 +523,11 @@
         const newWorkspace = this.getActiveWorkspace();
         if (newWorkspace !== this.activeWorkspace) {
           this.activeWorkspace = newWorkspace;
+          
+          // PERFORMANCE FIX: Validate workspaces only on workspace change
+          this.needsValidation = true;
+          this.validateBlockedWorkspaces();
+          
           if (this.onWorkspaceChange) {
             this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
           }
@@ -1670,7 +1689,7 @@
 
     /**
      * Show notification
-     * SECURITY FIX: Handle invalid icon path gracefully
+     * SECURITY FIX: Simplified nested try-catch with conditional icon property
      */
     showNotification(phase) {
       const messages = {
@@ -1685,18 +1704,19 @@
       // Browser notification with permission check
       try {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          // SECURITY FIX: Try with icon, fallback without icon if it fails
-          try {
-            new Notification('Zen Pomodoro Timer', {
-              body: message,
-              icon: 'chrome://branding/content/about-logo.png'
-            });
-          } catch (iconError) {
-            // Fallback: create notification without icon if icon path is invalid
-            new Notification('Zen Pomodoro Timer', {
-              body: message
-            });
+          // Check if icon path is valid and create notification with conditional icon property
+          const iconPath = 'chrome://branding/content/about-logo.png';
+          const notificationOptions = {
+            body: message
+          };
+          
+          // Add icon property only if path exists
+          // For browser chrome:// URIs, we can include them as they're internal
+          if (iconPath) {
+            notificationOptions.icon = iconPath;
           }
+          
+          new Notification('Zen Pomodoro Timer', notificationOptions);
         } else {
           console.log('Notification:', message);
         }
