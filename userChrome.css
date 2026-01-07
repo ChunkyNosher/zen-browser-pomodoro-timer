@@ -256,7 +256,11 @@
 /* ============================================
    Timer Configuration Dialog
    ============================================ */
-#zen-pomodoro-config-dialog {
+#zen-pomodoro-config-dialog,
+#zen-pomodoro-start-dialog,
+#zen-pomodoro-settings-dialog,
+#zen-pomodoro-alert-dialog,
+#zen-pomodoro-confirm-dialog {
   position: fixed;
   top: 50%;
   left: 50%;
@@ -274,19 +278,58 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-#zen-pomodoro-config-dialog.active {
+/* Generic dialog class for all dialogs */
+.zen-pomodoro-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #2b2a33;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  z-index: calc(var(--zen-pomodoro-z-index) + 1);
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+#zen-pomodoro-config-dialog.active,
+#zen-pomodoro-start-dialog.active,
+#zen-pomodoro-settings-dialog.active,
+#zen-pomodoro-alert-dialog.active,
+#zen-pomodoro-confirm-dialog.active,
+.zen-pomodoro-dialog.active {
   display: flex;
 }
 
-#zen-pomodoro-config-dialog h2 {
+#zen-pomodoro-config-dialog h2,
+#zen-pomodoro-start-dialog h2,
+#zen-pomodoro-settings-dialog h2,
+#zen-pomodoro-alert-dialog h2,
+#zen-pomodoro-confirm-dialog h2,
+.zen-pomodoro-dialog h2 {
   margin: 0 0 16px 0;
   font-size: 24px;
   font-weight: 700;
 }
 
-#zen-pomodoro-config-dialog p {
+#zen-pomodoro-config-dialog p,
+#zen-pomodoro-start-dialog p,
+#zen-pomodoro-settings-dialog p,
+#zen-pomodoro-alert-dialog p,
+#zen-pomodoro-confirm-dialog p,
+.zen-pomodoro-dialog p {
   margin: 0;
   line-height: 1.5;
+}
+
+/* Dialog message text with proper spacing */
+.zen-pomodoro-dialog-message {
+  margin-bottom: 16px;
 }
 
 .zen-pomodoro-config-section {
@@ -316,6 +359,11 @@
   padding: 8px 12px;
   font-size: 14px;
   width: 120px;
+}
+
+/* Motivational message input with wider width */
+.zen-pomodoro-message-input {
+  width: 250px !important;
 }
 
 .zen-pomodoro-config-row input:focus,
@@ -359,6 +407,16 @@
    Workspace Selection UI
    MISSING FEATURE FIX: Added styles for workspace selection
    ============================================ */
+/* Workspace row with vertical layout */
+.zen-pomodoro-workspace-row {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+}
+
+.zen-pomodoro-workspace-row label {
+  margin-bottom: 8px;
+}
+
 .zen-pomodoro-workspace-list {
   display: flex;
   flex-direction: column;
@@ -495,6 +553,12 @@
   font-weight: 700;
   margin: 16px 0;
   color: #2180cd;
+}
+
+/* Lock screen subtext styling */
+.zen-pomodoro-lock-subtext {
+  font-size: 14px;
+  opacity: 0.7;
 }
 
 /* UI/UX FIX: Moved inline styles to CSS class */

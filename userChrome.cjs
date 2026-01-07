@@ -169,11 +169,14 @@
   }
 
   /**
-   * Sanitize text content to prevent XSS
+   * Sanitize text content to prevent XSS attacks
+   * Removes HTML-like characters (<, >) that could be used for injection
+   * This is a defense-in-depth measure since we use textContent instead of innerHTML
+   * @param {string} text - The text to sanitize
+   * @returns {string} Sanitized text with HTML characters removed
    */
   function sanitizeText(text) {
     if (typeof text !== 'string') return '';
-    // Basic sanitization - remove any HTML-like content
     return text.replace(/[<>]/g, '');
   }
 
@@ -265,14 +268,19 @@
 
       // Pomodoro mode phase transitions
       if (this.currentPhase === 'focus') {
-        // Focus period complete, start break
-        // Check if this is a long break cycle (not the final cycle)
-        if (this.currentCycle % this.config.longBreakInterval === 0 && this.currentCycle < this.totalCycles) {
-          // Long break condition
+        // Focus period complete, determine break type
+        // Long breaks occur after completing N focus cycles (where N = longBreakInterval)
+        // Example: if longBreakInterval=4, long breaks occur after cycles 4, 8, 12, etc.
+        // We only show long break if there are more cycles remaining after this one
+        const isLongBreakCycle = (this.currentCycle % this.config.longBreakInterval === 0);
+        const hasMoreCyclesRemaining = (this.currentCycle < this.totalCycles);
+        
+        if (isLongBreakCycle && hasMoreCyclesRemaining) {
+          // Long break after completing N cycles
           this.currentPhase = 'long-break';
           this.remainingTime = this.config.longBreakDuration * 60;
         } else {
-          // Regular break
+          // Regular short break
           this.currentPhase = 'break';
           this.remainingTime = this.config.breakDuration * 60;
         }
@@ -471,6 +479,7 @@
       }
       
       // Use MutationObserver to detect workspace changes
+      // PERFORMANCE FIX: Use attributeFilter to only observe 'active' attribute changes
       this.workspaceObserver = new MutationObserver(() => {
         const newWorkspace = this.getActiveWorkspace();
         if (newWorkspace !== this.activeWorkspace) {
@@ -529,7 +538,7 @@
       this.indicator = null;
       this.config = getConfig();
       this.isVisible = false;
-      this.resizeObserver = null; // Store observer for cleanup
+      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles sizing with 100% width/height
     }
 
     /**
@@ -609,44 +618,12 @@
       document.documentElement.appendChild(this.overlay);
       document.documentElement.appendChild(this.indicator);
 
-      // Setup responsive resizing
-      this.setupResizeObserver();
+      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles sizing automatically
+      // The overlay uses fixed positioning with width: 100% and height: 100%
       
       // Setup button handlers after elements are created
       // RACE CONDITION FIX: Set up handlers immediately after creation
       this.setupOverlayHandlers();
-    }
-
-    /**
-     * Setup ResizeObserver for responsive design
-     * MEMORY LEAK FIX: Store observer for cleanup
-     */
-    setupResizeObserver() {
-      if (!this.overlay) return;
-      
-      // Clean up existing observer
-      if (this.resizeObserver) {
-        this.resizeObserver.disconnect();
-      }
-
-      this.resizeObserver = new ResizeObserver(() => {
-        this.updateOverlayDimensions();
-      });
-
-      this.resizeObserver.observe(document.documentElement);
-    }
-
-    /**
-     * Update overlay dimensions
-     */
-    updateOverlayDimensions() {
-      if (!this.overlay) return;
-      
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      
-      this.overlay.style.width = `${width}px`;
-      this.overlay.style.height = `${height}px`;
     }
 
     /**
@@ -787,14 +764,9 @@
 
     /**
      * Remove overlay elements and cleanup
-     * MEMORY LEAK FIX: Disconnect observer
+     * MEMORY LEAK FIX: Removed ResizeObserver cleanup (no longer using it)
      */
     destroy() {
-      if (this.resizeObserver) {
-        this.resizeObserver.disconnect();
-        this.resizeObserver = null;
-      }
-      
       if (this.overlay) {
         this.overlay.remove();
         this.overlay = null;
@@ -812,15 +784,16 @@
   
   class ContextMenuHandler {
     constructor() {
-      this.globalClickListener = null; // Track listener for proper cleanup
+      this.contextMenuListener = null; // Track listener for proper cleanup
     }
 
     /**
      * Initialize context menu listeners
+     * MEMORY LEAK FIX: Store listener reference for cleanup
      */
     init() {
       // Listen for context menu on sidebar and workspace buttons
-      document.addEventListener('contextmenu', (e) => {
+      this.contextMenuListener = (e) => {
         const target = e.target;
         
         // Check if right-click is on workspace button or sidebar
@@ -830,7 +803,26 @@
         if (isWorkspaceButton || isSidebar) {
           this.addContextMenuItem(e);
         }
-      });
+      };
+      
+      document.addEventListener('contextmenu', this.contextMenuListener);
+    }
+
+    /**
+     * Destroy and cleanup all listeners
+     * MEMORY LEAK FIX: Properly remove event listeners
+     */
+    destroy() {
+      if (this.contextMenuListener) {
+        document.removeEventListener('contextmenu', this.contextMenuListener);
+        this.contextMenuListener = null;
+      }
+      
+      // Remove any existing context menu
+      const existingMenu = document.getElementById('zen-pomodoro-context-menu');
+      if (existingMenu) {
+        existingMenu.remove();
+      }
     }
 
     /**
@@ -915,8 +907,8 @@
      */
     showConfigDialog() {
       const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-config-dialog';
-      dialog.className = 'active';
+      dialog.id = 'zen-pomodoro-start-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
       
       const config = getConfig();
       
@@ -1058,8 +1050,8 @@
      */
     createSettingsDialog() {
       const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-config-dialog';
-      dialog.className = 'active';
+      dialog.id = 'zen-pomodoro-settings-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
       
       const config = getConfig();
       
@@ -1086,20 +1078,17 @@
       const messageInput = document.createElement('input');
       messageInput.type = 'text';
       messageInput.id = 'motivational-message';
+      messageInput.className = 'zen-pomodoro-message-input';
       messageInput.value = config.motivationalMessage;
-      messageInput.style.width = '250px';
       messageRow.appendChild(messageLabel);
       messageRow.appendChild(messageInput);
       
       // MISSING FEATURE: Workspace selection UI
       const workspaceRow = document.createElement('div');
-      workspaceRow.className = 'zen-pomodoro-config-row';
-      workspaceRow.style.flexDirection = 'column';
-      workspaceRow.style.alignItems = 'flex-start';
+      workspaceRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
       
       const workspaceLabel = document.createElement('label');
       workspaceLabel.textContent = 'Blocked Workspaces:';
-      workspaceLabel.style.marginBottom = '8px';
       
       const workspaceContainer = document.createElement('div');
       workspaceContainer.className = 'zen-pomodoro-workspace-list';
@@ -1227,6 +1216,7 @@
     constructor() {
       this.lockScreen = null;
       this.lockIntervalId = null; // Store interval for cleanup
+      this.lockTimerElement = null; // PERFORMANCE FIX: Cache timer element reference
       this.holdDuration = 3000;
     }
 
@@ -1281,7 +1271,7 @@
         input.placeholder = 'Enter code here';
         
         const buttonDiv = document.createElement('div');
-        buttonDiv.style.marginTop = '16px';
+        buttonDiv.className = 'zen-pomodoro-dialog-buttons';
         
         const unlockButton = document.createElement('button');
         unlockButton.className = 'zen-pomodoro-dialog-button';
@@ -1343,8 +1333,7 @@
         timerDiv.textContent = waitTime.toString();
         
         const pSub = document.createElement('p');
-        pSub.style.fontSize = '14px';
-        pSub.style.opacity = '0.7';
+        pSub.className = 'zen-pomodoro-lock-subtext';
         pSub.textContent = 'seconds remaining';
         
         lockContent.appendChild(h2);
@@ -1355,12 +1344,14 @@
         this.lockScreen.appendChild(lockContent);
         document.documentElement.appendChild(this.lockScreen);
         
+        // PERFORMANCE FIX: Cache timer element reference
+        this.lockTimerElement = timerDiv;
+        
         // MEMORY LEAK FIX: Store interval for cleanup
         this.lockIntervalId = setInterval(() => {
           waitTime--;
-          const timerEl = document.querySelector('#zen-pomodoro-lock-timer');
-          if (timerEl) {
-            timerEl.textContent = waitTime.toString();
+          if (this.lockTimerElement) {
+            this.lockTimerElement.textContent = waitTime.toString();
           }
           
           if (waitTime <= 0) {
@@ -1368,6 +1359,7 @@
               clearInterval(this.lockIntervalId);
               this.lockIntervalId = null;
             }
+            this.lockTimerElement = null;
             if (this.lockScreen) {
               this.lockScreen.remove();
               this.lockScreen = null;
@@ -1380,13 +1372,14 @@
 
     /**
      * Cleanup lock screen
-     * MEMORY LEAK FIX: Clear interval on cleanup
+     * MEMORY LEAK FIX: Clear interval and cached element reference on cleanup
      */
     cleanupLockScreen() {
       if (this.lockIntervalId) {
         clearInterval(this.lockIntervalId);
         this.lockIntervalId = null;
       }
+      this.lockTimerElement = null;
       if (this.lockScreen) {
         this.lockScreen.remove();
         this.lockScreen = null;
@@ -1396,6 +1389,7 @@
     /**
      * Implement hold-to-start button
      * MISSING FEATURE: Hold-to-start implementation
+     * MEMORY LEAK FIX: Added cleanup for interval on mouseup/mouseleave
      */
     setupHoldToStart(buttonElement, onComplete) {
       const config = getConfig();
@@ -1424,6 +1418,7 @@
           progressBar.style.width = `${percent}%`;
           
           if (progress >= duration) {
+            // MEMORY LEAK FIX: Clear interval on completion
             if (interval) {
               clearInterval(interval);
               interval = null;
@@ -1435,6 +1430,7 @@
       };
       
       const stopHold = () => {
+        // MEMORY LEAK FIX: Always clear interval when stopping
         if (interval) {
           clearInterval(interval);
           interval = null;
@@ -1461,21 +1457,29 @@
       this.contextMenu = new ContextMenuHandler();
       this.security = new SecurityManager();
       this.notificationPermissionRequested = false;
+      this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
       
       this.init();
     }
 
     /**
      * Initialize the application
+     * DUPLICATE FIX: Prevent duplicate initialization with guard
      */
     init() {
+      if (this.initialized) {
+        console.warn('Zen Pomodoro already initialized, skipping duplicate init');
+        return;
+      }
+      
       console.log('Zen Pomodoro Focus Blocker initializing...');
       
       // Wait for browser to be fully loaded
+      // DUPLICATE FIX: Use once option to prevent duplicate listeners
       if (document.readyState === 'complete') {
         this.onReady();
       } else {
-        window.addEventListener('load', () => this.onReady());
+        window.addEventListener('load', () => this.onReady(), { once: true });
       }
     }
 
@@ -1483,6 +1487,11 @@
      * Called when browser is ready
      */
     onReady() {
+      if (this.initialized) {
+        return;
+      }
+      
+      this.initialized = true;
       console.log('Zen Pomodoro Focus Blocker ready');
       
       // Initialize modules
@@ -1636,6 +1645,7 @@
 
     /**
      * Show notification
+     * SECURITY FIX: Handle invalid icon path gracefully
      */
     showNotification(phase) {
       const messages = {
@@ -1650,10 +1660,18 @@
       // Browser notification with permission check
       try {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('Zen Pomodoro Timer', {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png'
-          });
+          // SECURITY FIX: Try with icon, fallback without icon if it fails
+          try {
+            new Notification('Zen Pomodoro Timer', {
+              body: message,
+              icon: 'chrome://branding/content/about-logo.png'
+            });
+          } catch (iconError) {
+            // Fallback: create notification without icon if icon path is invalid
+            new Notification('Zen Pomodoro Timer', {
+              body: message
+            });
+          }
         } else {
           console.log('Notification:', message);
         }
@@ -1668,15 +1686,15 @@
      */
     showCustomAlert(title, message) {
       const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-config-dialog';
-      dialog.className = 'active';
+      dialog.id = 'zen-pomodoro-alert-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
       
       const h2 = document.createElement('h2');
       h2.textContent = title;
       
       const p = document.createElement('p');
       p.textContent = message;
-      p.style.marginBottom = '16px';
+      p.className = 'zen-pomodoro-dialog-message';
       
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
@@ -1704,15 +1722,15 @@
      */
     showCustomConfirm(title, message, onConfirm) {
       const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-config-dialog';
-      dialog.className = 'active';
+      dialog.id = 'zen-pomodoro-confirm-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
       
       const h2 = document.createElement('h2');
       h2.textContent = title;
       
       const p = document.createElement('p');
       p.textContent = message;
-      p.style.marginBottom = '16px';
+      p.className = 'zen-pomodoro-dialog-message';
       
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';

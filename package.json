@@ -2,7 +2,6 @@
   "name": "zen-pomodoro-blocker",
   "version": "1.0.0",
   "description": "A productivity mod implementing Pomodoro timer with workspace blocking",
-  "type": "module",
   "main": "userChrome.cjs",
   "scripts": {
     "lint": "eslint . && stylelint '**/*.css'",
