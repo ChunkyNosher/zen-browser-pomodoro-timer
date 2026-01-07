@@ -1,0 +1,43 @@
+[
+  {
+    "property": "zen-pomodoro.focusDuration",
+    "label": "Focus Duration (minutes)",
+    "type": "string",
+    "defaultValue": "25",
+    "placeholder": "25"
+  },
+  {
+    "property": "zen-pomodoro.breakDuration",
+    "label": "Break Duration (minutes)",
+    "type": "string",
+    "defaultValue": "5",
+    "placeholder": "5"
+  },
+  {
+    "property": "zen-pomodoro.longBreakDuration",
+    "label": "Long Break Duration (minutes)",
+    "type": "string",
+    "defaultValue": "15",
+    "placeholder": "15"
+  },
+  {
+    "property": "zen-pomodoro.cycles",
+    "label": "Number of Cycles",
+    "type": "string",
+    "defaultValue": "4",
+    "placeholder": "4"
+  },
+  {
+    "property": "zen-pomodoro.motivationalMessage",
+    "label": "Motivational Message",
+    "type": "string",
+    "defaultValue": "Get back to work.",
+    "placeholder": "Enter a message..."
+  },
+  {
+    "property": "zen-pomodoro.enableNotifications",
+    "label": "Enable Notifications",
+    "type": "checkbox",
+    "defaultValue": true
+  }
+]
