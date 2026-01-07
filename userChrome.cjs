@@ -1704,19 +1704,12 @@
       // Browser notification with permission check
       try {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          // Check if icon path is valid and create notification with conditional icon property
-          const iconPath = 'chrome://branding/content/about-logo.png';
-          const notificationOptions = {
-            body: message
-          };
-          
-          // Add icon property only if path exists
-          // For browser chrome:// URIs, we can include them as they're internal
-          if (iconPath) {
-            notificationOptions.icon = iconPath;
-          }
-          
-          new Notification('Zen Pomodoro Timer', notificationOptions);
+          // Use chrome:// URI for icon (internal browser resource)
+          // Falls back gracefully if path doesn't exist in some Zen Browser versions
+          new Notification('Zen Pomodoro Timer', {
+            body: message,
+            icon: 'chrome://branding/content/about-logo.png'
+          });
         } else {
           console.log('Notification:', message);
         }
