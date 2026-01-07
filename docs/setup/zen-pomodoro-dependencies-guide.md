@@ -293,7 +293,7 @@ These tools are used during development and testing but not included in the fina
 - **Purpose**: Debug browser chrome UI (not web content)
 - **Enable**: Set `devtools.chrome.enabled` to true in `about:config`
 - **Access**: Ctrl+Alt+Shift+I in Firefox
-- **Use**: Debug userChrome.cjs directly in Firefox context
+- **Use**: Debug userChrome.uc.mjs directly in Firefox context
 
 #### 10. Build Optimization
 
@@ -352,7 +352,7 @@ Recommended `package.json` organization:
   "version": "1.0.0",
   "description": "A productivity mod implementing Pomodoro timer with workspace blocking",
   "type": "module",
-  "main": "userChrome.cjs",
+  "main": "userChrome.uc.mjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -439,7 +439,7 @@ Key configurations:
 Location: Root directory
 
 Key settings:
-- Entry point: `src/userChrome.cjs`
+- Entry point: `src/userChrome.uc.mjs`
 - CSS processing with PostCSS
 - Build output directory: `dist/`
 - Minification enabled for production
@@ -515,8 +515,8 @@ Create each configuration file in the root directory with the settings specified
 ```
 zen-pomodoro-blocker/
 ├── src/
-│   ├── userChrome.cjs      (Main mod logic)
-│   ├── userChrome.css      (Mod styling)
+│   ├── userChrome.uc.mjs   (Main mod logic)
+│   ├── chrome.css          (Mod styling)
 │   └── index.ts            (TypeScript entry, if using TS)
 ├── tests/
 │   ├── timer.test.ts       (Timer logic tests)
@@ -537,7 +537,7 @@ zen-pomodoro-blocker/
 ├── tsconfig.json
 ├── vite.config.ts
 ├── vitest.config.ts
-├── manifest.json
+├── theme.json
 ├── package.json
 └── README.md
 ```
@@ -667,7 +667,7 @@ For optimal development experience:
 
 7. **Leverage Vite's HMR**: Changes reflect instantly; test in Firefox dev edition side-by-side
 
-8. **Monitor bundle size**: Keep final mod size small; compress userChrome.cjs and userChrome.css
+8. **Monitor bundle size**: Keep final mod size small; compress userChrome.uc.mjs and chrome.css
 
 9. **Document as you go**: Use JSDoc comments for public APIs; easier to maintain later
 

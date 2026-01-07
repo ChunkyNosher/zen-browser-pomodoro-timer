@@ -21,12 +21,12 @@
   /* Overlay colors */
   --zen-pomodoro-overlay-bg: #808080;
   --zen-pomodoro-overlay-opacity: 1;
-  --zen-pomodoro-text-color: #ffffff;
-  --zen-pomodoro-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --zen-pomodoro-text-color: #fff;
+  --zen-pomodoro-text-shadow: 0 2px 4px rgb(0 0 0 / 30%);
   
   /* Timer display */
   --zen-pomodoro-timer-font-size: 96px;
-  --zen-pomodoro-timer-font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --zen-pomodoro-timer-font-family: 'Segoe UI', -apple-system, blinkmacsystemfont, sans-serif;
   
   /* Phase colors */
   --zen-pomodoro-focus-color: #2180cd;
@@ -41,9 +41,9 @@
   --zen-pomodoro-z-index: 9999;
   
   /* Button colors */
-  --zen-pomodoro-button-bg: rgba(255, 255, 255, 0.1);
-  --zen-pomodoro-button-hover-bg: rgba(255, 255, 255, 0.2);
-  --zen-pomodoro-button-text: #ffffff;
+  --zen-pomodoro-button-bg: rgb(255 255 255 / 10%);
+  --zen-pomodoro-button-hover-bg: rgb(255 255 255 / 20%);
+  --zen-pomodoro-button-text: #fff;
 }
 
 /* ============================================
@@ -163,7 +163,7 @@
 .zen-pomodoro-button {
   background-color: var(--zen-pomodoro-button-bg);
   color: var(--zen-pomodoro-button-text);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgb(255 255 255 / 30%);
   border-radius: 8px;
   padding: 12px 24px;
   font-size: 16px;
@@ -178,7 +178,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .zen-pomodoro-button:hover {
     background-color: var(--zen-pomodoro-button-hover-bg);
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: rgb(255 255 255 / 50%);
     transform: translateY(-2px);
   }
 
@@ -191,7 +191,7 @@
 @media (prefers-reduced-motion: reduce) {
   .zen-pomodoro-button:hover {
     background-color: var(--zen-pomodoro-button-hover-bg);
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: rgb(255 255 255 / 50%);
   }
 }
 
@@ -202,9 +202,9 @@
   position: fixed;
   top: 12px;
   right: 12px;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgb(0 0 0 / 70%);
   backdrop-filter: blur(10px);
-  color: #ffffff;
+  color: #fff;
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 14px;
@@ -213,9 +213,10 @@
   display: none;
   align-items: center;
   gap: 8px;
+
   /* ACCESSIBILITY FIX: Removed cursor:pointer as there's no click handler */
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 }
 
 #zen-pomodoro-indicator.active {
@@ -248,6 +249,7 @@
   0%, 100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.4;
   }
@@ -262,7 +264,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background-color: #2b2a33;
-  color: #ffffff;
+  color: #fff;
   border-radius: 12px;
   padding: 24px;
   z-index: calc(var(--zen-pomodoro-z-index) + 1);
@@ -271,7 +273,7 @@
   gap: 16px;
   min-width: 400px;
   max-width: 500px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
 }
 
 .zen-pomodoro-dialog.active {
@@ -279,7 +281,7 @@
 }
 
 .zen-pomodoro-dialog h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   font-size: 24px;
   font-weight: 700;
 }
@@ -315,7 +317,7 @@
 .zen-pomodoro-config-row input,
 .zen-pomodoro-config-row select {
   background-color: #1e1d26;
-  color: #ffffff;
+  color: #fff;
   border: 1px solid #3a3944;
   border-radius: 6px;
   padding: 8px 12px;
@@ -343,7 +345,7 @@
 
 .zen-pomodoro-dialog-button {
   background-color: #2180cd;
-  color: #ffffff;
+  color: #fff;
   border: none;
   border-radius: 6px;
   padding: 10px 20px;
@@ -369,6 +371,7 @@
    Workspace Selection UI
    MISSING FEATURE FIX: Added styles for workspace selection
    ============================================ */
+
 /* Workspace row with vertical layout - override .zen-pomodoro-config-row default flex-direction */
 .zen-pomodoro-config-row.zen-pomodoro-workspace-row {
   flex-direction: column;
@@ -446,7 +449,7 @@
   border-radius: 6px;
   padding: 4px 0;
   z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
   min-width: 200px;
 }
 
@@ -457,16 +460,16 @@
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  color: #ffffff;
+  color: #fff;
 }
 
 .zen-pomodoro-context-menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgb(255 255 255 / 10%);
 }
 
 .zen-pomodoro-context-menu-separator {
   height: 1px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgb(255 255 255 / 10%);
   margin: 4px 0;
 }
 
@@ -479,7 +482,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: rgb(0 0 0 / 90%);
   z-index: calc(var(--zen-pomodoro-z-index) + 2);
   display: none;
   align-items: center;
@@ -492,7 +495,7 @@
 
 #zen-pomodoro-lock-content {
   background-color: #2b2a33;
-  color: #ffffff;
+  color: #fff;
   border-radius: 12px;
   padding: 32px;
   text-align: center;
@@ -500,13 +503,13 @@
 }
 
 #zen-pomodoro-lock-content h2 {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   font-size: 24px;
   font-weight: 700;
 }
 
 #zen-pomodoro-lock-content p {
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
   line-height: 1.5;
 }
 
@@ -537,7 +540,7 @@
 
 #zen-pomodoro-lock-code {
   background-color: #1e1d26;
-  color: #ffffff;
+  color: #fff;
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
@@ -555,7 +558,7 @@
 /* ============================================
    Responsive Design
    ============================================ */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   #zen-pomodoro-timer-display {
     font-size: 64px;
   }
@@ -578,7 +581,7 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   #zen-pomodoro-timer-display {
     font-size: 48px;
   }
@@ -597,10 +600,11 @@
    Animations
    ACCESSIBILITY FIX: Wrap animations in prefers-reduced-motion
    ============================================ */
-@keyframes fadeIn {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -609,23 +613,25 @@
 /* ACCESSIBILITY FIX: Only animate if user has no motion preference */
 @media (prefers-reduced-motion: no-preference) {
   #zen-pomodoro-overlay.active {
-    animation: fadeIn 0.3s ease;
+    animation: fade-in 0.3s ease;
   }
 
   /* Phase transition animation */
   #zen-pomodoro-overlay[data-transitioning="true"] {
-    animation: phaseTransition 0.5s ease;
+    animation: phase-transition 0.5s ease;
   }
 }
 
-@keyframes phaseTransition {
+@keyframes phase-transition {
   0% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.02);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
