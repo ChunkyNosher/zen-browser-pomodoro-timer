@@ -111,6 +111,22 @@
   };
 
   /**
+   * Delay (in ms) before revoking the URL after export download starts.
+   * Should be long enough to ensure download initiates but short enough to avoid memory leaks.
+   * @constant {number}
+   */
+  const URL_REVOKE_DELAY_MS = 200;
+
+  /**
+   * Keys to filter out from logged data for security.
+   * Only filters top-level object keys; nested sensitive data may still be logged.
+   * If stricter filtering is needed, consider deep-scanning string values for patterns
+   * or implementing a whitelist approach instead.
+   * @constant {string[]}
+   */
+  const SENSITIVE_KEYS = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
+
+  /**
    * LogManager class for comprehensive logging with export functionality.
    * Stores log entries in memory with timestamps and provides export capabilities.
    */
@@ -176,13 +192,12 @@
         return data.map(item => this._sanitizeData(item));
       }
 
-      // Handle objects - filter out sensitive keys
-      const sensitiveKeys = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
+      // Handle objects - filter out sensitive keys using module-level constant
       const sanitized = {};
 
       for (const [key, value] of Object.entries(data)) {
         const lowerKey = key.toLowerCase();
-        const isSensitive = sensitiveKeys.some(sensitive => lowerKey.includes(sensitive));
+        const isSensitive = SENSITIVE_KEYS.some(sensitive => lowerKey.includes(sensitive));
         
         if (isSensitive) {
           sanitized[key] = '[REDACTED]';
@@ -235,7 +250,7 @@
       a.click();
       
       // Revoke URL after a brief delay to ensure download has started
-      setTimeout(() => URL.revokeObjectURL(url), 200);
+      setTimeout(() => URL.revokeObjectURL(url), URL_REVOKE_DELAY_MS);
     }
   }
 
