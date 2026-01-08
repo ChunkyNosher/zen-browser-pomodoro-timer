@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.0
+ * Version: 1.0.4
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -58,7 +58,8 @@
     holdToStartDuration: 3000,
     enableNotifications: true,
     enableAudioAlerts: false,
-    phase: 'focus'
+    phase: 'focus',
+    keyboardShortcut: 'Alt+Shift+P'
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -202,6 +203,12 @@
     const holdToStartDuration = parseIntPref('holdToStartDuration', 0, 30000);
     if (holdToStartDuration !== null) {
       config.holdToStartDuration = holdToStartDuration;
+    }
+    
+    // Keyboard shortcut
+    const keyboardShortcut = getPref('keyboardShortcut', null);
+    if (keyboardShortcut !== null && keyboardShortcut !== '') {
+      config.keyboardShortcut = keyboardShortcut;
     }
     
     return config;
@@ -649,36 +656,136 @@
     /**
      * Get all available workspaces
      * Uses multiple methods to retrieve workspace names:
-     * 1. Try to get from gZenWorkspaces API if available
+     * 1. Try to get from ZenWorkspaces API (multiple possible APIs)
      * 2. Fall back to DOM attributes (label, tooltiptext, aria-label)
+     * 3. Try to extract from workspace panel if available
      */
     getAllWorkspaces() {
       try {
-        // Method 1: Try to use gZenWorkspaces API if available (most reliable)
+        // Method 1: Try to use ZenWorkspaces API if available (most reliable)
+        // Try different possible API variants used by Zen Browser
         // eslint-disable-next-line no-undef
-        if (typeof gZenWorkspaces !== 'undefined' && gZenWorkspaces.getWorkspaces) {
+        if (typeof ZenWorkspaces !== 'undefined') {
+          let workspaces = null;
+          
+          // Try different method names that Zen Browser might use
           // eslint-disable-next-line no-undef
-          const workspaces = gZenWorkspaces.getWorkspaces();
-          if (workspaces && workspaces.length > 0) {
+          if (typeof ZenWorkspaces.getWorkspaces === 'function') {
+            // eslint-disable-next-line no-undef
+            workspaces = ZenWorkspaces.getWorkspaces();
+          // eslint-disable-next-line no-undef
+          } else if (typeof ZenWorkspaces._workspaces !== 'undefined') {
+            // eslint-disable-next-line no-undef
+            workspaces = ZenWorkspaces._workspaces;
+          // eslint-disable-next-line no-undef
+          } else if (typeof ZenWorkspaces.workspaces !== 'undefined') {
+            // eslint-disable-next-line no-undef
+            workspaces = ZenWorkspaces.workspaces;
+          }
+          
+          if (workspaces && Array.isArray(workspaces) && workspaces.length > 0) {
+            console.log('Zen Pomodoro: Got workspaces from ZenWorkspaces API');
             return workspaces.map(ws => ({
-              id: ws.uuid,
-              name: ws.name || 'Unnamed Workspace'
+              id: ws.uuid || ws.id,
+              name: ws.name || ws.title || 'Unnamed Workspace'
             }));
           }
         }
         
-        // Method 2: Fall back to querying DOM buttons with multiple attribute checks
+        // Method 1b: Try legacy gZenWorkspaces API
+        // eslint-disable-next-line no-undef
+        if (typeof gZenWorkspaces !== 'undefined') {
+          let workspaces = null;
+          
+          // eslint-disable-next-line no-undef
+          if (typeof gZenWorkspaces.getWorkspaces === 'function') {
+            // eslint-disable-next-line no-undef
+            workspaces = gZenWorkspaces.getWorkspaces();
+          // eslint-disable-next-line no-undef
+          } else if (gZenWorkspaces._workspaces) {
+            // eslint-disable-next-line no-undef
+            workspaces = gZenWorkspaces._workspaces;
+          }
+          
+          if (workspaces && Array.isArray(workspaces) && workspaces.length > 0) {
+            console.log('Zen Pomodoro: Got workspaces from gZenWorkspaces API');
+            return workspaces.map(ws => ({
+              id: ws.uuid || ws.id,
+              name: ws.name || ws.title || 'Unnamed Workspace'
+            }));
+          }
+        }
+        
+        // Method 2: Query DOM buttons with comprehensive attribute checks
         const workspaceButtons = document.querySelectorAll('toolbarbutton[zen-workspace-id]');
-        return Array.from(workspaceButtons).map(btn => {
-          const id = btn.getAttribute('zen-workspace-id');
-          // Try multiple attributes to find the workspace name
-          const name = btn.getAttribute('label') || 
-                       btn.getAttribute('tooltiptext') || 
-                       btn.getAttribute('aria-label') ||
-                       btn.textContent?.trim() ||
-                       'Unnamed Workspace';
-          return { id, name };
-        });
+        if (workspaceButtons.length > 0) {
+          console.log(`Zen Pomodoro: Got ${workspaceButtons.length} workspaces from DOM`);
+          return Array.from(workspaceButtons).map(btn => {
+            const id = btn.getAttribute('zen-workspace-id');
+            
+            // Try multiple attributes to find the workspace name
+            // Priority order based on what's most likely to have the actual name
+            let name = null;
+            
+            // Check for data attributes first (often most reliable)
+            name = btn.getAttribute('data-workspace-name') ||
+                   btn.getAttribute('data-name');
+            
+            // Then check standard XUL/HTML attributes
+            if (!name || name === 'undefined') {
+              name = btn.getAttribute('label');
+            }
+            if (!name || name === 'undefined') {
+              name = btn.getAttribute('tooltiptext');
+            }
+            if (!name || name === 'undefined') {
+              name = btn.getAttribute('aria-label');
+            }
+            if (!name || name === 'undefined') {
+              name = btn.getAttribute('title');
+            }
+            
+            // Try to get text content from child elements
+            if (!name || name === 'undefined') {
+              const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
+              if (labelEl) {
+                name = labelEl.textContent?.trim();
+              }
+            }
+            
+            // Final fallback to direct text content
+            if (!name || name === 'undefined') {
+              name = btn.textContent?.trim();
+            }
+            
+            // Clean up the name
+            if (!name || name === 'undefined' || name === '') {
+              name = `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+            }
+            
+            return { id, name };
+          });
+        }
+        
+        // Method 3: Try to find workspace panel/container elements
+        const workspaceContainer = document.querySelector('#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]');
+        if (workspaceContainer) {
+          const items = workspaceContainer.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
+          if (items.length > 0) {
+            console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
+            return Array.from(items).map(item => {
+              const id = item.getAttribute('zen-workspace-id') || item.getAttribute('data-workspace-id');
+              const name = item.getAttribute('label') || 
+                          item.getAttribute('data-name') || 
+                          item.textContent?.trim() || 
+                          `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+              return { id, name };
+            });
+          }
+        }
+        
+        console.log('Zen Pomodoro: No workspaces found');
+        return [];
       } catch (e) {
         console.error('Failed to get workspaces:', e);
         return [];
@@ -938,78 +1045,144 @@
   }
 
   // ============================================
-  // Context Menu Module - Native Integration
+  // Keyboard Shortcut Module
   // ============================================
   
-  class ContextMenuHandler {
+  class KeyboardShortcutHandler {
     constructor() {
-      this.menuItemsAdded = false;
-      this.popupShowingListener = null;
-      this.initRetryCount = 0;
-      this.maxRetries = 20; // Maximum retries (20 * 500ms = 10 seconds)
-      this.initTimeoutId = null; // Store timeout ID for cleanup
+      this.keydownHandler = null;
+      this.menuDialog = null;
     }
 
     /**
-     * Initialize native context menu integration
-     * Uses XUL elements to add items to Zen Browser's native context menu
+     * Initialize keyboard shortcut handler
      */
     init() {
-      // Wait for context menu to exist
-      const contextMenu = document.getElementById('contentAreaContextMenu');
-      if (!contextMenu) {
-        // Retry after a short delay if context menu not yet available
-        this.initRetryCount++;
-        if (this.initRetryCount < this.maxRetries) {
-          this.initTimeoutId = setTimeout(() => this.init(), 500);
-        } else {
-          console.warn('Zen Pomodoro: Could not find contentAreaContextMenu after max retries');
-        }
-        return;
-      }
-      
-      // Log success after retries for debugging
-      if (this.initRetryCount > 0) {
-        console.log(`Zen Pomodoro: contentAreaContextMenu initialized after ${this.initRetryCount} retries`);
-      }
-      
-      this.addNativeContextMenuItems(contextMenu);
+      const config = getConfig();
+      this.setupKeyboardShortcut(config.keyboardShortcut);
+      console.log(`Zen Pomodoro: Keyboard shortcut registered: ${config.keyboardShortcut}`);
     }
 
     /**
-     * Add items to native context menu using XUL elements
+     * Parse keyboard shortcut string into components
+     * @param {string} shortcut - e.g., "Alt+Shift+P" or "Ctrl+P"
+     * @returns {object} - { ctrlKey, altKey, shiftKey, metaKey, key }
      */
-    addNativeContextMenuItems(contextMenu) {
-      if (this.menuItemsAdded) return;
+    parseShortcut(shortcut) {
+      const parts = shortcut.split('+').map(p => p.trim().toLowerCase());
+      const result = {
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+        metaKey: false,
+        key: ''
+      };
       
-      // Create separator
-      const separator = document.createXULElement('menuseparator');
-      separator.id = 'zen-pomodoro-menu-separator';
-      separator.setAttribute('hidden', 'true');
+      for (const part of parts) {
+        if (part === 'ctrl' || part === 'control') {
+          result.ctrlKey = true;
+        } else if (part === 'alt') {
+          result.altKey = true;
+        } else if (part === 'shift') {
+          result.shiftKey = true;
+        } else if (part === 'meta' || part === 'cmd' || part === 'command') {
+          result.metaKey = true;
+        } else {
+          result.key = part.toUpperCase();
+        }
+      }
       
-      // Create main menu with submenu
-      const menu = document.createXULElement('menu');
-      menu.id = 'zen-pomodoro-menu';
-      menu.setAttribute('label', '⏱️ Pomodoro Timer');
-      menu.setAttribute('hidden', 'true');
+      return result;
+    }
+
+    /**
+     * Setup keyboard shortcut listener
+     * @param {string} shortcut - Keyboard shortcut string
+     */
+    setupKeyboardShortcut(shortcut) {
+      // Clean up existing handler
+      if (this.keydownHandler) {
+        document.removeEventListener('keydown', this.keydownHandler);
+      }
       
-      // Create submenu popup
-      const popup = document.createXULElement('menupopup');
-      popup.id = 'zen-pomodoro-submenu-popup';
+      const parsed = this.parseShortcut(shortcut);
       
-      // Create menu items
-      const startTimerItem = document.createXULElement('menuitem');
-      startTimerItem.id = 'zen-pomodoro-start-timer';
-      startTimerItem.setAttribute('label', 'Start Pomodoro Timer');
-      startTimerItem.addEventListener('command', () => {
-        this.showConfigDialog();
-      });
+      this.keydownHandler = (event) => {
+        // Check if all modifier keys match
+        if (event.ctrlKey === parsed.ctrlKey &&
+            event.altKey === parsed.altKey &&
+            event.shiftKey === parsed.shiftKey &&
+            event.metaKey === parsed.metaKey &&
+            event.key.toUpperCase() === parsed.key) {
+          
+          event.preventDefault();
+          event.stopPropagation();
+          this.showPomodoroMenu();
+        }
+      };
       
-      const stopTimerItem = document.createXULElement('menuitem');
-      stopTimerItem.id = 'zen-pomodoro-stop-timer';
-      stopTimerItem.setAttribute('label', 'Stop Timer');
-      stopTimerItem.addEventListener('command', () => {
-        if (window.zenPomodoroApp) {
+      document.addEventListener('keydown', this.keydownHandler, true);
+    }
+
+    /**
+     * Show the main Pomodoro menu dialog
+     */
+    showPomodoroMenu() {
+      // Remove existing menu if present
+      if (this.menuDialog) {
+        this.menuDialog.remove();
+        this.menuDialog = null;
+      }
+      
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-menu-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
+      this.menuDialog = dialog;
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = '⏱️ Pomodoro Timer';
+      
+      const menuSection = document.createElement('div');
+      menuSection.className = 'zen-pomodoro-config-section';
+      
+      const timerActive = window.zenPomodoroApp && window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+      
+      if (timerActive) {
+        // Timer is running - show timer controls
+        const status = window.zenPomodoroApp.timer.getStatus();
+        const timeStr = formatTime(status.remainingTime);
+        const phaseStr = status.currentPhase === 'focus' ? 'Focus' : 
+                        status.currentPhase === 'break' ? 'Break' : 'Long Break';
+        
+        const statusRow = document.createElement('div');
+        statusRow.className = 'zen-pomodoro-config-row';
+        statusRow.style.justifyContent = 'center';
+        statusRow.style.marginBottom = '16px';
+        const statusText = document.createElement('div');
+        statusText.style.fontSize = '18px';
+        statusText.style.fontWeight = '600';
+        statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+        statusRow.appendChild(statusText);
+        
+        const pauseResumeBtn = document.createElement('button');
+        pauseResumeBtn.className = 'zen-pomodoro-dialog-button';
+        pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
+        pauseResumeBtn.addEventListener('click', () => {
+          if (window.zenPomodoroApp.timer.isPaused) {
+            window.zenPomodoroApp.timer.resume();
+          } else {
+            window.zenPomodoroApp.timer.pause();
+          }
+          dialog.remove();
+          this.menuDialog = null;
+        });
+        
+        const stopBtn = document.createElement('button');
+        stopBtn.className = 'zen-pomodoro-dialog-button secondary';
+        stopBtn.textContent = 'Stop Timer';
+        stopBtn.addEventListener('click', () => {
+          dialog.remove();
+          this.menuDialog = null;
           window.zenPomodoroApp.showCustomConfirm(
             'Stop Timer',
             'Are you sure you want to stop the timer?',
@@ -1017,127 +1190,95 @@
               window.zenPomodoroApp.stopTimer();
             }
           );
+        });
+        
+        const settingsBtn = document.createElement('button');
+        settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
+        settingsBtn.textContent = 'Timer Settings';
+        settingsBtn.addEventListener('click', () => {
+          dialog.remove();
+          this.menuDialog = null;
+          this.showSettingsDialog();
+        });
+        
+        menuSection.appendChild(statusRow);
+        menuSection.appendChild(pauseResumeBtn);
+        menuSection.appendChild(stopBtn);
+        menuSection.appendChild(settingsBtn);
+      } else {
+        // Timer not running - show start options
+        const startBtn = document.createElement('button');
+        startBtn.className = 'zen-pomodoro-dialog-button';
+        startBtn.textContent = 'Start Pomodoro Timer';
+        startBtn.addEventListener('click', () => {
+          dialog.remove();
+          this.menuDialog = null;
+          this.showConfigDialog();
+        });
+        
+        const settingsBtn = document.createElement('button');
+        settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
+        settingsBtn.textContent = 'Timer Settings';
+        settingsBtn.addEventListener('click', () => {
+          dialog.remove();
+          this.menuDialog = null;
+          this.showSettingsDialog();
+        });
+        
+        menuSection.appendChild(startBtn);
+        menuSection.appendChild(settingsBtn);
+      }
+      
+      // Buttons section
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+      
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Close';
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+        this.menuDialog = null;
+      });
+      
+      buttonDiv.appendChild(cancelButton);
+      
+      dialog.appendChild(h2);
+      dialog.appendChild(menuSection);
+      dialog.appendChild(buttonDiv);
+      
+      document.documentElement.appendChild(dialog);
+      
+      // Focus the dialog
+      dialog.focus();
+      
+      // Close on Escape key
+      const escHandler = (e) => {
+        if (e.key === 'Escape') {
+          dialog.remove();
+          this.menuDialog = null;
+          document.removeEventListener('keydown', escHandler);
         }
-      });
-      
-      const pauseResumeItem = document.createXULElement('menuitem');
-      pauseResumeItem.id = 'zen-pomodoro-pause-resume';
-      pauseResumeItem.setAttribute('label', 'Pause Timer');
-      pauseResumeItem.addEventListener('command', () => {
-        if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
-          if (window.zenPomodoroApp.timer.isPaused) {
-            window.zenPomodoroApp.timer.resume();
-          } else {
-            window.zenPomodoroApp.timer.pause();
-          }
-        }
-      });
-      
-      const subSeparator = document.createXULElement('menuseparator');
-      
-      const settingsItem = document.createXULElement('menuitem');
-      settingsItem.id = 'zen-pomodoro-open-settings';
-      settingsItem.setAttribute('label', 'Timer Settings');
-      settingsItem.addEventListener('command', () => {
-        this.showSettingsDialog();
-      });
-      
-      // Assemble submenu
-      popup.appendChild(startTimerItem);
-      popup.appendChild(stopTimerItem);
-      popup.appendChild(pauseResumeItem);
-      popup.appendChild(subSeparator);
-      popup.appendChild(settingsItem);
-      menu.appendChild(popup);
-      
-      // Add to context menu
-      contextMenu.appendChild(separator);
-      contextMenu.appendChild(menu);
-      
-      this.menuItemsAdded = true;
-      
-      // Listen for context menu showing to update visibility
-      this.popupShowingListener = () => {
-        this.updateMenuVisibility();
       };
-      contextMenu.addEventListener('popupshowing', this.popupShowingListener);
-    }
-
-    /**
-     * Update menu item visibility based on timer state
-     */
-    updateMenuVisibility() {
-      const separator = document.getElementById('zen-pomodoro-menu-separator');
-      const menu = document.getElementById('zen-pomodoro-menu');
-      const startItem = document.getElementById('zen-pomodoro-start-timer');
-      const stopItem = document.getElementById('zen-pomodoro-stop-timer');
-      const pauseResumeItem = document.getElementById('zen-pomodoro-pause-resume');
-      
-      if (!menu || !separator) return;
-      
-      // Always show the menu
-      separator.removeAttribute('hidden');
-      menu.removeAttribute('hidden');
-      
-      // Update item visibility based on timer state
-      const timerActive = window.zenPomodoroApp && window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
-      
-      if (startItem) {
-        if (timerActive) {
-          startItem.setAttribute('hidden', 'true');
-        } else {
-          startItem.removeAttribute('hidden');
-        }
-      }
-      
-      if (stopItem) {
-        if (timerActive) {
-          stopItem.removeAttribute('hidden');
-        } else {
-          stopItem.setAttribute('hidden', 'true');
-        }
-      }
-      
-      if (pauseResumeItem) {
-        if (timerActive) {
-          pauseResumeItem.removeAttribute('hidden');
-          const isPaused = window.zenPomodoroApp.timer.isPaused;
-          pauseResumeItem.setAttribute('label', isPaused ? 'Resume Timer' : 'Pause Timer');
-        } else {
-          pauseResumeItem.setAttribute('hidden', 'true');
-        }
-      }
+      document.addEventListener('keydown', escHandler);
     }
 
     /**
      * Destroy and cleanup
      */
     destroy() {
-      // Clear any pending initialization timeout
-      if (this.initTimeoutId) {
-        clearTimeout(this.initTimeoutId);
-        this.initTimeoutId = null;
+      if (this.keydownHandler) {
+        document.removeEventListener('keydown', this.keydownHandler, true);
+        this.keydownHandler = null;
       }
-      
-      const contextMenu = document.getElementById('contentAreaContextMenu');
-      if (contextMenu && this.popupShowingListener) {
-        contextMenu.removeEventListener('popupshowing', this.popupShowingListener);
-        this.popupShowingListener = null;
+      if (this.menuDialog) {
+        this.menuDialog.remove();
+        this.menuDialog = null;
       }
-      
-      // Remove our menu items
-      const separator = document.getElementById('zen-pomodoro-menu-separator');
-      const menu = document.getElementById('zen-pomodoro-menu');
-      
-      if (separator) separator.remove();
-      if (menu) menu.remove();
-      
-      this.menuItemsAdded = false;
     }
 
     /**
      * Show timer configuration dialog
-     * MISSING FEATURE: Integrate hold-to-start feature
      */
     showConfigDialog() {
       const dialog = document.createElement('div');
@@ -1201,7 +1342,7 @@
       cancelButton.id = 'zen-pomodoro-cancel-button';
       cancelButton.textContent = 'Cancel';
       
-      // MISSING FEATURE: Hold-to-start button integration
+      // Hold-to-start button integration
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
       startButton.id = 'zen-pomodoro-start-button';
@@ -1231,7 +1372,7 @@
         dialog.remove();
       });
       
-      // MISSING FEATURE: Setup hold-to-start if enabled
+      // Setup hold-to-start if enabled
       if (config.holdToStartDuration > 0 && window.zenPomodoroApp && window.zenPomodoroApp.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, () => {
           const mode = modeSelect.value;
@@ -1259,12 +1400,10 @@
 
     /**
      * Show settings dialog
-     * MISSING FEATURE: Add workspace selection UI
-     * MISSING FEATURE: Integrate security lock screen
-     * LOGIC FIX: Add input validation
+     * Checks security lock before showing
      */
     showSettingsDialog() {
-      // MISSING FEATURE: Check if security lock should be shown
+      // Check if security lock should be shown
       if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
         const timerActive = window.zenPomodoroApp.timer.isActive;
         if (window.zenPomodoroApp.security.shouldLockSettings(timerActive)) {
@@ -1280,8 +1419,6 @@
 
     /**
      * Create the actual settings dialog
-     * MISSING FEATURE: Workspace selection UI added
-     * NEW: Dev mode password entry added
      */
     createSettingsDialog() {
       const dialog = document.createElement('div');
@@ -1318,7 +1455,7 @@
       messageRow.appendChild(messageLabel);
       messageRow.appendChild(messageInput);
       
-      // MISSING FEATURE: Workspace selection UI
+      // Workspace selection UI
       const workspaceRow = document.createElement('div');
       workspaceRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
       
@@ -1331,24 +1468,32 @@
       // Get all workspaces
       const workspaces = window.zenPomodoroApp ? window.zenPomodoroApp.workspace.getAllWorkspaces() : [];
       
-      workspaces.forEach(workspace => {
-        const checkboxWrapper = document.createElement('div');
-        checkboxWrapper.className = 'zen-pomodoro-checkbox-row';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `workspace-${workspace.id}`;
-        checkbox.value = workspace.id;
-        checkbox.checked = config.blockedWorkspaces.includes(workspace.id);
-        
-        const label = document.createElement('label');
-        label.setAttribute('for', `workspace-${workspace.id}`);
-        label.textContent = workspace.name;
-        
-        checkboxWrapper.appendChild(checkbox);
-        checkboxWrapper.appendChild(label);
-        workspaceContainer.appendChild(checkboxWrapper);
-      });
+      if (workspaces.length === 0) {
+        const noWorkspacesMsg = document.createElement('div');
+        noWorkspacesMsg.textContent = 'No workspaces found';
+        noWorkspacesMsg.style.fontStyle = 'italic';
+        noWorkspacesMsg.style.opacity = '0.7';
+        workspaceContainer.appendChild(noWorkspacesMsg);
+      } else {
+        workspaces.forEach(workspace => {
+          const checkboxWrapper = document.createElement('div');
+          checkboxWrapper.className = 'zen-pomodoro-checkbox-row';
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `workspace-${workspace.id}`;
+          checkbox.value = workspace.id;
+          checkbox.checked = config.blockedWorkspaces.includes(workspace.id);
+          
+          const label = document.createElement('label');
+          label.setAttribute('for', `workspace-${workspace.id}`);
+          label.textContent = workspace.name;
+          
+          checkboxWrapper.appendChild(checkbox);
+          checkboxWrapper.appendChild(label);
+          workspaceContainer.appendChild(checkboxWrapper);
+        });
+      }
       
       workspaceRow.appendChild(workspaceLabel);
       workspaceRow.appendChild(workspaceContainer);
@@ -1387,7 +1532,7 @@
       });
       
       saveButton.addEventListener('click', () => {
-        // LOGIC FIX: Validate all inputs
+        // Validate all inputs
         config.focusDuration = validateIntegerInput(
           dialog.querySelector('#focus-duration').value, 1, 120, config.focusDuration
         );
@@ -1399,7 +1544,7 @@
         );
         config.motivationalMessage = sanitizeText(dialog.querySelector('#motivational-message').value);
         
-        // MISSING FEATURE: Save blocked workspaces
+        // Save blocked workspaces
         const checkedWorkspaces = [];
         workspaceContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
           checkedWorkspaces.push(checkbox.value);
@@ -1893,7 +2038,7 @@
       this.timer = new PomodoroTimer();
       this.workspace = new WorkspaceDetector();
       this.overlay = new OverlayManager();
-      this.contextMenu = new ContextMenuHandler();
+      this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -1935,7 +2080,7 @@
       console.log('Zen Pomodoro Focus Blocker ready');
       
       // Initialize modules
-      this.contextMenu.init();
+      this.keyboardShortcut.init();
       this.workspace.startMonitoring();
       
       // Setup timer callbacks
@@ -1966,7 +2111,7 @@
       // MISSING FEATURE: Request notification permission
       this.requestNotificationPermission();
       
-      // Expose app globally for debugging and context menu
+      // Expose app globally for debugging and keyboard shortcut
       window.zenPomodoroApp = this;
     }
 
