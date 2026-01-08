@@ -166,6 +166,8 @@
     
     const enableNotifications = getPref('enableNotifications', null);
     if (enableNotifications !== null) {
+      // Sine checkbox preferences normally return a boolean. The string check ('true')
+      // is kept for robustness/legacy cases where values may have been stored as strings.
       config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
     }
     
