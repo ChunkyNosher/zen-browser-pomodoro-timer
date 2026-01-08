@@ -719,3 +719,85 @@
   padding: 6px 12px;
   font-size: 12px;
 }
+
+/* Dev button variant for timer overlay */
+.zen-pomodoro-button.dev {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-style: dashed;
+}
+
+/* ============================================
+   Dev Bypass Dialog - Higher z-index than lock screen
+   ============================================ */
+#zen-pomodoro-dev-bypass-dialog {
+  z-index: calc(var(--zen-pomodoro-z-index) + 10);
+}
+
+/* ============================================
+   Keyboard Shortcut Recorder Styles
+   ============================================ */
+.zen-pomodoro-shortcut-recorder {
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 180px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.zen-pomodoro-shortcut-recorder:hover {
+  border-color: #4a4954;
+}
+
+.zen-pomodoro-shortcut-recorder.recording {
+  border-color: #2180cd;
+  background-color: #1a2a3a;
+  color: #2180cd;
+}
+
+.zen-pomodoro-shortcut-recorder:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+/* ============================================
+   Timer Mode Selection Styles
+   ============================================ */
+.zen-pomodoro-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 12px;
+  background-color: #1e1d26;
+  border-radius: 6px;
+  border: 1px solid #3a3944;
+}
+
+.zen-pomodoro-mode-options .zen-pomodoro-config-row {
+  margin: 0;
+}
+
+/* Hidden rows for conditional display */
+.zen-pomodoro-config-row.hidden {
+  display: none !important;
+}
+
+/* Lockout method selection styles */
+.zen-pomodoro-lockout-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #3a3944;
+}
+
+.zen-pomodoro-lockout-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #999;
+}
