@@ -44,10 +44,13 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 
 1. Install [Sine Mod Manager](https://github.com/CosmoCreeper/Sine) if you haven't already
 2. Open Zen Browser Settings → Sine Mods
-3. Click "Install from Repository"
-4. Paste this URL: `https://github.com/ChunkyNosher/zen-browser-pomodoro-timer`
-5. Click "Install"
-6. Restart Zen Browser when prompted
+3. **Enable JavaScript Mods**: In Sine settings, enable "Allow Unsafe JS" to allow JavaScript mods from custom repositories
+4. Click "Install from Repository"
+5. Paste: `ChunkyNosher/zen-browser-pomodoro-timer`
+6. Click "Install"
+7. Restart Zen Browser when prompted
+
+> **Note**: Since this mod includes JavaScript functionality (not just CSS), you must enable the "Allow Unsafe JS" option in Sine's settings for the mod to work properly. This is required for all JavaScript mods installed from custom repositories (not the official Sine store).
 
 ### Manual Installation
 
@@ -62,7 +65,7 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 6. Copy `zen-pomodoro-focus-blocker.uc.js` to the `chrome/JS` folder
 7. Restart Zen Browser
 
-**Note**: When using Sine mod manager, the mod is automatically installed in the `chrome/sine-mods/` folder.
+**Note**: When using Sine mod manager, the mod is automatically installed in the `chrome/sine-mods/` folder, and the JavaScript file is loaded according to the `scripts` configuration in `theme.json`.
 
 > **Important**: This mod uses the **userChrome.js loader approach** (requires Firefox's autoconfig/userChrome.js support), not the native Zen Mod Store CSS-only approach. Zen Browser tracks installed mods via `zen-themes.json` (NOT `.db` files). This mod provides JavaScript functionality that goes beyond CSS theming, which is why it requires the userChrome.js loader.
 
