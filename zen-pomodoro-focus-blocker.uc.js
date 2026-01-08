@@ -38,6 +38,8 @@
   // ============================================
   
   const PREF_PREFIX = 'zen-pomodoro';
+  // DEV NOTE: This password is for development bypass only and will be removed
+  // before production release. It's intentionally hardcoded for testing purposes.
   const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
@@ -183,8 +185,9 @@
       config.settingsLockIdleDuration = settingsLockIdleDuration;
     }
     
-    // Settings lock code length (0 to disable, 8-128 for active)
-    // Enforce documented constraint: only 0 (disabled) or 8-128 (active) are valid
+    // Settings lock code length: 0 disables the feature, 8-128 enables code entry
+    // Values 1-7 are too short for meaningful security, so they are treated as disabled
+    // This constraint is documented in preferences.json label
     const settingsLockCodeLength = parseIntPref('settingsLockCodeLength', 0, 128);
     if (settingsLockCodeLength !== null) {
       // Values 1-7 are invalid - treat as disabled (0) with warning
@@ -1740,6 +1743,8 @@
         holdButton.addEventListener('mousedown', startHold);
         holdButton.addEventListener('mouseup', stopHold);
         holdButton.addEventListener('mouseleave', stopHold);
+        // Note: passive: false is required for touchstart to allow preventDefault() to work,
+        // which prevents unwanted page scrolling while holding the button
         holdButton.addEventListener('touchstart', startHold, { passive: false });
         holdButton.addEventListener('touchend', stopHold);
         holdButton.addEventListener('touchcancel', stopHold);
