@@ -665,7 +665,7 @@
   height: 4px;
   background-color: #2ec491;
   width: 0%;
-  transition: width 0.1s linear;
+  transition: width 1s linear;
 }
 
 /* ============================================

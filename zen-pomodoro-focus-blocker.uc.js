@@ -184,21 +184,21 @@
     }
     
     // Settings lock code length (0 to disable, 8-128 for active)
+    // Enforce documented constraint: only 0 (disabled) or 8-128 (active) are valid
     const settingsLockCodeLength = parseIntPref('settingsLockCodeLength', 0, 128);
     if (settingsLockCodeLength !== null) {
-      config.settingsLockActiveCodeLength = settingsLockCodeLength;
+      // Values 1-7 are invalid - treat as disabled (0) with warning
+      if (settingsLockCodeLength === 0 || settingsLockCodeLength >= 8) {
+        config.settingsLockActiveCodeLength = settingsLockCodeLength;
+      } else {
+        console.warn(`Zen Pomodoro: settingsLockCodeLength value ${settingsLockCodeLength} is invalid (must be 0 or 8-128). Treating as disabled.`);
+      }
     }
     
     // Hold-to-start duration in milliseconds (0 to disable)
     const holdToStartDuration = parseIntPref('holdToStartDuration', 0, 30000);
     if (holdToStartDuration !== null) {
       config.holdToStartDuration = holdToStartDuration;
-    }
-    
-    // Dev mode preference
-    const devMode = getPref('devMode', null);
-    if (devMode !== null) {
-      config.devMode = devMode === true || devMode === 'true';
     }
     
     return config;
@@ -921,6 +921,7 @@
       this.popupShowingListener = null;
       this.initRetryCount = 0;
       this.maxRetries = 20; // Maximum retries (20 * 500ms = 10 seconds)
+      this.initTimeoutId = null; // Store timeout ID for cleanup
     }
 
     /**
@@ -934,11 +935,16 @@
         // Retry after a short delay if context menu not yet available
         this.initRetryCount++;
         if (this.initRetryCount < this.maxRetries) {
-          setTimeout(() => this.init(), 500);
+          this.initTimeoutId = setTimeout(() => this.init(), 500);
         } else {
           console.warn('Zen Pomodoro: Could not find contentAreaContextMenu after max retries');
         }
         return;
+      }
+      
+      // Log success after retries for debugging
+      if (this.initRetryCount > 0) {
+        console.log(`Zen Pomodoro: contentAreaContextMenu initialized after ${this.initRetryCount} retries`);
       }
       
       this.addNativeContextMenuItems(contextMenu);
@@ -1081,6 +1087,12 @@
      * Destroy and cleanup
      */
     destroy() {
+      // Clear any pending initialization timeout
+      if (this.initTimeoutId) {
+        clearTimeout(this.initTimeoutId);
+        this.initTimeoutId = null;
+      }
+      
       const contextMenu = document.getElementById('contentAreaContextMenu');
       if (contextMenu && this.popupShowingListener) {
         contextMenu.removeEventListener('popupshowing', this.popupShowingListener);
@@ -1315,77 +1327,11 @@
       workspaceRow.appendChild(workspaceLabel);
       workspaceRow.appendChild(workspaceContainer);
       
-      // Dev mode password entry row
-      const devModeRow = document.createElement('div');
-      devModeRow.className = 'zen-pomodoro-config-row zen-pomodoro-devmode-row';
-      
-      const devModeLabel = document.createElement('label');
-      devModeLabel.textContent = 'Dev Mode:';
-      
-      const devModeContainer = document.createElement('div');
-      devModeContainer.className = 'zen-pomodoro-devmode-container';
-      
-      const isDevModeEnabled = window.zenPomodoroApp && window.zenPomodoroApp.security.isDevModeEnabled();
-      
-      if (isDevModeEnabled) {
-        // Show dev mode status and disable button
-        const devModeStatus = document.createElement('span');
-        devModeStatus.className = 'zen-pomodoro-devmode-status enabled';
-        devModeStatus.textContent = '✓ Enabled';
-        
-        const disableButton = document.createElement('button');
-        disableButton.className = 'zen-pomodoro-dialog-button secondary small';
-        disableButton.textContent = 'Disable';
-        disableButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
-            window.zenPomodoroApp.security.disableDevMode();
-            // Refresh the dialog
-            dialog.remove();
-            this.createSettingsDialog();
-          }
-        });
-        
-        devModeContainer.appendChild(devModeStatus);
-        devModeContainer.appendChild(disableButton);
-      } else {
-        // Show password input
-        const devModeInput = document.createElement('input');
-        devModeInput.type = 'password';
-        devModeInput.id = 'zen-pomodoro-devmode-password';
-        devModeInput.placeholder = 'Enter dev password';
-        devModeInput.className = 'zen-pomodoro-devmode-input';
-        
-        const enableButton = document.createElement('button');
-        enableButton.className = 'zen-pomodoro-dialog-button small';
-        enableButton.textContent = 'Enable';
-        enableButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
-            const password = devModeInput.value;
-            if (window.zenPomodoroApp.security.tryEnableDevMode(password)) {
-              window.zenPomodoroApp.showCustomAlert('Dev Mode', 'Developer mode enabled!');
-              // Refresh the dialog
-              dialog.remove();
-              this.createSettingsDialog();
-            } else {
-              window.zenPomodoroApp.showCustomAlert('Dev Mode', 'Incorrect password.');
-              devModeInput.value = '';
-            }
-          }
-        });
-        
-        devModeContainer.appendChild(devModeInput);
-        devModeContainer.appendChild(enableButton);
-      }
-      
-      devModeRow.appendChild(devModeLabel);
-      devModeRow.appendChild(devModeContainer);
-      
       configSection.appendChild(focusRow);
       configSection.appendChild(breakRow);
       configSection.appendChild(longBreakRow);
       configSection.appendChild(messageRow);
       configSection.appendChild(workspaceRow);
-      configSection.appendChild(devModeRow);
       
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -1481,57 +1427,21 @@
       this.lockIntervalId = null; // Store interval for cleanup
       this.lockTimerElement = null; // PERFORMANCE FIX: Initialize timer element reference for caching
       this.holdDuration = 3000;
-      this.holdToUnlockInterval = null; // Store hold-to-unlock interval
+      this.holdToUnlockIntervalId = null; // Store hold-to-unlock interval (renamed for consistency)
     }
 
     /**
-     * Check if dev mode is enabled (bypasses all locks)
+     * Verify dev bypass password
+     * Returns true if password matches
      */
-    isDevModeEnabled() {
-      const config = getConfig();
-      return config.devMode === true;
-    }
-
-    /**
-     * Enable dev mode via password
-     */
-    tryEnableDevMode(password) {
-      if (password === DEV_MODE_PASSWORD) {
-        setPref('devMode', true);
-        console.log('[DEV MODE] Developer mode enabled');
-        return true;
-      }
-      return false;
-    }
-
-    /**
-     * Disable dev mode
-     */
-    disableDevMode() {
-      setPref('devMode', false);
-      console.log('[DEV MODE] Developer mode disabled');
-    }
-
-    /**
-     * Log message only in dev mode
-     */
-    devLog(...args) {
-      if (this.isDevModeEnabled()) {
-        console.log('[DEV MODE]', ...args);
-      }
+    verifyDevPassword(password) {
+      return password === DEV_MODE_PASSWORD;
     }
 
     /**
      * Check if settings should be locked
-     * Returns false if dev mode is enabled
      */
     shouldLockSettings(timerActive) {
-      // Dev mode bypasses all locks
-      if (this.isDevModeEnabled()) {
-        this.devLog('Bypassing lock screen (dev mode enabled)');
-        return false;
-      }
-      
       const config = getConfig();
       
       if (timerActive) {
@@ -1542,20 +1452,88 @@
     }
 
     /**
+     * Show dev bypass password prompt dialog
+     * This is shown on the lock screen as a way to bypass during development
+     */
+    showDevBypassPrompt(onSuccess) {
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dev-bypass-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = 'Dev Bypass';
+      
+      const p = document.createElement('p');
+      p.textContent = 'Enter developer password to bypass lockout:';
+      p.className = 'zen-pomodoro-dialog-message';
+      
+      const input = document.createElement('input');
+      input.type = 'password';
+      input.id = 'zen-pomodoro-dev-bypass-password';
+      input.placeholder = 'Enter password';
+      input.className = 'zen-pomodoro-devmode-input';
+      input.style.width = '100%';
+      input.style.marginBottom = '16px';
+      
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+      
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      
+      const submitButton = document.createElement('button');
+      submitButton.className = 'zen-pomodoro-dialog-button';
+      submitButton.textContent = 'Bypass';
+      
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(submitButton);
+      
+      dialog.appendChild(h2);
+      dialog.appendChild(p);
+      dialog.appendChild(input);
+      dialog.appendChild(buttonDiv);
+      
+      document.documentElement.appendChild(dialog);
+      
+      // Focus input
+      input.focus();
+      
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+      });
+      
+      submitButton.addEventListener('click', () => {
+        const password = input.value;
+        if (this.verifyDevPassword(password)) {
+          dialog.remove();
+          console.log('[DEV BYPASS] Lock screen bypassed');
+          onSuccess();
+        } else {
+          if (window.zenPomodoroApp) {
+            window.zenPomodoroApp.showCustomAlert('Incorrect Password', 'Please try again.');
+          }
+          input.value = '';
+          input.focus();
+        }
+      });
+      
+      // Allow Enter key to submit
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          submitButton.click();
+        }
+      });
+    }
+
+    /**
      * Show settings lock screen
      * UI/UX FIX: Replace alert() with custom dialog
      * MEMORY LEAK FIX: Store and clear interval properly
-     * NEW: Added cancel button and hold-to-unlock for timer wait mode
+     * NEW: Added cancel button, hold-to-unlock, and dev bypass button
      */
     showLockScreen(timerActive, onUnlock) {
       const config = getConfig();
-      
-      // Dev mode check
-      if (this.isDevModeEnabled()) {
-        this.devLog('Bypassing lock screen');
-        onUnlock();
-        return;
-      }
       
       this.lockScreen = document.createElement('div');
       this.lockScreen.id = 'zen-pomodoro-lock-screen';
@@ -1594,12 +1572,19 @@
         cancelButton.id = 'zen-pomodoro-lock-cancel';
         cancelButton.textContent = 'Cancel';
         
+        // Dev bypass button
+        const devBypassButton = document.createElement('button');
+        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
+        devBypassButton.id = 'zen-pomodoro-dev-bypass';
+        devBypassButton.textContent = 'Dev Bypass';
+        
         const unlockButton = document.createElement('button');
         unlockButton.className = 'zen-pomodoro-dialog-button';
         unlockButton.id = 'zen-pomodoro-lock-submit';
         unlockButton.textContent = 'Unlock';
         
         buttonDiv.appendChild(cancelButton);
+        buttonDiv.appendChild(devBypassButton);
         buttonDiv.appendChild(unlockButton);
         
         lockContent.appendChild(h2);
@@ -1614,6 +1599,14 @@
         // Cancel button handler
         cancelButton.addEventListener('click', () => {
           this.cleanupLockScreen();
+        });
+        
+        // Dev bypass button handler
+        devBypassButton.addEventListener('click', () => {
+          this.showDevBypassPrompt(() => {
+            this.cleanupLockScreen();
+            onUnlock();
+          });
         });
         
         unlockButton.addEventListener('click', () => {
@@ -1667,7 +1660,14 @@
         cancelButton.id = 'zen-pomodoro-lock-cancel';
         cancelButton.textContent = 'Cancel';
         
+        // Dev bypass button
+        const devBypassButton = document.createElement('button');
+        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
+        devBypassButton.id = 'zen-pomodoro-dev-bypass';
+        devBypassButton.textContent = 'Dev Bypass';
+        
         buttonDiv.appendChild(cancelButton);
+        buttonDiv.appendChild(devBypassButton);
         buttonDiv.appendChild(holdButton);
         
         lockContent.appendChild(h2);
@@ -1685,26 +1685,34 @@
         // Hold-to-unlock logic
         let currentWaitTime = waitTime;
         
-        const startHold = () => {
-          // Clear any existing interval
-          if (this.holdToUnlockInterval) {
-            clearInterval(this.holdToUnlockInterval);
+        const startHold = (e) => {
+          // Prevent default for touch events to avoid scrolling
+          if (e.type === 'touchstart') {
+            e.preventDefault();
           }
           
-          this.holdToUnlockInterval = setInterval(() => {
+          // Clear any existing interval to prevent race conditions
+          if (this.holdToUnlockIntervalId) {
+            clearInterval(this.holdToUnlockIntervalId);
+            this.holdToUnlockIntervalId = null;
+          }
+          
+          this.holdToUnlockIntervalId = setInterval(() => {
             currentWaitTime--;
             if (this.lockTimerElement) {
               this.lockTimerElement.textContent = currentWaitTime.toString();
             }
             
-            // Update progress bar
+            // Update progress bar with null check
             const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
-            holdProgress.style.width = `${percent}%`;
+            if (holdProgress && holdProgress.style) {
+              holdProgress.style.width = `${percent}%`;
+            }
             
             if (currentWaitTime <= 0) {
-              if (this.holdToUnlockInterval) {
-                clearInterval(this.holdToUnlockInterval);
-                this.holdToUnlockInterval = null;
+              if (this.holdToUnlockIntervalId) {
+                clearInterval(this.holdToUnlockIntervalId);
+                this.holdToUnlockIntervalId = null;
               }
               this.cleanupLockScreen();
               onUnlock();
@@ -1714,27 +1722,52 @@
         
         const stopHold = () => {
           // Reset timer when button released
-          if (this.holdToUnlockInterval) {
-            clearInterval(this.holdToUnlockInterval);
-            this.holdToUnlockInterval = null;
+          if (this.holdToUnlockIntervalId) {
+            clearInterval(this.holdToUnlockIntervalId);
+            this.holdToUnlockIntervalId = null;
           }
           currentWaitTime = waitTime;
           if (this.lockTimerElement) {
             this.lockTimerElement.textContent = waitTime.toString();
           }
-          holdProgress.style.width = '0%';
+          // Add null check for holdProgress
+          if (holdProgress) {
+            holdProgress.style.width = '0%';
+          }
         };
         
+        // Mouse and touch event handlers
         holdButton.addEventListener('mousedown', startHold);
         holdButton.addEventListener('mouseup', stopHold);
         holdButton.addEventListener('mouseleave', stopHold);
-        holdButton.addEventListener('touchstart', startHold);
+        holdButton.addEventListener('touchstart', startHold, { passive: false });
         holdButton.addEventListener('touchend', stopHold);
         holdButton.addEventListener('touchcancel', stopHold);
+        
+        // Keyboard accessibility - support space/enter for hold
+        holdButton.addEventListener('keydown', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            startHold(e);
+          }
+        });
+        holdButton.addEventListener('keyup', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            stopHold();
+          }
+        });
         
         // Cancel button handler
         cancelButton.addEventListener('click', () => {
           this.cleanupLockScreen();
+        });
+        
+        // Dev bypass button handler
+        devBypassButton.addEventListener('click', () => {
+          this.showDevBypassPrompt(() => {
+            this.cleanupLockScreen();
+            onUnlock();
+          });
         });
       }
     }
@@ -1748,9 +1781,9 @@
         clearInterval(this.lockIntervalId);
         this.lockIntervalId = null;
       }
-      if (this.holdToUnlockInterval) {
-        clearInterval(this.holdToUnlockInterval);
-        this.holdToUnlockInterval = null;
+      if (this.holdToUnlockIntervalId) {
+        clearInterval(this.holdToUnlockIntervalId);
+        this.holdToUnlockIntervalId = null;
       }
       this.lockTimerElement = null;
       if (this.lockScreen) {
