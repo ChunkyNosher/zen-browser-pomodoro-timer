@@ -331,7 +331,9 @@
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 14px;
-  width: 120px;
+  width: 180px;
+  min-width: 180px;
+  text-overflow: ellipsis;
 }
 
 /* Motivational message input with wider width */
@@ -820,10 +822,26 @@
 }
 
 /* ============================================
-   Issue 4: Alert Dialog - Higher z-index than lock screen
+   Regular Dialogs - z-index + 3 (above lock screen)
+   ============================================ */
+#zen-pomodoro-menu-dialog,
+#zen-pomodoro-settings-dialog,
+#zen-pomodoro-start-dialog {
+  z-index: calc(var(--zen-pomodoro-z-index) + 3);
+}
+
+/* ============================================
+   Issue 4: Alert Dialog - Higher z-index than all other dialogs including dev bypass
    ============================================ */
 #zen-pomodoro-alert-dialog {
-  z-index: calc(var(--zen-pomodoro-z-index) + 5);
+  z-index: calc(var(--zen-pomodoro-z-index) + 15);
+}
+
+/* ============================================
+   Confirm Dialog - Same high z-index as alert dialog
+   ============================================ */
+#zen-pomodoro-confirm-dialog {
+  z-index: calc(var(--zen-pomodoro-z-index) + 15);
 }
 
 /* ============================================
