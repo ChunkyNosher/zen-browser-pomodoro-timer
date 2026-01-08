@@ -332,10 +332,10 @@
    */
   function validateIntegerInput(value, min, max, defaultValue) {
     const parsed = parseInt(value, 10);
-    if (isNaN(parsed) || parsed < min || parsed > max) {
-      return defaultValue;
-    }
-    return parsed;
+    const isValidNumber = !isNaN(parsed);
+    const isInRange = parsed >= min && parsed <= max;
+    
+    return (isValidNumber && isInRange) ? parsed : defaultValue;
   }
 
   /**
@@ -1599,28 +1599,52 @@
      * MEMORY LEAK FIX: Clean up ResizeObserver and event listeners on destroy
      */
     destroy() {
+      this._cleanupContentAreaObserver();
+      this._restoreContentAreaPosition();
+      this._cleanupIndicatorEventListener();
+      this._removeOverlayElements();
+    }
+
+    /**
+     * Clean up content area observer.
+     * @private
+     */
+    _cleanupObserver() {
       if (this.contentAreaObserver) {
         this.contentAreaObserver.disconnect();
         this.contentAreaObserver = null;
       }
+    }
+
+    /**
+     * Restore original content area position if modified.
+     * @private
+     */
+    _restoreContentAreaPosition() {
+      if (!this.contentArea || !this.originalContentAreaPosition) return;
       
-      // Restore original content area position if we changed it
-      if (this.contentArea && this.originalContentAreaPosition) {
-        if (this.originalContentAreaPosition === 'static') {
-          this.contentArea.style.position = '';
-        } else {
-          this.contentArea.style.position = this.originalContentAreaPosition;
-        }
-        this.contentArea = null;
-        this.originalContentAreaPosition = null;
-      }
-      
-      // Clean up indicator event listener before removing
+      const position = this.originalContentAreaPosition === 'static' ? '' : this.originalContentAreaPosition;
+      this.contentArea.style.position = position;
+      this.contentArea = null;
+      this.originalContentAreaPosition = null;
+    }
+
+    /**
+     * Clean up indicator mouse event listener.
+     * @private
+     */
+    _cleanupIndicatorEventListener() {
       if (this.indicator && this.indicatorMouseDownHandler) {
         this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
         this.indicatorMouseDownHandler = null;
       }
-      
+    }
+
+    /**
+     * Remove overlay and indicator elements from DOM.
+     * @private
+     */
+    _removeOverlayElements() {
       if (this.overlay) {
         this.overlay.remove();
         this.overlay = null;
@@ -1720,13 +1744,8 @@
       const parsed = this.parseShortcut(shortcut);
       
       this.keydownHandler = (event) => {
-        // Check if all modifier keys match
-        if (event.ctrlKey === parsed.ctrlKey &&
-            event.altKey === parsed.altKey &&
-            event.shiftKey === parsed.shiftKey &&
-            event.metaKey === parsed.metaKey &&
-            event.key.toUpperCase() === parsed.key) {
-          
+        // Check if all modifier keys match using helper function
+        if (this._isShortcutMatch(event, parsed)) {
           event.preventDefault();
           event.stopPropagation();
           this.showPomodoroMenu();
@@ -1734,6 +1753,23 @@
       };
       
       document.addEventListener('keydown', this.keydownHandler, true);
+    }
+
+    /**
+     * Check if a keyboard event matches the parsed shortcut.
+     * @param {KeyboardEvent} event - The keyboard event
+     * @param {Object} parsed - Parsed shortcut with modifier key booleans and key
+     * @returns {boolean} True if event matches shortcut
+     * @private
+     */
+    _isShortcutMatch(event, parsed) {
+      const modifiersMatch = 
+        event.ctrlKey === parsed.ctrlKey &&
+        event.altKey === parsed.altKey &&
+        event.shiftKey === parsed.shiftKey &&
+        event.metaKey === parsed.metaKey;
+      
+      return modifiersMatch && event.key.toUpperCase() === parsed.key;
     }
 
     /**
@@ -1948,7 +1984,12 @@
       setupDialogDrag(dialog);
       
       // Event handlers
-      this._setupModeToggleHandler(modeSelect, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow);
+      this._setupModeToggleHandler(modeSelect, {
+        simpleDurationRow,
+        focusDurationRow,
+        breakDurationRow,
+        cyclesRow
+      });
       cancelButton.addEventListener('click', () => dialog.remove());
       this._setupStartHandler(dialog, config, modeSelect, startButton);
     }
@@ -2017,19 +2058,20 @@
     /**
      * Setup mode toggle handler for showing/hiding duration rows.
      * @param {HTMLSelectElement} modeSelect - Mode select element
-     * @param {HTMLElement} simpleDurationRow - Simple duration row
-     * @param {HTMLElement} focusDurationRow - Focus duration row
-     * @param {HTMLElement} breakDurationRow - Break duration row
-     * @param {HTMLElement} cyclesRow - Cycles row
+     * @param {Object} rows - Object containing row elements
+     * @param {HTMLElement} rows.simpleDurationRow - Simple duration row
+     * @param {HTMLElement} rows.focusDurationRow - Focus duration row
+     * @param {HTMLElement} rows.breakDurationRow - Break duration row
+     * @param {HTMLElement} rows.cyclesRow - Cycles row
      * @private
      */
-    _setupModeToggleHandler(modeSelect, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow) {
+    _setupModeToggleHandler(modeSelect, rows) {
       modeSelect.addEventListener('change', () => {
         const isSimple = modeSelect.value === 'simple';
-        simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
-        focusDurationRow.style.display = isSimple ? 'none' : 'flex';
-        breakDurationRow.style.display = isSimple ? 'none' : 'flex';
-        cyclesRow.style.display = isSimple ? 'none' : 'flex';
+        rows.simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
+        rows.focusDurationRow.style.display = isSimple ? 'none' : 'flex';
+        rows.breakDurationRow.style.display = isSimple ? 'none' : 'flex';
+        rows.cyclesRow.style.display = isSimple ? 'none' : 'flex';
       });
     }
 
@@ -2091,54 +2133,6 @@
       }
       
       return sessionOverrides;
-    }
-      
-      // Issue 9: Update visibility based on mode selection
-      modeSelect.addEventListener('change', () => {
-        const isSimple = modeSelect.value === 'simple';
-        simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
-        focusDurationRow.style.display = isSimple ? 'none' : 'flex';
-        breakDurationRow.style.display = isSimple ? 'none' : 'flex';
-        cyclesRow.style.display = isSimple ? 'none' : 'flex';
-      });
-      
-      cancelButton.addEventListener('click', () => {
-        dialog.remove();
-      });
-      
-      // Issue 9: Helper function to apply session-only duration overrides and start timer
-      const applyDurationsAndStart = () => {
-        const mode = modeSelect.value;
-        const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
-        
-        // Build session-only overrides object (not modifying timer.config directly)
-        const sessionOverrides = {};
-        if (mode === 'simple') {
-          sessionOverrides.simpleDuration = validateIntegerInput(
-            simpleDurationInput.value, 1, 180, config.simpleDuration
-          );
-        } else {
-          sessionOverrides.focusDuration = validateIntegerInput(
-            focusDurationInput.value, 1, 120, config.focusDuration
-          );
-          sessionOverrides.breakDuration = validateIntegerInput(
-            breakDurationInput.value, 1, 30, config.breakDuration
-          );
-        }
-        
-        dialog.remove();
-        
-        if (window.zenPomodoroApp) {
-          window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
-        }
-      };
-      
-      // Set up hold-to-start if enabled, otherwise use regular click
-      if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
-        window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
-      } else {
-        startButton.addEventListener('click', applyDurationsAndStart);
-      }
     }
 
     /**
@@ -2277,7 +2271,8 @@
       // ========================================
       // Simple Timer Duration (only visible for simple mode)
       // ========================================
-      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', config.simpleDuration, 1, 180);
+      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', 
+        { value: config.simpleDuration, min: 1, max: 180 });
       simpleDurationRow.id = 'simple-duration-row';
       if (config.timerMode !== 'simple') {
         simpleDurationRow.classList.add('hidden');
@@ -2286,25 +2281,29 @@
       // ========================================
       // Pomodoro-specific options
       // ========================================
-      const focusRow = this.createInputRow('Focus Duration (min):', 'focus-duration', config.focusDuration, 1, 120);
+      const focusRow = this.createInputRow('Focus Duration (min):', 'focus-duration', 
+        { value: config.focusDuration, min: 1, max: 120 });
       focusRow.id = 'focus-duration-row';
       if (config.timerMode === 'simple') {
         focusRow.classList.add('hidden');
       }
       
-      const breakRow = this.createInputRow('Break Duration (min):', 'break-duration', config.breakDuration, 1, 30);
+      const breakRow = this.createInputRow('Break Duration (min):', 'break-duration', 
+        { value: config.breakDuration, min: 1, max: 30 });
       breakRow.id = 'break-duration-row';
       if (config.timerMode === 'simple') {
         breakRow.classList.add('hidden');
       }
       
-      const longBreakRow = this.createInputRow('Long Break (min):', 'long-break-duration', config.longBreakDuration, 5, 60);
+      const longBreakRow = this.createInputRow('Long Break (min):', 'long-break-duration', 
+        { value: config.longBreakDuration, min: 5, max: 60 });
       longBreakRow.id = 'long-break-duration-row';
       if (config.timerMode === 'simple') {
         longBreakRow.classList.add('hidden');
       }
       
-      const cyclesRow = this.createInputRow('Number of Cycles:', 'cycles', config.cycles, 1, 20);
+      const cyclesRow = this.createInputRow('Number of Cycles:', 'cycles', 
+        { value: config.cycles, min: 1, max: 20 });
       cyclesRow.id = 'cycles-row';
       if (config.timerMode === 'simple') {
         cyclesRow.classList.add('hidden');
@@ -2436,10 +2435,12 @@
       activeMethodRow.appendChild(activeMethodSelect);
       
       // Hold duration setting (used for both idle and active when hold method is selected)
-      const lockHoldDurationRow = this.createInputRow('Button Hold Time (seconds):', 'hold-duration', config.settingsLockIdleDuration, 1, 300);
+      const lockHoldDurationRow = this.createInputRow('Button Hold Time (seconds):', 'hold-duration', 
+        { value: config.settingsLockIdleDuration, min: 1, max: 300 });
       
       // Code length setting (used for both idle and active when code method is selected)
-      const lockCodeLengthRow = this.createInputRow('Code Length (8-128):', 'code-length', config.settingsLockActiveCodeLength, 8, 128);
+      const lockCodeLengthRow = this.createInputRow('Code Length (8-128):', 'code-length', 
+        { value: config.settingsLockActiveCodeLength, min: 8, max: 128 });
       
       // Only show hold/code settings when at least one lockout method uses them
       const updateLockoutVisibility = () => {
@@ -2510,80 +2511,125 @@
       });
       
       saveButton.addEventListener('click', () => {
-        // Save keyboard shortcut (validate it contains at least one non-modifier key)
-        const newShortcut = shortcutInput.getAttribute('data-shortcut');
-        const shortcutParts = newShortcut ? newShortcut.split('+') : [];
-        const hasNonModifierKey = shortcutParts.some(part => 
-          !['Ctrl', 'Alt', 'Shift', 'Meta'].includes(part)
-        );
-        
-        if (newShortcut && hasNonModifierKey && newShortcut !== config.keyboardShortcut) {
-          config.keyboardShortcut = newShortcut;
-          // Update the keyboard shortcut handler
-          if (window.zenPomodoroApp && window.zenPomodoroApp.keyboardShortcut) {
-            window.zenPomodoroApp.keyboardShortcut.setupKeyboardShortcut(newShortcut);
-          }
-          // Also save to preferences for persistence
-          setPref('keyboardShortcut', newShortcut);
-        }
-        
-        // Save timer mode
-        config.timerMode = timerModeSelect.value;
-        
-        // Save simple duration
-        config.simpleDuration = validateIntegerInput(
-          dialog.querySelector('#simple-duration').value, 1, 180, config.simpleDuration
-        );
-        
-        // Validate pomodoro inputs
-        config.focusDuration = validateIntegerInput(
-          dialog.querySelector('#focus-duration').value, 1, 120, config.focusDuration
-        );
-        config.breakDuration = validateIntegerInput(
-          dialog.querySelector('#break-duration').value, 1, 30, config.breakDuration
-        );
-        config.longBreakDuration = validateIntegerInput(
-          dialog.querySelector('#long-break-duration').value, 5, 60, config.longBreakDuration
-        );
-        config.cycles = validateIntegerInput(
-          dialog.querySelector('#cycles').value, 1, 20, config.cycles
-        );
-        config.motivationalMessage = sanitizeText(dialog.querySelector('#motivational-message').value);
-        
-        // Save lockout settings
-        config.settingsLockIdleMethod = idleMethodSelect.value;
-        config.settingsLockActiveMethod = activeMethodSelect.value;
-        config.settingsLockIdleDuration = validateIntegerInput(
-          dialog.querySelector('#hold-duration').value, 1, 300, config.settingsLockIdleDuration
-        );
-        config.settingsLockActiveCodeLength = validateIntegerInput(
-          dialog.querySelector('#code-length').value, 8, 128, config.settingsLockActiveCodeLength
-        );
-        
-        // Save blocked workspaces
-        const checkedWorkspaces = [];
-        workspaceContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
-          checkedWorkspaces.push(checkbox.value);
-        });
-        config.blockedWorkspaces = checkedWorkspaces;
+        this._saveKeyboardShortcut(shortcutInput, config);
+        this._saveTimerSettings(dialog, config, timerModeSelect);
+        this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
+        this._saveBlockedWorkspaces(workspaceContainer, config);
         
         saveConfig(config);
         dialog.remove();
         
-        // Update overlay message if it exists
-        if (window.zenPomodoroApp && window.zenPomodoroApp.overlay.overlay) {
-          const messageEl = window.zenPomodoroApp.overlay.overlay.querySelector('#zen-pomodoro-message');
-          if (messageEl) {
-            messageEl.textContent = sanitizeText(config.motivationalMessage);
-          }
-        }
+        this._updateOverlayMessage(config);
       });
     }
 
     /**
-     * Helper to create input row
+     * Save keyboard shortcut from settings dialog.
+     * @param {HTMLElement} shortcutInput - The shortcut input element
+     * @param {Object} config - Configuration object to update
+     * @private
      */
-    createInputRow(labelText, inputId, value, min, max) {
+    _saveKeyboardShortcut(shortcutInput, config) {
+      const newShortcut = shortcutInput.getAttribute('data-shortcut');
+      if (!newShortcut || newShortcut === config.keyboardShortcut) return;
+      
+      const shortcutParts = newShortcut.split('+');
+      const hasNonModifierKey = shortcutParts.some(part => 
+        !['Ctrl', 'Alt', 'Shift', 'Meta'].includes(part)
+      );
+      
+      if (!hasNonModifierKey) return;
+      
+      config.keyboardShortcut = newShortcut;
+      if (window.zenPomodoroApp?.keyboardShortcut) {
+        window.zenPomodoroApp.keyboardShortcut.setupKeyboardShortcut(newShortcut);
+      }
+      setPref('keyboardShortcut', newShortcut);
+    }
+
+    /**
+     * Save timer settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @param {HTMLSelectElement} timerModeSelect - Timer mode select element
+     * @private
+     */
+    _saveTimerSettings(dialog, config, timerModeSelect) {
+      config.timerMode = timerModeSelect.value;
+      
+      config.simpleDuration = validateIntegerInput(
+        dialog.querySelector('#simple-duration').value, 1, 180, config.simpleDuration
+      );
+      config.focusDuration = validateIntegerInput(
+        dialog.querySelector('#focus-duration').value, 1, 120, config.focusDuration
+      );
+      config.breakDuration = validateIntegerInput(
+        dialog.querySelector('#break-duration').value, 1, 30, config.breakDuration
+      );
+      config.longBreakDuration = validateIntegerInput(
+        dialog.querySelector('#long-break-duration').value, 5, 60, config.longBreakDuration
+      );
+      config.cycles = validateIntegerInput(
+        dialog.querySelector('#cycles').value, 1, 20, config.cycles
+      );
+      config.motivationalMessage = sanitizeText(dialog.querySelector('#motivational-message').value);
+    }
+
+    /**
+     * Save lockout settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @param {HTMLSelectElement} idleMethodSelect - Idle method select element
+     * @param {HTMLSelectElement} activeMethodSelect - Active method select element
+     * @private
+     */
+    _saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect) {
+      config.settingsLockIdleMethod = idleMethodSelect.value;
+      config.settingsLockActiveMethod = activeMethodSelect.value;
+      config.settingsLockIdleDuration = validateIntegerInput(
+        dialog.querySelector('#hold-duration').value, 1, 300, config.settingsLockIdleDuration
+      );
+      config.settingsLockActiveCodeLength = validateIntegerInput(
+        dialog.querySelector('#code-length').value, 8, 128, config.settingsLockActiveCodeLength
+      );
+    }
+
+    /**
+     * Save blocked workspaces from settings dialog.
+     * @param {HTMLElement} workspaceContainer - Container with workspace checkboxes
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveBlockedWorkspaces(workspaceContainer, config) {
+      const checkedWorkspaces = [];
+      workspaceContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+        checkedWorkspaces.push(checkbox.value);
+      });
+      config.blockedWorkspaces = checkedWorkspaces;
+    }
+
+    /**
+     * Update overlay message if it exists.
+     * @param {Object} config - Configuration object with message
+     * @private
+     */
+    _updateOverlayMessage(config) {
+      if (!window.zenPomodoroApp?.overlay?.overlay) return;
+      
+      const messageEl = window.zenPomodoroApp.overlay.overlay.querySelector('#zen-pomodoro-message');
+      if (messageEl) {
+        messageEl.textContent = sanitizeText(config.motivationalMessage);
+      }
+    }
+
+    /**
+     * Helper to create input row.
+     * @param {string} labelText - Label text
+     * @param {string} inputId - Input element ID
+     * @param {Object} options - Input options (value, min, max)
+     * @returns {HTMLElement} The row element
+     */
+    createInputRow(labelText, inputId, options = {}) {
       const row = document.createElement('div');
       row.className = 'zen-pomodoro-config-row';
       
@@ -2593,9 +2639,9 @@
       const input = document.createElement('input');
       input.type = 'number';
       input.id = inputId;
-      input.value = value;
-      input.min = min;
-      input.max = max;
+      if (options.value !== undefined) input.value = options.value;
+      if (options.min !== undefined) input.min = options.min;
+      if (options.max !== undefined) input.max = options.max;
       
       row.appendChild(label);
       row.appendChild(input);
@@ -2725,262 +2771,294 @@
      */
     showLockScreen(timerActive, onUnlock) {
       const config = getConfig();
+      const method = this._determineLockoutMethod(timerActive, config);
       
+      this._initializeLockScreen();
+      const lockContent = this._createLockContent();
+      
+      if (method === LOCKOUT_METHODS.CODE) {
+        this._setupCodeEntryMode(lockContent, config, timerActive, onUnlock);
+      } else {
+        this._setupHoldToUnlockMode(lockContent, config, timerActive, onUnlock);
+      }
+      
+      this.lockScreen.appendChild(lockContent);
+      document.documentElement.appendChild(this.lockScreen);
+    }
+
+    /**
+     * Determine which lockout method to use based on timer state and config.
+     * @param {boolean} timerActive - Whether timer is currently active
+     * @param {Object} config - Configuration object
+     * @returns {string} The lockout method to use
+     * @private
+     */
+    _determineLockoutMethod(timerActive, config) {
+      const requestedMethod = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
+      
+      if (requestedMethod === LOCKOUT_METHODS.CODE || requestedMethod === LOCKOUT_METHODS.HOLD) {
+        return requestedMethod;
+      }
+      
+      // Fall back to defaults: code for active, hold for idle
+      const defaultMethod = timerActive ? LOCKOUT_METHODS.CODE : LOCKOUT_METHODS.HOLD;
+      console.warn(`Zen Pomodoro: Invalid lockout method "${requestedMethod}", using default "${defaultMethod}".`);
+      return defaultMethod;
+    }
+
+    /**
+     * Initialize the lock screen container element.
+     * @private
+     */
+    _initializeLockScreen() {
       this.lockScreen = document.createElement('div');
       this.lockScreen.id = 'zen-pomodoro-lock-screen';
       this.lockScreen.className = 'active';
-      
+    }
+
+    /**
+     * Create the lock content container element.
+     * @returns {HTMLElement} The lock content element
+     * @private
+     */
+    _createLockContent() {
       const lockContent = document.createElement('div');
       lockContent.id = 'zen-pomodoro-lock-content';
+      return lockContent;
+    }
+
+    /**
+     * Create standard lock screen button row with cancel and dev bypass buttons.
+     * @param {Function} onUnlock - Callback when unlock succeeds
+     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLElement, devBypassButton: HTMLElement}}
+     * @private
+     */
+    _createLockButtonRow(onUnlock) {
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
       
-      // Determine which method to use based on timer state and config
-      // Validate method value and fall back to defaults if invalid
-      const requestedMethod = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
-      let method = requestedMethod;
-      if (method !== LOCKOUT_METHODS.CODE && method !== LOCKOUT_METHODS.HOLD) {
-        // Fall back to defaults: code for active, hold for idle
-        method = timerActive ? LOCKOUT_METHODS.CODE : LOCKOUT_METHODS.HOLD;
-        console.warn(`Zen Pomodoro: Invalid lockout method "${requestedMethod}", using default "${method}".`);
-      }
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.id = 'zen-pomodoro-lock-cancel';
+      cancelButton.textContent = 'Cancel';
       
-      if (method === LOCKOUT_METHODS.CODE) {
-        // Code entry mode
-        const code = generateRandomCode(
-          config.settingsLockActiveCodeLength,
-          config.settingsLockActiveCharacterSet
-        );
-        
-        const h2 = document.createElement('h2');
-        h2.textContent = 'Settings Locked';
-        
-        const p = document.createElement('p');
-        p.textContent = timerActive 
-          ? 'Timer is active. Enter the code below to unlock settings:'
-          : 'Enter the code below to unlock settings:';
-        
-        const codeDiv = document.createElement('div');
-        codeDiv.className = 'zen-pomodoro-lock-code-display';
-        codeDiv.textContent = code;
-        
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.id = 'zen-pomodoro-lock-code';
-        input.placeholder = 'Enter code here';
-        
-        const buttonDiv = document.createElement('div');
-        buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-        
-        const cancelButton = document.createElement('button');
-        cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-        cancelButton.id = 'zen-pomodoro-lock-cancel';
-        cancelButton.textContent = 'Cancel';
-        
-        // Dev bypass button
-        const devBypassButton = document.createElement('button');
-        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
-        devBypassButton.id = 'zen-pomodoro-dev-bypass';
-        devBypassButton.textContent = 'Dev Bypass';
-        
-        const unlockButton = document.createElement('button');
-        unlockButton.className = 'zen-pomodoro-dialog-button';
-        unlockButton.id = 'zen-pomodoro-lock-submit';
-        unlockButton.textContent = 'Unlock';
-        
-        buttonDiv.appendChild(cancelButton);
-        buttonDiv.appendChild(devBypassButton);
-        buttonDiv.appendChild(unlockButton);
-        
-        lockContent.appendChild(h2);
-        lockContent.appendChild(p);
-        lockContent.appendChild(codeDiv);
-        lockContent.appendChild(input);
-        lockContent.appendChild(buttonDiv);
-        
-        this.lockScreen.appendChild(lockContent);
-        document.documentElement.appendChild(this.lockScreen);
-        
-        // Focus the input field for better UX (use setTimeout to ensure DOM is ready)
-        setTimeout(() => {
-          if (input) input.focus();
-        }, 0);
-        
-        // Cancel button handler
-        cancelButton.addEventListener('click', () => {
+      const devBypassButton = document.createElement('button');
+      devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
+      devBypassButton.id = 'zen-pomodoro-dev-bypass';
+      devBypassButton.textContent = 'Dev Bypass';
+      
+      // Attach event handlers
+      cancelButton.addEventListener('click', () => this.cleanupLockScreen());
+      devBypassButton.addEventListener('click', () => {
+        this.showDevBypassPrompt(() => {
           this.cleanupLockScreen();
+          onUnlock();
         });
+      });
+      
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(devBypassButton);
+      
+      return { buttonDiv, cancelButton, devBypassButton };
+    }
+
+    /**
+     * Setup code entry lockout mode UI and handlers.
+     * @param {HTMLElement} lockContent - Container for lock content
+     * @param {Object} config - Configuration object
+     * @param {boolean} timerActive - Whether timer is active
+     * @param {Function} onUnlock - Callback when unlock succeeds
+     * @private
+     */
+    _setupCodeEntryMode(lockContent, config, timerActive, onUnlock) {
+      const code = generateRandomCode(
+        config.settingsLockActiveCodeLength,
+        config.settingsLockActiveCharacterSet
+      );
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = 'Settings Locked';
+      
+      const p = document.createElement('p');
+      p.textContent = timerActive 
+        ? 'Timer is active. Enter the code below to unlock settings:'
+        : 'Enter the code below to unlock settings:';
+      
+      const codeDiv = document.createElement('div');
+      codeDiv.className = 'zen-pomodoro-lock-code-display';
+      codeDiv.textContent = code;
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'zen-pomodoro-lock-code';
+      input.placeholder = 'Enter code here';
+      
+      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      
+      const unlockButton = document.createElement('button');
+      unlockButton.className = 'zen-pomodoro-dialog-button';
+      unlockButton.id = 'zen-pomodoro-lock-submit';
+      unlockButton.textContent = 'Unlock';
+      buttonDiv.appendChild(unlockButton);
+      
+      unlockButton.addEventListener('click', () => {
+        if (input.value === code) {
+          this.cleanupLockScreen();
+          onUnlock();
+        } else if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
+        }
+      });
+      
+      lockContent.appendChild(h2);
+      lockContent.appendChild(p);
+      lockContent.appendChild(codeDiv);
+      lockContent.appendChild(input);
+      lockContent.appendChild(buttonDiv);
+      
+      // Focus the input field for better UX
+      setTimeout(() => input?.focus(), 0);
+    }
+
+    /**
+     * Setup hold-to-unlock lockout mode UI and handlers.
+     * @param {HTMLElement} lockContent - Container for lock content
+     * @param {Object} config - Configuration object
+     * @param {boolean} timerActive - Whether timer is active
+     * @param {Function} onUnlock - Callback when unlock succeeds
+     * @private
+     */
+    _setupHoldToUnlockMode(lockContent, config, timerActive, onUnlock) {
+      const waitTime = config.settingsLockIdleDuration;
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = 'Settings Locked';
+      
+      const p = document.createElement('p');
+      p.textContent = timerActive 
+        ? 'Timer is active. Hold the button below to unlock settings:'
+        : 'Hold the button below to unlock settings:';
+      
+      const timerDiv = document.createElement('div');
+      timerDiv.id = 'zen-pomodoro-lock-timer';
+      timerDiv.textContent = waitTime.toString();
+      
+      const pSub = document.createElement('p');
+      pSub.className = 'zen-pomodoro-lock-subtext';
+      pSub.textContent = 'seconds remaining - hold button to count down';
+      
+      const { holdButton, holdProgress } = this._createHoldButton();
+      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      buttonDiv.appendChild(holdButton);
+      
+      lockContent.appendChild(h2);
+      lockContent.appendChild(p);
+      lockContent.appendChild(timerDiv);
+      lockContent.appendChild(pSub);
+      lockContent.appendChild(buttonDiv);
+      
+      // Cache timer element reference for updates
+      this.lockTimerElement = timerDiv;
+      
+      // Setup hold logic
+      this._setupHoldHandlers(holdButton, holdProgress, waitTime, onUnlock);
+    }
+
+    /**
+     * Create the hold-to-unlock button with progress bar.
+     * @returns {{holdButton: HTMLElement, holdProgress: HTMLElement}}
+     * @private
+     */
+    _createHoldButton() {
+      const holdButton = document.createElement('button');
+      holdButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-hold-to-unlock-btn';
+      holdButton.id = 'zen-pomodoro-hold-to-unlock';
+      holdButton.textContent = 'Hold to Unlock';
+      
+      const holdProgress = document.createElement('div');
+      holdProgress.className = 'zen-pomodoro-hold-unlock-progress';
+      holdProgress.id = 'zen-pomodoro-hold-unlock-progress';
+      holdButton.appendChild(holdProgress);
+      
+      return { holdButton, holdProgress };
+    }
+
+    /**
+     * Setup hold-to-unlock event handlers.
+     * @param {HTMLElement} holdButton - The hold button element
+     * @param {HTMLElement} holdProgress - The progress bar element
+     * @param {number} waitTime - Total wait time in seconds
+     * @param {Function} onUnlock - Callback when unlock succeeds
+     * @private
+     */
+    _setupHoldHandlers(holdButton, holdProgress, waitTime, onUnlock) {
+      let currentWaitTime = waitTime;
+      
+      const startHold = (e) => {
+        if (e.type === 'touchstart') e.preventDefault();
         
-        // Dev bypass button handler
-        devBypassButton.addEventListener('click', () => {
-          this.showDevBypassPrompt(() => {
-            this.cleanupLockScreen();
-            onUnlock();
-          });
-        });
+        this._clearHoldInterval();
         
-        unlockButton.addEventListener('click', () => {
-          const inputValue = input.value;
-          if (inputValue === code) {
-            this.cleanupLockScreen();
-            onUnlock();
-          } else {
-            // UI/UX FIX: Use custom dialog instead of alert()
-            if (window.zenPomodoroApp) {
-              window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
-            }
-          }
-        });
-        
-      } else {
-        // Hold-to-unlock timer mode
-        let waitTime = config.settingsLockIdleDuration;
-        
-        const h2 = document.createElement('h2');
-        h2.textContent = 'Settings Locked';
-        
-        const p = document.createElement('p');
-        p.textContent = timerActive 
-          ? 'Timer is active. Hold the button below to unlock settings:'
-          : 'Hold the button below to unlock settings:';
-        
-        const timerDiv = document.createElement('div');
-        timerDiv.id = 'zen-pomodoro-lock-timer';
-        timerDiv.textContent = waitTime.toString();
-        
-        const pSub = document.createElement('p');
-        pSub.className = 'zen-pomodoro-lock-subtext';
-        pSub.textContent = 'seconds remaining - hold button to count down';
-        
-        // Hold-to-unlock button
-        const holdButton = document.createElement('button');
-        holdButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-hold-to-unlock-btn';
-        holdButton.id = 'zen-pomodoro-hold-to-unlock';
-        holdButton.textContent = 'Hold to Unlock';
-        
-        // Progress bar for hold button
-        const holdProgress = document.createElement('div');
-        holdProgress.className = 'zen-pomodoro-hold-unlock-progress';
-        holdProgress.id = 'zen-pomodoro-hold-unlock-progress';
-        holdButton.appendChild(holdProgress);
-        
-        const buttonDiv = document.createElement('div');
-        buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-        
-        const cancelButton = document.createElement('button');
-        cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-        cancelButton.id = 'zen-pomodoro-lock-cancel';
-        cancelButton.textContent = 'Cancel';
-        
-        // Dev bypass button
-        const devBypassButton = document.createElement('button');
-        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
-        devBypassButton.id = 'zen-pomodoro-dev-bypass';
-        devBypassButton.textContent = 'Dev Bypass';
-        
-        buttonDiv.appendChild(cancelButton);
-        buttonDiv.appendChild(devBypassButton);
-        buttonDiv.appendChild(holdButton);
-        
-        lockContent.appendChild(h2);
-        lockContent.appendChild(p);
-        lockContent.appendChild(timerDiv);
-        lockContent.appendChild(pSub);
-        lockContent.appendChild(buttonDiv);
-        
-        this.lockScreen.appendChild(lockContent);
-        document.documentElement.appendChild(this.lockScreen);
-        
-        // PERFORMANCE FIX: Cache timer element reference
-        this.lockTimerElement = timerDiv;
-        
-        // Hold-to-unlock logic
-        let currentWaitTime = waitTime;
-        
-        const startHold = (e) => {
-          // Prevent default for touch events to avoid scrolling
-          if (e.type === 'touchstart') {
-            e.preventDefault();
-          }
-          
-          // Clear any existing interval to prevent race conditions
-          if (this.holdToUnlockIntervalId) {
-            clearInterval(this.holdToUnlockIntervalId);
-            this.holdToUnlockIntervalId = null;
-          }
-          
-          this.holdToUnlockIntervalId = setInterval(() => {
-            currentWaitTime--;
-            if (this.lockTimerElement) {
-              this.lockTimerElement.textContent = currentWaitTime.toString();
-            }
-            
-            // Update progress bar with null check
-            const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
-            if (holdProgress && holdProgress.style) {
-              holdProgress.style.width = `${percent}%`;
-            }
-            
-            if (currentWaitTime <= 0) {
-              if (this.holdToUnlockIntervalId) {
-                clearInterval(this.holdToUnlockIntervalId);
-                this.holdToUnlockIntervalId = null;
-              }
-              this.cleanupLockScreen();
-              onUnlock();
-            }
-          }, 1000);
-        };
-        
-        const stopHold = () => {
-          // Reset timer when button released
-          if (this.holdToUnlockIntervalId) {
-            clearInterval(this.holdToUnlockIntervalId);
-            this.holdToUnlockIntervalId = null;
-          }
-          currentWaitTime = waitTime;
+        this.holdToUnlockIntervalId = setInterval(() => {
+          currentWaitTime--;
           if (this.lockTimerElement) {
-            this.lockTimerElement.textContent = waitTime.toString();
+            this.lockTimerElement.textContent = currentWaitTime.toString();
           }
-          // Add null check for holdProgress
-          if (holdProgress) {
-            holdProgress.style.width = '0%';
+          
+          const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
+          if (holdProgress?.style) {
+            holdProgress.style.width = `${percent}%`;
           }
-        };
-        
-        // Mouse and touch event handlers
-        holdButton.addEventListener('mousedown', startHold);
-        holdButton.addEventListener('mouseup', stopHold);
-        holdButton.addEventListener('mouseleave', stopHold);
-        // Note: passive: false is required for touchstart to allow preventDefault() to work,
-        // which prevents unwanted page scrolling while holding the button
-        holdButton.addEventListener('touchstart', startHold, { passive: false });
-        holdButton.addEventListener('touchend', stopHold);
-        holdButton.addEventListener('touchcancel', stopHold);
-        
-        // Keyboard accessibility - support space/enter for hold
-        holdButton.addEventListener('keydown', (e) => {
-          if (e.key === ' ' || e.key === 'Enter') {
-            e.preventDefault();
-            startHold(e);
-          }
-        });
-        holdButton.addEventListener('keyup', (e) => {
-          if (e.key === ' ' || e.key === 'Enter') {
-            stopHold();
-          }
-        });
-        
-        // Cancel button handler
-        cancelButton.addEventListener('click', () => {
-          this.cleanupLockScreen();
-        });
-        
-        // Dev bypass button handler
-        devBypassButton.addEventListener('click', () => {
-          this.showDevBypassPrompt(() => {
+          
+          if (currentWaitTime <= 0) {
+            this._clearHoldInterval();
             this.cleanupLockScreen();
             onUnlock();
-          });
-        });
+          }
+        }, 1000);
+      };
+      
+      const stopHold = () => {
+        this._clearHoldInterval();
+        currentWaitTime = waitTime;
+        if (this.lockTimerElement) {
+          this.lockTimerElement.textContent = waitTime.toString();
+        }
+        if (holdProgress) {
+          holdProgress.style.width = '0%';
+        }
+      };
+      
+      // Mouse events
+      holdButton.addEventListener('mousedown', startHold);
+      holdButton.addEventListener('mouseup', stopHold);
+      holdButton.addEventListener('mouseleave', stopHold);
+      
+      // Touch events (passive: false to allow preventDefault)
+      holdButton.addEventListener('touchstart', startHold, { passive: false });
+      holdButton.addEventListener('touchend', stopHold);
+      holdButton.addEventListener('touchcancel', stopHold);
+      
+      // Keyboard accessibility
+      holdButton.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          startHold(e);
+        }
+      });
+      holdButton.addEventListener('keyup', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') stopHold();
+      });
+    }
+
+    /**
+     * Clear the hold-to-unlock interval if active.
+     * @private
+     */
+    _clearHoldInterval() {
+      if (this.holdToUnlockIntervalId) {
+        clearInterval(this.holdToUnlockIntervalId);
+        this.holdToUnlockIntervalId = null;
       }
     }
 
