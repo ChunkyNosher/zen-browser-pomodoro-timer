@@ -368,7 +368,7 @@
       );
     };
     
-    if (timerActive) {  // Always require lockout when stopping active timer
+    if (timerActive) {  // Show lockout only when timer is active; skip if already stopped
       window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
     } else {
       showStopConfirmation();

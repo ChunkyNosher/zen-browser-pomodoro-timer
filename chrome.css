@@ -621,12 +621,10 @@
 }
 
 /* ACCESSIBILITY FIX: Only animate if user has no motion preference
-   Issue 2 FIX: Use animation-fill-mode: forwards and animation-iteration-count: 1
-   to prevent flickering when animation re-triggers on style recalculations */
+   Issue 2 FIX: Use animation-fill-mode: forwards to prevent flickering */
 @media (prefers-reduced-motion: no-preference) {
   #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
     animation: fade-in 0.3s ease forwards;
-    animation-iteration-count: 1;
   }
 
   /* Phase transition animation */
