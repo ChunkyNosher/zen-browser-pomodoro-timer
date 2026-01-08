@@ -286,6 +286,10 @@
   margin: 0 0 16px;
   font-size: 24px;
   font-weight: 700;
+
+  /* Issue 8: Make dialog header draggable */
+  cursor: move;
+  user-select: none;
 }
 
 .zen-pomodoro-dialog p {
@@ -612,10 +616,13 @@
   }
 }
 
-/* ACCESSIBILITY FIX: Only animate if user has no motion preference */
+/* ACCESSIBILITY FIX: Only animate if user has no motion preference
+   Issue 2 FIX: Use animation-fill-mode: forwards and animation-iteration-count: 1
+   to prevent flickering when animation re-triggers on style recalculations */
 @media (prefers-reduced-motion: no-preference) {
-  #zen-pomodoro-overlay.active {
-    animation: fade-in 0.3s ease;
+  #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
+    animation: fade-in 0.3s ease forwards;
+    animation-iteration-count: 1;
   }
 
   /* Phase transition animation */
@@ -642,7 +649,8 @@
 
 /* Fallback for reduced motion - no animations */
 @media (prefers-reduced-motion: reduce) {
-  #zen-pomodoro-overlay.active {
+  #zen-pomodoro-overlay.active,
+  #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
     animation: none;
   }
 
@@ -823,5 +831,16 @@
 
 /* Issue 9: Wider select dropdown for mode selection */
 #zen-pomodoro-mode-select {
-  width: 150px;
+  width: 170px;
+}
+
+/* ============================================
+   Issue 8: Draggable Dialog Support
+   ============================================ */
+.zen-pomodoro-dialog.dragging {
+  user-select: none;
+}
+
+.zen-pomodoro-dialog.dragging h2 {
+  cursor: grabbing;
 }

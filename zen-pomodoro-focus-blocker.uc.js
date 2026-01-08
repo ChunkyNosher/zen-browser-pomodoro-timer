@@ -193,6 +193,120 @@
   }
 
   /**
+   * Issue 8: Setup drag functionality for dialogs
+   * Makes a dialog draggable by its header (h2 element).
+   * The dialog can be moved within the viewport boundaries.
+   * 
+   * @param {HTMLElement} dialog - The dialog element to make draggable.
+   *                               Must contain an h2 element as the drag handle.
+   * @returns {void}
+   * 
+   * @example
+   * const dialog = document.createElement('div');
+   * dialog.className = 'zen-pomodoro-dialog active';
+   * // ... add h2 and other content ...
+   * document.documentElement.appendChild(dialog);
+   * setupDialogDrag(dialog);
+   */
+  function setupDialogDrag(dialog) {
+    const header = dialog.querySelector('h2');
+    if (!header) return;
+    
+    let isDragging = false;
+    let startX, startY;
+    let startLeft, startTop;
+    let dialogWidth, dialogHeight;
+    
+    // Clean up function to remove document-level listeners
+    const cleanupDrag = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      isDragging = false;
+    };
+    
+    const onMouseDown = (e) => {
+      // Only start drag on left mouse button
+      if (e.button !== 0) return;
+      
+      e.preventDefault();
+      isDragging = true;
+      
+      const rect = dialog.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      // If dialog is centered with transform, convert to left/top positioning
+      const computedStyle = window.getComputedStyle(dialog);
+      if (computedStyle.transform !== 'none') {
+        dialog.style.transform = 'none';
+        dialog.style.left = `${rect.left}px`;
+        dialog.style.top = `${rect.top}px`;
+      }
+      
+      startLeft = rect.left;
+      startTop = rect.top;
+      dialogWidth = rect.width;
+      dialogHeight = rect.height;
+      
+      dialog.classList.add('dragging');
+      
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+    
+    const onMouseMove = (e) => {
+      if (!isDragging) return;
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      let newLeft = startLeft + deltaX;
+      let newTop = startTop + deltaY;
+      
+      // Keep within viewport boundaries
+      const maxX = window.innerWidth - dialogWidth;
+      const maxY = window.innerHeight - dialogHeight;
+      
+      newLeft = Math.max(0, Math.min(newLeft, maxX));
+      newTop = Math.max(0, Math.min(newTop, maxY));
+      
+      dialog.style.left = `${newLeft}px`;
+      dialog.style.top = `${newTop}px`;
+    };
+    
+    const onMouseUp = () => {
+      if (!isDragging) return;
+      
+      isDragging = false;
+      dialog.classList.remove('dragging');
+      
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    
+    header.addEventListener('mousedown', onMouseDown);
+    
+    // Use MutationObserver to clean up when dialog is removed from DOM
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const removedNode of mutation.removedNodes) {
+          if (removedNode === dialog || removedNode.contains?.(dialog)) {
+            cleanupDrag();
+            header.removeEventListener('mousedown', onMouseDown);
+            observer.disconnect();
+            return;
+          }
+        }
+      }
+    });
+    
+    // Observe the parent for child removal
+    if (dialog.parentNode) {
+      observer.observe(dialog.parentNode, { childList: true, subtree: true });
+    }
+  }
+
+  /**
    * Generate cryptographically secure random code for settings lock
    * SECURITY FIX: Uses crypto.getRandomValues() instead of Math.random()
    */
@@ -1131,14 +1245,17 @@
     /**
      * Show overlay
      * FLICKERING FIX: Only add 'active' class if not already visible to prevent
-     * re-triggering CSS animations on every tick
+     * re-triggering CSS animations on every tick. Uses separate animation class
+     * that's only added once when first shown.
      */
     show(phase = 'focus') {
       if (!this.overlay) this.createOverlay();
       
-      // Only add active class if not already showing to prevent animation flicker
+      // Only add active class and trigger animation if not already showing
       if (!this.isVisible) {
         this.overlay.classList.add('active');
+        // Add animation class separately so it only triggers once
+        this.overlay.classList.add('zen-pomodoro-animate-in');
         this.isVisible = true;
       }
       
@@ -1152,10 +1269,12 @@
 
     /**
      * Hide overlay
+     * Also removes animation class so it can re-trigger when shown again
      */
     hide() {
       if (this.overlay) {
         this.overlay.classList.remove('active');
+        this.overlay.classList.remove('zen-pomodoro-animate-in');
         this.isVisible = false;
       }
     }
@@ -1276,6 +1395,17 @@
   // Keyboard Shortcut Module
   // ============================================
   
+  // Issue 4: Define dialog selectors as a constant for maintainability
+  const POMODORO_DIALOG_SELECTORS = [
+    '#zen-pomodoro-menu-dialog',
+    '#zen-pomodoro-start-dialog',
+    '#zen-pomodoro-settings-dialog',
+    '#zen-pomodoro-lock-screen',
+    '#zen-pomodoro-alert-dialog',
+    '#zen-pomodoro-confirm-dialog',
+    '#zen-pomodoro-dev-bypass-dialog'
+  ];
+  
   class KeyboardShortcutHandler {
     constructor() {
       this.keydownHandler = null;
@@ -1292,16 +1422,7 @@
         window.zenPomodoroApp.security.cleanupLockScreen();
       }
       
-      const selectors = [
-        '#zen-pomodoro-menu-dialog',
-        '#zen-pomodoro-start-dialog',
-        '#zen-pomodoro-settings-dialog',
-        '#zen-pomodoro-lock-screen',
-        '#zen-pomodoro-alert-dialog',
-        '#zen-pomodoro-confirm-dialog',
-        '#zen-pomodoro-dev-bypass-dialog'
-      ];
-      selectors.forEach(sel => {
+      POMODORO_DIALOG_SELECTORS.forEach(sel => {
         const el = document.querySelector(sel);
         if (el) el.remove();
       });
@@ -1380,10 +1501,19 @@
 
     /**
      * Show the main Pomodoro menu dialog
+     * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
      */
     showPomodoroMenu() {
-      // Issue 3: Close all existing dialogs to prevent duplicates
-      this.closeAllDialogs();
+      // Issue 4: Check if any dialogs are currently open using shared constant
+      const existingDialogs = document.querySelectorAll(
+        POMODORO_DIALOG_SELECTORS.join(', ')
+      );
+      
+      if (existingDialogs.length > 0) {
+        // If any dialog exists, close them all and return (toggle behavior)
+        this.closeAllDialogs();
+        return;
+      }
       
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-menu-dialog';
@@ -1496,6 +1626,9 @@
       dialog.appendChild(buttonDiv);
       
       document.documentElement.appendChild(dialog);
+      
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
       
       // Focus the dialog
       dialog.focus();
@@ -1674,6 +1807,9 @@
       dialog.appendChild(buttonDiv);
       
       document.documentElement.appendChild(dialog);
+      
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
       
       // Issue 9: Update visibility based on mode selection
       modeSelect.addEventListener('change', () => {
@@ -2084,6 +2220,9 @@
       
       document.documentElement.appendChild(dialog);
       
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
+      
       cancelButton.addEventListener('click', () => {
         dialog.remove();
       });
@@ -2262,6 +2401,9 @@
       
       document.documentElement.appendChild(dialog);
       
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
+      
       // Focus input
       input.focus();
       
@@ -2414,7 +2556,9 @@
         h2.textContent = 'Settings Locked';
         
         const p = document.createElement('p');
-        p.textContent = 'Hold the button below to unlock settings:';
+        p.textContent = timerActive 
+          ? 'Timer is active. Hold the button below to unlock settings:'
+          : 'Hold the button below to unlock settings:';
         
         const timerDiv = document.createElement('div');
         timerDiv.id = 'zen-pomodoro-lock-timer';
@@ -2904,6 +3048,9 @@
       
       document.documentElement.appendChild(dialog);
       
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
+      
       okButton.addEventListener('click', () => {
         dialog.remove();
       });
@@ -2944,6 +3091,9 @@
       dialog.appendChild(buttonDiv);
       
       document.documentElement.appendChild(dialog);
+      
+      // Issue 8: Make dialog draggable
+      setupDialogDrag(dialog);
       
       cancelButton.addEventListener('click', () => {
         dialog.remove();
