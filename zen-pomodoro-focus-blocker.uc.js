@@ -236,6 +236,31 @@
     return text.replace(/[<>]/g, '');
   }
 
+  /**
+   * Helper to handle stop timer with lockout
+   * Reduces code duplication for stop timer logic
+   * @param {Function} onStop - Callback to execute after successful stop confirmation
+   */
+  function handleStopTimerWithLockout(onStop) {
+    if (!window.zenPomodoroApp) return;
+    
+    const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+    
+    const showStopConfirmation = () => {
+      window.zenPomodoroApp.showCustomConfirm(
+        'Stop Timer',
+        'Are you sure you want to stop the timer?',
+        onStop
+      );
+    };
+    
+    if (timerActive && window.zenPomodoroApp.security.shouldLockSettings(true)) {
+      window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
+    } else {
+      showStopConfirmation();
+    }
+  }
+
   // ============================================
   // Timer Engine Module
   // ============================================
@@ -260,8 +285,11 @@
 
     /**
      * Start the timer
+     * @param {string} mode - Timer mode ('pomodoro' or 'simple')
+     * @param {number} cycles - Number of pomodoro cycles
+     * @param {Object} sessionOverrides - Optional session-only duration overrides
      */
-    start(mode = 'pomodoro', cycles = 4) {
+    start(mode = 'pomodoro', cycles = 4, sessionOverrides = {}) {
       this.mode = mode;
       this.totalCycles = cycles;
       this.currentCycle = 1;
@@ -270,13 +298,19 @@
       this.isPaused = false;
       this.tickCounter = 0;
       
-      // Store config with timer state for proper restoration
-      this.savedConfig = { ...this.config };
+      // Get base config from preferences (ensures we start fresh without previous session modifications)
+      this.config = getConfig();
+      
+      // Apply session-only overrides (these don't persist to saved config)
+      const effectiveConfig = { ...this.config, ...sessionOverrides };
+      
+      // Store the effective config with timer state for proper restoration
+      this.savedConfig = { ...effectiveConfig };
 
       if (mode === 'simple') {
-        this.remainingTime = this.config.simpleDuration * 60;
+        this.remainingTime = effectiveConfig.simpleDuration * 60;
       } else {
-        this.remainingTime = this.config.focusDuration * 60;
+        this.remainingTime = effectiveConfig.focusDuration * 60;
       }
 
       this.startInterval();
@@ -761,8 +795,13 @@
       this.indicator = null;
       this.config = getConfig();
       this.isVisible = false;
-      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles responsive sizing
-      // The overlay uses position: fixed with width: 100% and height: 100% to fill viewport
+      this.contentAreaObserver = null; // Issue 1: Observer for content area size changes
+      this.indicatorWidth = 0; // Cached indicator width for drag operations
+      this.indicatorHeight = 0; // Cached indicator height for drag operations
+      this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.contentArea = null; // Store reference for cleanup
+      this.originalContentAreaPosition = null; // Store original position for restoration
+      this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
 
     /**
@@ -846,19 +885,206 @@
       this.indicator.appendChild(indicatorDot);
       this.indicator.appendChild(indicatorText);
 
-      document.documentElement.appendChild(this.overlay);
+      // Issue 1: Position overlay within content area instead of full window
+      const contentArea = document.querySelector('#tabbrowser-tabpanels') || 
+                          document.querySelector('#appcontent') || 
+                          document.querySelector('#browser');
+      if (contentArea) {
+        // Store reference and original position for cleanup
+        this.contentArea = contentArea;
+        const computedPosition = window.getComputedStyle(contentArea).position;
+        this.originalContentAreaPosition = computedPosition;
+        
+        // Only set position if not already a positioning context
+        if (computedPosition === 'static') {
+          contentArea.style.position = 'relative';
+        }
+        contentArea.appendChild(this.overlay);
+        
+        // Issue 1: Set up observer for content area size changes
+        this.setupContentAreaObserver(contentArea);
+      } else {
+        // Fallback to document root if content area not found
+        document.documentElement.appendChild(this.overlay);
+      }
+      
       document.documentElement.appendChild(this.indicator);
 
-      // PERFORMANCE FIX: Removed ResizeObserver - CSS handles sizing automatically
-      // The overlay uses fixed positioning with width: 100% and height: 100%
+      // Issue 8: Set up drag functionality for indicator
+      this.setupIndicatorDrag();
       
-      // Setup button handlers after elements are created
+      // Set up button handlers after elements are created
       // RACE CONDITION FIX: Set up handlers immediately after creation
       this.setupOverlayHandlers();
     }
 
     /**
-     * Setup overlay button handlers
+     * Issue 1: Set up observer for content area size changes
+     * Watches for size/position changes when sidebars are toggled or resized
+     */
+    setupContentAreaObserver(contentArea) {
+      // Clean up existing observer if any
+      if (this.contentAreaObserver) {
+        this.contentAreaObserver.disconnect();
+      }
+      
+      // Also observe parent elements for size changes (sidebar toggles)
+      const browser = document.querySelector('#browser');
+      
+      // Use ResizeObserver with debouncing to detect size changes when sidebars are toggled
+      this.contentAreaObserver = new ResizeObserver((entries) => {
+        // Check if any relevant element has resized
+        let shouldUpdate = false;
+        for (const entry of entries) {
+          if (entry.target === contentArea || (browser && entry.target === browser)) {
+            shouldUpdate = true;
+            break;
+          }
+        }
+        if (!shouldUpdate) {
+          return;
+        }
+
+        // Debounce updates so multiple resize events in the same frame
+        // only trigger a single overlay position update.
+        if (this._overlayUpdateScheduled) {
+          return;
+        }
+        this._overlayUpdateScheduled = true;
+        requestAnimationFrame(() => {
+          this._overlayUpdateScheduled = false;
+          this.updateOverlayPosition(contentArea);
+        });
+      });
+      
+      this.contentAreaObserver.observe(contentArea);
+      
+      if (browser && browser !== contentArea) {
+        this.contentAreaObserver.observe(browser);
+      }
+      
+      // Initial position update
+      this.updateOverlayPosition(contentArea);
+    }
+
+    /**
+     * Issue 1: Update overlay position to match content area
+     * Ensures the overlay continues to cover the visible content area when it resizes.
+     */
+    updateOverlayPosition(contentArea) {
+      if (!this.overlay || !contentArea) {
+        return;
+      }
+
+      // Ensure the overlay is positioned relative to the content area
+      // CSS handles most sizing via width/height: 100%, but we ensure positioning is correct
+      this.overlay.style.position = 'absolute';
+      this.overlay.style.top = '0';
+      this.overlay.style.left = '0';
+    }
+
+    /**
+     * Issue 8: Set up drag functionality for indicator
+     */
+    setupIndicatorDrag() {
+      if (!this.indicator) return;
+      
+      let isDragging = false;
+      let startX, startY;
+      let startLeft, startTop;
+      
+      // Load saved position from preferences and validate against viewport bounds
+      const savedPosX = getPref('indicatorPosX', null);
+      const savedPosY = getPref('indicatorPosY', null);
+      if (savedPosX !== null && savedPosY !== null) {
+        // Ensure saved position is within current viewport bounds
+        const rect = this.indicator.getBoundingClientRect();
+        const indicatorWidth = rect.width;
+        const indicatorHeight = rect.height;
+
+        const rawX = Number(savedPosX);
+        const rawY = Number(savedPosY);
+
+        if (Number.isFinite(rawX) && Number.isFinite(rawY)) {
+          const maxX = Math.max(0, window.innerWidth - indicatorWidth);
+          const maxY = Math.max(0, window.innerHeight - indicatorHeight);
+
+          const clampedX = Math.max(0, Math.min(rawX, maxX));
+          const clampedY = Math.max(0, Math.min(rawY, maxY));
+
+          this.indicator.style.right = 'auto';
+          this.indicator.style.left = `${clampedX}px`;
+          this.indicator.style.top = `${clampedY}px`;
+        }
+      }
+      
+      const onMouseDown = (e) => {
+        // Only start drag on left mouse button
+        if (e.button !== 0) return;
+        
+        e.preventDefault();
+        isDragging = true;
+        
+        const rect = this.indicator.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+        
+        // Cache dimensions at start of drag to avoid repeated getBoundingClientRect calls
+        this.indicatorWidth = rect.width;
+        this.indicatorHeight = rect.height;
+        
+        this.indicator.style.cursor = 'grabbing';
+        
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      };
+      
+      const onMouseMove = (e) => {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newLeft = startLeft + deltaX;
+        let newTop = startTop + deltaY;
+        
+        // Keep within viewport boundaries using cached dimensions
+        const maxX = window.innerWidth - this.indicatorWidth;
+        const maxY = window.innerHeight - this.indicatorHeight;
+        
+        newLeft = Math.max(0, Math.min(newLeft, maxX));
+        newTop = Math.max(0, Math.min(newTop, maxY));
+        
+        // Use left positioning instead of right
+        this.indicator.style.right = 'auto';
+        this.indicator.style.left = `${newLeft}px`;
+        this.indicator.style.top = `${newTop}px`;
+      };
+      
+      const onMouseUp = () => {
+        if (!isDragging) return;
+        
+        isDragging = false;
+        this.indicator.style.cursor = '';
+        
+        // Save position to preferences
+        const rect = this.indicator.getBoundingClientRect();
+        setPref('indicatorPosX', Math.round(rect.left));
+        setPref('indicatorPosY', Math.round(rect.top));
+        
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+      
+      // Store reference for cleanup
+      this.indicatorMouseDownHandler = onMouseDown;
+      this.indicator.addEventListener('mousedown', onMouseDown);
+    }
+
+    /**
+     * Set up overlay button handlers
      * RACE CONDITION FIX: Called immediately after overlay creation
      */
     setupOverlayHandlers() {
@@ -882,16 +1108,10 @@
       
       if (stopButton) {
         stopButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp) {
-            // UI/UX FIX: Use custom dialog instead of confirm()
-            window.zenPomodoroApp.showCustomConfirm(
-              'Stop Timer',
-              'Are you sure you want to stop the timer?',
-              () => {
-                window.zenPomodoroApp.stopTimer();
-              }
-            );
-          }
+          // Issue 6: Require lockout before stopping timer using helper function
+          handleStopTimerWithLockout(() => {
+            window.zenPomodoroApp.stopTimer();
+          });
         });
       }
       
@@ -910,16 +1130,24 @@
 
     /**
      * Show overlay
+     * FLICKERING FIX: Only add 'active' class if not already visible to prevent
+     * re-triggering CSS animations on every tick
      */
     show(phase = 'focus') {
       if (!this.overlay) this.createOverlay();
       
-      this.overlay.classList.add('active');
-      this.overlay.setAttribute('data-phase', phase);
-      this.isVisible = true;
+      // Only add active class if not already showing to prevent animation flicker
+      if (!this.isVisible) {
+        this.overlay.classList.add('active');
+        this.isVisible = true;
+      }
       
-      // Update color based on phase
-      this.updatePhaseColor(phase);
+      // Only update phase color when phase actually changes
+      const currentPhase = this.overlay.getAttribute('data-phase');
+      if (currentPhase !== phase) {
+        this.overlay.setAttribute('data-phase', phase);
+        this.updatePhaseColor(phase);
+      }
     }
 
     /**
@@ -1008,9 +1236,31 @@
 
     /**
      * Remove overlay elements and cleanup
-     * MEMORY LEAK FIX: Removed ResizeObserver cleanup (no longer using it)
+     * MEMORY LEAK FIX: Clean up ResizeObserver and event listeners on destroy
      */
     destroy() {
+      if (this.contentAreaObserver) {
+        this.contentAreaObserver.disconnect();
+        this.contentAreaObserver = null;
+      }
+      
+      // Restore original content area position if we changed it
+      if (this.contentArea && this.originalContentAreaPosition) {
+        if (this.originalContentAreaPosition === 'static') {
+          this.contentArea.style.position = '';
+        } else {
+          this.contentArea.style.position = this.originalContentAreaPosition;
+        }
+        this.contentArea = null;
+        this.originalContentAreaPosition = null;
+      }
+      
+      // Clean up indicator event listener before removing
+      if (this.indicator && this.indicatorMouseDownHandler) {
+        this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
+        this.indicatorMouseDownHandler = null;
+      }
+      
       if (this.overlay) {
         this.overlay.remove();
         this.overlay = null;
@@ -1029,6 +1279,32 @@
   class KeyboardShortcutHandler {
     constructor() {
       this.keydownHandler = null;
+      this.menuDialog = null;
+    }
+
+    /**
+     * Issue 3: Close all existing dialogs to prevent duplicates
+     * MEMORY LEAK FIX: Clean up associated resources for dialogs that manage state
+     */
+    closeAllDialogs() {
+      // Clean up lock screen resources if the security manager exists
+      if (window.zenPomodoroApp?.security) {
+        window.zenPomodoroApp.security.cleanupLockScreen();
+      }
+      
+      const selectors = [
+        '#zen-pomodoro-menu-dialog',
+        '#zen-pomodoro-start-dialog',
+        '#zen-pomodoro-settings-dialog',
+        '#zen-pomodoro-lock-screen',
+        '#zen-pomodoro-alert-dialog',
+        '#zen-pomodoro-confirm-dialog',
+        '#zen-pomodoro-dev-bypass-dialog'
+      ];
+      selectors.forEach(sel => {
+        const el = document.querySelector(sel);
+        if (el) el.remove();
+      });
       this.menuDialog = null;
     }
 
@@ -1106,11 +1382,8 @@
      * Show the main Pomodoro menu dialog
      */
     showPomodoroMenu() {
-      // Remove existing menu if present
-      if (this.menuDialog) {
-        this.menuDialog.remove();
-        this.menuDialog = null;
-      }
+      // Issue 3: Close all existing dialogs to prevent duplicates
+      this.closeAllDialogs();
       
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-menu-dialog';
@@ -1161,13 +1434,10 @@
         stopBtn.addEventListener('click', () => {
           dialog.remove();
           this.menuDialog = null;
-          window.zenPomodoroApp.showCustomConfirm(
-            'Stop Timer',
-            'Are you sure you want to stop the timer?',
-            () => {
-              window.zenPomodoroApp.stopTimer();
-            }
-          );
+          // Issue 6: Require lockout before stopping timer using helper function
+          handleStopTimerWithLockout(() => {
+            window.zenPomodoroApp.stopTimer();
+          });
         });
         
         const settingsBtn = document.createElement('button');
@@ -1265,6 +1535,15 @@
       
       const config = getConfig();
       
+      // Issue 5: Add back button
+      const backButton = document.createElement('button');
+      backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
+      backButton.textContent = '← Back';
+      backButton.addEventListener('click', () => {
+        dialog.remove();
+        this.showPomodoroMenu();
+      });
+      
       const h2 = document.createElement('h2');
       h2.textContent = 'Start Timer';
       
@@ -1287,12 +1566,60 @@
       const pomodoroOption = document.createElement('option');
       pomodoroOption.value = 'pomodoro';
       pomodoroOption.selected = config.timerMode === 'pomodoro';
-      pomodoroOption.textContent = 'Pomodoro Cycles';
+      pomodoroOption.textContent = 'Pomodoro Mode';
       
       modeSelect.appendChild(simpleOption);
       modeSelect.appendChild(pomodoroOption);
       modeRow.appendChild(modeLabel);
       modeRow.appendChild(modeSelect);
+      
+      // Issue 9: Add duration input for simple timer
+      const simpleDurationRow = document.createElement('div');
+      simpleDurationRow.className = 'zen-pomodoro-config-row';
+      simpleDurationRow.id = 'zen-pomodoro-simple-duration-row';
+      simpleDurationRow.style.display = config.timerMode === 'simple' ? 'flex' : 'none';
+      const simpleDurationLabel = document.createElement('label');
+      simpleDurationLabel.textContent = 'Duration (min):';
+      const simpleDurationInput = document.createElement('input');
+      simpleDurationInput.type = 'number';
+      simpleDurationInput.id = 'zen-pomodoro-simple-duration-input';
+      simpleDurationInput.value = config.simpleDuration;
+      simpleDurationInput.min = '1';
+      simpleDurationInput.max = '180';
+      simpleDurationRow.appendChild(simpleDurationLabel);
+      simpleDurationRow.appendChild(simpleDurationInput);
+      
+      // Issue 9: Add focus duration input for pomodoro mode
+      const focusDurationRow = document.createElement('div');
+      focusDurationRow.className = 'zen-pomodoro-config-row';
+      focusDurationRow.id = 'zen-pomodoro-focus-duration-row';
+      focusDurationRow.style.display = config.timerMode === 'pomodoro' ? 'flex' : 'none';
+      const focusDurationLabel = document.createElement('label');
+      focusDurationLabel.textContent = 'Focus (min):';
+      const focusDurationInput = document.createElement('input');
+      focusDurationInput.type = 'number';
+      focusDurationInput.id = 'zen-pomodoro-focus-duration-input';
+      focusDurationInput.value = config.focusDuration;
+      focusDurationInput.min = '1';
+      focusDurationInput.max = '120';
+      focusDurationRow.appendChild(focusDurationLabel);
+      focusDurationRow.appendChild(focusDurationInput);
+      
+      // Issue 9: Add break duration input for pomodoro mode
+      const breakDurationRow = document.createElement('div');
+      breakDurationRow.className = 'zen-pomodoro-config-row';
+      breakDurationRow.id = 'zen-pomodoro-break-duration-row';
+      breakDurationRow.style.display = config.timerMode === 'pomodoro' ? 'flex' : 'none';
+      const breakDurationLabel = document.createElement('label');
+      breakDurationLabel.textContent = 'Break (min):';
+      const breakDurationInput = document.createElement('input');
+      breakDurationInput.type = 'number';
+      breakDurationInput.id = 'zen-pomodoro-break-duration-input';
+      breakDurationInput.value = config.breakDuration;
+      breakDurationInput.min = '1';
+      breakDurationInput.max = '30';
+      breakDurationRow.appendChild(breakDurationLabel);
+      breakDurationRow.appendChild(breakDurationInput);
       
       // Cycles input
       const cyclesRow = document.createElement('div');
@@ -1311,6 +1638,9 @@
       cyclesRow.appendChild(cyclesInput);
       
       configSection.appendChild(modeRow);
+      configSection.appendChild(simpleDurationRow);
+      configSection.appendChild(focusDurationRow);
+      configSection.appendChild(breakDurationRow);
       configSection.appendChild(cyclesRow);
       
       // Buttons
@@ -1338,43 +1668,58 @@
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(startButton);
       
+      dialog.appendChild(backButton);
       dialog.appendChild(h2);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
       
       document.documentElement.appendChild(dialog);
       
+      // Issue 9: Update visibility based on mode selection
       modeSelect.addEventListener('change', () => {
-        cyclesRow.style.display = modeSelect.value === 'pomodoro' ? 'flex' : 'none';
+        const isSimple = modeSelect.value === 'simple';
+        simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
+        focusDurationRow.style.display = isSimple ? 'none' : 'flex';
+        breakDurationRow.style.display = isSimple ? 'none' : 'flex';
+        cyclesRow.style.display = isSimple ? 'none' : 'flex';
       });
       
       cancelButton.addEventListener('click', () => {
         dialog.remove();
       });
       
-      // Setup hold-to-start if enabled
-      if (config.holdToStartDuration > 0 && window.zenPomodoroApp && window.zenPomodoroApp.security) {
-        window.zenPomodoroApp.security.setupHoldToStart(startButton, () => {
-          const mode = modeSelect.value;
-          const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
-          
-          dialog.remove();
-          
-          if (window.zenPomodoroApp) {
-            window.zenPomodoroApp.startTimer(mode, cycles);
-          }
-        });
+      // Issue 9: Helper function to apply session-only duration overrides and start timer
+      const applyDurationsAndStart = () => {
+        const mode = modeSelect.value;
+        const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
+        
+        // Build session-only overrides object (not modifying timer.config directly)
+        const sessionOverrides = {};
+        if (mode === 'simple') {
+          sessionOverrides.simpleDuration = validateIntegerInput(
+            simpleDurationInput.value, 1, 180, config.simpleDuration
+          );
+        } else {
+          sessionOverrides.focusDuration = validateIntegerInput(
+            focusDurationInput.value, 1, 120, config.focusDuration
+          );
+          sessionOverrides.breakDuration = validateIntegerInput(
+            breakDurationInput.value, 1, 30, config.breakDuration
+          );
+        }
+        
+        dialog.remove();
+        
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+        }
+      };
+      
+      // Set up hold-to-start if enabled, otherwise use regular click
+      if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
+        window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
       } else {
-        startButton.addEventListener('click', () => {
-          const mode = modeSelect.value;
-          const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
-          
-          dialog.remove();
-          
-          if (window.zenPomodoroApp) {
-            window.zenPomodoroApp.startTimer(mode, cycles);
-          }
-        });
+        startButton.addEventListener('click', applyDurationsAndStart);
       }
     }
 
@@ -1406,6 +1751,15 @@
       dialog.className = 'zen-pomodoro-dialog active';
       
       const config = getConfig();
+      
+      // Issue 5: Add back button
+      const backButton = document.createElement('button');
+      backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
+      backButton.textContent = '← Back';
+      backButton.addEventListener('click', () => {
+        dialog.remove();
+        this.showPomodoroMenu();
+      });
       
       const h2 = document.createElement('h2');
       h2.textContent = 'Pomodoro Timer Settings';
@@ -1723,6 +2077,7 @@
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(saveButton);
       
+      dialog.appendChild(backButton);
       dialog.appendChild(h2);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
@@ -2391,10 +2746,16 @@
     /**
      * Start the timer
      */
-    startTimer(mode = 'pomodoro', cycles = 4) {
+    /**
+     * Start the timer
+     * @param {string} mode - Timer mode ('pomodoro' or 'simple')
+     * @param {number} cycles - Number of pomodoro cycles
+     * @param {Object} sessionOverrides - Optional session-only duration overrides
+     */
+    startTimer(mode = 'pomodoro', cycles = 4, sessionOverrides = {}) {
       console.log(`Starting timer: mode=${mode}, cycles=${cycles}`);
       
-      this.timer.start(mode, cycles);
+      this.timer.start(mode, cycles, sessionOverrides);
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
     }
