@@ -41,6 +41,16 @@
   // DEV NOTE: This password is for development bypass only and will be removed
   // before production release. It's intentionally hardcoded for testing purposes.
   const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
+  
+  // Constants for keyboard shortcut handling
+  const MODIFIER_KEYS = ['Control', 'Alt', 'Shift', 'Meta'];
+  
+  // Constants for lockout method types
+  const LOCKOUT_METHODS = {
+    CODE: 'code',
+    HOLD: 'hold'
+  };
+  
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
     simpleDuration: 25,
@@ -1334,7 +1344,7 @@
       if (config.holdToStartDuration > 0 && window.zenPomodoroApp && window.zenPomodoroApp.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, () => {
           const mode = modeSelect.value;
-          const cycles = validateIntegerInput(cyclesInput.value, 1, 10, config.cycles);
+          const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
           
           dialog.remove();
           
@@ -1345,7 +1355,7 @@
       } else {
         startButton.addEventListener('click', () => {
           const mode = modeSelect.value;
-          const cycles = validateIntegerInput(cyclesInput.value, 1, 10, config.cycles);
+          const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
           
           dialog.remove();
           
@@ -1429,11 +1439,12 @@
         if (e.metaKey) parts.push('Meta');
         
         // Get the key (ignore modifier keys alone)
-        // Normalize key: single characters to uppercase, special keys stay capitalized
+        // Normalize key: single characters to uppercase, special keys keep their natural casing
         const key = e.key;
-        if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
-          // Normalize to uppercase for consistency with parseShortcut
-          parts.push(key.toUpperCase());
+        if (!MODIFIER_KEYS.includes(key)) {
+          // Only uppercase single character keys, keep special keys like ArrowUp, Enter as-is
+          const normalizedKey = key.length === 1 ? key.toUpperCase() : key;
+          parts.push(normalizedKey);
           
           const shortcutStr = parts.join('+');
           shortcutInput.textContent = shortcutStr;
@@ -1603,14 +1614,14 @@
       idleMethodSelect.id = 'idle-lock-method';
       
       const idleHoldOption = document.createElement('option');
-      idleHoldOption.value = 'hold';
+      idleHoldOption.value = LOCKOUT_METHODS.HOLD;
       idleHoldOption.textContent = 'Hold to Unlock';
-      idleHoldOption.selected = config.settingsLockIdleMethod === 'hold';
+      idleHoldOption.selected = config.settingsLockIdleMethod === LOCKOUT_METHODS.HOLD;
       
       const idleCodeOption = document.createElement('option');
-      idleCodeOption.value = 'code';
+      idleCodeOption.value = LOCKOUT_METHODS.CODE;
       idleCodeOption.textContent = 'Code Entry';
-      idleCodeOption.selected = config.settingsLockIdleMethod === 'code';
+      idleCodeOption.selected = config.settingsLockIdleMethod === LOCKOUT_METHODS.CODE;
       
       idleMethodSelect.appendChild(idleHoldOption);
       idleMethodSelect.appendChild(idleCodeOption);
@@ -1626,14 +1637,14 @@
       activeMethodSelect.id = 'active-lock-method';
       
       const activeHoldOption = document.createElement('option');
-      activeHoldOption.value = 'hold';
+      activeHoldOption.value = LOCKOUT_METHODS.HOLD;
       activeHoldOption.textContent = 'Hold to Unlock';
-      activeHoldOption.selected = config.settingsLockActiveMethod === 'hold';
+      activeHoldOption.selected = config.settingsLockActiveMethod === LOCKOUT_METHODS.HOLD;
       
       const activeCodeOption = document.createElement('option');
-      activeCodeOption.value = 'code';
+      activeCodeOption.value = LOCKOUT_METHODS.CODE;
       activeCodeOption.textContent = 'Code Entry';
-      activeCodeOption.selected = config.settingsLockActiveMethod === 'code';
+      activeCodeOption.selected = config.settingsLockActiveMethod === LOCKOUT_METHODS.CODE;
       
       activeMethodSelect.appendChild(activeHoldOption);
       activeMethodSelect.appendChild(activeCodeOption);
@@ -1910,9 +1921,15 @@
       lockContent.id = 'zen-pomodoro-lock-content';
       
       // Determine which method to use based on timer state and config
-      const method = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
+      // Validate method value and fall back to defaults if invalid
+      let method = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
+      if (method !== LOCKOUT_METHODS.CODE && method !== LOCKOUT_METHODS.HOLD) {
+        // Fall back to defaults: code for active, hold for idle
+        method = timerActive ? LOCKOUT_METHODS.CODE : LOCKOUT_METHODS.HOLD;
+        console.warn(`Zen Pomodoro: Invalid lockout method "${method}", using default.`);
+      }
       
-      if (method === 'code') {
+      if (method === LOCKOUT_METHODS.CODE) {
         // Code entry mode
         const code = generateRandomCode(
           config.settingsLockActiveCodeLength,
