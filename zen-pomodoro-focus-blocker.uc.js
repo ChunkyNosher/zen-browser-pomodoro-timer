@@ -351,6 +351,177 @@
   }
 
   /**
+   * Mapping of shortcut key names to their result property names.
+   * Used by parseShortcut to convert string shortcuts to key objects.
+   * @constant {Object<string, string>}
+   */
+  const SHORTCUT_MODIFIER_MAP = {
+    'ctrl': 'ctrlKey',
+    'control': 'ctrlKey',
+    'alt': 'altKey',
+    'shift': 'shiftKey',
+    'meta': 'metaKey',
+    'cmd': 'metaKey',
+    'command': 'metaKey'
+  };
+
+  /**
+   * Check if a workspace array is valid and non-empty.
+   * @param {*} workspaces - The workspaces value to check
+   * @returns {boolean} True if valid non-empty array
+   */
+  function isValidWorkspaceArray(workspaces) {
+    return workspaces && Array.isArray(workspaces) && workspaces.length > 0;
+  }
+
+  /**
+   * Format workspace data from API response to standard format.
+   * @param {Array} workspaces - Raw workspace array from API
+   * @returns {Array<{id: string, name: string}>} Formatted workspace array
+   */
+  function formatWorkspacesFromApi(workspaces) {
+    return workspaces.map(ws => ({
+      id: ws.uuid || ws.id,
+      name: ws.name || ws.title || 'Unnamed Workspace'
+    }));
+  }
+
+  /**
+   * Extract workspace name from a DOM button element.
+   * Tries multiple attributes in priority order.
+   * @param {Element} btn - The button element
+   * @param {string} id - The workspace ID (for fallback name)
+   * @returns {string} The workspace name
+   */
+  function extractWorkspaceNameFromButton(btn, id) {
+    // Priority order for finding workspace name
+    const attributeChecks = [
+      () => btn.getAttribute('data-workspace-name'),
+      () => btn.getAttribute('data-name'),
+      () => btn.getAttribute('label'),
+      () => btn.getAttribute('tooltiptext'),
+      () => btn.getAttribute('aria-label'),
+      () => btn.getAttribute('title'),
+      () => {
+        const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
+        return labelEl?.textContent?.trim();
+      },
+      () => btn.textContent?.trim()
+    ];
+    
+    for (const check of attributeChecks) {
+      const name = check();
+      if (isValidName(name)) {
+        return name;
+      }
+    }
+    
+    // Fallback name using truncated ID
+    return createFallbackWorkspaceName(id);
+  }
+
+  /**
+   * Check if a workspace name is valid (non-empty and not 'undefined').
+   * @param {*} name - The name to check
+   * @returns {boolean} True if valid
+   */
+  function isValidName(name) {
+    return Boolean(name) && name !== 'undefined' && name !== '';
+  }
+
+  /**
+   * Create a fallback workspace name from an ID.
+   * @param {string} id - The workspace ID
+   * @returns {string} Fallback name
+   */
+  function createFallbackWorkspaceName(id) {
+    const idPrefix = id?.substring(0, 8) || 'Unknown';
+    return `Workspace ${idPrefix}`;
+  }
+
+  /**
+   * Get phase display label from phase identifier.
+   * @param {string} phase - Phase identifier ('focus', 'break', 'long-break')
+   * @returns {string} Human-readable phase label
+   */
+  function getPhaseLabel(phase) {
+    const labels = {
+      'focus': 'Focus Period',
+      'break': 'Break Time',
+      'long-break': 'Long Break'
+    };
+    return labels[phase] || 'Focus Period';
+  }
+
+  /**
+   * Get short phase label for indicator.
+   * @param {string} phase - Phase identifier
+   * @returns {string} Short phase label
+   */
+  function getShortPhaseLabel(phase) {
+    return phase === 'focus' ? 'Focus' : 'Break';
+  }
+
+  /**
+   * Create a labeled input row for dialog forms.
+   * @param {string} labelText - Label text
+   * @param {string} inputId - Input element ID
+   * @param {Object} inputAttrs - Input attributes (type, value, min, max)
+   * @returns {HTMLElement} The row element
+   */
+  function createLabeledInputRow(labelText, inputId, inputAttrs = {}) {
+    const row = document.createElement('div');
+    row.className = 'zen-pomodoro-config-row';
+    row.id = `${inputId}-row`;
+    
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    
+    const input = document.createElement('input');
+    input.type = inputAttrs.type || 'number';
+    input.id = inputId;
+    if (inputAttrs.value !== undefined) input.value = inputAttrs.value;
+    if (inputAttrs.min !== undefined) input.min = inputAttrs.min;
+    if (inputAttrs.max !== undefined) input.max = inputAttrs.max;
+    
+    row.appendChild(label);
+    row.appendChild(input);
+    
+    return row;
+  }
+
+  /**
+   * Create a labeled select row for dialog forms.
+   * @param {string} labelText - Label text
+   * @param {string} selectId - Select element ID
+   * @param {Array<{value: string, text: string, selected?: boolean}>} options - Select options
+   * @returns {{row: HTMLElement, select: HTMLSelectElement}} The row and select elements
+   */
+  function createLabeledSelectRow(labelText, selectId, options) {
+    const row = document.createElement('div');
+    row.className = 'zen-pomodoro-config-row';
+    
+    const label = document.createElement('label');
+    label.textContent = labelText;
+    
+    const select = document.createElement('select');
+    select.id = selectId;
+    
+    options.forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.text;
+      if (opt.selected) option.selected = true;
+      select.appendChild(option);
+    });
+    
+    row.appendChild(label);
+    row.appendChild(select);
+    
+    return { row, select };
+  }
+
+  /**
    * Helper to handle stop timer with lockout
    * Reduces code duplication for stop timer logic.
    * 
@@ -481,51 +652,64 @@
       }
 
       // Pomodoro mode phase transitions
-      if (this.currentPhase === 'focus') {
-        // Focus period complete, determine break type
-        // Long breaks occur after completing N focus cycles (where N = longBreakInterval)
-        // Example: if longBreakInterval=4, long breaks occur after cycles 4, 8, 12, etc.
-        // LOGIC FIX: Check if this is the last cycle
-        const isLastCycle = (this.currentCycle >= this.totalCycles);
-        
-        if (isLastCycle) {
-          // Last focus cycle complete - end session without break
-          this.completeTimer();
-          return;
-        }
-        
-        // Not the last cycle, so give appropriate break
-        const isLongBreakCycle = (this.currentCycle % this.config.longBreakInterval === 0);
-        
-        if (isLongBreakCycle) {
-          // Long break after completing N cycles
-          this.currentPhase = 'long-break';
-          this.remainingTime = this.config.longBreakDuration * 60;
-        } else {
-          // Regular short break
-          this.currentPhase = 'break';
-          this.remainingTime = this.config.breakDuration * 60;
-        }
-      } else {
-        // Break complete, move to next cycle
-        this.currentCycle++;
-        
-        if (this.currentCycle > this.totalCycles) {
-          // All cycles complete
-          this.completeTimer();
-          return;
-        }
-        
-        // Start next focus period
-        this.currentPhase = 'focus';
-        this.remainingTime = this.config.focusDuration * 60;
-      }
+      const shouldComplete = this.currentPhase === 'focus' 
+        ? this._handleFocusPhaseComplete()
+        : this._handleBreakPhaseComplete();
+      
+      if (shouldComplete) return;
 
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
 
       this.saveState();
+    }
+
+    /**
+     * Handle completion of a focus phase.
+     * @returns {boolean} True if timer should complete, false to continue
+     * @private
+     */
+    _handleFocusPhaseComplete() {
+      const isLastCycle = this.currentCycle >= this.totalCycles;
+      
+      if (isLastCycle) {
+        this.completeTimer();
+        return true;
+      }
+      
+      // Determine break type
+      const isLongBreakCycle = this.currentCycle % this.config.longBreakInterval === 0;
+      
+      if (isLongBreakCycle) {
+        this.currentPhase = 'long-break';
+        this.remainingTime = this.config.longBreakDuration * 60;
+      } else {
+        this.currentPhase = 'break';
+        this.remainingTime = this.config.breakDuration * 60;
+      }
+      
+      return false;
+    }
+
+    /**
+     * Handle completion of a break phase.
+     * @returns {boolean} True if timer should complete, false to continue
+     * @private
+     */
+    _handleBreakPhaseComplete() {
+      this.currentCycle++;
+      
+      if (this.currentCycle > this.totalCycles) {
+        this.completeTimer();
+        return true;
+      }
+      
+      // Start next focus period
+      this.currentPhase = 'focus';
+      this.remainingTime = this.config.focusDuration * 60;
+      
+      return false;
     }
 
     /**
@@ -778,127 +962,21 @@
      */
     getAllWorkspaces() {
       try {
-        // Method 1: Try to use ZenWorkspaces API if available (most reliable)
-        // Try different possible API variants used by Zen Browser
-        // eslint-disable-next-line no-undef
-        if (typeof ZenWorkspaces !== 'undefined') {
-          let workspaces = null;
-          
-          // Try different method names that Zen Browser might use
-          // eslint-disable-next-line no-undef
-          if (typeof ZenWorkspaces.getWorkspaces === 'function') {
-            // eslint-disable-next-line no-undef
-            workspaces = ZenWorkspaces.getWorkspaces();
-          // eslint-disable-next-line no-undef
-          } else if (typeof ZenWorkspaces._workspaces !== 'undefined') {
-            // eslint-disable-next-line no-undef
-            workspaces = ZenWorkspaces._workspaces;
-          // eslint-disable-next-line no-undef
-          } else if (typeof ZenWorkspaces.workspaces !== 'undefined') {
-            // eslint-disable-next-line no-undef
-            workspaces = ZenWorkspaces.workspaces;
-          }
-          
-          if (workspaces && Array.isArray(workspaces) && workspaces.length > 0) {
-            console.log('Zen Pomodoro: Got workspaces from ZenWorkspaces API');
-            return workspaces.map(ws => ({
-              id: ws.uuid || ws.id,
-              name: ws.name || ws.title || 'Unnamed Workspace'
-            }));
-          }
-        }
+        // Method 1: Try ZenWorkspaces API (most reliable)
+        const zenResult = this._tryZenWorkspacesApi();
+        if (zenResult) return zenResult;
         
-        // Method 1b: Try legacy gZenWorkspaces API
-        // eslint-disable-next-line no-undef
-        if (typeof gZenWorkspaces !== 'undefined') {
-          let workspaces = null;
-          
-          // eslint-disable-next-line no-undef
-          if (typeof gZenWorkspaces.getWorkspaces === 'function') {
-            // eslint-disable-next-line no-undef
-            workspaces = gZenWorkspaces.getWorkspaces();
-          // eslint-disable-next-line no-undef
-          } else if (gZenWorkspaces._workspaces) {
-            // eslint-disable-next-line no-undef
-            workspaces = gZenWorkspaces._workspaces;
-          }
-          
-          if (workspaces && Array.isArray(workspaces) && workspaces.length > 0) {
-            console.log('Zen Pomodoro: Got workspaces from gZenWorkspaces API');
-            return workspaces.map(ws => ({
-              id: ws.uuid || ws.id,
-              name: ws.name || ws.title || 'Unnamed Workspace'
-            }));
-          }
-        }
+        // Method 2: Try legacy gZenWorkspaces API
+        const legacyResult = this._tryLegacyWorkspacesApi();
+        if (legacyResult) return legacyResult;
         
-        // Method 2: Query DOM buttons with comprehensive attribute checks
-        const workspaceButtons = document.querySelectorAll('toolbarbutton[zen-workspace-id]');
-        if (workspaceButtons.length > 0) {
-          console.log(`Zen Pomodoro: Got ${workspaceButtons.length} workspaces from DOM`);
-          return Array.from(workspaceButtons).map(btn => {
-            const id = btn.getAttribute('zen-workspace-id');
-            
-            // Try multiple attributes to find the workspace name
-            // Priority order based on what's most likely to have the actual name
-            let name = null;
-            
-            // Check for data attributes first (often most reliable)
-            name = btn.getAttribute('data-workspace-name') ||
-                   btn.getAttribute('data-name');
-            
-            // Then check standard XUL/HTML attributes
-            if (!name || name === 'undefined') {
-              name = btn.getAttribute('label');
-            }
-            if (!name || name === 'undefined') {
-              name = btn.getAttribute('tooltiptext');
-            }
-            if (!name || name === 'undefined') {
-              name = btn.getAttribute('aria-label');
-            }
-            if (!name || name === 'undefined') {
-              name = btn.getAttribute('title');
-            }
-            
-            // Try to get text content from child elements
-            if (!name || name === 'undefined') {
-              const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
-              if (labelEl) {
-                name = labelEl.textContent?.trim();
-              }
-            }
-            
-            // Final fallback to direct text content
-            if (!name || name === 'undefined') {
-              name = btn.textContent?.trim();
-            }
-            
-            // Clean up the name
-            if (!name || name === 'undefined' || name === '') {
-              name = `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
-            }
-            
-            return { id, name };
-          });
-        }
+        // Method 3: Query DOM buttons
+        const domResult = this._tryDomWorkspaceButtons();
+        if (domResult) return domResult;
         
-        // Method 3: Try to find workspace panel/container elements
-        const workspaceContainer = document.querySelector('#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]');
-        if (workspaceContainer) {
-          const items = workspaceContainer.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
-          if (items.length > 0) {
-            console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
-            return Array.from(items).map(item => {
-              const id = item.getAttribute('zen-workspace-id') || item.getAttribute('data-workspace-id');
-              const name = item.getAttribute('label') || 
-                          item.getAttribute('data-name') || 
-                          item.textContent?.trim() || 
-                          `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
-              return { id, name };
-            });
-          }
-        }
+        // Method 4: Try workspace container elements
+        const containerResult = this._tryWorkspaceContainer();
+        if (containerResult) return containerResult;
         
         console.log('Zen Pomodoro: No workspaces found');
         return [];
@@ -906,6 +984,105 @@
         console.error('Failed to get workspaces:', e);
         return [];
       }
+    }
+
+    /**
+     * Try to get workspaces from ZenWorkspaces API.
+     * @returns {Array|null} Workspaces array or null if not available
+     * @private
+     */
+    _tryZenWorkspacesApi() {
+      // eslint-disable-next-line no-undef
+      if (typeof ZenWorkspaces === 'undefined') return null;
+      
+      // eslint-disable-next-line no-undef
+      const workspaces = this._getWorkspacesFromObject(ZenWorkspaces);
+      
+      if (isValidWorkspaceArray(workspaces)) {
+        console.log('Zen Pomodoro: Got workspaces from ZenWorkspaces API');
+        return formatWorkspacesFromApi(workspaces);
+      }
+      return null;
+    }
+
+    /**
+     * Try to get workspaces from legacy gZenWorkspaces API.
+     * @returns {Array|null} Workspaces array or null if not available
+     * @private
+     */
+    _tryLegacyWorkspacesApi() {
+      // eslint-disable-next-line no-undef
+      if (typeof gZenWorkspaces === 'undefined') return null;
+      
+      // eslint-disable-next-line no-undef
+      const workspaces = this._getWorkspacesFromObject(gZenWorkspaces);
+      
+      if (isValidWorkspaceArray(workspaces)) {
+        console.log('Zen Pomodoro: Got workspaces from gZenWorkspaces API');
+        return formatWorkspacesFromApi(workspaces);
+      }
+      return null;
+    }
+
+    /**
+     * Extract workspaces from a workspace API object.
+     * Tries multiple property/method names.
+     * @param {Object} wsObject - The workspace API object
+     * @returns {Array|null} Workspaces array or null
+     * @private
+     */
+    _getWorkspacesFromObject(wsObject) {
+      if (typeof wsObject.getWorkspaces === 'function') {
+        return wsObject.getWorkspaces();
+      }
+      if (wsObject._workspaces !== undefined) {
+        return wsObject._workspaces;
+      }
+      if (wsObject.workspaces !== undefined) {
+        return wsObject.workspaces;
+      }
+      return null;
+    }
+
+    /**
+     * Try to get workspaces from DOM toolbar buttons.
+     * @returns {Array|null} Workspaces array or null if none found
+     * @private
+     */
+    _tryDomWorkspaceButtons() {
+      const buttons = document.querySelectorAll('toolbarbutton[zen-workspace-id]');
+      if (buttons.length === 0) return null;
+      
+      console.log(`Zen Pomodoro: Got ${buttons.length} workspaces from DOM`);
+      return Array.from(buttons).map(btn => {
+        const id = btn.getAttribute('zen-workspace-id');
+        return { id, name: extractWorkspaceNameFromButton(btn, id) };
+      });
+    }
+
+    /**
+     * Try to get workspaces from container elements.
+     * @returns {Array|null} Workspaces array or null if none found
+     * @private
+     */
+    _tryWorkspaceContainer() {
+      const container = document.querySelector(
+        '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
+      );
+      if (!container) return null;
+      
+      const items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
+      if (items.length === 0) return null;
+      
+      console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
+      return Array.from(items).map(item => {
+        const id = item.getAttribute('zen-workspace-id') || item.getAttribute('data-workspace-id');
+        const name = item.getAttribute('label') || 
+                    item.getAttribute('data-name') || 
+                    item.textContent?.trim() || 
+                    `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+        return { id, name };
+      });
     }
   }
 
@@ -1047,38 +1224,14 @@
      * Watches for size/position changes when sidebars are toggled or resized
      */
     setupContentAreaObserver(contentArea) {
-      // Clean up existing observer if any
-      if (this.contentAreaObserver) {
-        this.contentAreaObserver.disconnect();
-      }
+      this._cleanupContentAreaObserver();
       
-      // Also observe parent elements for size changes (sidebar toggles)
       const browser = document.querySelector('#browser');
       
-      // Use ResizeObserver with debouncing to detect size changes when sidebars are toggled
       this.contentAreaObserver = new ResizeObserver((entries) => {
-        // Check if any relevant element has resized
-        let shouldUpdate = false;
-        for (const entry of entries) {
-          if (entry.target === contentArea || (browser && entry.target === browser)) {
-            shouldUpdate = true;
-            break;
-          }
+        if (this._shouldUpdateOverlay(entries, contentArea, browser)) {
+          this._scheduleOverlayUpdate(contentArea);
         }
-        if (!shouldUpdate) {
-          return;
-        }
-
-        // Debounce updates so multiple resize events in the same frame
-        // only trigger a single overlay position update.
-        if (this._overlayUpdateScheduled) {
-          return;
-        }
-        this._overlayUpdateScheduled = true;
-        requestAnimationFrame(() => {
-          this._overlayUpdateScheduled = false;
-          this.updateOverlayPosition(contentArea);
-        });
       });
       
       this.contentAreaObserver.observe(contentArea);
@@ -1087,8 +1240,46 @@
         this.contentAreaObserver.observe(browser);
       }
       
-      // Initial position update
       this.updateOverlayPosition(contentArea);
+    }
+
+    /**
+     * Clean up existing content area observer.
+     * @private
+     */
+    _cleanupContentAreaObserver() {
+      if (this.contentAreaObserver) {
+        this.contentAreaObserver.disconnect();
+      }
+    }
+
+    /**
+     * Check if overlay should be updated based on resize entries.
+     * @param {ResizeObserverEntry[]} entries - Resize observer entries
+     * @param {Element} contentArea - The content area element
+     * @param {Element|null} browser - The browser element
+     * @returns {boolean} True if overlay should update
+     * @private
+     */
+    _shouldUpdateOverlay(entries, contentArea, browser) {
+      return entries.some(entry => 
+        entry.target === contentArea || (browser && entry.target === browser)
+      );
+    }
+
+    /**
+     * Schedule a debounced overlay position update.
+     * @param {Element} contentArea - The content area element
+     * @private
+     */
+    _scheduleOverlayUpdate(contentArea) {
+      if (this._overlayUpdateScheduled) return;
+      
+      this._overlayUpdateScheduled = true;
+      requestAnimationFrame(() => {
+        this._overlayUpdateScheduled = false;
+        this.updateOverlayPosition(contentArea);
+      });
     }
 
     /**
@@ -1305,34 +1496,65 @@
     updateDisplay(remainingTime, phase, currentCycle, totalCycles) {
       if (!this.overlay) return;
 
-      const timerDisplay = this.overlay.querySelector('#zen-pomodoro-timer-display');
-      const phaseLabel = this.overlay.querySelector('#zen-pomodoro-phase-label');
-      const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
-      const indicatorText = this.indicator?.querySelector('#zen-pomodoro-indicator-text');
-
       const timeStr = formatTime(remainingTime);
       
+      this._updateTimerText(timeStr);
+      this._updatePhaseLabel(phase);
+      this._updateCycleProgress(phase, currentCycle, totalCycles);
+      this._updateIndicator(phase, timeStr);
+    }
+
+    /**
+     * Update the main timer text display.
+     * @param {string} timeStr - Formatted time string
+     * @private
+     */
+    _updateTimerText(timeStr) {
+      const timerDisplay = this.overlay.querySelector('#zen-pomodoro-timer-display');
       if (timerDisplay) timerDisplay.textContent = timeStr;
-      
+    }
+
+    /**
+     * Update the phase label display.
+     * @param {string} phase - Current phase identifier
+     * @private
+     */
+    _updatePhaseLabel(phase) {
+      const phaseLabel = this.overlay.querySelector('#zen-pomodoro-phase-label');
       if (phaseLabel) {
-        phaseLabel.textContent = phase === 'focus' ? 'Focus Period' : 
-                                  phase === 'break' ? 'Break Time' : 
-                                  'Long Break';
+        phaseLabel.textContent = getPhaseLabel(phase);
       }
+    }
+
+    /**
+     * Update the cycle progress display.
+     * @param {string} phase - Current phase identifier
+     * @param {number} currentCycle - Current cycle number
+     * @param {number} totalCycles - Total number of cycles
+     * @private
+     */
+    _updateCycleProgress(phase, currentCycle, totalCycles) {
+      const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
+      if (!cycleProgress) return;
       
-      if (cycleProgress && phase === 'focus') {
+      const shouldShow = phase === 'focus';
+      cycleProgress.style.display = shouldShow ? 'block' : 'none';
+      if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
-        cycleProgress.style.display = 'block';
-      } else if (cycleProgress) {
-        cycleProgress.style.display = 'none';
       }
+    }
 
+    /**
+     * Update the corner indicator.
+     * @param {string} phase - Current phase identifier
+     * @param {string} timeStr - Formatted time string
+     * @private
+     */
+    _updateIndicator(phase, timeStr) {
+      const indicatorText = this.indicator?.querySelector('#zen-pomodoro-indicator-text');
       if (indicatorText) {
-        const phaseShort = phase === 'focus' ? 'Focus' : 'Break';
-        indicatorText.textContent = `${phaseShort}: ${timeStr}`;
+        indicatorText.textContent = `${getShortPhaseLabel(phase)}: ${timeStr}`;
       }
-
-      // Update indicator
       if (this.indicator) {
         this.indicator.setAttribute('data-phase', phase);
       }
@@ -1458,7 +1680,8 @@
     }
 
     /**
-     * Parse keyboard shortcut string into components
+     * Parse keyboard shortcut string into components.
+     * Uses SHORTCUT_MODIFIER_MAP lookup table for cleaner code.
      * @param {string} shortcut - e.g., "Alt+Shift+P" or "Ctrl+P"
      * @returns {object} - { ctrlKey, altKey, shiftKey, metaKey, key }
      */
@@ -1473,14 +1696,9 @@
       };
       
       for (const part of parts) {
-        if (part === 'ctrl' || part === 'control') {
-          result.ctrlKey = true;
-        } else if (part === 'alt') {
-          result.altKey = true;
-        } else if (part === 'shift') {
-          result.shiftKey = true;
-        } else if (part === 'meta' || part === 'cmd' || part === 'command') {
-          result.metaKey = true;
+        const modifierKey = SHORTCUT_MODIFIER_MAP[part];
+        if (modifierKey) {
+          result[modifierKey] = true;
         } else {
           result.key = part.toUpperCase();
         }
@@ -1686,8 +1904,62 @@
       dialog.className = 'zen-pomodoro-dialog active';
       
       const config = getConfig();
+      const isSimpleMode = config.timerMode === 'simple';
       
-      // Issue 5: Add back button
+      // Create dialog structure
+      const backButton = this._createBackButton(dialog);
+      const h2 = this._createDialogTitle('Start Timer');
+      const configSection = document.createElement('div');
+      configSection.className = 'zen-pomodoro-config-section';
+      
+      // Mode selection using helper
+      const { row: modeRow, select: modeSelect } = createLabeledSelectRow('Timer Mode:', 'zen-pomodoro-mode-select', [
+        { value: 'simple', text: 'Simple Timer', selected: isSimpleMode },
+        { value: 'pomodoro', text: 'Pomodoro Mode', selected: !isSimpleMode }
+      ]);
+      
+      // Duration inputs using helper
+      const simpleDurationRow = createLabeledInputRow('Duration (min):', 'zen-pomodoro-simple-duration-input', 
+        { value: config.simpleDuration, min: '1', max: '180' });
+      simpleDurationRow.style.display = isSimpleMode ? 'flex' : 'none';
+      
+      const focusDurationRow = createLabeledInputRow('Focus (min):', 'zen-pomodoro-focus-duration-input',
+        { value: config.focusDuration, min: '1', max: '120' });
+      focusDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      
+      const breakDurationRow = createLabeledInputRow('Break (min):', 'zen-pomodoro-break-duration-input',
+        { value: config.breakDuration, min: '1', max: '30' });
+      breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      
+      const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input',
+        { value: config.cycles, min: '1', max: '20' });
+      cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
+      
+      // Add to config section
+      [modeRow, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow]
+        .forEach(row => configSection.appendChild(row));
+      
+      // Buttons
+      const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons(config);
+      
+      // Assemble dialog
+      [backButton, h2, configSection, buttonDiv].forEach(el => dialog.appendChild(el));
+      document.documentElement.appendChild(dialog);
+      setupDialogDrag(dialog);
+      
+      // Event handlers
+      this._setupModeToggleHandler(modeSelect, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow);
+      cancelButton.addEventListener('click', () => dialog.remove());
+      this._setupStartHandler(dialog, config, modeSelect, startButton);
+    }
+
+    /**
+     * Create a back button for dialogs.
+     * @param {HTMLElement} dialog - The dialog element
+     * @returns {HTMLButtonElement} The back button
+     * @private
+     */
+    _createBackButton(dialog) {
       const backButton = document.createElement('button');
       backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
       backButton.textContent = '← Back';
@@ -1695,107 +1967,28 @@
         dialog.remove();
         this.showPomodoroMenu();
       });
-      
+      return backButton;
+    }
+
+    /**
+     * Create a dialog title element.
+     * @param {string} text - Title text
+     * @returns {HTMLHeadingElement} The title element
+     * @private
+     */
+    _createDialogTitle(text) {
       const h2 = document.createElement('h2');
-      h2.textContent = 'Start Timer';
-      
-      const configSection = document.createElement('div');
-      configSection.className = 'zen-pomodoro-config-section';
-      
-      // Mode selection
-      const modeRow = document.createElement('div');
-      modeRow.className = 'zen-pomodoro-config-row';
-      const modeLabel = document.createElement('label');
-      modeLabel.textContent = 'Timer Mode:';
-      const modeSelect = document.createElement('select');
-      modeSelect.id = 'zen-pomodoro-mode-select';
-      
-      const simpleOption = document.createElement('option');
-      simpleOption.value = 'simple';
-      simpleOption.textContent = 'Simple Timer';
-      simpleOption.selected = config.timerMode === 'simple';
-      
-      const pomodoroOption = document.createElement('option');
-      pomodoroOption.value = 'pomodoro';
-      pomodoroOption.selected = config.timerMode === 'pomodoro';
-      pomodoroOption.textContent = 'Pomodoro Mode';
-      
-      modeSelect.appendChild(simpleOption);
-      modeSelect.appendChild(pomodoroOption);
-      modeRow.appendChild(modeLabel);
-      modeRow.appendChild(modeSelect);
-      
-      // Issue 9: Add duration input for simple timer
-      const simpleDurationRow = document.createElement('div');
-      simpleDurationRow.className = 'zen-pomodoro-config-row';
-      simpleDurationRow.id = 'zen-pomodoro-simple-duration-row';
-      simpleDurationRow.style.display = config.timerMode === 'simple' ? 'flex' : 'none';
-      const simpleDurationLabel = document.createElement('label');
-      simpleDurationLabel.textContent = 'Duration (min):';
-      const simpleDurationInput = document.createElement('input');
-      simpleDurationInput.type = 'number';
-      simpleDurationInput.id = 'zen-pomodoro-simple-duration-input';
-      simpleDurationInput.value = config.simpleDuration;
-      simpleDurationInput.min = '1';
-      simpleDurationInput.max = '180';
-      simpleDurationRow.appendChild(simpleDurationLabel);
-      simpleDurationRow.appendChild(simpleDurationInput);
-      
-      // Issue 9: Add focus duration input for pomodoro mode
-      const focusDurationRow = document.createElement('div');
-      focusDurationRow.className = 'zen-pomodoro-config-row';
-      focusDurationRow.id = 'zen-pomodoro-focus-duration-row';
-      focusDurationRow.style.display = config.timerMode === 'pomodoro' ? 'flex' : 'none';
-      const focusDurationLabel = document.createElement('label');
-      focusDurationLabel.textContent = 'Focus (min):';
-      const focusDurationInput = document.createElement('input');
-      focusDurationInput.type = 'number';
-      focusDurationInput.id = 'zen-pomodoro-focus-duration-input';
-      focusDurationInput.value = config.focusDuration;
-      focusDurationInput.min = '1';
-      focusDurationInput.max = '120';
-      focusDurationRow.appendChild(focusDurationLabel);
-      focusDurationRow.appendChild(focusDurationInput);
-      
-      // Issue 9: Add break duration input for pomodoro mode
-      const breakDurationRow = document.createElement('div');
-      breakDurationRow.className = 'zen-pomodoro-config-row';
-      breakDurationRow.id = 'zen-pomodoro-break-duration-row';
-      breakDurationRow.style.display = config.timerMode === 'pomodoro' ? 'flex' : 'none';
-      const breakDurationLabel = document.createElement('label');
-      breakDurationLabel.textContent = 'Break (min):';
-      const breakDurationInput = document.createElement('input');
-      breakDurationInput.type = 'number';
-      breakDurationInput.id = 'zen-pomodoro-break-duration-input';
-      breakDurationInput.value = config.breakDuration;
-      breakDurationInput.min = '1';
-      breakDurationInput.max = '30';
-      breakDurationRow.appendChild(breakDurationLabel);
-      breakDurationRow.appendChild(breakDurationInput);
-      
-      // Cycles input
-      const cyclesRow = document.createElement('div');
-      cyclesRow.className = 'zen-pomodoro-config-row';
-      cyclesRow.id = 'zen-pomodoro-cycles-row';
-      cyclesRow.style.display = config.timerMode === 'pomodoro' ? 'flex' : 'none';
-      const cyclesLabel = document.createElement('label');
-      cyclesLabel.textContent = 'Number of Cycles:';
-      const cyclesInput = document.createElement('input');
-      cyclesInput.type = 'number';
-      cyclesInput.id = 'zen-pomodoro-cycles-input';
-      cyclesInput.value = config.cycles;
-      cyclesInput.min = '1';
-      cyclesInput.max = '20';
-      cyclesRow.appendChild(cyclesLabel);
-      cyclesRow.appendChild(cyclesInput);
-      
-      configSection.appendChild(modeRow);
-      configSection.appendChild(simpleDurationRow);
-      configSection.appendChild(focusDurationRow);
-      configSection.appendChild(breakDurationRow);
-      configSection.appendChild(cyclesRow);
-      
-      // Buttons
+      h2.textContent = text;
+      return h2;
+    }
+
+    /**
+     * Create buttons for the start timer dialog.
+     * @param {Object} config - Config object
+     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLButtonElement, startButton: HTMLButtonElement}}
+     * @private
+     */
+    _createStartDialogButtons(config) {
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
       
@@ -1804,31 +1997,101 @@
       cancelButton.id = 'zen-pomodoro-cancel-button';
       cancelButton.textContent = 'Cancel';
       
-      // Hold-to-start button integration
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
-      startButton.id = 'zen-pomodoro-start-button';
       
-      // Check if hold-to-start is enabled
       if (config.holdToStartDuration > 0) {
         startButton.id = 'zen-pomodoro-hold-to-start';
         startButton.textContent = `Hold to Start (${config.holdToStartDuration / 1000}s)`;
       } else {
+        startButton.id = 'zen-pomodoro-start-button';
         startButton.textContent = 'Start Timer';
       }
       
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(startButton);
       
-      dialog.appendChild(backButton);
-      dialog.appendChild(h2);
-      dialog.appendChild(configSection);
-      dialog.appendChild(buttonDiv);
+      return { buttonDiv, cancelButton, startButton };
+    }
+
+    /**
+     * Setup mode toggle handler for showing/hiding duration rows.
+     * @param {HTMLSelectElement} modeSelect - Mode select element
+     * @param {HTMLElement} simpleDurationRow - Simple duration row
+     * @param {HTMLElement} focusDurationRow - Focus duration row
+     * @param {HTMLElement} breakDurationRow - Break duration row
+     * @param {HTMLElement} cyclesRow - Cycles row
+     * @private
+     */
+    _setupModeToggleHandler(modeSelect, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow) {
+      modeSelect.addEventListener('change', () => {
+        const isSimple = modeSelect.value === 'simple';
+        simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
+        focusDurationRow.style.display = isSimple ? 'none' : 'flex';
+        breakDurationRow.style.display = isSimple ? 'none' : 'flex';
+        cyclesRow.style.display = isSimple ? 'none' : 'flex';
+      });
+    }
+
+    /**
+     * Setup start button handler with session duration overrides.
+     * @param {HTMLElement} dialog - Dialog element
+     * @param {Object} config - Config object
+     * @param {HTMLSelectElement} modeSelect - Mode select element
+     * @param {HTMLButtonElement} startButton - Start button element
+     * @private
+     */
+    _setupStartHandler(dialog, config, modeSelect, startButton) {
+      const applyDurationsAndStart = () => {
+        const mode = modeSelect.value;
+        const cyclesInput = dialog.querySelector('#zen-pomodoro-cycles-input');
+        const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
+        
+        const sessionOverrides = this._buildSessionOverrides(dialog, mode, config);
+        
+        dialog.remove();
+        
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+        }
+      };
       
-      document.documentElement.appendChild(dialog);
+      if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
+        window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
+      } else {
+        startButton.addEventListener('click', applyDurationsAndStart);
+      }
+    }
+
+    /**
+     * Build session override object from dialog inputs.
+     * @param {HTMLElement} dialog - Dialog element
+     * @param {string} mode - Timer mode
+     * @param {Object} config - Config object
+     * @returns {Object} Session overrides
+     * @private
+     */
+    _buildSessionOverrides(dialog, mode, config) {
+      const sessionOverrides = {};
       
-      // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
+      if (mode === 'simple') {
+        const simpleDurationInput = dialog.querySelector('#zen-pomodoro-simple-duration-input');
+        sessionOverrides.simpleDuration = validateIntegerInput(
+          simpleDurationInput.value, 1, 180, config.simpleDuration
+        );
+      } else {
+        const focusDurationInput = dialog.querySelector('#zen-pomodoro-focus-duration-input');
+        const breakDurationInput = dialog.querySelector('#zen-pomodoro-break-duration-input');
+        sessionOverrides.focusDuration = validateIntegerInput(
+          focusDurationInput.value, 1, 120, config.focusDuration
+        );
+        sessionOverrides.breakDuration = validateIntegerInput(
+          breakDurationInput.value, 1, 30, config.breakDuration
+        );
+      }
+      
+      return sessionOverrides;
+    }
       
       // Issue 9: Update visibility based on mode selection
       modeSelect.addEventListener('change', () => {
