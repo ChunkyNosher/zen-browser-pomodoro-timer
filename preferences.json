@@ -39,5 +39,32 @@
     "label": "Enable Notifications",
     "type": "checkbox",
     "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.settingsLockIdleDuration",
+    "label": "Settings Lock Wait Time (seconds, 0 to disable)",
+    "type": "string",
+    "defaultValue": "20",
+    "placeholder": "20"
+  },
+  {
+    "property": "zen-pomodoro.settingsLockCodeLength",
+    "label": "Settings Lock Code Length (8-128, 0 to disable)",
+    "type": "string",
+    "defaultValue": "64",
+    "placeholder": "64"
+  },
+  {
+    "property": "zen-pomodoro.holdToStartDuration",
+    "label": "Hold-to-Start Duration (ms, 0 to disable)",
+    "type": "string",
+    "defaultValue": "3000",
+    "placeholder": "3000"
+  },
+  {
+    "property": "zen-pomodoro.devMode",
+    "label": "Developer Mode",
+    "type": "checkbox",
+    "defaultValue": false
   }
 ]
