@@ -1,7 +1,7 @@
 {
     "id": "zen-pomodoro-focus-blocker",
     "name": "Zen Pomodoro Focus Blocker",
-    "description": "A productivity mod implementing customizable Pomodoro timer with workspace blocking to enhance focus and prevent distractions",
+    "description": "A productivity mod implementing customizable Pomodoro timer with workspace blocking to enhance focus and prevent distractions.",
     "homepage": "https://github.com/ChunkyNosher/zen-browser-pomodoro-timer",
     "author": "ChunkyNosher",
     "version": "1.0.5",
