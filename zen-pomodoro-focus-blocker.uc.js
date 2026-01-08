@@ -58,8 +58,7 @@
     holdToStartDuration: 3000,
     enableNotifications: true,
     enableAudioAlerts: false,
-    phase: 'focus',
-    devMode: false
+    phase: 'focus'
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -195,6 +194,7 @@
         config.settingsLockActiveCodeLength = settingsLockCodeLength;
       } else {
         console.warn(`Zen Pomodoro: settingsLockCodeLength value ${settingsLockCodeLength} is invalid (must be 0 or 8-128). Treating as disabled.`);
+        config.settingsLockActiveCodeLength = 0;
       }
     }
     
@@ -648,14 +648,37 @@
 
     /**
      * Get all available workspaces
+     * Uses multiple methods to retrieve workspace names:
+     * 1. Try to get from gZenWorkspaces API if available
+     * 2. Fall back to DOM attributes (label, tooltiptext, aria-label)
      */
     getAllWorkspaces() {
       try {
+        // Method 1: Try to use gZenWorkspaces API if available (most reliable)
+        // eslint-disable-next-line no-undef
+        if (typeof gZenWorkspaces !== 'undefined' && gZenWorkspaces.getWorkspaces) {
+          // eslint-disable-next-line no-undef
+          const workspaces = gZenWorkspaces.getWorkspaces();
+          if (workspaces && workspaces.length > 0) {
+            return workspaces.map(ws => ({
+              id: ws.uuid,
+              name: ws.name || 'Unnamed Workspace'
+            }));
+          }
+        }
+        
+        // Method 2: Fall back to querying DOM buttons with multiple attribute checks
         const workspaceButtons = document.querySelectorAll('toolbarbutton[zen-workspace-id]');
-        return Array.from(workspaceButtons).map(btn => ({
-          id: btn.getAttribute('zen-workspace-id'),
-          name: btn.getAttribute('label') || 'Unnamed Workspace'
-        }));
+        return Array.from(workspaceButtons).map(btn => {
+          const id = btn.getAttribute('zen-workspace-id');
+          // Try multiple attributes to find the workspace name
+          const name = btn.getAttribute('label') || 
+                       btn.getAttribute('tooltiptext') || 
+                       btn.getAttribute('aria-label') ||
+                       btn.textContent?.trim() ||
+                       'Unnamed Workspace';
+          return { id, name };
+        });
       } catch (e) {
         console.error('Failed to get workspaces:', e);
         return [];
@@ -1598,6 +1621,11 @@
         
         this.lockScreen.appendChild(lockContent);
         document.documentElement.appendChild(this.lockScreen);
+        
+        // Focus the input field for better UX (use setTimeout to ensure DOM is ready)
+        setTimeout(() => {
+          if (input) input.focus();
+        }, 0);
         
         // Cancel button handler
         cancelButton.addEventListener('click', () => {
