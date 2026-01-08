@@ -275,6 +275,8 @@
   gap: 16px;
   min-width: 400px;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
 }
 
@@ -286,6 +288,10 @@
   margin: 0 0 16px;
   font-size: 24px;
   font-weight: 700;
+
+  /* Issue 8: Make dialog header draggable */
+  cursor: move;
+  user-select: none;
 }
 
 .zen-pomodoro-dialog p {
@@ -302,6 +308,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 60vh;
 }
 
 .zen-pomodoro-config-row {
@@ -614,7 +621,7 @@
 
 /* ACCESSIBILITY FIX: Only animate if user has no motion preference */
 @media (prefers-reduced-motion: no-preference) {
-  #zen-pomodoro-overlay.active {
+  #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
     animation: fade-in 0.3s ease;
   }
 
@@ -642,7 +649,8 @@
 
 /* Fallback for reduced motion - no animations */
 @media (prefers-reduced-motion: reduce) {
-  #zen-pomodoro-overlay.active {
+  #zen-pomodoro-overlay.active,
+  #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
     animation: none;
   }
 
@@ -727,6 +735,13 @@
   font-size: 12px;
   padding: 8px 12px;
   border-style: dashed;
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  background-color: rgb(255 107 107 / 10%);
+}
+
+.zen-pomodoro-button.dev:hover {
+  background-color: rgb(255 107 107 / 20%) !important;
 }
 
 /* ============================================
@@ -823,5 +838,16 @@
 
 /* Issue 9: Wider select dropdown for mode selection */
 #zen-pomodoro-mode-select {
-  width: 150px;
+  width: 180px;
+}
+
+/* ============================================
+   Issue 8: Draggable Dialog Support
+   ============================================ */
+.zen-pomodoro-dialog.dragging {
+  user-select: none;
+}
+
+.zen-pomodoro-dialog.dragging h2 {
+  cursor: grabbing;
 }
