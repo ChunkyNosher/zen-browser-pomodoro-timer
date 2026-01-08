@@ -821,18 +821,6 @@
   margin-bottom: 8px;
 }
 
-/* ============================================
-   Issue 8: Draggable Dialog Styles
-   ============================================ */
-.zen-pomodoro-dialog.draggable {
-  cursor: move;
-}
-
-.zen-pomodoro-dialog.dragging {
-  opacity: 0.9;
-  box-shadow: 0 12px 48px rgb(0 0 0 / 50%);
-}
-
 /* Issue 9: Wider select dropdown for mode selection */
 #zen-pomodoro-mode-select {
   width: 150px;

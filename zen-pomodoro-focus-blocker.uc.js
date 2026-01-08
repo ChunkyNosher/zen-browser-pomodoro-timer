@@ -285,8 +285,11 @@
 
     /**
      * Start the timer
+     * @param {string} mode - Timer mode ('pomodoro' or 'simple')
+     * @param {number} cycles - Number of pomodoro cycles
+     * @param {Object} sessionOverrides - Optional session-only duration overrides
      */
-    start(mode = 'pomodoro', cycles = 4) {
+    start(mode = 'pomodoro', cycles = 4, sessionOverrides = {}) {
       this.mode = mode;
       this.totalCycles = cycles;
       this.currentCycle = 1;
@@ -295,13 +298,19 @@
       this.isPaused = false;
       this.tickCounter = 0;
       
-      // Store config with timer state for proper restoration
-      this.savedConfig = { ...this.config };
+      // Get base config from preferences (ensures we start fresh without previous session modifications)
+      this.config = getConfig();
+      
+      // Apply session-only overrides (these don't persist to saved config)
+      const effectiveConfig = { ...this.config, ...sessionOverrides };
+      
+      // Store the effective config with timer state for proper restoration
+      this.savedConfig = { ...effectiveConfig };
 
       if (mode === 'simple') {
-        this.remainingTime = this.config.simpleDuration * 60;
+        this.remainingTime = effectiveConfig.simpleDuration * 60;
       } else {
-        this.remainingTime = this.config.focusDuration * 60;
+        this.remainingTime = effectiveConfig.focusDuration * 60;
       }
 
       this.startInterval();
@@ -787,9 +796,12 @@
       this.config = getConfig();
       this.isVisible = false;
       this.contentAreaObserver = null; // Issue 1: Observer for content area size changes
-      this.indicatorDragData = null; // Issue 8: Drag state for indicator
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
+      this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.contentArea = null; // Store reference for cleanup
+      this.originalContentAreaPosition = null; // Store original position for restoration
+      this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
 
     /**
@@ -878,14 +890,18 @@
                           document.querySelector('#appcontent') || 
                           document.querySelector('#browser');
       if (contentArea) {
-        // Only set position if not already a positioning context
+        // Store reference and original position for cleanup
+        this.contentArea = contentArea;
         const computedPosition = window.getComputedStyle(contentArea).position;
+        this.originalContentAreaPosition = computedPosition;
+        
+        // Only set position if not already a positioning context
         if (computedPosition === 'static') {
           contentArea.style.position = 'relative';
         }
         contentArea.appendChild(this.overlay);
         
-        // Issue 1: Setup observer for content area size changes
+        // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
         // Fallback to document root if content area not found
@@ -894,16 +910,16 @@
       
       document.documentElement.appendChild(this.indicator);
 
-      // Issue 8: Setup drag functionality for indicator
+      // Issue 8: Set up drag functionality for indicator
       this.setupIndicatorDrag();
       
-      // Setup button handlers after elements are created
+      // Set up button handlers after elements are created
       // RACE CONDITION FIX: Set up handlers immediately after creation
       this.setupOverlayHandlers();
     }
 
     /**
-     * Issue 1: Setup observer for content area size changes
+     * Issue 1: Set up observer for content area size changes
      * Watches for size/position changes when sidebars are toggled or resized
      */
     setupContentAreaObserver(contentArea) {
@@ -912,15 +928,37 @@
         this.contentAreaObserver.disconnect();
       }
       
-      // Use ResizeObserver to detect size changes when sidebars are toggled
-      this.contentAreaObserver = new ResizeObserver(() => {
-        this.updateOverlayPosition(contentArea);
+      // Also observe parent elements for size changes (sidebar toggles)
+      const browser = document.querySelector('#browser');
+      
+      // Use ResizeObserver with debouncing to detect size changes when sidebars are toggled
+      this.contentAreaObserver = new ResizeObserver((entries) => {
+        // Check if any relevant element has resized
+        let shouldUpdate = false;
+        for (const entry of entries) {
+          if (entry.target === contentArea || (browser && entry.target === browser)) {
+            shouldUpdate = true;
+            break;
+          }
+        }
+        if (!shouldUpdate) {
+          return;
+        }
+
+        // Debounce updates so multiple resize events in the same frame
+        // only trigger a single overlay position update.
+        if (this._overlayUpdateScheduled) {
+          return;
+        }
+        this._overlayUpdateScheduled = true;
+        requestAnimationFrame(() => {
+          this._overlayUpdateScheduled = false;
+          this.updateOverlayPosition(contentArea);
+        });
       });
       
       this.contentAreaObserver.observe(contentArea);
       
-      // Also observe parent elements for size changes (sidebar toggles)
-      const browser = document.querySelector('#browser');
       if (browser && browser !== contentArea) {
         this.contentAreaObserver.observe(browser);
       }
@@ -931,16 +969,22 @@
 
     /**
      * Issue 1: Update overlay position to match content area
+     * Ensures the overlay continues to cover the visible content area when it resizes.
      */
     updateOverlayPosition(contentArea) {
-      if (!this.overlay || !contentArea) return;
-      
-      // The overlay is now a child of contentArea, so position: absolute will work
-      // CSS handles the sizing - this method is for future enhancements if needed
+      if (!this.overlay || !contentArea) {
+        return;
+      }
+
+      // Ensure the overlay is positioned relative to the content area
+      // CSS handles most sizing via width/height: 100%, but we ensure positioning is correct
+      this.overlay.style.position = 'absolute';
+      this.overlay.style.top = '0';
+      this.overlay.style.left = '0';
     }
 
     /**
-     * Issue 8: Setup drag functionality for indicator
+     * Issue 8: Set up drag functionality for indicator
      */
     setupIndicatorDrag() {
       if (!this.indicator) return;
@@ -949,13 +993,29 @@
       let startX, startY;
       let startLeft, startTop;
       
-      // Load saved position from preferences
+      // Load saved position from preferences and validate against viewport bounds
       const savedPosX = getPref('indicatorPosX', null);
       const savedPosY = getPref('indicatorPosY', null);
       if (savedPosX !== null && savedPosY !== null) {
-        this.indicator.style.right = 'auto';
-        this.indicator.style.left = `${savedPosX}px`;
-        this.indicator.style.top = `${savedPosY}px`;
+        // Ensure saved position is within current viewport bounds
+        const rect = this.indicator.getBoundingClientRect();
+        const indicatorWidth = rect.width;
+        const indicatorHeight = rect.height;
+
+        const rawX = Number(savedPosX);
+        const rawY = Number(savedPosY);
+
+        if (Number.isFinite(rawX) && Number.isFinite(rawY)) {
+          const maxX = Math.max(0, window.innerWidth - indicatorWidth);
+          const maxY = Math.max(0, window.innerHeight - indicatorHeight);
+
+          const clampedX = Math.max(0, Math.min(rawX, maxX));
+          const clampedY = Math.max(0, Math.min(rawY, maxY));
+
+          this.indicator.style.right = 'auto';
+          this.indicator.style.left = `${clampedX}px`;
+          this.indicator.style.top = `${clampedY}px`;
+        }
       }
       
       const onMouseDown = (e) => {
@@ -1018,11 +1078,13 @@
         document.removeEventListener('mouseup', onMouseUp);
       };
       
+      // Store reference for cleanup
+      this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
     }
 
     /**
-     * Setup overlay button handlers
+     * Set up overlay button handlers
      * RACE CONDITION FIX: Called immediately after overlay creation
      */
     setupOverlayHandlers() {
@@ -1068,16 +1130,24 @@
 
     /**
      * Show overlay
+     * FLICKERING FIX: Only add 'active' class if not already visible to prevent
+     * re-triggering CSS animations on every tick
      */
     show(phase = 'focus') {
       if (!this.overlay) this.createOverlay();
       
-      this.overlay.classList.add('active');
-      this.overlay.setAttribute('data-phase', phase);
-      this.isVisible = true;
+      // Only add active class if not already showing to prevent animation flicker
+      if (!this.isVisible) {
+        this.overlay.classList.add('active');
+        this.isVisible = true;
+      }
       
-      // Update color based on phase
-      this.updatePhaseColor(phase);
+      // Only update phase color when phase actually changes
+      const currentPhase = this.overlay.getAttribute('data-phase');
+      if (currentPhase !== phase) {
+        this.overlay.setAttribute('data-phase', phase);
+        this.updatePhaseColor(phase);
+      }
     }
 
     /**
@@ -1166,13 +1236,31 @@
 
     /**
      * Remove overlay elements and cleanup
-     * MEMORY LEAK FIX: Clean up ResizeObserver on destroy
+     * MEMORY LEAK FIX: Clean up ResizeObserver and event listeners on destroy
      */
     destroy() {
       if (this.contentAreaObserver) {
         this.contentAreaObserver.disconnect();
         this.contentAreaObserver = null;
       }
+      
+      // Restore original content area position if we changed it
+      if (this.contentArea && this.originalContentAreaPosition) {
+        if (this.originalContentAreaPosition === 'static') {
+          this.contentArea.style.position = '';
+        } else {
+          this.contentArea.style.position = this.originalContentAreaPosition;
+        }
+        this.contentArea = null;
+        this.originalContentAreaPosition = null;
+      }
+      
+      // Clean up indicator event listener before removing
+      if (this.indicator && this.indicatorMouseDownHandler) {
+        this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
+        this.indicatorMouseDownHandler = null;
+      }
+      
       if (this.overlay) {
         this.overlay.remove();
         this.overlay = null;
@@ -1196,8 +1284,14 @@
 
     /**
      * Issue 3: Close all existing dialogs to prevent duplicates
+     * MEMORY LEAK FIX: Clean up associated resources for dialogs that manage state
      */
     closeAllDialogs() {
+      // Clean up lock screen resources if the security manager exists
+      if (window.zenPomodoroApp?.security) {
+        window.zenPomodoroApp.security.cleanupLockScreen();
+      }
+      
       const selectors = [
         '#zen-pomodoro-menu-dialog',
         '#zen-pomodoro-start-dialog',
@@ -1599,30 +1693,29 @@
         const mode = modeSelect.value;
         const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
         
-        // Apply session-only duration overrides with optional chaining
-        if (window.zenPomodoroApp?.timer?.config) {
-          if (mode === 'simple') {
-            window.zenPomodoroApp.timer.config.simpleDuration = validateIntegerInput(
-              simpleDurationInput.value, 1, 180, config.simpleDuration
-            );
-          } else {
-            window.zenPomodoroApp.timer.config.focusDuration = validateIntegerInput(
-              focusDurationInput.value, 1, 120, config.focusDuration
-            );
-            window.zenPomodoroApp.timer.config.breakDuration = validateIntegerInput(
-              breakDurationInput.value, 1, 30, config.breakDuration
-            );
-          }
+        // Build session-only overrides object (not modifying timer.config directly)
+        const sessionOverrides = {};
+        if (mode === 'simple') {
+          sessionOverrides.simpleDuration = validateIntegerInput(
+            simpleDurationInput.value, 1, 180, config.simpleDuration
+          );
+        } else {
+          sessionOverrides.focusDuration = validateIntegerInput(
+            focusDurationInput.value, 1, 120, config.focusDuration
+          );
+          sessionOverrides.breakDuration = validateIntegerInput(
+            breakDurationInput.value, 1, 30, config.breakDuration
+          );
         }
         
         dialog.remove();
         
         if (window.zenPomodoroApp) {
-          window.zenPomodoroApp.startTimer(mode, cycles);
+          window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
         }
       };
       
-      // Setup hold-to-start if enabled, otherwise use regular click
+      // Set up hold-to-start if enabled, otherwise use regular click
       if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
       } else {
@@ -2653,10 +2746,16 @@
     /**
      * Start the timer
      */
-    startTimer(mode = 'pomodoro', cycles = 4) {
+    /**
+     * Start the timer
+     * @param {string} mode - Timer mode ('pomodoro' or 'simple')
+     * @param {number} cycles - Number of pomodoro cycles
+     * @param {Object} sessionOverrides - Optional session-only duration overrides
+     */
+    startTimer(mode = 'pomodoro', cycles = 4, sessionOverrides = {}) {
       console.log(`Starting timer: mode=${mode}, cycles=${cycles}`);
       
-      this.timer.start(mode, cycles);
+      this.timer.start(mode, cycles, sessionOverrides);
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
     }
