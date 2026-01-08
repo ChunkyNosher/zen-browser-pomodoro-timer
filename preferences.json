@@ -1,5 +1,12 @@
 [
   {
+    "property": "zen-pomodoro.keyboardShortcut",
+    "label": "Keyboard Shortcut (e.g., Alt+Shift+P)",
+    "type": "string",
+    "defaultValue": "Alt+Shift+P",
+    "placeholder": "Alt+Shift+P"
+  },
+  {
     "property": "zen-pomodoro.focusDuration",
     "label": "Focus Duration (minutes)",
     "type": "string",

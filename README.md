@@ -73,13 +73,13 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 
 ### Starting a Timer
 
-1. **Right-click** on the sidebar or any workspace button
-2. Select **"Start Pomodoro Timer"** from the context menu
+1. Press **Alt+Shift+P** (or your configured keyboard shortcut) to open the Pomodoro menu
+2. Click **"Start Pomodoro Timer"** to configure and start a new session
 3. Choose your timer mode:
    - **Simple Timer**: Single countdown, no breaks
    - **Pomodoro Cycles**: Multiple focus/break periods
 4. If Pomodoro mode, specify the number of cycles (default: 4)
-5. Click **"Start Timer"**
+5. Click **"Start Timer"** (or hold if hold-to-start is enabled)
 
 The timer will begin immediately, and if you're on a blocked workspace, the full-screen overlay will appear.
 
@@ -89,9 +89,10 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
 - **Phase Indicator**: Shows whether you're in focus or break mode
 - **Cycle Progress**: Displays current cycle number (e.g., "Cycle 2 of 4")
 - **Corner Indicator**: Persistent small indicator in top-right corner
-- **Controls**: 
-  - Pause/Resume button to temporarily stop the timer
-  - Stop button to end the session (requires confirmation)
+- **Keyboard Shortcut Menu**: Press the keyboard shortcut to access:
+  - Pause/Resume timer
+  - Stop timer (requires confirmation)
+  - Timer Settings
 
 ### Switching Workspaces
 
@@ -237,15 +238,16 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
    ```
 4. Check for conflicting mods or extensions
 
-### Context Menu Not Showing
+### Keyboard Shortcut Not Working
 
-**Issue**: Right-click doesn't show "Start Pomodoro Timer" option
+**Issue**: Pressing Alt+Shift+P doesn't open the Pomodoro menu
 
 **Solutions**:
 1. Verify `zen-pomodoro-focus-blocker.uc.js` is loaded (check browser console on startup)
-2. Try right-clicking directly on workspace buttons (not tabs)
-3. Restart browser completely
-4. Check for JavaScript errors in console
+2. Check if another extension or mod is using the same shortcut
+3. Configure a different shortcut in the mod settings
+4. Restart browser completely after changing settings
+5. Check for JavaScript errors in console
 
 ### Overlay Covers Everything
 
