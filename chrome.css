@@ -308,7 +308,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow-y: auto;
   max-height: 60vh;
 }
 
@@ -620,11 +619,10 @@
   }
 }
 
-/* ACCESSIBILITY FIX: Only animate if user has no motion preference
-   Issue 2 FIX: Use animation-fill-mode: forwards to prevent flickering */
+/* ACCESSIBILITY FIX: Only animate if user has no motion preference */
 @media (prefers-reduced-motion: no-preference) {
   #zen-pomodoro-overlay.active.zen-pomodoro-animate-in {
-    animation: fade-in 0.3s ease forwards;
+    animation: fade-in 0.3s ease;
   }
 
   /* Phase transition animation */
@@ -743,7 +741,7 @@
 }
 
 .zen-pomodoro-button.dev:hover {
-  background-color: rgb(255 107 107 / 20%);
+  background-color: rgb(255 107 107 / 20%) !important;
 }
 
 /* ============================================

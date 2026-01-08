@@ -267,8 +267,25 @@
       const maxX = window.innerWidth - dialogWidth;
       const maxY = window.innerHeight - dialogHeight;
       
-      newLeft = Math.max(0, Math.min(newLeft, maxX));
-      newTop = Math.max(0, Math.min(newTop, maxY));
+      if (maxX >= 0) {
+        newLeft = Math.max(0, Math.min(newLeft, maxX));
+      } else {
+        // Dialog wider than viewport: allow negative positions but ensure some part stays visible
+        const overflowX = dialogWidth - window.innerWidth;
+        const minLeft = -overflowX;
+        const maxLeft = 0;
+        newLeft = Math.max(minLeft, Math.min(newLeft, maxLeft));
+      }
+
+      if (maxY >= 0) {
+        newTop = Math.max(0, Math.min(newTop, maxY));
+      } else {
+        // Dialog taller than viewport
+        const overflowY = dialogHeight - window.innerHeight;
+        const minTop = -overflowY;
+        const maxTop = 0;
+        newTop = Math.max(minTop, Math.min(newTop, maxTop));
+      }
       
       dialog.style.left = `${newLeft}px`;
       dialog.style.top = `${newTop}px`;
@@ -290,7 +307,7 @@
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const removedNode of mutation.removedNodes) {
-          if (removedNode === dialog || removedNode.contains?.(dialog)) {
+          if (removedNode === dialog) {
             cleanupDrag();
             header.removeEventListener('mousedown', onMouseDown);
             observer.disconnect();
@@ -300,9 +317,12 @@
       }
     });
     
-    // Observe the parent for child removal
-    if (dialog.parentNode) {
-      observer.observe(dialog.parentNode, { childList: true, subtree: true });
+    // Observe a stable ancestor (documentElement) to ensure observer always sees dialog removal
+    const targetNode = dialog.ownerDocument && dialog.ownerDocument.documentElement;
+    if (targetNode) {
+      observer.observe(targetNode, { childList: true, subtree: true });
+    } else if (dialog.parentNode) {
+      observer.observe(dialog.parentNode, { childList: true, subtree: false });
     }
   }
 
@@ -339,9 +359,9 @@
   }
 
   /**
-   * Sanitize text content to prevent XSS attacks
-   * Removes HTML-like characters (<, >) that could be used for injection
-   * This is a defense-in-depth measure since we use textContent instead of innerHTML
+   * Sanitize text content to prevent XSS attacks.
+   * Removes HTML-like characters (<, >) that could be used for injection.
+   * This is a defense-in-depth measure since we use textContent instead of innerHTML.
    * @param {string} text - The text to sanitize
    * @returns {string} Sanitized text with HTML characters removed
    */
@@ -349,21 +369,6 @@
     if (typeof text !== 'string') return '';
     return text.replace(/[<>]/g, '');
   }
-
-  /**
-   * Mapping of shortcut key names to their result property names.
-   * Used by parseShortcut to convert string shortcuts to key objects.
-   * @constant {Object<string, string>}
-   */
-  const SHORTCUT_MODIFIER_MAP = {
-    'ctrl': 'ctrlKey',
-    'control': 'ctrlKey',
-    'alt': 'altKey',
-    'shift': 'shiftKey',
-    'meta': 'metaKey',
-    'cmd': 'metaKey',
-    'command': 'metaKey'
-  };
 
   /**
    * Check if a workspace array is valid and non-empty.
@@ -387,6 +392,19 @@
   }
 
   /**
+   * Attribute names to check for workspace name, in priority order.
+   * @constant {string[]}
+   */
+  const WORKSPACE_NAME_ATTRIBUTES = [
+    'data-workspace-name',
+    'data-name',
+    'label',
+    'tooltiptext',
+    'aria-label',
+    'title'
+  ];
+
+  /**
    * Extract workspace name from a DOM button element.
    * Tries multiple attributes in priority order.
    * @param {Element} btn - The button element
@@ -394,28 +412,21 @@
    * @returns {string} The workspace name
    */
   function extractWorkspaceNameFromButton(btn, id) {
-    // Priority order for finding workspace name
-    const attributeChecks = [
-      () => btn.getAttribute('data-workspace-name'),
-      () => btn.getAttribute('data-name'),
-      () => btn.getAttribute('label'),
-      () => btn.getAttribute('tooltiptext'),
-      () => btn.getAttribute('aria-label'),
-      () => btn.getAttribute('title'),
-      () => {
-        const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
-        return labelEl?.textContent?.trim();
-      },
-      () => btn.textContent?.trim()
-    ];
-    
-    for (const check of attributeChecks) {
-      const name = check();
-      if (isValidName(name)) {
-        return name;
-      }
+    // Try each attribute in priority order
+    for (const attr of WORKSPACE_NAME_ATTRIBUTES) {
+      const name = btn.getAttribute(attr);
+      if (isValidName(name)) return name;
     }
-    
+
+    // Try to find a label element
+    const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
+    const labelName = labelEl?.textContent?.trim();
+    if (isValidName(labelName)) return labelName;
+
+    // Try button text content
+    const textName = btn.textContent?.trim();
+    if (isValidName(textName)) return textName;
+
     // Fallback name using truncated ID
     return createFallbackWorkspaceName(id);
   }
@@ -522,7 +533,7 @@
   }
 
   /**
-   * Helper to handle stop timer with lockout
+   * Helper to handle stop timer with lockout.
    * Reduces code duplication for stop timer logic.
    * 
    * When timer is active, ALWAYS shows the lockout screen before allowing
@@ -531,7 +542,7 @@
    * 
    * When timer is not active, shows confirmation directly without lockout.
    * 
-   * @param {Function} onStop - Callback to execute after successful stop confirmation
+   * @param {() => void} onStop - Callback to execute after successful stop confirmation
    */
   function handleStopTimerWithLockout(onStop) {
     if (!window.zenPomodoroApp) return;
@@ -1250,6 +1261,7 @@
     _cleanupContentAreaObserver() {
       if (this.contentAreaObserver) {
         this.contentAreaObserver.disconnect();
+        this.contentAreaObserver = null;
       }
     }
 
@@ -1606,17 +1618,6 @@
     }
 
     /**
-     * Clean up content area observer.
-     * @private
-     */
-    _cleanupObserver() {
-      if (this.contentAreaObserver) {
-        this.contentAreaObserver.disconnect();
-        this.contentAreaObserver = null;
-      }
-    }
-
-    /**
      * Restore original content area position if modified.
      * @private
      */
@@ -1670,6 +1671,21 @@
     '#zen-pomodoro-confirm-dialog',
     '#zen-pomodoro-dev-bypass-dialog'
   ];
+  
+  /**
+   * Mapping of shortcut modifier key names to their corresponding event property names.
+   * Used by parseShortcut to convert string shortcuts (e.g., "Ctrl+Shift+P") to key objects.
+   * @constant {Object<string, string>}
+   */
+  const SHORTCUT_MODIFIER_MAP = {
+    'ctrl': 'ctrlKey',
+    'control': 'ctrlKey',
+    'alt': 'altKey',
+    'shift': 'shiftKey',
+    'meta': 'metaKey',
+    'cmd': 'metaKey',
+    'command': 'metaKey'
+  };
   
   class KeyboardShortcutHandler {
     constructor() {
@@ -2005,7 +2021,9 @@
       backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
       backButton.textContent = '← Back';
       backButton.addEventListener('click', () => {
-        dialog.remove();
+        if (dialog && dialog.parentNode) {
+          dialog.remove();
+        }
         this.showPomodoroMenu();
       });
       return backButton;
@@ -2087,7 +2105,9 @@
       const applyDurationsAndStart = () => {
         const mode = modeSelect.value;
         const cyclesInput = dialog.querySelector('#zen-pomodoro-cycles-input');
-        const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
+        const cycles = cyclesInput
+          ? validateIntegerInput(cyclesInput.value, 1, 20, config.cycles)
+          : config.cycles;
         
         const sessionOverrides = this._buildSessionOverrides(dialog, mode, config);
         
@@ -2118,18 +2138,18 @@
       
       if (mode === 'simple') {
         const simpleDurationInput = dialog.querySelector('#zen-pomodoro-simple-duration-input');
-        sessionOverrides.simpleDuration = validateIntegerInput(
-          simpleDurationInput.value, 1, 180, config.simpleDuration
-        );
+        sessionOverrides.simpleDuration = simpleDurationInput
+          ? validateIntegerInput(simpleDurationInput.value, 1, 180, config.simpleDuration)
+          : config.simpleDuration;
       } else {
         const focusDurationInput = dialog.querySelector('#zen-pomodoro-focus-duration-input');
         const breakDurationInput = dialog.querySelector('#zen-pomodoro-break-duration-input');
-        sessionOverrides.focusDuration = validateIntegerInput(
-          focusDurationInput.value, 1, 120, config.focusDuration
-        );
-        sessionOverrides.breakDuration = validateIntegerInput(
-          breakDurationInput.value, 1, 30, config.breakDuration
-        );
+        sessionOverrides.focusDuration = focusDurationInput
+          ? validateIntegerInput(focusDurationInput.value, 1, 120, config.focusDuration)
+          : config.focusDuration;
+        sessionOverrides.breakDuration = breakDurationInput
+          ? validateIntegerInput(breakDurationInput.value, 1, 30, config.breakDuration)
+          : config.breakDuration;
       }
       
       return sessionOverrides;
@@ -2557,22 +2577,40 @@
     _saveTimerSettings(dialog, config, timerModeSelect) {
       config.timerMode = timerModeSelect.value;
       
-      config.simpleDuration = validateIntegerInput(
-        dialog.querySelector('#simple-duration').value, 1, 180, config.simpleDuration
-      );
-      config.focusDuration = validateIntegerInput(
-        dialog.querySelector('#focus-duration').value, 1, 120, config.focusDuration
-      );
-      config.breakDuration = validateIntegerInput(
-        dialog.querySelector('#break-duration').value, 1, 30, config.breakDuration
-      );
-      config.longBreakDuration = validateIntegerInput(
-        dialog.querySelector('#long-break-duration').value, 5, 60, config.longBreakDuration
-      );
-      config.cycles = validateIntegerInput(
-        dialog.querySelector('#cycles').value, 1, 20, config.cycles
-      );
-      config.motivationalMessage = sanitizeText(dialog.querySelector('#motivational-message').value);
+      const simpleDurationInput = dialog.querySelector('#simple-duration');
+      if (simpleDurationInput) {
+        config.simpleDuration = validateIntegerInput(
+          simpleDurationInput.value, 1, 180, config.simpleDuration
+        );
+      }
+      const focusDurationInput = dialog.querySelector('#focus-duration');
+      if (focusDurationInput) {
+        config.focusDuration = validateIntegerInput(
+          focusDurationInput.value, 1, 120, config.focusDuration
+        );
+      }
+      const breakDurationInput = dialog.querySelector('#break-duration');
+      if (breakDurationInput) {
+        config.breakDuration = validateIntegerInput(
+          breakDurationInput.value, 1, 30, config.breakDuration
+        );
+      }
+      const longBreakDurationInput = dialog.querySelector('#long-break-duration');
+      if (longBreakDurationInput) {
+        config.longBreakDuration = validateIntegerInput(
+          longBreakDurationInput.value, 5, 60, config.longBreakDuration
+        );
+      }
+      const cyclesInput = dialog.querySelector('#cycles');
+      if (cyclesInput) {
+        config.cycles = validateIntegerInput(
+          cyclesInput.value, 1, 20, config.cycles
+        );
+      }
+      const motivationalMessageInput = dialog.querySelector('#motivational-message');
+      if (motivationalMessageInput) {
+        config.motivationalMessage = sanitizeText(motivationalMessageInput.value);
+      }
     }
 
     /**
@@ -2586,12 +2624,18 @@
     _saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect) {
       config.settingsLockIdleMethod = idleMethodSelect.value;
       config.settingsLockActiveMethod = activeMethodSelect.value;
-      config.settingsLockIdleDuration = validateIntegerInput(
-        dialog.querySelector('#hold-duration').value, 1, 300, config.settingsLockIdleDuration
-      );
-      config.settingsLockActiveCodeLength = validateIntegerInput(
-        dialog.querySelector('#code-length').value, 8, 128, config.settingsLockActiveCodeLength
-      );
+      const holdDurationInput = dialog.querySelector('#hold-duration');
+      if (holdDurationInput) {
+        config.settingsLockIdleDuration = validateIntegerInput(
+          holdDurationInput.value, 1, 300, config.settingsLockIdleDuration
+        );
+      }
+      const codeLengthInput = dialog.querySelector('#code-length');
+      if (codeLengthInput) {
+        config.settingsLockActiveCodeLength = validateIntegerInput(
+          codeLengthInput.value, 8, 128, config.settingsLockActiveCodeLength
+        );
+      }
     }
 
     /**
@@ -2892,6 +2936,18 @@
       input.type = 'text';
       input.id = 'zen-pomodoro-lock-code';
       input.placeholder = 'Enter code here';
+      
+      // Add Enter key support for code entry
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          if (input.value === code) {
+            this.cleanupLockScreen();
+            onUnlock();
+          } else if (window.zenPomodoroApp) {
+            window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
+          }
+        }
+      });
       
       const { buttonDiv } = this._createLockButtonRow(onUnlock);
       
