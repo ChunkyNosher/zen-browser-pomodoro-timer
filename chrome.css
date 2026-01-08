@@ -48,9 +48,10 @@
 
 /* ============================================
    Main Overlay Container
+   Issue 1: Position within content area, not full window
    ============================================ */
 #zen-pomodoro-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
@@ -197,6 +198,7 @@
 
 /* ============================================
    Persistent Timer Indicator (corner display)
+   Issue 8: Added cursor: move for drag functionality
    ============================================ */
 #zen-pomodoro-indicator {
   position: fixed;
@@ -213,8 +215,8 @@
   display: none;
   align-items: center;
   gap: 8px;
-
-  /* ACCESSIBILITY FIX: Removed cursor:pointer as there's no click handler */
+  cursor: move;
+  user-select: none;
   transition: all 0.2s ease;
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 }
@@ -800,4 +802,38 @@
   font-weight: 600;
   margin-bottom: 12px;
   color: #999;
+}
+
+/* ============================================
+   Issue 4: Alert Dialog - Higher z-index than lock screen
+   ============================================ */
+#zen-pomodoro-alert-dialog {
+  z-index: calc(var(--zen-pomodoro-z-index) + 5);
+}
+
+/* ============================================
+   Issue 5: Back Button Styles
+   ============================================ */
+.zen-pomodoro-back-button {
+  align-self: flex-start;
+  padding: 6px 12px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+/* ============================================
+   Issue 8: Draggable Dialog Styles
+   ============================================ */
+.zen-pomodoro-dialog.draggable {
+  cursor: move;
+}
+
+.zen-pomodoro-dialog.dragging {
+  opacity: 0.9;
+  box-shadow: 0 12px 48px rgb(0 0 0 / 50%);
+}
+
+/* Issue 9: Wider select dropdown for mode selection */
+#zen-pomodoro-mode-select {
+  width: 150px;
 }
