@@ -65,9 +65,9 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 6. Copy `zen-pomodoro-focus-blocker.uc.js` to the `chrome/JS` folder
 7. Restart Zen Browser
 
-**Note**: When using Sine mod manager, the mod is automatically installed in the `chrome/sine-mods/` folder. With `"js": true` in `theme.json`, Sine automatically discovers and loads the `.uc.js` file.
+**Note**: When using Sine mod manager, the mod is installed in the `chrome/sine-mods/zen-pomodoro-focus-blocker/` folder. The `scripts` property in `theme.json` tells Sine which JS files to load and when.
 
-> **Important**: This mod uses the **userChrome.js loader approach** (requires Firefox's autoconfig/userChrome.js support), not the native Zen Mod Store CSS-only approach. Zen Browser tracks installed mods via `zen-themes.json` (NOT `.db` files). This mod provides JavaScript functionality that goes beyond CSS theming, which is why it requires the userChrome.js loader.
+> **Important**: This mod uses the **userChrome.js loader approach** (requires Sine's fx-autoconfig support), not the native Zen Mod Store CSS-only approach. The mod provides JavaScript functionality that goes beyond CSS theming, which is why it requires Sine's JS loading capability.
 
 ## 🚀 Usage
 
