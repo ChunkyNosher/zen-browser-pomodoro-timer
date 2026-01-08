@@ -648,3 +648,74 @@
     animation: none;
   }
 }
+
+/* ============================================
+   Hold-to-Unlock Button Styles
+   ============================================ */
+.zen-pomodoro-hold-to-unlock-btn {
+  position: relative;
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.zen-pomodoro-hold-unlock-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background-color: #2ec491;
+  width: 0%;
+  transition: width 1s linear;
+}
+
+/* ============================================
+   Dev Mode UI Styles
+   ============================================ */
+.zen-pomodoro-devmode-row {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.zen-pomodoro-devmode-row label {
+  margin-bottom: 8px;
+}
+
+.zen-pomodoro-devmode-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.zen-pomodoro-devmode-input {
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  flex: 1;
+  max-width: 200px;
+}
+
+.zen-pomodoro-devmode-input:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+.zen-pomodoro-devmode-status {
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.zen-pomodoro-devmode-status.enabled {
+  background-color: rgb(46 196 145 / 20%);
+  color: #2ec491;
+}
+
+/* Small button variant */
+.zen-pomodoro-dialog-button.small {
+  padding: 6px 12px;
+  font-size: 12px;
+}

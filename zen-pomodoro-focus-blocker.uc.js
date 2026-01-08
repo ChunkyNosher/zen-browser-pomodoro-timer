@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.0.0
+ * Version: 1.1.0
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -12,11 +12,14 @@
  * - Memory leak fixes
  * 
  * FEATURES IMPLEMENTED:
+ * - Native context menu integration (XUL-based)
  * - Workspace selection UI in settings
- * - Security lock screens
+ * - Security lock screens with cancel buttons
  * - Hold-to-start integration
+ * - Hold-to-unlock for settings access
  * - Notification permission requests
  * - Custom confirmation dialogs
+ * - Dev mode with bypass capabilities
  * 
  * CODE QUALITY:
  * - Proper input validation
@@ -24,6 +27,7 @@
  * - Config stored with timer state
  * - Viewport boundary checks
  * - Accessibility improvements
+ * - Settings consolidated to preferences.json
  */
 
 (() => {
@@ -34,6 +38,9 @@
   // ============================================
   
   const PREF_PREFIX = 'zen-pomodoro';
+  // DEV NOTE: This password is for development bypass only and will be removed
+  // before production release. It's intentionally hardcoded for testing purposes.
+  const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
     simpleDuration: 25,
@@ -169,6 +176,32 @@
       // Sine checkbox preferences normally return a boolean. The string check ('true')
       // is kept for robustness/legacy cases where values may have been stored as strings.
       config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
+    }
+    
+    // Settings lock idle duration (0 to disable)
+    const settingsLockIdleDuration = parseIntPref('settingsLockIdleDuration', 0, 300);
+    if (settingsLockIdleDuration !== null) {
+      config.settingsLockIdleDuration = settingsLockIdleDuration;
+    }
+    
+    // Settings lock code length: 0 disables the feature, 8-128 enables code entry
+    // Values 1-7 are too short for meaningful security, so they are treated as disabled
+    // This constraint is documented in preferences.json label
+    const settingsLockCodeLength = parseIntPref('settingsLockCodeLength', 0, 128);
+    if (settingsLockCodeLength !== null) {
+      // Values 1-7 are invalid - treat as disabled (0) with warning
+      if (settingsLockCodeLength === 0 || settingsLockCodeLength >= 8) {
+        config.settingsLockActiveCodeLength = settingsLockCodeLength;
+      } else {
+        console.warn(`Zen Pomodoro: settingsLockCodeLength value ${settingsLockCodeLength} is invalid (must be 0 or 8-128). Treating as disabled.`);
+        config.settingsLockActiveCodeLength = 0;
+      }
+    }
+    
+    // Hold-to-start duration in milliseconds (0 to disable)
+    const holdToStartDuration = parseIntPref('holdToStartDuration', 0, 30000);
+    if (holdToStartDuration !== null) {
+      config.holdToStartDuration = holdToStartDuration;
     }
     
     return config;
@@ -615,14 +648,37 @@
 
     /**
      * Get all available workspaces
+     * Uses multiple methods to retrieve workspace names:
+     * 1. Try to get from gZenWorkspaces API if available
+     * 2. Fall back to DOM attributes (label, tooltiptext, aria-label)
      */
     getAllWorkspaces() {
       try {
+        // Method 1: Try to use gZenWorkspaces API if available (most reliable)
+        // eslint-disable-next-line no-undef
+        if (typeof gZenWorkspaces !== 'undefined' && gZenWorkspaces.getWorkspaces) {
+          // eslint-disable-next-line no-undef
+          const workspaces = gZenWorkspaces.getWorkspaces();
+          if (workspaces && workspaces.length > 0) {
+            return workspaces.map(ws => ({
+              id: ws.uuid,
+              name: ws.name || 'Unnamed Workspace'
+            }));
+          }
+        }
+        
+        // Method 2: Fall back to querying DOM buttons with multiple attribute checks
         const workspaceButtons = document.querySelectorAll('toolbarbutton[zen-workspace-id]');
-        return Array.from(workspaceButtons).map(btn => ({
-          id: btn.getAttribute('zen-workspace-id'),
-          name: btn.getAttribute('label') || 'Unnamed Workspace'
-        }));
+        return Array.from(workspaceButtons).map(btn => {
+          const id = btn.getAttribute('zen-workspace-id');
+          // Try multiple attributes to find the workspace name
+          const name = btn.getAttribute('label') || 
+                       btn.getAttribute('tooltiptext') || 
+                       btn.getAttribute('aria-label') ||
+                       btn.textContent?.trim() ||
+                       'Unnamed Workspace';
+          return { id, name };
+        });
       } catch (e) {
         console.error('Failed to get workspaces:', e);
         return [];
@@ -882,126 +938,201 @@
   }
 
   // ============================================
-  // Context Menu Module
+  // Context Menu Module - Native Integration
   // ============================================
   
   class ContextMenuHandler {
     constructor() {
-      this.contextMenuListener = null; // Track listener for proper cleanup
+      this.menuItemsAdded = false;
+      this.popupShowingListener = null;
+      this.initRetryCount = 0;
+      this.maxRetries = 20; // Maximum retries (20 * 500ms = 10 seconds)
+      this.initTimeoutId = null; // Store timeout ID for cleanup
     }
 
     /**
-     * Initialize context menu listeners
-     * MEMORY LEAK FIX: Store listener reference for cleanup
+     * Initialize native context menu integration
+     * Uses XUL elements to add items to Zen Browser's native context menu
      */
     init() {
-      // Listen for context menu on sidebar and workspace buttons
-      this.contextMenuListener = (e) => {
-        const target = e.target;
-        
-        // Check if right-click is on workspace button or sidebar
-        const isWorkspaceButton = target.closest('toolbarbutton[zen-workspace-id]');
-        const isSidebar = target.closest('#navigator-toolbox, #sidebar-box');
-        
-        if (isWorkspaceButton || isSidebar) {
-          this.addContextMenuItem(e);
+      // Wait for context menu to exist
+      const contextMenu = document.getElementById('contentAreaContextMenu');
+      if (!contextMenu) {
+        // Retry after a short delay if context menu not yet available
+        this.initRetryCount++;
+        if (this.initRetryCount < this.maxRetries) {
+          this.initTimeoutId = setTimeout(() => this.init(), 500);
+        } else {
+          console.warn('Zen Pomodoro: Could not find contentAreaContextMenu after max retries');
         }
-      };
+        return;
+      }
       
-      document.addEventListener('contextmenu', this.contextMenuListener);
+      // Log success after retries for debugging
+      if (this.initRetryCount > 0) {
+        console.log(`Zen Pomodoro: contentAreaContextMenu initialized after ${this.initRetryCount} retries`);
+      }
+      
+      this.addNativeContextMenuItems(contextMenu);
     }
 
     /**
-     * Destroy and cleanup all listeners
-     * MEMORY LEAK FIX: Properly remove event listeners
+     * Add items to native context menu using XUL elements
      */
-    destroy() {
-      if (this.contextMenuListener) {
-        document.removeEventListener('contextmenu', this.contextMenuListener);
-        this.contextMenuListener = null;
-      }
+    addNativeContextMenuItems(contextMenu) {
+      if (this.menuItemsAdded) return;
       
-      // Remove any existing context menu
-      const existingMenu = document.getElementById('zen-pomodoro-context-menu');
-      if (existingMenu) {
-        existingMenu.remove();
-      }
-    }
-
-    /**
-     * Add context menu item
-     * UI/UX FIX: Add viewport boundary checks
-     * MEMORY LEAK FIX: Proper cleanup of event listeners
-     */
-    addContextMenuItem(event) {
-      const existingMenu = document.getElementById('zen-pomodoro-context-menu');
-      if (existingMenu) existingMenu.remove();
+      // Create separator
+      const separator = document.createXULElement('menuseparator');
+      separator.id = 'zen-pomodoro-menu-separator';
+      separator.setAttribute('hidden', 'true');
       
-      const menu = document.createElement('div');
-      menu.id = 'zen-pomodoro-context-menu';
-      menu.className = 'zen-pomodoro-context-menu';
+      // Create main menu with submenu
+      const menu = document.createXULElement('menu');
+      menu.id = 'zen-pomodoro-menu';
+      menu.setAttribute('label', '⏱️ Pomodoro Timer');
+      menu.setAttribute('hidden', 'true');
       
-      // Create menu items using DOM methods
-      const startItem = document.createElement('div');
-      startItem.className = 'zen-pomodoro-context-menu-item';
-      startItem.id = 'zen-pomodoro-start-timer';
-      const startSpan = document.createElement('span');
-      startSpan.textContent = '⏱️ Start Pomodoro Timer';
-      startItem.appendChild(startSpan);
+      // Create submenu popup
+      const popup = document.createXULElement('menupopup');
+      popup.id = 'zen-pomodoro-submenu-popup';
       
-      const separator = document.createElement('div');
-      separator.className = 'zen-pomodoro-context-menu-separator';
-      
-      const settingsItem = document.createElement('div');
-      settingsItem.className = 'zen-pomodoro-context-menu-item';
-      settingsItem.id = 'zen-pomodoro-open-settings';
-      const settingsSpan = document.createElement('span');
-      settingsSpan.textContent = '⚙️ Timer Settings';
-      settingsItem.appendChild(settingsSpan);
-      
-      menu.appendChild(startItem);
-      menu.appendChild(separator);
-      menu.appendChild(settingsItem);
-      
-      // UI/UX FIX: Viewport boundary check
-      const menuWidth = 250; // Approximate menu width
-      const menuHeight = 100; // Approximate menu height
-      let left = event.clientX;
-      let top = event.clientY;
-      
-      if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - 10;
-      }
-      if (top + menuHeight > window.innerHeight) {
-        top = window.innerHeight - menuHeight - 10;
-      }
-      
-      menu.style.left = `${left}px`;
-      menu.style.top = `${top}px`;
-      
-      document.documentElement.appendChild(menu);
-      
-      // Add click handlers
-      startItem.addEventListener('click', () => {
-        menu.remove();
+      // Create menu items
+      const startTimerItem = document.createXULElement('menuitem');
+      startTimerItem.id = 'zen-pomodoro-start-timer';
+      startTimerItem.setAttribute('label', 'Start Pomodoro Timer');
+      startTimerItem.addEventListener('command', () => {
         this.showConfigDialog();
       });
       
-      settingsItem.addEventListener('click', () => {
-        menu.remove();
+      const stopTimerItem = document.createXULElement('menuitem');
+      stopTimerItem.id = 'zen-pomodoro-stop-timer';
+      stopTimerItem.setAttribute('label', 'Stop Timer');
+      stopTimerItem.addEventListener('command', () => {
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.showCustomConfirm(
+            'Stop Timer',
+            'Are you sure you want to stop the timer?',
+            () => {
+              window.zenPomodoroApp.stopTimer();
+            }
+          );
+        }
+      });
+      
+      const pauseResumeItem = document.createXULElement('menuitem');
+      pauseResumeItem.id = 'zen-pomodoro-pause-resume';
+      pauseResumeItem.setAttribute('label', 'Pause Timer');
+      pauseResumeItem.addEventListener('command', () => {
+        if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
+          if (window.zenPomodoroApp.timer.isPaused) {
+            window.zenPomodoroApp.timer.resume();
+          } else {
+            window.zenPomodoroApp.timer.pause();
+          }
+        }
+      });
+      
+      const subSeparator = document.createXULElement('menuseparator');
+      
+      const settingsItem = document.createXULElement('menuitem');
+      settingsItem.id = 'zen-pomodoro-open-settings';
+      settingsItem.setAttribute('label', 'Timer Settings');
+      settingsItem.addEventListener('command', () => {
         this.showSettingsDialog();
       });
       
-      // MEMORY LEAK FIX: Remove menu when clicking outside with proper cleanup
-      setTimeout(() => {
-        const clickHandler = () => {
-          menu.remove();
-        };
-        document.addEventListener('click', clickHandler, { once: true });
-      }, 100);
+      // Assemble submenu
+      popup.appendChild(startTimerItem);
+      popup.appendChild(stopTimerItem);
+      popup.appendChild(pauseResumeItem);
+      popup.appendChild(subSeparator);
+      popup.appendChild(settingsItem);
+      menu.appendChild(popup);
       
-      event.preventDefault();
-      event.stopPropagation();
+      // Add to context menu
+      contextMenu.appendChild(separator);
+      contextMenu.appendChild(menu);
+      
+      this.menuItemsAdded = true;
+      
+      // Listen for context menu showing to update visibility
+      this.popupShowingListener = () => {
+        this.updateMenuVisibility();
+      };
+      contextMenu.addEventListener('popupshowing', this.popupShowingListener);
+    }
+
+    /**
+     * Update menu item visibility based on timer state
+     */
+    updateMenuVisibility() {
+      const separator = document.getElementById('zen-pomodoro-menu-separator');
+      const menu = document.getElementById('zen-pomodoro-menu');
+      const startItem = document.getElementById('zen-pomodoro-start-timer');
+      const stopItem = document.getElementById('zen-pomodoro-stop-timer');
+      const pauseResumeItem = document.getElementById('zen-pomodoro-pause-resume');
+      
+      if (!menu || !separator) return;
+      
+      // Always show the menu
+      separator.removeAttribute('hidden');
+      menu.removeAttribute('hidden');
+      
+      // Update item visibility based on timer state
+      const timerActive = window.zenPomodoroApp && window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+      
+      if (startItem) {
+        if (timerActive) {
+          startItem.setAttribute('hidden', 'true');
+        } else {
+          startItem.removeAttribute('hidden');
+        }
+      }
+      
+      if (stopItem) {
+        if (timerActive) {
+          stopItem.removeAttribute('hidden');
+        } else {
+          stopItem.setAttribute('hidden', 'true');
+        }
+      }
+      
+      if (pauseResumeItem) {
+        if (timerActive) {
+          pauseResumeItem.removeAttribute('hidden');
+          const isPaused = window.zenPomodoroApp.timer.isPaused;
+          pauseResumeItem.setAttribute('label', isPaused ? 'Resume Timer' : 'Pause Timer');
+        } else {
+          pauseResumeItem.setAttribute('hidden', 'true');
+        }
+      }
+    }
+
+    /**
+     * Destroy and cleanup
+     */
+    destroy() {
+      // Clear any pending initialization timeout
+      if (this.initTimeoutId) {
+        clearTimeout(this.initTimeoutId);
+        this.initTimeoutId = null;
+      }
+      
+      const contextMenu = document.getElementById('contentAreaContextMenu');
+      if (contextMenu && this.popupShowingListener) {
+        contextMenu.removeEventListener('popupshowing', this.popupShowingListener);
+        this.popupShowingListener = null;
+      }
+      
+      // Remove our menu items
+      const separator = document.getElementById('zen-pomodoro-menu-separator');
+      const menu = document.getElementById('zen-pomodoro-menu');
+      
+      if (separator) separator.remove();
+      if (menu) menu.remove();
+      
+      this.menuItemsAdded = false;
     }
 
     /**
@@ -1150,6 +1281,7 @@
     /**
      * Create the actual settings dialog
      * MISSING FEATURE: Workspace selection UI added
+     * NEW: Dev mode password entry added
      */
     createSettingsDialog() {
       const dialog = document.createElement('div');
@@ -1321,6 +1453,15 @@
       this.lockIntervalId = null; // Store interval for cleanup
       this.lockTimerElement = null; // PERFORMANCE FIX: Initialize timer element reference for caching
       this.holdDuration = 3000;
+      this.holdToUnlockIntervalId = null; // Store hold-to-unlock interval (renamed for consistency)
+    }
+
+    /**
+     * Verify dev bypass password
+     * Returns true if password matches
+     */
+    verifyDevPassword(password) {
+      return password === DEV_MODE_PASSWORD;
     }
 
     /**
@@ -1337,9 +1478,85 @@
     }
 
     /**
+     * Show dev bypass password prompt dialog
+     * This is shown on the lock screen as a way to bypass during development
+     */
+    showDevBypassPrompt(onSuccess) {
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dev-bypass-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = 'Dev Bypass';
+      
+      const p = document.createElement('p');
+      p.textContent = 'Enter developer password to bypass lockout:';
+      p.className = 'zen-pomodoro-dialog-message';
+      
+      const input = document.createElement('input');
+      input.type = 'password';
+      input.id = 'zen-pomodoro-dev-bypass-password';
+      input.placeholder = 'Enter password';
+      input.className = 'zen-pomodoro-devmode-input';
+      input.style.width = '100%';
+      input.style.marginBottom = '16px';
+      
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+      
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      
+      const submitButton = document.createElement('button');
+      submitButton.className = 'zen-pomodoro-dialog-button';
+      submitButton.textContent = 'Bypass';
+      
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(submitButton);
+      
+      dialog.appendChild(h2);
+      dialog.appendChild(p);
+      dialog.appendChild(input);
+      dialog.appendChild(buttonDiv);
+      
+      document.documentElement.appendChild(dialog);
+      
+      // Focus input
+      input.focus();
+      
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+      });
+      
+      submitButton.addEventListener('click', () => {
+        const password = input.value;
+        if (this.verifyDevPassword(password)) {
+          dialog.remove();
+          console.log('[DEV BYPASS] Lock screen bypassed');
+          onSuccess();
+        } else {
+          if (window.zenPomodoroApp) {
+            window.zenPomodoroApp.showCustomAlert('Incorrect Password', 'Please try again.');
+          }
+          input.value = '';
+          input.focus();
+        }
+      });
+      
+      // Allow Enter key to submit
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          submitButton.click();
+        }
+      });
+    }
+
+    /**
      * Show settings lock screen
      * UI/UX FIX: Replace alert() with custom dialog
      * MEMORY LEAK FIX: Store and clear interval properly
+     * NEW: Added cancel button, hold-to-unlock, and dev bypass button
      */
     showLockScreen(timerActive, onUnlock) {
       const config = getConfig();
@@ -1376,18 +1593,25 @@
         const buttonDiv = document.createElement('div');
         buttonDiv.className = 'zen-pomodoro-dialog-buttons';
         
-        const unlockButton = document.createElement('button');
-        unlockButton.className = 'zen-pomodoro-dialog-button';
-        unlockButton.id = 'zen-pomodoro-lock-submit';
-        unlockButton.textContent = 'Unlock';
-        
         const cancelButton = document.createElement('button');
         cancelButton.className = 'zen-pomodoro-dialog-button secondary';
         cancelButton.id = 'zen-pomodoro-lock-cancel';
         cancelButton.textContent = 'Cancel';
         
-        buttonDiv.appendChild(unlockButton);
+        // Dev bypass button
+        const devBypassButton = document.createElement('button');
+        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
+        devBypassButton.id = 'zen-pomodoro-dev-bypass';
+        devBypassButton.textContent = 'Dev Bypass';
+        
+        const unlockButton = document.createElement('button');
+        unlockButton.className = 'zen-pomodoro-dialog-button';
+        unlockButton.id = 'zen-pomodoro-lock-submit';
+        unlockButton.textContent = 'Unlock';
+        
         buttonDiv.appendChild(cancelButton);
+        buttonDiv.appendChild(devBypassButton);
+        buttonDiv.appendChild(unlockButton);
         
         lockContent.appendChild(h2);
         lockContent.appendChild(p);
@@ -1398,13 +1622,28 @@
         this.lockScreen.appendChild(lockContent);
         document.documentElement.appendChild(this.lockScreen);
         
+        // Focus the input field for better UX (use setTimeout to ensure DOM is ready)
+        setTimeout(() => {
+          if (input) input.focus();
+        }, 0);
+        
+        // Cancel button handler
+        cancelButton.addEventListener('click', () => {
+          this.cleanupLockScreen();
+        });
+        
+        // Dev bypass button handler
+        devBypassButton.addEventListener('click', () => {
+          this.showDevBypassPrompt(() => {
+            this.cleanupLockScreen();
+            onUnlock();
+          });
+        });
+        
         unlockButton.addEventListener('click', () => {
           const inputValue = input.value;
           if (inputValue === code) {
-            if (this.lockScreen) {
-              this.lockScreen.remove();
-              this.lockScreen = null;
-            }
+            this.cleanupLockScreen();
             onUnlock();
           } else {
             // UI/UX FIX: Use custom dialog instead of alert()
@@ -1414,22 +1653,15 @@
           }
         });
         
-        cancelButton.addEventListener('click', () => {
-          if (this.lockScreen) {
-            this.lockScreen.remove();
-            this.lockScreen = null;
-          }
-        });
-        
       } else {
-        // Wait timer mode
+        // Hold-to-unlock timer mode (timer not active)
         let waitTime = config.settingsLockIdleDuration;
         
         const h2 = document.createElement('h2');
         h2.textContent = 'Settings Locked';
         
         const p = document.createElement('p');
-        p.textContent = 'Please wait to access settings:';
+        p.textContent = 'Hold the button below to unlock settings:';
         
         const timerDiv = document.createElement('div');
         timerDiv.id = 'zen-pomodoro-lock-timer';
@@ -1437,12 +1669,43 @@
         
         const pSub = document.createElement('p');
         pSub.className = 'zen-pomodoro-lock-subtext';
-        pSub.textContent = 'seconds remaining';
+        pSub.textContent = 'seconds remaining - hold button to count down';
+        
+        // Hold-to-unlock button
+        const holdButton = document.createElement('button');
+        holdButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-hold-to-unlock-btn';
+        holdButton.id = 'zen-pomodoro-hold-to-unlock';
+        holdButton.textContent = 'Hold to Unlock';
+        
+        // Progress bar for hold button
+        const holdProgress = document.createElement('div');
+        holdProgress.className = 'zen-pomodoro-hold-unlock-progress';
+        holdProgress.id = 'zen-pomodoro-hold-unlock-progress';
+        holdButton.appendChild(holdProgress);
+        
+        const buttonDiv = document.createElement('div');
+        buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+        
+        const cancelButton = document.createElement('button');
+        cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+        cancelButton.id = 'zen-pomodoro-lock-cancel';
+        cancelButton.textContent = 'Cancel';
+        
+        // Dev bypass button
+        const devBypassButton = document.createElement('button');
+        devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
+        devBypassButton.id = 'zen-pomodoro-dev-bypass';
+        devBypassButton.textContent = 'Dev Bypass';
+        
+        buttonDiv.appendChild(cancelButton);
+        buttonDiv.appendChild(devBypassButton);
+        buttonDiv.appendChild(holdButton);
         
         lockContent.appendChild(h2);
         lockContent.appendChild(p);
         lockContent.appendChild(timerDiv);
         lockContent.appendChild(pSub);
+        lockContent.appendChild(buttonDiv);
         
         this.lockScreen.appendChild(lockContent);
         document.documentElement.appendChild(this.lockScreen);
@@ -1450,26 +1713,95 @@
         // PERFORMANCE FIX: Cache timer element reference
         this.lockTimerElement = timerDiv;
         
-        // MEMORY LEAK FIX: Store interval for cleanup
-        this.lockIntervalId = setInterval(() => {
-          waitTime--;
+        // Hold-to-unlock logic
+        let currentWaitTime = waitTime;
+        
+        const startHold = (e) => {
+          // Prevent default for touch events to avoid scrolling
+          if (e.type === 'touchstart') {
+            e.preventDefault();
+          }
+          
+          // Clear any existing interval to prevent race conditions
+          if (this.holdToUnlockIntervalId) {
+            clearInterval(this.holdToUnlockIntervalId);
+            this.holdToUnlockIntervalId = null;
+          }
+          
+          this.holdToUnlockIntervalId = setInterval(() => {
+            currentWaitTime--;
+            if (this.lockTimerElement) {
+              this.lockTimerElement.textContent = currentWaitTime.toString();
+            }
+            
+            // Update progress bar with null check
+            const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
+            if (holdProgress && holdProgress.style) {
+              holdProgress.style.width = `${percent}%`;
+            }
+            
+            if (currentWaitTime <= 0) {
+              if (this.holdToUnlockIntervalId) {
+                clearInterval(this.holdToUnlockIntervalId);
+                this.holdToUnlockIntervalId = null;
+              }
+              this.cleanupLockScreen();
+              onUnlock();
+            }
+          }, 1000);
+        };
+        
+        const stopHold = () => {
+          // Reset timer when button released
+          if (this.holdToUnlockIntervalId) {
+            clearInterval(this.holdToUnlockIntervalId);
+            this.holdToUnlockIntervalId = null;
+          }
+          currentWaitTime = waitTime;
           if (this.lockTimerElement) {
             this.lockTimerElement.textContent = waitTime.toString();
           }
-          
-          if (waitTime <= 0) {
-            if (this.lockIntervalId) {
-              clearInterval(this.lockIntervalId);
-              this.lockIntervalId = null;
-            }
-            this.lockTimerElement = null;
-            if (this.lockScreen) {
-              this.lockScreen.remove();
-              this.lockScreen = null;
-            }
-            onUnlock();
+          // Add null check for holdProgress
+          if (holdProgress) {
+            holdProgress.style.width = '0%';
           }
-        }, 1000);
+        };
+        
+        // Mouse and touch event handlers
+        holdButton.addEventListener('mousedown', startHold);
+        holdButton.addEventListener('mouseup', stopHold);
+        holdButton.addEventListener('mouseleave', stopHold);
+        // Note: passive: false is required for touchstart to allow preventDefault() to work,
+        // which prevents unwanted page scrolling while holding the button
+        holdButton.addEventListener('touchstart', startHold, { passive: false });
+        holdButton.addEventListener('touchend', stopHold);
+        holdButton.addEventListener('touchcancel', stopHold);
+        
+        // Keyboard accessibility - support space/enter for hold
+        holdButton.addEventListener('keydown', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            startHold(e);
+          }
+        });
+        holdButton.addEventListener('keyup', (e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            stopHold();
+          }
+        });
+        
+        // Cancel button handler
+        cancelButton.addEventListener('click', () => {
+          this.cleanupLockScreen();
+        });
+        
+        // Dev bypass button handler
+        devBypassButton.addEventListener('click', () => {
+          this.showDevBypassPrompt(() => {
+            this.cleanupLockScreen();
+            onUnlock();
+          });
+        });
       }
     }
 
@@ -1481,6 +1813,10 @@
       if (this.lockIntervalId) {
         clearInterval(this.lockIntervalId);
         this.lockIntervalId = null;
+      }
+      if (this.holdToUnlockIntervalId) {
+        clearInterval(this.holdToUnlockIntervalId);
+        this.holdToUnlockIntervalId = null;
       }
       this.lockTimerElement = null;
       if (this.lockScreen) {
