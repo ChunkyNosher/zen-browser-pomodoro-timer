@@ -138,6 +138,7 @@
       };
 
       // Filter out sensitive data before logging
+      // Note: This only filters top-level sensitive keys and may not catch nested sensitive data patterns
       if (data !== null && data !== undefined) {
         entry.data = this._sanitizeData(data);
       }
@@ -234,7 +235,7 @@
       a.click();
       
       // Revoke URL after a delay to ensure download has started
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
   }
 
@@ -1103,7 +1104,6 @@
       
       const activeWorkspace = this.getActiveWorkspace();
       if (!activeWorkspace) {
-        console.log('[Zen Pomodoro] isCurrentWorkspaceBlocked: No active workspace found');
         return false;
       }
       
@@ -1113,7 +1113,6 @@
         isBlocked: isBlocked,
         blockedCount: this.config.blockedWorkspaces.length
       });
-      console.log(`[Zen Pomodoro] isCurrentWorkspaceBlocked: workspace=${activeWorkspace}, blockedList=[${this.config.blockedWorkspaces.join(', ')}], isBlocked=${isBlocked}`);
       return isBlocked;
     }
 
@@ -1416,13 +1415,12 @@
           contentArea.style.position = 'relative';
         }
         contentArea.appendChild(this.overlay);
-        console.log(`[Zen Pomodoro] Overlay created and appended to: #${contentArea.id || 'unknown'}, contentArea position: ${computedPosition === 'static' ? 'relative (was static)' : computedPosition}`);
         
         // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
         // Fallback to document root if content area not found
-        console.log('[Zen Pomodoro] Warning: Content area not found, appending overlay to document root');
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Content area not found, appending overlay to document root');
         document.documentElement.appendChild(this.overlay);
       }
       
@@ -1681,12 +1679,10 @@
       // Only add classes and trigger animation if not already showing
       if (!this.isVisible) {
         logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay shown', { phase: phase });
-        console.log(`[Zen Pomodoro] Overlay show() called, phase=${phase}, overlay parent=${this.overlay?.parentNode?.id || 'unknown'}`);
         this.overlay.classList.add('active');
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
         this.isVisible = true;
-        console.log(`[Zen Pomodoro] Overlay now visible, classes: ${this.overlay.className}`);
       }
       
       // Only update phase color when phase actually changes
@@ -1707,7 +1703,6 @@
         // Only log when actually hiding (transitioning from visible to hidden)
         if (this.isVisible) {
           logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay hidden');
-          console.log('[Zen Pomodoro] Overlay hide() called, was visible');
         }
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
@@ -1808,7 +1803,6 @@
      */
     showIndicator() {
       if (!this.indicator) this.createOverlay();
-      console.log('[Zen Pomodoro] showIndicator() called');
       this.indicator.classList.add('active');
     }
 
@@ -1817,7 +1811,6 @@
      */
     hideIndicator() {
       if (this.indicator) {
-        console.log('[Zen Pomodoro] hideIndicator() called');
         this.indicator.classList.remove('active');
       }
     }
@@ -3595,12 +3588,10 @@
      */
     stopTimer() {
       logger.log(LOG_CATEGORIES.TIMER, 'Stop timer requested by user');
-      console.log('[Zen Pomodoro] stopTimer() called');
       
       this.timer.stop();
       this.overlay.hide();
       this.overlay.hideIndicator();
-      console.log('[Zen Pomodoro] Timer stopped, overlay and indicator hidden');
     }
 
     /**
@@ -3616,7 +3607,6 @@
      */
     onPhaseChange(phase, cycle) {
       logger.log(LOG_CATEGORIES.TIMER, 'Phase change notification', { phase: phase, cycle: cycle });
-      console.log(`Phase changed: ${phase}, cycle ${cycle}`);
       
       this.overlay.updatePhaseColor(phase);
       this.updateOverlayVisibility();
@@ -3633,7 +3623,6 @@
      */
     onTimerComplete() {
       logger.log(LOG_CATEGORIES.TIMER, 'Timer session completed');
-      console.log('[Zen Pomodoro] onTimerComplete() called');
       
       this.overlay.hide();
       this.overlay.hideIndicator();
@@ -3650,7 +3639,6 @@
         workspaceId: workspaceId,
         isBlocked: isBlocked
       });
-      console.log(`Workspace changed: ${workspaceId}, blocked=${isBlocked}`);
       
       this.updateOverlayVisibility();
     }
@@ -3667,11 +3655,9 @@
       }
       
       const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
-      console.log(`[Zen Pomodoro] updateOverlayVisibility: isBlocked=${isBlocked}, timerActive=${this.timer.isActive}`);
       
       if (isBlocked) {
         const status = this.timer.getStatus();
-        console.log(`[Zen Pomodoro] Showing overlay for blocked workspace, phase=${status.currentPhase}`);
         this.overlay.show(status.currentPhase);
         this.overlay.updateDisplay(
           status.remainingTime,
