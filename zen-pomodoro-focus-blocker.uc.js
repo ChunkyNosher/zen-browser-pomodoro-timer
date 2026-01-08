@@ -93,6 +93,155 @@
   const SAVE_STATE_INTERVAL_SECONDS = 10;
 
   // ============================================
+  // LogManager Class
+  // ============================================
+  
+  /**
+   * Log categories for different parts of the application.
+   * @constant {Object}
+   */
+  const LOG_CATEGORIES = {
+    TIMER: 'TIMER',
+    SETTINGS: 'SETTINGS',
+    MENU: 'MENU',
+    OVERLAY: 'OVERLAY',
+    WORKSPACE: 'WORKSPACE',
+    SECURITY: 'SECURITY',
+    INIT: 'INIT'
+  };
+
+  /**
+   * LogManager class for comprehensive logging with export functionality.
+   * Stores log entries in memory with timestamps and provides export capabilities.
+   */
+  class LogManager {
+    /**
+     * Create a LogManager instance.
+     * @param {number} maxLogSize - Maximum number of log entries to store (default: 1000)
+     */
+    constructor(maxLogSize = 1000) {
+      this.logs = [];
+      this.maxLogSize = maxLogSize;
+    }
+
+    /**
+     * Log an entry with category, message, and optional data.
+     * @param {string} category - Log category (e.g., 'TIMER', 'SETTINGS')
+     * @param {string} message - Log message
+     * @param {Object} [data] - Optional additional data (sensitive data will be filtered)
+     */
+    log(category, message, data = null) {
+      const entry = {
+        timestamp: new Date().toISOString(),
+        category: category || 'GENERAL',
+        message: message
+      };
+
+      // Filter out sensitive data before logging
+      if (data !== null && data !== undefined) {
+        entry.data = this._sanitizeData(data);
+      }
+
+      this.logs.push(entry);
+
+      // Enforce max log size by removing oldest entries
+      if (this.logs.length > this.maxLogSize) {
+        this.logs.shift();
+      }
+
+      // Also output to console for real-time debugging
+      const dataStr = entry.data ? ` | Data: ${JSON.stringify(entry.data)}` : '';
+      console.log(`[Zen Pomodoro][${category}] ${message}${dataStr}`);
+    }
+
+    /**
+     * Sanitize data to remove sensitive information.
+     * @param {*} data - Data to sanitize
+     * @returns {*} Sanitized data
+     * @private
+     */
+    _sanitizeData(data) {
+      if (data === null || data === undefined) {
+        return data;
+      }
+
+      // Handle primitive types
+      if (typeof data !== 'object') {
+        return data;
+      }
+
+      // Handle arrays
+      if (Array.isArray(data)) {
+        return data.map(item => this._sanitizeData(item));
+      }
+
+      // Handle objects - filter out sensitive keys
+      const sensitiveKeys = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
+      const sanitized = {};
+
+      for (const [key, value] of Object.entries(data)) {
+        const lowerKey = key.toLowerCase();
+        const isSensitive = sensitiveKeys.some(sensitive => lowerKey.includes(sensitive));
+        
+        if (isSensitive) {
+          sanitized[key] = '[REDACTED]';
+        } else if (typeof value === 'object' && value !== null) {
+          sanitized[key] = this._sanitizeData(value);
+        } else {
+          sanitized[key] = value;
+        }
+      }
+
+      return sanitized;
+    }
+
+    /**
+     * Get all stored log entries.
+     * @returns {Array} Array of log entries
+     */
+    getLogs() {
+      return [...this.logs];
+    }
+
+    /**
+     * Clear all stored log entries.
+     */
+    clearLogs() {
+      this.logs = [];
+      console.log('[Zen Pomodoro][LOGGER] Logs cleared');
+    }
+
+    /**
+     * Export logs as a downloadable JSON file.
+     * Creates a Blob with JSON data and triggers a download.
+     */
+    exportLogs() {
+      // Log the export event before creating export data for accurate count
+      this.log(LOG_CATEGORIES.SETTINGS, 'Logs exported', { entryCount: this.logs.length });
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        totalEntries: this.logs.length,
+        logs: this.logs
+      };
+
+      const data = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zen-pomodoro-logs-${Date.now()}.json`;
+      a.click();
+      
+      // Revoke URL after a delay to ensure download has started
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    }
+  }
+
+  // Create global logger instance
+  const logger = new LogManager(1000);
+
+  // ============================================
   // Utility Functions
   // ============================================
   
@@ -178,7 +327,15 @@
   function saveConfig(config) {
     try {
       setPref('config', JSON.stringify(config));
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Configuration saved', {
+        timerMode: config.timerMode,
+        focusDuration: config.focusDuration,
+        breakDuration: config.breakDuration,
+        cycles: config.cycles,
+        blockedWorkspacesCount: config.blockedWorkspaces?.length || 0
+      });
     } catch (e) {
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to save config', { error: e.message });
       console.error('Failed to save config:', e);
     }
   }
@@ -619,6 +776,13 @@
         this.remainingTime = effectiveConfig.focusDuration * 60;
       }
 
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer started', {
+        mode: mode,
+        cycles: cycles,
+        duration: this.remainingTime,
+        phase: this.currentPhase
+      });
+
       this.startInterval();
       this.saveState();
     }
@@ -657,6 +821,12 @@
      * Handle phase completion
      */
     handlePhaseComplete() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Phase complete', {
+        phase: this.currentPhase,
+        cycle: this.currentCycle,
+        mode: this.mode
+      });
+
       if (this.mode === 'simple') {
         this.completeTimer();
         return;
@@ -668,6 +838,12 @@
         : this._handleBreakPhaseComplete();
       
       if (shouldComplete) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Phase changed', {
+        newPhase: this.currentPhase,
+        cycle: this.currentCycle,
+        remainingTime: this.remainingTime
+      });
 
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
@@ -728,6 +904,10 @@
      */
     pause() {
       this.isPaused = true;
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer paused', {
+        remainingTime: this.remainingTime,
+        phase: this.currentPhase
+      });
       this.saveState();
     }
 
@@ -736,6 +916,10 @@
      */
     resume() {
       this.isPaused = false;
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer resumed', {
+        remainingTime: this.remainingTime,
+        phase: this.currentPhase
+      });
       this.saveState();
     }
 
@@ -743,6 +927,12 @@
      * Stop the timer
      */
     stop() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer stopped', {
+        wasActive: this.isActive,
+        remainingTime: this.remainingTime,
+        phase: this.currentPhase,
+        cycle: this.currentCycle
+      });
       this.isActive = false;
       this.isPaused = false;
       if (this.intervalId) {
@@ -758,6 +948,10 @@
      * RENAMED: From 'complete' to 'completeTimer' for clarity
      */
     completeTimer() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer completed', {
+        mode: this.mode,
+        totalCycles: this.totalCycles
+      });
       this.stop();
       if (this.onComplete) {
         this.onComplete();
@@ -908,9 +1102,19 @@
       this.config = getConfig();
       
       const activeWorkspace = this.getActiveWorkspace();
-      if (!activeWorkspace) return false;
+      if (!activeWorkspace) {
+        console.log('[Zen Pomodoro] isCurrentWorkspaceBlocked: No active workspace found');
+        return false;
+      }
       
-      return this.config.blockedWorkspaces.includes(activeWorkspace);
+      const isBlocked = this.config.blockedWorkspaces.includes(activeWorkspace);
+      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace blocked check', {
+        workspaceId: activeWorkspace,
+        isBlocked: isBlocked,
+        blockedCount: this.config.blockedWorkspaces.length
+      });
+      console.log(`[Zen Pomodoro] isCurrentWorkspaceBlocked: workspace=${activeWorkspace}, blockedList=[${this.config.blockedWorkspaces.join(', ')}], isBlocked=${isBlocked}`);
+      return isBlocked;
     }
 
     /**
@@ -1212,11 +1416,13 @@
           contentArea.style.position = 'relative';
         }
         contentArea.appendChild(this.overlay);
+        console.log(`[Zen Pomodoro] Overlay created and appended to: #${contentArea.id || 'unknown'}, contentArea position: ${computedPosition === 'static' ? 'relative (was static)' : computedPosition}`);
         
         // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
         // Fallback to document root if content area not found
+        console.log('[Zen Pomodoro] Warning: Content area not found, appending overlay to document root');
         document.documentElement.appendChild(this.overlay);
       }
       
@@ -1474,10 +1680,13 @@
       
       // Only add classes and trigger animation if not already showing
       if (!this.isVisible) {
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay shown', { phase: phase });
+        console.log(`[Zen Pomodoro] Overlay show() called, phase=${phase}, overlay parent=${this.overlay?.parentNode?.id || 'unknown'}`);
         this.overlay.classList.add('active');
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
         this.isVisible = true;
+        console.log(`[Zen Pomodoro] Overlay now visible, classes: ${this.overlay.className}`);
       }
       
       // Only update phase color when phase actually changes
@@ -1495,6 +1704,11 @@
      */
     hide() {
       if (this.overlay) {
+        // Only log when actually hiding (transitioning from visible to hidden)
+        if (this.isVisible) {
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay hidden');
+          console.log('[Zen Pomodoro] Overlay hide() called, was visible');
+        }
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
         this.isVisible = false;
@@ -1594,6 +1808,7 @@
      */
     showIndicator() {
       if (!this.indicator) this.createOverlay();
+      console.log('[Zen Pomodoro] showIndicator() called');
       this.indicator.classList.add('active');
     }
 
@@ -1602,6 +1817,7 @@
      */
     hideIndicator() {
       if (this.indicator) {
+        console.log('[Zen Pomodoro] hideIndicator() called');
         this.indicator.classList.remove('active');
       }
     }
@@ -1800,9 +2016,12 @@
       
       if (existingDialogs.length > 0) {
         // If any dialog exists, close them all and return (toggle behavior)
+        logger.log(LOG_CATEGORIES.MENU, 'Closing all dialogs (toggle behavior)');
         this.closeAllDialogs();
         return;
       }
+      
+      logger.log(LOG_CATEGORIES.MENU, 'Opening main menu');
       
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-menu-dialog';
@@ -1951,6 +2170,8 @@
      * Show timer configuration dialog
      */
     showConfigDialog() {
+      logger.log(LOG_CATEGORIES.MENU, 'Opening start timer dialog');
+      
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-start-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
@@ -2160,10 +2381,13 @@
      * Checks security lock before showing
      */
     showSettingsDialog() {
+      logger.log(LOG_CATEGORIES.MENU, 'Settings dialog requested');
+      
       // Check if security lock should be shown
       if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
         const timerActive = window.zenPomodoroApp.timer.isActive;
         if (window.zenPomodoroApp.security.shouldLockSettings(timerActive)) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Lock screen required for settings', { timerActive: timerActive });
           window.zenPomodoroApp.security.showLockScreen(timerActive, () => {
             this.createSettingsDialog();
           });
@@ -2178,6 +2402,8 @@
      * Create the actual settings dialog
      */
     createSettingsDialog() {
+      logger.log(LOG_CATEGORIES.MENU, 'Opening settings dialog');
+      
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-settings-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
@@ -2508,12 +2734,18 @@
       cancelButton.id = 'zen-pomodoro-settings-cancel';
       cancelButton.textContent = 'Cancel';
       
+      const exportLogsButton = document.createElement('button');
+      exportLogsButton.className = 'zen-pomodoro-dialog-button secondary';
+      exportLogsButton.id = 'zen-pomodoro-export-logs';
+      exportLogsButton.textContent = 'Export Logs';
+      
       const saveButton = document.createElement('button');
       saveButton.className = 'zen-pomodoro-dialog-button';
       saveButton.id = 'zen-pomodoro-settings-save';
       saveButton.textContent = 'Save';
       
       buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(exportLogsButton);
       buttonDiv.appendChild(saveButton);
       
       dialog.appendChild(backButton);
@@ -2527,10 +2759,20 @@
       setupDialogDrag(dialog);
       
       cancelButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.MENU, 'Settings dialog cancelled');
         dialog.remove();
       });
       
+      exportLogsButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Export logs button clicked');
+        if (window.zenPomodoroApp?.logger) {
+          window.zenPomodoroApp.logger.exportLogs();
+          window.zenPomodoroApp.showCustomAlert('Export Complete', 'Logs have been exported successfully.');
+        }
+      });
+      
       saveButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
         this._saveKeyboardShortcut(shortcutInput, config);
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
@@ -2733,6 +2975,8 @@
      * This is shown on the lock screen as a way to bypass during development
      */
     showDevBypassPrompt(onSuccess) {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass prompt shown');
+      
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-dev-bypass-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
@@ -2780,6 +3024,7 @@
       input.focus();
       
       cancelButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass cancelled');
         dialog.remove();
       });
       
@@ -2787,9 +3032,11 @@
         const password = input.value;
         if (this.verifyDevPassword(password)) {
           dialog.remove();
+          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful');
           console.log('[DEV BYPASS] Lock screen bypassed');
           onSuccess();
         } else {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - incorrect password');
           if (window.zenPomodoroApp) {
             window.zenPomodoroApp.showCustomAlert('Incorrect Password', 'Please try again.');
           }
@@ -2816,6 +3063,11 @@
     showLockScreen(timerActive, onUnlock) {
       const config = getConfig();
       const method = this._determineLockoutMethod(timerActive, config);
+      
+      logger.log(LOG_CATEGORIES.SECURITY, 'Lock screen shown', {
+        timerActive: timerActive,
+        method: method
+      });
       
       this._initializeLockScreen();
       const lockContent = this._createLockContent();
@@ -2920,6 +3172,10 @@
         config.settingsLockActiveCharacterSet
       );
       
+      logger.log(LOG_CATEGORIES.SECURITY, 'Code entry mode initialized', {
+        codeLength: config.settingsLockActiveCodeLength
+      });
+      
       const h2 = document.createElement('h2');
       h2.textContent = 'Settings Locked';
       
@@ -2941,9 +3197,11 @@
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           if (input.value === code) {
+            logger.log(LOG_CATEGORIES.SECURITY, 'Code verification successful');
             this.cleanupLockScreen();
             onUnlock();
           } else if (window.zenPomodoroApp) {
+            logger.log(LOG_CATEGORIES.SECURITY, 'Code verification failed - incorrect code');
             window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
           }
         }
@@ -2959,9 +3217,11 @@
       
       unlockButton.addEventListener('click', () => {
         if (input.value === code) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification successful');
           this.cleanupLockScreen();
           onUnlock();
         } else if (window.zenPomodoroApp) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification failed - incorrect code');
           window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
         }
       });
@@ -3067,6 +3327,7 @@
           }
           
           if (currentWaitTime <= 0) {
+            logger.log(LOG_CATEGORIES.SECURITY, 'Hold-to-unlock completed successfully');
             this._clearHoldInterval();
             this.cleanupLockScreen();
             onUnlock();
@@ -3208,6 +3469,7 @@
       this.overlay = new OverlayManager();
       this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
+      this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
       
@@ -3224,6 +3486,7 @@
         return;
       }
       
+      logger.log(LOG_CATEGORIES.INIT, 'Application initializing');
       console.log('Zen Pomodoro Focus Blocker initializing...');
       
       // Wait for browser to be fully loaded
@@ -3245,10 +3508,14 @@
       }
       
       this.initialized = true;
+      logger.log(LOG_CATEGORIES.INIT, 'Application ready');
       console.log('Zen Pomodoro Focus Blocker ready');
       
       // Initialize modules
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing keyboard shortcut handler');
       this.keyboardShortcut.init();
+      
+      logger.log(LOG_CATEGORIES.INIT, 'Starting workspace monitoring');
       this.workspace.startMonitoring();
       
       // Setup timer callbacks
@@ -3272,6 +3539,7 @@
       // Try to restore timer state
       const restored = this.timer.loadState();
       if (restored) {
+        logger.log(LOG_CATEGORIES.INIT, 'Timer state restored from previous session');
         console.log('Restored timer state from previous session');
         this.updateOverlayVisibility();
       }
@@ -3281,6 +3549,8 @@
       
       // Expose app globally for debugging and keyboard shortcut
       window.zenPomodoroApp = this;
+      
+      logger.log(LOG_CATEGORIES.INIT, 'Application initialization complete');
     }
 
     /**
@@ -3324,11 +3594,13 @@
      * Stop the timer
      */
     stopTimer() {
-      console.log('Stopping timer');
+      logger.log(LOG_CATEGORIES.TIMER, 'Stop timer requested by user');
+      console.log('[Zen Pomodoro] stopTimer() called');
       
       this.timer.stop();
       this.overlay.hide();
       this.overlay.hideIndicator();
+      console.log('[Zen Pomodoro] Timer stopped, overlay and indicator hidden');
     }
 
     /**
@@ -3343,6 +3615,7 @@
      * Handle phase change
      */
     onPhaseChange(phase, cycle) {
+      logger.log(LOG_CATEGORIES.TIMER, 'Phase change notification', { phase: phase, cycle: cycle });
       console.log(`Phase changed: ${phase}, cycle ${cycle}`);
       
       this.overlay.updatePhaseColor(phase);
@@ -3359,7 +3632,8 @@
      * Handle timer completion
      */
     onTimerComplete() {
-      console.log('Timer completed');
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer session completed');
+      console.log('[Zen Pomodoro] onTimerComplete() called');
       
       this.overlay.hide();
       this.overlay.hideIndicator();
@@ -3372,6 +3646,10 @@
      * Handle workspace change
      */
     onWorkspaceChange(workspaceId, isBlocked) {
+      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace changed', {
+        workspaceId: workspaceId,
+        isBlocked: isBlocked
+      });
       console.log(`Workspace changed: ${workspaceId}, blocked=${isBlocked}`);
       
       this.updateOverlayVisibility();
@@ -3379,17 +3657,21 @@
 
     /**
      * Update overlay visibility based on current state
+     * Bug Fix: Also hide indicator when timer is not active
      */
     updateOverlayVisibility() {
       if (!this.timer.isActive) {
         this.overlay.hide();
+        this.overlay.hideIndicator();
         return;
       }
       
       const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
+      console.log(`[Zen Pomodoro] updateOverlayVisibility: isBlocked=${isBlocked}, timerActive=${this.timer.isActive}`);
       
       if (isBlocked) {
         const status = this.timer.getStatus();
+        console.log(`[Zen Pomodoro] Showing overlay for blocked workspace, phase=${status.currentPhase}`);
         this.overlay.show(status.currentPhase);
         this.overlay.updateDisplay(
           status.remainingTime,
