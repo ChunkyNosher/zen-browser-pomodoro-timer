@@ -1599,8 +1599,8 @@
         const mode = modeSelect.value;
         const cycles = validateIntegerInput(cyclesInput.value, 1, 20, config.cycles);
         
-        // Apply session-only duration overrides with null check
-        if (window.zenPomodoroApp && window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.config) {
+        // Apply session-only duration overrides with optional chaining
+        if (window.zenPomodoroApp?.timer?.config) {
           if (mode === 'simple') {
             window.zenPomodoroApp.timer.config.simpleDuration = validateIntegerInput(
               simpleDurationInput.value, 1, 180, config.simpleDuration
@@ -1623,7 +1623,7 @@
       };
       
       // Setup hold-to-start if enabled, otherwise use regular click
-      if (config.holdToStartDuration > 0 && window.zenPomodoroApp && window.zenPomodoroApp.security) {
+      if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
       } else {
         startButton.addEventListener('click', applyDurationsAndStart);
