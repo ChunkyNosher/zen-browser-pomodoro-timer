@@ -234,8 +234,8 @@
       a.download = `zen-pomodoro-logs-${Date.now()}.json`;
       a.click();
       
-      // Revoke URL after a delay to ensure download has started
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      // Revoke URL after a brief delay to ensure download has started
+      setTimeout(() => URL.revokeObjectURL(url), 200);
     }
   }
 
