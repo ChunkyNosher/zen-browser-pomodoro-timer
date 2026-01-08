@@ -160,7 +160,7 @@
     }
     
     const motivationalMessage = getPref('motivationalMessage', null);
-    if (motivationalMessage !== null) {
+    if (motivationalMessage !== null && motivationalMessage !== '') {
       config.motivationalMessage = motivationalMessage;
     }
     
