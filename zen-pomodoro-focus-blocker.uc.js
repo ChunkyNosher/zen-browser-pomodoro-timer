@@ -368,7 +368,7 @@
       );
     };
     
-    if (timerActive && window.zenPomodoroApp.security.shouldLockSettings(true)) {
+    if (timerActive) {  // Always require lockout when stopping active timer
       window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
     } else {
       showStopConfirmation();
