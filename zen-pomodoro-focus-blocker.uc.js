@@ -352,7 +352,14 @@
 
   /**
    * Helper to handle stop timer with lockout
-   * Reduces code duplication for stop timer logic
+   * Reduces code duplication for stop timer logic.
+   * 
+   * When timer is active, ALWAYS shows the lockout screen before allowing
+   * the timer to be stopped. The lockout method (code entry or hold button)
+   * is determined by the user's settingsLockActiveMethod configuration.
+   * 
+   * When timer is not active, shows confirmation directly without lockout.
+   * 
    * @param {Function} onStop - Callback to execute after successful stop confirmation
    */
   function handleStopTimerWithLockout(onStop) {
@@ -368,7 +375,10 @@
       );
     };
     
-    if (timerActive) {  // Show lockout only when timer is active; skip if already stopped
+    // Issue 6: Always require lockout when stopping an active timer.
+    // This prevents accidental or impulsive timer stops during focus sessions.
+    // The lockout uses the user's configured settingsLockActiveMethod.
+    if (timerActive) {
       window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
     } else {
       showStopConfirmation();
@@ -1244,17 +1254,25 @@
 
     /**
      * Show overlay
-     * FLICKERING FIX: Only add 'active' class if not already visible to prevent
-     * re-triggering CSS animations on every tick. Uses separate animation class
-     * that's only added once when first shown.
+     * 
+     * FLICKERING FIX (Issue 2): The overlay was flickering because the CSS animation
+     * was re-triggering every second when updateOverlayVisibility() called show().
+     * 
+     * Solution: Use two-class approach:
+     * 1. 'active' class controls display (flex/none)
+     * 2. 'zen-pomodoro-animate-in' class triggers the fade-in animation
+     * 
+     * CSS selector requires BOTH classes: .active.zen-pomodoro-animate-in
+     * This ensures animation only runs once when overlay first appears.
+     * The animation class is removed in hide() so it can re-trigger next time.
      */
     show(phase = 'focus') {
       if (!this.overlay) this.createOverlay();
       
-      // Only add active class and trigger animation if not already showing
+      // Only add classes and trigger animation if not already showing
       if (!this.isVisible) {
         this.overlay.classList.add('active');
-        // Add animation class separately so it only triggers once
+        // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
         this.isVisible = true;
       }
@@ -1269,7 +1287,8 @@
 
     /**
      * Hide overlay
-     * Also removes animation class so it can re-trigger when shown again
+     * Removes both active and animation classes.
+     * Animation class removal allows re-triggering when show() is called again.
      */
     hide() {
       if (this.overlay) {
