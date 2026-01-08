@@ -63,8 +63,8 @@
     overlayColor: '#808080',
     motivationalMessage: 'Get back to work.',
     settingsLockIdleDuration: 20,
-    settingsLockIdleMethod: 'hold', // 'hold' | 'code' - what method to use when timer is idle
-    settingsLockActiveMethod: 'code', // 'hold' | 'code' - what method to use when timer is active
+    settingsLockIdleMethod: LOCKOUT_METHODS.HOLD, // 'hold' | 'code' - what method to use when timer is idle
+    settingsLockActiveMethod: LOCKOUT_METHODS.CODE, // 'hold' | 'code' - what method to use when timer is active
     settingsLockActiveCodeLength: 64,
     settingsLockActiveCharacterSet: 'all-typeable',
     holdToStartDuration: 3000,
@@ -801,12 +801,9 @@
       
       // Dev bypass button for timer overlay
       const devButton = document.createElement('button');
-      devButton.className = 'zen-pomodoro-button';
+      devButton.className = 'zen-pomodoro-button dev';
       devButton.id = 'zen-pomodoro-overlay-dev-button';
       devButton.textContent = 'Dev';
-      devButton.style.opacity = '0.6';
-      devButton.style.fontSize = '12px';
-      devButton.style.padding = '8px 12px';
       
       controls.appendChild(pauseButton);
       controls.appendChild(stopButton);
@@ -1922,11 +1919,12 @@
       
       // Determine which method to use based on timer state and config
       // Validate method value and fall back to defaults if invalid
-      let method = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
+      const requestedMethod = timerActive ? config.settingsLockActiveMethod : config.settingsLockIdleMethod;
+      let method = requestedMethod;
       if (method !== LOCKOUT_METHODS.CODE && method !== LOCKOUT_METHODS.HOLD) {
         // Fall back to defaults: code for active, hold for idle
         method = timerActive ? LOCKOUT_METHODS.CODE : LOCKOUT_METHODS.HOLD;
-        console.warn(`Zen Pomodoro: Invalid lockout method "${method}", using default.`);
+        console.warn(`Zen Pomodoro: Invalid lockout method "${requestedMethod}", using default "${method}".`);
       }
       
       if (method === LOCKOUT_METHODS.CODE) {
