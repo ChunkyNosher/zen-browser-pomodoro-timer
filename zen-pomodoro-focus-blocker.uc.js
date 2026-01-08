@@ -42,10 +42,19 @@
   // before production release. It's intentionally hardcoded for testing purposes.
   const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
   
-  // Constants for keyboard shortcut handling
+  /**
+   * Modifier keys used by the keyboard shortcut recorder.
+   * These are the keys that can be combined with a regular key to form a shortcut.
+   * @constant {string[]}
+   */
   const MODIFIER_KEYS = ['Control', 'Alt', 'Shift', 'Meta'];
   
-  // Constants for lockout method types
+  /**
+   * Valid lockout method types for settings access control.
+   * @constant {Object}
+   * @property {string} CODE - Requires entering a randomly generated code
+   * @property {string} HOLD - Requires holding a button for a duration
+   */
   const LOCKOUT_METHODS = {
     CODE: 'code',
     HOLD: 'hold'
@@ -62,9 +71,15 @@
     blockedWorkspaces: [],
     overlayColor: '#808080',
     motivationalMessage: 'Get back to work.',
+    // Note: Despite the name, this duration is used whenever the "hold" method is selected
+    // (for both idle and active states). Name kept for backward compatibility.
     settingsLockIdleDuration: 20,
-    settingsLockIdleMethod: LOCKOUT_METHODS.HOLD, // 'hold' | 'code' - what method to use when timer is idle
-    settingsLockActiveMethod: LOCKOUT_METHODS.CODE, // 'hold' | 'code' - what method to use when timer is active
+    /** @type {'hold'|'code'} Method to use when timer is idle */
+    settingsLockIdleMethod: LOCKOUT_METHODS.HOLD,
+    /** @type {'hold'|'code'} Method to use when timer is active */
+    settingsLockActiveMethod: LOCKOUT_METHODS.CODE,
+    // Note: Despite the name, this code length is used whenever the "code" method is selected
+    // (for both idle and active states). Name kept for backward compatibility.
     settingsLockActiveCodeLength: 64,
     settingsLockActiveCharacterSet: 'all-typeable',
     holdToStartDuration: 3000,
@@ -1291,7 +1306,7 @@
       cyclesInput.id = 'zen-pomodoro-cycles-input';
       cyclesInput.value = config.cycles;
       cyclesInput.min = '1';
-      cyclesInput.max = '10';
+      cyclesInput.max = '20';
       cyclesRow.appendChild(cyclesLabel);
       cyclesRow.appendChild(cyclesInput);
       
@@ -1490,7 +1505,7 @@
       // ========================================
       // Simple Timer Duration (only visible for simple mode)
       // ========================================
-      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', config.simpleDuration, 1, 480);
+      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', config.simpleDuration, 1, 180);
       simpleDurationRow.id = 'simple-duration-row';
       if (config.timerMode !== 'simple') {
         simpleDurationRow.classList.add('hidden');
@@ -1648,17 +1663,34 @@
       activeMethodRow.appendChild(activeMethodLabel);
       activeMethodRow.appendChild(activeMethodSelect);
       
-      // Hold duration setting
-      const holdDurationRow = this.createInputRow('Hold Duration (seconds):', 'hold-duration', config.settingsLockIdleDuration, 1, 300);
+      // Hold duration setting (used for both idle and active when hold method is selected)
+      const lockHoldDurationRow = this.createInputRow('Button Hold Time (seconds):', 'hold-duration', config.settingsLockIdleDuration, 1, 300);
       
-      // Code length setting
-      const codeLengthRow = this.createInputRow('Code Length (8-128):', 'code-length', config.settingsLockActiveCodeLength, 8, 128);
+      // Code length setting (used for both idle and active when code method is selected)
+      const lockCodeLengthRow = this.createInputRow('Code Length (8-128):', 'code-length', config.settingsLockActiveCodeLength, 8, 128);
+      
+      // Only show hold/code settings when at least one lockout method uses them
+      const updateLockoutVisibility = () => {
+        const usesHold =
+          idleMethodSelect.value === LOCKOUT_METHODS.HOLD ||
+          activeMethodSelect.value === LOCKOUT_METHODS.HOLD;
+        const usesCode =
+          idleMethodSelect.value === LOCKOUT_METHODS.CODE ||
+          activeMethodSelect.value === LOCKOUT_METHODS.CODE;
+
+        lockHoldDurationRow.style.display = usesHold ? '' : 'none';
+        lockCodeLengthRow.style.display = usesCode ? '' : 'none';
+      };
+
+      idleMethodSelect.addEventListener('change', updateLockoutVisibility);
+      activeMethodSelect.addEventListener('change', updateLockoutVisibility);
+      updateLockoutVisibility();
       
       lockoutSection.appendChild(lockoutTitle);
       lockoutSection.appendChild(idleMethodRow);
       lockoutSection.appendChild(activeMethodRow);
-      lockoutSection.appendChild(holdDurationRow);
-      lockoutSection.appendChild(codeLengthRow);
+      lockoutSection.appendChild(lockHoldDurationRow);
+      lockoutSection.appendChild(lockCodeLengthRow);
       
       // ========================================
       // Assemble config section
@@ -1702,9 +1734,14 @@
       });
       
       saveButton.addEventListener('click', () => {
-        // Save keyboard shortcut
+        // Save keyboard shortcut (validate it contains at least one non-modifier key)
         const newShortcut = shortcutInput.getAttribute('data-shortcut');
-        if (newShortcut && newShortcut !== config.keyboardShortcut) {
+        const shortcutParts = newShortcut ? newShortcut.split('+') : [];
+        const hasNonModifierKey = shortcutParts.some(part => 
+          !['Ctrl', 'Alt', 'Shift', 'Meta'].includes(part)
+        );
+        
+        if (newShortcut && hasNonModifierKey && newShortcut !== config.keyboardShortcut) {
           config.keyboardShortcut = newShortcut;
           // Update the keyboard shortcut handler
           if (window.zenPomodoroApp && window.zenPomodoroApp.keyboardShortcut) {
@@ -1719,7 +1756,7 @@
         
         // Save simple duration
         config.simpleDuration = validateIntegerInput(
-          dialog.querySelector('#simple-duration').value, 1, 480, config.simpleDuration
+          dialog.querySelector('#simple-duration').value, 1, 180, config.simpleDuration
         );
         
         // Validate pomodoro inputs

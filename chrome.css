@@ -722,9 +722,9 @@
 
 /* Dev button variant for timer overlay */
 .zen-pomodoro-button.dev {
-  opacity: 0.6;
   font-size: 12px;
   padding: 8px 12px;
+  border-style: dashed;
 }
 
 /* ============================================
