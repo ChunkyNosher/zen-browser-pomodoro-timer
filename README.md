@@ -59,7 +59,7 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 3. Create the `chrome` folder if it doesn't exist
 4. Copy `chrome.css` to the `chrome` folder
 5. Create the `chrome/JS` folder if it doesn't exist
-6. Copy `userChrome.uc.mjs` to the `chrome/JS` folder
+6. Copy `userChrome.uc.js` to the `chrome/JS` folder
 7. Restart Zen Browser
 
 **Note**: When using Sine mod manager, the mod is automatically installed in the `chrome/sine-mods/` folder.
@@ -207,7 +207,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
    - Click "Clear Startup Cache"
    - Restart browser
 3. Check browser console for JavaScript errors (F12 → Console)
-4. Ensure `userChrome.uc.mjs` is in the `chrome/JS` folder and `chrome.css` is in the `chrome` folder
+4. Ensure `userChrome.uc.js` is in the `chrome/JS` folder and `chrome.css` is in the `chrome` folder
 
 ### Timer Inaccuracy
 
@@ -237,7 +237,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Right-click doesn't show "Start Pomodoro Timer" option
 
 **Solutions**:
-1. Verify `userChrome.uc.mjs` is loaded (check browser console on startup)
+1. Verify `userChrome.uc.js` is loaded (check browser console on startup)
 2. Try right-clicking directly on workspace buttons (not tabs)
 3. Restart browser completely
 4. Check for JavaScript errors in console
@@ -278,7 +278,7 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 ### Development Setup
 
 1. Clone the repository
-2. Make changes to `userChrome.uc.mjs` or `chrome.css`
+2. Make changes to `userChrome.uc.js` or `chrome.css`
 3. Test in Zen Browser by copying files to your profile chrome folder
 4. Submit a pull request with clear description of changes
 

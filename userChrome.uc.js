@@ -102,18 +102,76 @@
   }
 
   /**
+   * Parse an integer preference with validation
+   * @param {string} key - Preference key
+   * @param {number} min - Minimum allowed value
+   * @param {number} max - Maximum allowed value
+   * @returns {number|null} Parsed value or null if not set/invalid
+   */
+  function parseIntPref(key, min, max) {
+    const value = getPref(key, null);
+    if (value === null) return null;
+    
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < min || parsed > max) {
+      return null;
+    }
+    return parsed;
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
+    // Start with default config
+    let config = { ...DEFAULT_CONFIG };
+    
+    // Load from stored JSON config (legacy support)
     const configStr = getPref('config', null);
     if (configStr) {
       try {
-        return JSON.parse(configStr);
+        const storedConfig = JSON.parse(configStr);
+        config = { ...config, ...storedConfig };
       } catch (e) {
         console.error('Failed to parse config:', e);
       }
     }
-    return { ...DEFAULT_CONFIG };
+    
+    // Override with individual Sine preferences if set
+    // These are set by Sine's preferences.json options page
+    const focusDuration = parseIntPref('focusDuration', 1, 120);
+    if (focusDuration !== null) {
+      config.focusDuration = focusDuration;
+    }
+    
+    const breakDuration = parseIntPref('breakDuration', 1, 30);
+    if (breakDuration !== null) {
+      config.breakDuration = breakDuration;
+    }
+    
+    const longBreakDuration = parseIntPref('longBreakDuration', 5, 60);
+    if (longBreakDuration !== null) {
+      config.longBreakDuration = longBreakDuration;
+    }
+    
+    const cycles = parseIntPref('cycles', 1, 10);
+    if (cycles !== null) {
+      config.cycles = cycles;
+    }
+    
+    const motivationalMessage = getPref('motivationalMessage', null);
+    if (motivationalMessage !== null && motivationalMessage !== '') {
+      config.motivationalMessage = motivationalMessage;
+    }
+    
+    const enableNotifications = getPref('enableNotifications', null);
+    if (enableNotifications !== null) {
+      // Sine checkbox preferences normally return a boolean. The string check ('true')
+      // is kept for robustness/legacy cases where values may have been stored as strings.
+      config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
+    }
+    
+    return config;
   }
 
   /**
