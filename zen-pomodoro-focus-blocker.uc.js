@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.0.9
+ * Version: 1.1.0
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -1928,6 +1928,7 @@
      * Hide overlay
      * Removes both active and animation classes.
      * Animation class removal allows re-triggering when show() is called again.
+     * Bug Fix: Clear all inline styles that were set in show() to prevent UI artifacts
      */
     hide() {
       if (this.overlay) {
@@ -1938,9 +1939,18 @@
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
         
-        // Clear inline styles
-        this.overlay.style.display = '';
-        this.overlay.style.visibility = '';
+        // Clear ALL inline styles that were set in show() to prevent black screen bug
+        // These must match the styles set in show() with setProperty()
+        this.overlay.style.removeProperty('display');
+        this.overlay.style.removeProperty('visibility');
+        this.overlay.style.removeProperty('opacity');
+        this.overlay.style.removeProperty('pointer-events');
+        this.overlay.style.removeProperty('z-index');
+        
+        // Ensure overlay is completely hidden
+        this.overlay.style.display = 'none';
+        this.overlay.style.visibility = 'hidden';
+        this.overlay.style.pointerEvents = 'none';
         
         this.isVisible = false;
       }
@@ -2036,9 +2046,21 @@
 
     /**
      * Show persistent indicator
+     * Bug Fix: Reset indicator display before showing to prevent flash of previous timer duration
      */
     showIndicator() {
       if (!this.indicator) this.createOverlay();
+      
+      // Reset indicator text and phase before showing to prevent flash of previous timer data
+      const indicatorText = this.indicator.querySelector('#zen-pomodoro-indicator-text');
+      const timer = window.zenPomodoroApp?.timer;
+      if (indicatorText && timer && timer.remainingTime !== undefined) {
+        const timeStr = formatTime(timer.remainingTime);
+        const phaseLabel = getShortPhaseLabel(timer.currentPhase || 'focus');
+        indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
+        this.indicator.setAttribute('data-phase', timer.currentPhase || 'focus');
+      }
+      
       this.indicator.classList.add('active');
     }
 
@@ -2505,9 +2527,11 @@
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
       
-      if (config.holdToStartDuration > 0) {
+      // Only use hold-to-start if explicitly enabled with a positive duration
+      const holdDuration = Number(config.holdToStartDuration) || 0;
+      if (holdDuration > 0) {
         startButton.id = 'zen-pomodoro-hold-to-start';
-        startButton.textContent = `Hold to Start (${config.holdToStartDuration / 1000}s)`;
+        startButton.textContent = `Hold to Start (${holdDuration / 1000}s)`;
       } else {
         startButton.id = 'zen-pomodoro-start-button';
         startButton.textContent = 'Start Timer';
@@ -2564,9 +2588,12 @@
         }
       };
       
-      if (config.holdToStartDuration > 0 && window.zenPomodoroApp?.security) {
+      // Only use hold-to-start if explicitly enabled with a positive duration
+      const holdDuration = Number(config.holdToStartDuration) || 0;
+      if (holdDuration > 0 && window.zenPomodoroApp?.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
       } else {
+        // Instant start - no hold required
         startButton.addEventListener('click', applyDurationsAndStart);
       }
     }
@@ -3631,10 +3658,11 @@
      */
     setupHoldToStart(buttonElement, onComplete) {
       const config = getConfig();
-      const duration = config.holdToStartDuration;
+      // Ensure duration is a valid positive number, otherwise use instant click
+      const duration = Number(config.holdToStartDuration) || 0;
       
       if (duration <= 0) {
-        // If hold-to-start is disabled, just call onComplete
+        // If hold-to-start is disabled, use instant click - no hold required
         buttonElement.addEventListener('click', onComplete);
         return;
       }

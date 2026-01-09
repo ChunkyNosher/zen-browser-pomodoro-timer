@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.0.9
+ * Version: 1.1.0
  * License: MPL-2.0
  * 
  * ACCESSIBILITY FIXES:
@@ -515,7 +515,7 @@
   width: 100%;
   height: 100%;
   background-color: rgb(0 0 0 / 90%);
-  z-index: calc(var(--zen-pomodoro-z-index) + 2);
+  z-index: 2147483647 !important;
   display: none;
   align-items: center;
   justify-content: center;
@@ -768,10 +768,14 @@
 }
 
 /* ============================================
-   Dev Bypass Dialog - Higher z-index than lock screen
+   Dev Bypass Dialog - Higher z-index than overlay (which uses max-z-index)
+   Bug Fix: Must appear above the blocking overlay which uses max z-index 2147483647
+   Note: We use the same max z-index value since CSS calc() overflow would cause issues
+   The !important flag and position:fixed ensure it appears above the overlay
    ============================================ */
 #zen-pomodoro-dev-bypass-dialog {
-  z-index: calc(var(--zen-pomodoro-z-index) + 10);
+  z-index: 2147483647 !important;
+  position: fixed !important;
 }
 
 /* ============================================
@@ -848,21 +852,26 @@
 #zen-pomodoro-menu-dialog,
 #zen-pomodoro-settings-dialog,
 #zen-pomodoro-start-dialog {
-  z-index: calc(var(--zen-pomodoro-z-index) + 3);
+  z-index: 2147483647 !important;
+  position: fixed !important;
 }
 
 /* ============================================
    Issue 4: Alert Dialog - Higher z-index than all other dialogs including dev bypass
+   Bug Fix: Must appear above the blocking overlay which uses max z-index 2147483647
    ============================================ */
 #zen-pomodoro-alert-dialog {
-  z-index: calc(var(--zen-pomodoro-z-index) + 15);
+  z-index: 2147483647 !important;
+  position: fixed !important;
 }
 
 /* ============================================
    Confirm Dialog - Same high z-index as alert dialog
+   Bug Fix: Must appear above the blocking overlay which uses max z-index 2147483647
    ============================================ */
 #zen-pomodoro-confirm-dialog {
-  z-index: calc(var(--zen-pomodoro-z-index) + 15);
+  z-index: 2147483647 !important;
+  position: fixed !important;
 }
 
 /* ============================================
