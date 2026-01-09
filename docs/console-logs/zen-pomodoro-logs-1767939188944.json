@@ -1,0 +1,2998 @@
+{
+  "exportedAt": "2026-01-09T06:13:08.943Z",
+  "totalEntries": 343,
+  "logs": [
+    {
+      "timestamp": "2026-01-09T02:18:42.277Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-01-09T02:18:43.046Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-01-09T02:18:43.046Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-01-09T02:18:43.046Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-01-09T02:18:43.047Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-01-09T02:22:52.120Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:22:53.615Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T02:22:53.615Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:22:53.616Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:22:54.901Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:01.488Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:01.488Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:04.654Z",
+      "category": "SETTINGS",
+      "message": "Saving settings"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:04.655Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 25,
+        "breakDuration": 5,
+        "cycles": 1,
+        "blockedWorkspacesCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:06.338Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:07.411Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:12.679Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "simple",
+        "cycles": 1,
+        "duration": 1500,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:12.679Z",
+      "category": "OVERLAY",
+      "message": "Overlay attached to content area",
+      "data": {
+        "selector": "#tabbrowser-tabpanels"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:12.681Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:12.786Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:13.680Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:14.683Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:15.732Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:17.196Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:18.270Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:19.744Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:19.744Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:20.744Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:21.888Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:22.928Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:23.931Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:25.027Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:26.571Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:27.571Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:29.051Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:30.167Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:31.351Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:32.378Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:33.385Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:34.742Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{06ba12f8-07f4-4512-b265-fc1d88fdb8fa}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:35.748Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{06ba12f8-07f4-4512-b265-fc1d88fdb8fa}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:37.216Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:38.318Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:39.343Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:40.368Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:41.380Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:42.383Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:44.051Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:45.152Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:46.223Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:47.224Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:48.262Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:48.262Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-09T02:23:49.271Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:50.275Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:51.378Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:52.485Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:53.629Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:54.630Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:55.630Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:56.631Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:57.631Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:58.652Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:23:59.653Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:00.354Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:00.661Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:01.911Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:02.132Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:02.133Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": true
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:02.133Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:02.133Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:02.925Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:03.514Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:03.963Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:05.031Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:06.039Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:06.406Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:06.406Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:07.039Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:08.044Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:09.046Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:10.138Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:11.242Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:12.247Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:13.257Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:14.272Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:15.279Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:16.298Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:17.299Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:18.311Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:19.332Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:20.337Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:21.349Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:22.366Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:23.519Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:24.627Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:25.637Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:26.637Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:27.645Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:28.645Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:29.646Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:30.181Z",
+      "category": "SETTINGS",
+      "message": "Saving settings"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:30.181Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 25,
+        "breakDuration": 5,
+        "cycles": 1,
+        "blockedWorkspacesCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:30.646Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:31.416Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:31.653Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:32.616Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:32.616Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:32.659Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:33.484Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:33.669Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:34.680Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:34.855Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:35.586Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:35.586Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1424,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:36.750Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:37.777Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:41.959Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "pomodoro",
+        "cycles": 1,
+        "duration": 1500,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:41.960Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:42.063Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:42.960Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:43.964Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:45.387Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:45.387Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:46.387Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:47.398Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:48.456Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:49.496Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:50.497Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:51.499Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:52.653Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:53.759Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:55.228Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{dcc04f60-553a-41a3-9a05-8de9fdacce63}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:56.380Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:56.380Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-09T02:24:57.415Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:24:58.653Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:00.008Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:01.051Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:02.522Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:02.522Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:03.756Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{06ba12f8-07f4-4512-b265-fc1d88fdb8fa}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:04.761Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{06ba12f8-07f4-4512-b265-fc1d88fdb8fa}",
+        "isBlocked": true,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:06.008Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:06.008Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:07.014Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:07.668Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:08.023Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:08.837Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:08.837Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:09.023Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:09.567Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:10.139Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:10.414Z",
+      "category": "SECURITY",
+      "message": "Dev bypass cancelled"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:11.157Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:12.234Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:13.233Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:14.281Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:15.390Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:15.782Z",
+      "category": "SECURITY",
+      "message": "Code verification failed - incorrect code"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:16.442Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:17.448Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:18.458Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:19.458Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:20.460Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:21.460Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:22.460Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:23.570Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:24.571Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:25.572Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:26.580Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:27.581Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:28.581Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:29.612Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:30.622Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:31.663Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:32.664Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:33.745Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:34.767Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:35.767Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:36.768Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:37.769Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:38.770Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:39.771Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:40.791Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:41.798Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:42.798Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:43.800Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:44.800Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:45.809Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:46.819Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:47.832Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:48.716Z",
+      "category": "SECURITY",
+      "message": "Code verification successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:48.834Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:49.515Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:49.515Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1437,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:52.592Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:53.338Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T02:25:53.338Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:25:53.338Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:26:17.823Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-09T02:26:17.823Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:26:30.831Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-01-09T02:26:30.832Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 203
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:26:40.108Z",
+      "category": "SETTINGS",
+      "message": "Saving settings"
+    },
+    {
+      "timestamp": "2026-01-09T02:26:40.109Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 25,
+        "breakDuration": 5,
+        "cycles": 1,
+        "blockedWorkspacesCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:34:28.514Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:34:30.013Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T02:34:30.013Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:34:30.013Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:34:30.915Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:34:36.774Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:34:36.774Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:02.351Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:07.128Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:15.194Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "pomodoro",
+        "cycles": 1,
+        "duration": 1500,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:15.195Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:15.296Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:16.195Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:17.214Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:18.214Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:18.844Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:19.226Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:20.310Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:20.484Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:20.484Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:21.312Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:21.478Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:22.335Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:23.336Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:24.336Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:25.337Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-09T02:35:25.341Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:25.962Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-09T02:35:25.962Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1490,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:06:41.140Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:42.513Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:44.866Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:46.010Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:46.010Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:06:46.010Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:06:47.297Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:55.178Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:55.178Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:57.980Z",
+      "category": "SETTINGS",
+      "message": "Saving settings"
+    },
+    {
+      "timestamp": "2026-01-09T04:06:57.981Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 25,
+        "breakDuration": 5,
+        "cycles": 1,
+        "blockedWorkspacesCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:06:58.993Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:00.197Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:13.110Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "pomodoro",
+        "cycles": 1,
+        "duration": 1500,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:13.112Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:13.220Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:14.197Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:15.725Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:15.725Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:16.725Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:17.751Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:19.218Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:20.618Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:21.639Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:22.652Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:24.116Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:25.198Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:26.272Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:27.341Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:27.622Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:28.774Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:28.957Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:28.957Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:29.849Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:30.163Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:30.851Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:31.858Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:32.859Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:33.868Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:34.700Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:34.868Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:35.482Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-09T04:07:35.482Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1481,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-09T04:07:35.482Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-09T06:10:35.035Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T06:10:37.381Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-09T06:10:41.806Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "pomodoro",
+        "cycles": 1,
+        "duration": 1500,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:41.807Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:41.910Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:42.809Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:43.818Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:45.516Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:46.853Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:47.938Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:48.988Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:49.996Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:51.012Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:52.040Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:53.096Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:54.107Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{24b5e96e-9c85-4727-90fd-e861afa0150f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:55.897Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:55.897Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:57.327Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:58.334Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:10:59.334Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:00.340Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:01.350Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:02.839Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:03.842Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:04.867Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:05.893Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:06.905Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{42633c99-b9c3-4d1b-87e8-d67f7e5093b7}",
+        "isBlocked": true,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:08.044Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:08.044Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:09.066Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:10.276Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:11.288Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:12.300Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:13.424Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:14.436Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:14.777Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:15.494Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:16.347Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:16.347Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:16.503Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:17.513Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:17.926Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:18.555Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:19.571Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:20.581Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:21.591Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:22.599Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:23.619Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:24.155Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:24.714Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": false,
+        "blockedCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:24.825Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:24.825Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1461,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:26.527Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:28.105Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:28.105Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:28.105Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-09T06:11:29.030Z",
+      "category": "SECURITY",
+      "message": "Dev bypass prompt shown"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:33.860Z",
+      "category": "SECURITY",
+      "message": "Dev bypass failed - incorrect password"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:40.047Z",
+      "category": "SECURITY",
+      "message": "Dev bypass failed - incorrect password"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:47.135Z",
+      "category": "SECURITY",
+      "message": "Dev bypass successful"
+    },
+    {
+      "timestamp": "2026-01-09T06:11:47.135Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-09T06:13:08.943Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-01-09T06:13:08.943Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 342
+      }
+    }
+  ]
+}
