@@ -1416,9 +1416,27 @@
       this.indicator.appendChild(indicatorText);
 
       // Issue 1: Position overlay within content area instead of full window
-      const contentArea = document.querySelector('#tabbrowser-tabpanels') || 
-                          document.querySelector('#appcontent') || 
-                          document.querySelector('#browser');
+      // Try multiple Zen Browser and Firefox specific selectors
+      const contentAreaSelectors = [
+        '#tabbrowser-tabpanels',
+        '#appcontent',
+        '#zen-main-view',
+        '#browser',
+        '#main-window'
+      ];
+      
+      let contentArea = null;
+      let usedSelector = null;
+      
+      for (const selector of contentAreaSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          contentArea = element;
+          usedSelector = selector;
+          break;
+        }
+      }
+      
       if (contentArea) {
         // Store reference and original position for cleanup
         this.contentArea = contentArea;
@@ -1431,11 +1449,22 @@
         }
         contentArea.appendChild(this.overlay);
         
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached to content area', { selector: usedSelector });
+        
         // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
-        // Fallback to document root if content area not found
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Content area not found, appending overlay to document root');
+        // Fallback: Use position fixed and append to document root
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: No content area found, using fixed positioning fallback');
+        
+        // Apply inline styles for fixed positioning as backup
+        this.overlay.style.position = 'fixed';
+        this.overlay.style.top = '0';
+        this.overlay.style.left = '0';
+        this.overlay.style.width = '100vw';
+        this.overlay.style.height = '100vh';
+        this.overlay.style.zIndex = '99999';
+        
         document.documentElement.appendChild(this.overlay);
       }
       
