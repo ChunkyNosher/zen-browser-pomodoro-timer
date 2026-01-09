@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.0
+ * Version: 1.1.1
  * License: MPL-2.0
  * 
  * ACCESSIBILITY FIXES:
@@ -232,8 +232,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  /* z-index one less than max to ensure dialogs appear above indicator */
-  z-index: 2147483646;
+  z-index: 2147483646; /* z-index one less than max to ensure dialogs appear above indicator */
   display: none;
   align-items: center;
   gap: 8px;
@@ -769,10 +768,11 @@
 }
 
 /* ============================================
-   Dev Bypass Dialog - Higher z-index than overlay (which uses max-z-index)
-   Bug Fix: Must appear above the blocking overlay which uses max z-index 2147483647
-   Note: We use the same max z-index value since CSS calc() overflow would cause issues
-   The !important flag and position:fixed ensure it appears above the overlay
+   Dev Bypass Dialog - Appears above blocking overlay
+   Bug Fix: Both overlay and dialog use max z-index (2147483647)
+   The JS code temporarily disables pointer-events on the overlay
+   when this dialog is shown, allowing the dialog to receive input.
+   The !important flag and position:fixed ensure proper positioning.
    ============================================ */
 #zen-pomodoro-dev-bypass-dialog {
   z-index: 2147483647 !important;

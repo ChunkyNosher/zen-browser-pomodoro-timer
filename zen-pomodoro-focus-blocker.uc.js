@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.0
+ * Version: 1.1.1
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -1903,6 +1903,11 @@
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
         
+        // Re-setup ResizeObserver if content area exists (was disconnected in hide())
+        if (this.contentArea) {
+          this.setupContentAreaObserver(this.contentArea);
+        }
+        
         // Update overlay bounds to ensure proper positioning
         this.updateOverlayBounds();
         
@@ -1962,6 +1967,19 @@
         this.overlay.style.removeProperty('opacity');
         this.overlay.style.removeProperty('pointer-events');
         this.overlay.style.removeProperty('z-index');
+        
+        // BUG FIX: Clear bounds styles set by updateOverlayBounds()
+        // These inline styles (top, left, width, height) can cause the overlay
+        // to still affect layout even when hidden, potentially blocking UI elements
+        // like the Zen Sidebar and toolbar
+        this.overlay.style.removeProperty('top');
+        this.overlay.style.removeProperty('left');
+        this.overlay.style.removeProperty('width');
+        this.overlay.style.removeProperty('height');
+        
+        // BUG FIX: Disconnect ResizeObserver when hiding to prevent
+        // unnecessary reflows and potential UI blocking issues
+        this._cleanupContentAreaObserver();
         
         this.isVisible = false;
       }
@@ -2484,7 +2502,7 @@
         .forEach(row => configSection.appendChild(row));
       
       // Buttons
-      const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons(config);
+      const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
       
       // Assemble dialog
       [backButton, h2, configSection, buttonDiv].forEach(el => dialog.appendChild(el));
@@ -2535,11 +2553,10 @@
 
     /**
      * Create buttons for the start timer dialog.
-     * @param {Object} config - Config object
      * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLButtonElement, startButton: HTMLButtonElement}}
      * @private
      */
-    _createStartDialogButtons(config) {
+    _createStartDialogButtons() {
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
       
@@ -2550,16 +2567,9 @@
       
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
-      
-      // Only use hold-to-start if explicitly enabled with a positive duration
-      const holdDuration = getValidHoldDuration(config);
-      if (holdDuration > 0) {
-        startButton.id = 'zen-pomodoro-hold-to-start';
-        startButton.textContent = `Hold to Start (${holdDuration / 1000}s)`;
-      } else {
-        startButton.id = 'zen-pomodoro-start-button';
-        startButton.textContent = 'Start Timer';
-      }
+      // Always use instant-click start button (no hold-to-start)
+      startButton.id = 'zen-pomodoro-start-button';
+      startButton.textContent = 'Start Timer';
       
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(startButton);
@@ -2612,14 +2622,8 @@
         }
       };
       
-      // Only use hold-to-start if explicitly enabled with a positive duration
-      const holdDuration = getValidHoldDuration(config);
-      if (holdDuration > 0 && window.zenPomodoroApp?.security) {
-        window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
-      } else {
-        // Instant start - no hold required
-        startButton.addEventListener('click', applyDurationsAndStart);
-      }
+      // Always use instant start - no hold required
+      startButton.addEventListener('click', applyDurationsAndStart);
     }
 
     /**
@@ -3253,6 +3257,21 @@
     showDevBypassPrompt(onSuccess) {
       logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass prompt shown');
       
+      // Z-INDEX FIX: Temporarily disable pointer-events on overlay so dialog can receive input
+      // The overlay and dialog both use max z-index (2147483647), so we need to let
+      // pointer events pass through the overlay to the dialog
+      const overlay = document.getElementById('zen-pomodoro-overlay');
+      if (overlay) {
+        overlay.style.setProperty('pointer-events', 'none', 'important');
+      }
+      
+      // Helper function to restore overlay pointer-events when dialog closes
+      const restoreOverlayPointerEvents = () => {
+        if (overlay) {
+          overlay.style.setProperty('pointer-events', 'all', 'important');
+        }
+      };
+      
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-dev-bypass-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
@@ -3301,12 +3320,14 @@
       
       cancelButton.addEventListener('click', () => {
         logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass cancelled');
+        restoreOverlayPointerEvents();
         dialog.remove();
       });
       
       submitButton.addEventListener('click', () => {
         const password = input.value;
         if (this.verifyDevPassword(password)) {
+          restoreOverlayPointerEvents();
           dialog.remove();
           logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful');
           console.log('[DEV BYPASS] Lock screen bypassed');
