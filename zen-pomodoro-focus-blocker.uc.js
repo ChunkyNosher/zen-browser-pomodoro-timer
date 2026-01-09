@@ -1726,7 +1726,22 @@
         this.overlay.classList.add('active');
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
+        
+        // Backup: Apply inline styles to ensure visibility
+        this.overlay.style.display = 'flex';
+        this.overlay.style.visibility = 'visible';
+        
         this.isVisible = true;
+        
+        // Verify visibility after next paint
+        requestAnimationFrame(() => {
+          const computedStyle = window.getComputedStyle(this.overlay);
+          if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
+            logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Overlay not visible after show, forcing styles');
+            this.overlay.style.setProperty('display', 'flex', 'important');
+            this.overlay.style.setProperty('visibility', 'visible', 'important');
+          }
+        });
       }
       
       // Only update phase color when phase actually changes
@@ -1750,6 +1765,11 @@
         }
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
+        
+        // Clear inline styles
+        this.overlay.style.display = '';
+        this.overlay.style.visibility = '';
+        
         this.isVisible = false;
       }
     }
