@@ -1557,8 +1557,9 @@
      * the overlay properly covers the browser content area.
      * 
      * Note: This method is called from debounced resize observer callbacks
-     * via _scheduleOverlayUpdate() which uses requestAnimationFrame to
-     * batch layout calculations and avoid performance issues.
+     * via the chain: _scheduleOverlayUpdate() → updateOverlayPosition() → updateOverlayBounds().
+     * The debouncing mechanism uses requestAnimationFrame to batch layout
+     * calculations and avoid performance issues during rapid resize events.
      */
     updateOverlayBounds() {
       if (!this.overlay || !this.contentArea) return;
@@ -1700,9 +1701,14 @@
     }
 
     /**
-     * Issue 1: Update overlay position to match content area
+     * Issue 1: Update overlay position to match content area.
      * Ensures the overlay continues to cover the visible content area when it resizes.
      * Now delegates to updateOverlayBounds() for fixed positioning with explicit pixel values.
+     * 
+     * Note: This method updates this.contentArea to the passed parameter to ensure
+     * bounds are always calculated for the correct element.
+     * 
+     * @param {Element} contentArea - The content area element to match bounds to
      */
     updateOverlayPosition(contentArea) {
       if (!this.overlay || !contentArea) {
