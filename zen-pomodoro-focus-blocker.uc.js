@@ -1161,14 +1161,23 @@
         }
       });
 
-      const workspaceContainer = document.querySelector('#zen-workspace-button-container, [id*="workspace"]');
-      if (workspaceContainer) {
-        this.workspaceObserver.observe(workspaceContainer, {
+      // Try multiple containers for more reliable detection
+      const containers = [
+        document.querySelector('#zen-workspace-button-container'),
+        document.querySelector('#zen-workspaces-button-container'),
+        document.querySelector('[id*="workspace"]'),
+        document.querySelector('#navigator-toolbox'),
+        document.body
+      ].filter(Boolean);
+      
+      containers.forEach(container => {
+        this.workspaceObserver.observe(container, {
           attributes: true,
-          attributeFilter: ['active'],
-          subtree: true
+          attributeFilter: ['active', 'selected', 'zen-workspace-id'],
+          subtree: true,
+          childList: true
         });
-      }
+      });
     }
 
     /**
@@ -3645,6 +3654,12 @@
       this.timer.start(mode, cycles, sessionOverrides);
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
+      
+      // Double-check overlay visibility after a short delay
+      // This ensures the DOM has settled after timer start
+      setTimeout(() => {
+        this.updateOverlayVisibility();
+      }, 100);
     }
 
     /**
