@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.0.7
+ * Version: 1.0.8
  * License: MPL-2.0
  * 
  * ACCESSIBILITY FIXES:
@@ -39,6 +39,7 @@
   
   /* Z-index hierarchy */
   --zen-pomodoro-z-index: 99999;
+  --zen-pomodoro-max-z-index: 2147483647;
   
   /* Button colors */
   --zen-pomodoro-button-bg: rgb(255 255 255 / 10%);
@@ -51,28 +52,47 @@
    Issue 1: Position within content area, not full window
    ============================================ */
 #zen-pomodoro-overlay {
+  /* Force absolute positioning within content area */
   position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
+  inset: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  
+  /* Ultra-high z-index to appear above all web content */
+  z-index: var(--zen-pomodoro-max-z-index) !important;
+  
+  /* Background styling */
   background-color: var(--zen-pomodoro-overlay-bg, #808080) !important;
   opacity: var(--zen-pomodoro-overlay-opacity, 1) !important;
-  z-index: var(--zen-pomodoro-z-index, 99999) !important;
+  
+  /* Capture all pointer events to block interaction */
   pointer-events: all !important;
-
-  /* Note: Using both display and visibility is intentional for browser compatibility */
+  
+  /* Initially hidden */
   display: none !important;
+  visibility: hidden !important;
+  
+  /* Layout */
   align-items: center !important;
   justify-content: center !important;
-  overflow: hidden;
-  font-family: var(--zen-pomodoro-timer-font-family);
-  visibility: hidden;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  
+  /* Typography */
+  font-family: var(--zen-pomodoro-timer-font-family) !important;
+  
+  /* Ensure overlay is painted */
+  isolation: isolate !important;
+  contain: layout style !important;
 }
 
 #zen-pomodoro-overlay.active {
   display: flex !important;
   visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Phase-specific overlay colors */
