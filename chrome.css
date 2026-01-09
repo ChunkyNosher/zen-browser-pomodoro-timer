@@ -60,6 +60,8 @@
   opacity: var(--zen-pomodoro-overlay-opacity, 1) !important;
   z-index: var(--zen-pomodoro-z-index, 99999) !important;
   pointer-events: all !important;
+
+  /* Note: Using both display and visibility is intentional for browser compatibility */
   display: none !important;
   align-items: center;
   justify-content: center;

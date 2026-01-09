@@ -92,6 +92,9 @@
   // Save state every 10 seconds instead of every second for performance (in seconds)
   const SAVE_STATE_INTERVAL_SECONDS = 10;
 
+  // Delay for DOM settling after timer start (in milliseconds)
+  const DOM_SETTLE_DELAY_MS = 100;
+
   // ============================================
   // LogManager Class
   // ============================================
@@ -1162,13 +1165,23 @@
       });
 
       // Try multiple containers for more reliable detection
-      const containers = [
-        document.querySelector('#zen-workspace-button-container'),
-        document.querySelector('#zen-workspaces-button-container'),
-        document.querySelector('[id*="workspace"]'),
-        document.querySelector('#navigator-toolbox'),
-        document.body
-      ].filter(Boolean);
+      // Define selectors as strings
+      const containerSelectors = [
+        '#zen-workspace-button-container',
+        '#zen-workspaces-button-container',
+        '[id*="workspace"]',
+        '#navigator-toolbox'
+      ];
+
+      // Query and filter in one pass, with document.body as fallback
+      const containers = containerSelectors
+        .map(selector => document.querySelector(selector))
+        .filter(Boolean);
+
+      // Always include document.body as a fallback observer target
+      if (document.body) {
+        containers.push(document.body);
+      }
       
       containers.forEach(container => {
         this.workspaceObserver.observe(container, {
@@ -3659,7 +3672,7 @@
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
         this.updateOverlayVisibility();
-      }, 100);
+      }, DOM_SETTLE_DELAY_MS);
     }
 
     /**
