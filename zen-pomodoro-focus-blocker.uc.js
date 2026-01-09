@@ -130,6 +130,31 @@
   const SENSITIVE_KEYS = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
 
   /**
+   * Selectors to try for workspace container for MutationObserver.
+   * Order matters - earlier selectors are preferred.
+   * @constant {string[]}
+   */
+  const WORKSPACE_CONTAINER_SELECTORS = [
+    '#zen-workspace-button-container',
+    '#zen-workspaces-button-container',
+    '[id*="workspace"]',
+    '#navigator-toolbox'
+  ];
+
+  /**
+   * Selectors to try for content area to append overlay.
+   * Order matters - earlier selectors are preferred.
+   * @constant {string[]}
+   */
+  const CONTENT_AREA_SELECTORS = [
+    '#tabbrowser-tabpanels',
+    '#appcontent',
+    '#zen-main-view',
+    '#browser',
+    '#main-window'
+  ];
+
+  /**
    * LogManager class for comprehensive logging with export functionality.
    * Stores log entries in memory with timestamps and provides export capabilities.
    */
@@ -1165,17 +1190,9 @@
       });
 
       // Try multiple containers for more reliable detection
-      // Define selectors as strings
-      const containerSelectors = [
-        '#zen-workspace-button-container',
-        '#zen-workspaces-button-container',
-        '[id*="workspace"]',
-        '#navigator-toolbox'
-      ];
-
       // Query selectors - find first valid workspace container
       let workspaceContainer = null;
-      for (const selector of containerSelectors) {
+      for (const selector of WORKSPACE_CONTAINER_SELECTORS) {
         const element = document.querySelector(selector);
         if (element) {
           workspaceContainer = element;
@@ -1442,18 +1459,10 @@
 
       // Issue 1: Position overlay within content area instead of full window
       // Try multiple Zen Browser and Firefox specific selectors
-      const contentAreaSelectors = [
-        '#tabbrowser-tabpanels',
-        '#appcontent',
-        '#zen-main-view',
-        '#browser',
-        '#main-window'
-      ];
-      
       let contentArea = null;
       let usedSelector = null;
       
-      for (const selector of contentAreaSelectors) {
+      for (const selector of CONTENT_AREA_SELECTORS) {
         const element = document.querySelector(selector);
         if (element) {
           contentArea = element;
@@ -1758,7 +1767,8 @@
         
         this.isVisible = true;
         
-        // Verify visibility after next paint
+        // Deferred visibility check - runs once per show() after next paint
+        // Using getComputedStyle inside rAF is appropriate as it's after layout
         requestAnimationFrame(() => {
           const computedStyle = window.getComputedStyle(this.overlay);
           if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
