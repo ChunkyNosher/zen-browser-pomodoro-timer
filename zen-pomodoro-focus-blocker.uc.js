@@ -1555,6 +1555,10 @@
      * Update overlay bounds to match content area position and size.
      * Uses explicit pixel values from getBoundingClientRect() to ensure
      * the overlay properly covers the browser content area.
+     * 
+     * Note: This method is called from debounced resize observer callbacks
+     * via _scheduleOverlayUpdate() which uses requestAnimationFrame to
+     * batch layout calculations and avoid performance issues.
      */
     updateOverlayBounds() {
       if (!this.overlay || !this.contentArea) return;
@@ -1705,10 +1709,9 @@
         return;
       }
 
-      // Store content area reference if not already set
-      if (!this.contentArea) {
-        this.contentArea = contentArea;
-      }
+      // Always update content area reference to use the passed parameter
+      // This ensures bounds are calculated for the correct element
+      this.contentArea = contentArea;
 
       // Update bounds using fixed positioning with explicit pixel values
       this.updateOverlayBounds();
