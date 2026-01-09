@@ -63,8 +63,8 @@
 
   /* Note: Using both display and visibility is intentional for browser compatibility */
   display: none !important;
-  align-items: center;
-  justify-content: center;
+  align-items: center !important;
+  justify-content: center !important;
   overflow: hidden;
   font-family: var(--zen-pomodoro-timer-font-family);
   visibility: hidden;

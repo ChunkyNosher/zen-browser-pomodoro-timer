@@ -1173,24 +1173,27 @@
         '#navigator-toolbox'
       ];
 
-      // Query and filter in one pass, with document.body as fallback
-      const containers = containerSelectors
-        .map(selector => document.querySelector(selector))
-        .filter(Boolean);
-
-      // Always include document.body as a fallback observer target
-      if (document.body) {
-        containers.push(document.body);
+      // Query selectors - find first valid workspace container
+      let workspaceContainer = null;
+      for (const selector of containerSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          workspaceContainer = element;
+          break;
+        }
       }
-      
-      containers.forEach(container => {
-        this.workspaceObserver.observe(container, {
+
+      // Set up observer on the workspace container if found
+      if (workspaceContainer) {
+        this.workspaceObserver.observe(workspaceContainer, {
           attributes: true,
           attributeFilter: ['active', 'selected', 'zen-workspace-id'],
           subtree: true,
           childList: true
         });
-      });
+      } else {
+        console.warn('[Pomodoro Focus Blocker] No workspace container found for monitoring');
+      }
     }
 
     /**
