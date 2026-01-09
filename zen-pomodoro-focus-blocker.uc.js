@@ -1196,7 +1196,11 @@
       this.workspaceObserver = new MutationObserver(() => this._handleWorkspaceMutation());
 
       // Try multiple containers for more reliable detection
-      // Query selectors - find first valid workspace container
+      // NOTE: We use a for-loop with early break instead of combined selector string
+      // (document.querySelector('sel1, sel2, sel3')) because we want to find the FIRST
+      // valid element in priority order defined by WORKSPACE_CONTAINER_SELECTORS.
+      // A combined selector returns the first DOM element matching ANY selector,
+      // not respecting our preference order.
       let workspaceContainer = null;
       for (const selector of WORKSPACE_CONTAINER_SELECTORS) {
         const element = document.querySelector(selector);
@@ -1481,6 +1485,12 @@
     _attachOverlayToContentArea() {
       // Issue 1: Position overlay within content area instead of full window
       // Try multiple Zen Browser and Firefox specific selectors
+      // NOTE: We use a for-loop with early break instead of combined selector string
+      // (document.querySelector('sel1, sel2, sel3')) because:
+      // 1. We want to find the FIRST valid element in priority order defined by CONTENT_AREA_SELECTORS
+      // 2. We need to know WHICH selector matched for logging/debugging purposes
+      // A combined selector returns the first DOM element matching ANY selector,
+      // not respecting our preference order and without indicating which selector matched.
       let contentArea = null;
       let usedSelector = null;
       
@@ -1505,7 +1515,7 @@
         }
         contentArea.appendChild(this.overlay);
         
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached to content area', { selector: usedSelector });
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached to content area', { selector: usedSelector || 'unknown' });
         
         // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
