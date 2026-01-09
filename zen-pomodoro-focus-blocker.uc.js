@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.0.5
+ * Version: 1.0.7
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -92,6 +92,9 @@
   // Save state every 10 seconds instead of every second for performance (in seconds)
   const SAVE_STATE_INTERVAL_SECONDS = 10;
 
+  // Delay for DOM settling after timer start (in milliseconds)
+  const DOM_SETTLE_DELAY_MS = 100;
+
   // ============================================
   // LogManager Class
   // ============================================
@@ -125,6 +128,31 @@
    * @constant {string[]}
    */
   const SENSITIVE_KEYS = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
+
+  /**
+   * Selectors to try for workspace container for MutationObserver.
+   * Order matters - earlier selectors are preferred.
+   * @constant {string[]}
+   */
+  const WORKSPACE_CONTAINER_SELECTORS = [
+    '#zen-workspace-button-container',
+    '#zen-workspaces-button-container',
+    '[id*="workspace"]',
+    '#navigator-toolbox'
+  ];
+
+  /**
+   * Selectors to try for content area to append overlay.
+   * Order matters - earlier selectors are preferred.
+   * @constant {string[]}
+   */
+  const CONTENT_AREA_SELECTORS = [
+    '#tabbrowser-tabpanels',
+    '#appcontent',
+    '#zen-main-view',
+    '#browser',
+    '#main-window'
+  ];
 
   /**
    * LogManager class for comprehensive logging with export functionality.
@@ -177,6 +205,8 @@
      * @returns {*} Sanitized data
      * @private
      */
+    // NOTE: Cyclomatic complexity (cc=9) is acceptable for this recursive sanitization logic
+    // that handles multiple data types (null, primitive, array, object) and sensitive key filtering
     _sanitizeData(data) {
       if (data === null || data === undefined) {
         return data;
@@ -1132,6 +1162,23 @@
     }
 
     /**
+     * Handle workspace mutation observer callback
+     * @private
+     */
+    _handleWorkspaceMutation() {
+      const newWorkspace = this.getActiveWorkspace();
+      if (newWorkspace === this.activeWorkspace) return;
+
+      this.activeWorkspace = newWorkspace;
+      this.needsValidation = true;
+      this.validateBlockedWorkspaces();
+
+      if (this.onWorkspaceChange) {
+        this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
+      }
+    }
+
+    /**
      * Start monitoring workspace changes
      * MEMORY LEAK FIX: Store observer for cleanup
      * PERFORMANCE FIX: Validate workspaces on change, not on every check
@@ -1146,28 +1193,33 @@
       
       // Use MutationObserver to detect workspace changes
       // PERFORMANCE FIX: Use attributeFilter to only observe 'active' attribute changes
-      this.workspaceObserver = new MutationObserver(() => {
-        const newWorkspace = this.getActiveWorkspace();
-        if (newWorkspace !== this.activeWorkspace) {
-          this.activeWorkspace = newWorkspace;
-          
-          // PERFORMANCE FIX: Validate workspaces only on workspace change
-          this.needsValidation = true;
-          this.validateBlockedWorkspaces();
-          
-          if (this.onWorkspaceChange) {
-            this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
-          }
-        }
-      });
+      this.workspaceObserver = new MutationObserver(() => this._handleWorkspaceMutation());
 
-      const workspaceContainer = document.querySelector('#zen-workspace-button-container, [id*="workspace"]');
+      // Try multiple containers for more reliable detection
+      // NOTE: We use a for-loop with early break instead of combined selector string
+      // (document.querySelector('sel1, sel2, sel3')) because we want to find the FIRST
+      // valid element in priority order defined by WORKSPACE_CONTAINER_SELECTORS.
+      // A combined selector returns the first DOM element matching ANY selector,
+      // not respecting our preference order.
+      let workspaceContainer = null;
+      for (const selector of WORKSPACE_CONTAINER_SELECTORS) {
+        const element = document.querySelector(selector);
+        if (element) {
+          workspaceContainer = element;
+          break;
+        }
+      }
+
+      // Set up observer on the workspace container if found
       if (workspaceContainer) {
         this.workspaceObserver.observe(workspaceContainer, {
           attributes: true,
-          attributeFilter: ['active'],
-          subtree: true
+          attributeFilter: ['active', 'selected', 'zen-workspace-id'],
+          subtree: true,
+          childList: true
         });
+      } else {
+        console.warn('[Pomodoro Focus Blocker] No workspace container found for monitoring');
       }
     }
 
@@ -1335,17 +1387,11 @@
     }
 
     /**
-     * Create overlay elements
-     * SECURITY FIX: Use textContent instead of innerHTML for user content
+     * Create the overlay content container with phase label, timer display, etc.
+     * @returns {HTMLElement} The content container element
+     * @private
      */
-    createOverlay() {
-      if (this.overlay) return;
-
-      // Main overlay
-      this.overlay = document.createElement('div');
-      this.overlay.id = 'zen-pomodoro-overlay';
-      
-      // Create content container
+    _createOverlayContent() {
       const content = document.createElement('div');
       content.id = 'zen-pomodoro-content';
       
@@ -1370,6 +1416,23 @@
       message.textContent = sanitizeText(this.config.motivationalMessage);
       
       // Controls
+      const controls = this._createOverlayControls();
+      
+      content.appendChild(phaseLabel);
+      content.appendChild(timerDisplay);
+      content.appendChild(cycleProgress);
+      content.appendChild(message);
+      content.appendChild(controls);
+      
+      return content;
+    }
+
+    /**
+     * Create the overlay controls section with buttons
+     * @returns {HTMLElement} The controls container element
+     * @private
+     */
+    _createOverlayControls() {
       const controls = document.createElement('div');
       controls.id = 'zen-pomodoro-controls';
       
@@ -1393,15 +1456,14 @@
       controls.appendChild(stopButton);
       controls.appendChild(devButton);
       
-      content.appendChild(phaseLabel);
-      content.appendChild(timerDisplay);
-      content.appendChild(cycleProgress);
-      content.appendChild(message);
-      content.appendChild(controls);
-      
-      this.overlay.appendChild(content);
+      return controls;
+    }
 
-      // Persistent indicator
+    /**
+     * Create the persistent indicator element
+     * @private
+     */
+    _createIndicator() {
       this.indicator = document.createElement('div');
       this.indicator.id = 'zen-pomodoro-indicator';
       
@@ -1414,11 +1476,33 @@
       
       this.indicator.appendChild(indicatorDot);
       this.indicator.appendChild(indicatorText);
+    }
 
+    /**
+     * Attach overlay to content area or use fallback positioning
+     * @private
+     */
+    _attachOverlayToContentArea() {
       // Issue 1: Position overlay within content area instead of full window
-      const contentArea = document.querySelector('#tabbrowser-tabpanels') || 
-                          document.querySelector('#appcontent') || 
-                          document.querySelector('#browser');
+      // Try multiple Zen Browser and Firefox specific selectors
+      // NOTE: We use a for-loop with early break instead of combined selector string
+      // (document.querySelector('sel1, sel2, sel3')) because:
+      // 1. We want to find the FIRST valid element in priority order defined by CONTENT_AREA_SELECTORS
+      // 2. We need to know WHICH selector matched for logging/debugging purposes
+      // A combined selector returns the first DOM element matching ANY selector,
+      // not respecting our preference order and without indicating which selector matched.
+      let contentArea = null;
+      let usedSelector = null;
+      
+      for (const selector of CONTENT_AREA_SELECTORS) {
+        const element = document.querySelector(selector);
+        if (element) {
+          contentArea = element;
+          usedSelector = selector;
+          break;
+        }
+      }
+      
       if (contentArea) {
         // Store reference and original position for cleanup
         this.contentArea = contentArea;
@@ -1431,13 +1515,46 @@
         }
         contentArea.appendChild(this.overlay);
         
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached to content area', { selector: usedSelector || 'unknown' });
+        
         // Issue 1: Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
-        // Fallback to document root if content area not found
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Content area not found, appending overlay to document root');
+        // Fallback: Use position fixed and append to document root
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: No content area found, using fixed positioning fallback');
+        
+        // Apply inline styles for fixed positioning as backup
+        this.overlay.style.position = 'fixed';
+        this.overlay.style.top = '0';
+        this.overlay.style.left = '0';
+        this.overlay.style.width = '100vw';
+        this.overlay.style.height = '100vh';
+        this.overlay.style.zIndex = '99999';
+        
         document.documentElement.appendChild(this.overlay);
       }
+    }
+
+    /**
+     * Create overlay elements
+     * SECURITY FIX: Use textContent instead of innerHTML for user content
+     */
+    createOverlay() {
+      if (this.overlay) return;
+
+      // Main overlay
+      this.overlay = document.createElement('div');
+      this.overlay.id = 'zen-pomodoro-overlay';
+      
+      // Create and append content
+      const content = this._createOverlayContent();
+      this.overlay.appendChild(content);
+
+      // Create persistent indicator
+      this._createIndicator();
+
+      // Attach overlay to content area
+      this._attachOverlayToContentArea();
       
       document.documentElement.appendChild(this.indicator);
 
@@ -1697,7 +1814,23 @@
         this.overlay.classList.add('active');
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
+        
+        // Backup: Apply inline styles to ensure visibility
+        this.overlay.style.display = 'flex';
+        this.overlay.style.visibility = 'visible';
+        
         this.isVisible = true;
+        
+        // Deferred visibility check - runs once per show() after next paint
+        // Using getComputedStyle inside rAF is appropriate as it's after layout
+        requestAnimationFrame(() => {
+          const computedStyle = window.getComputedStyle(this.overlay);
+          if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
+            logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Overlay not visible after show, forcing styles');
+            this.overlay.style.setProperty('display', 'flex', 'important');
+            this.overlay.style.setProperty('visibility', 'visible', 'important');
+          }
+        });
       }
       
       // Only update phase color when phase actually changes
@@ -1721,6 +1854,11 @@
         }
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
+        
+        // Clear inline styles
+        this.overlay.style.display = '';
+        this.overlay.style.visibility = '';
+        
         this.isVisible = false;
       }
     }
@@ -3596,6 +3734,12 @@
       this.timer.start(mode, cycles, sessionOverrides);
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
+      
+      // Double-check overlay visibility after a short delay
+      // This ensures the DOM has settled after timer start
+      setTimeout(() => {
+        this.updateOverlayVisibility();
+      }, DOM_SETTLE_DELAY_MS);
     }
 
     /**
