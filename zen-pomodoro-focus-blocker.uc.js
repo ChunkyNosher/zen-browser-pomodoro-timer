@@ -98,6 +98,9 @@
   // Maximum z-index value for overlay (highest possible value for 32-bit signed integer)
   const MAX_OVERLAY_Z_INDEX = '2147483647';
 
+  // Minimum content area dimension for valid overlay bounds (in pixels)
+  const MIN_CONTENT_AREA_DIMENSION = 100;
+
   // ============================================
   // LogManager Class
   // ============================================
@@ -1387,7 +1390,7 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
-      this.contentArea = null; // Store reference for cleanup and bounds updates
+      this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
 
@@ -1559,9 +1562,8 @@
       const rect = this.contentArea.getBoundingClientRect();
       
       // Validate bounds to ensure they are reasonable
-      // Minimum dimensions of 100px to prevent invisible overlays
-      const MIN_DIMENSION = 100;
-      if (rect.width < MIN_DIMENSION || rect.height < MIN_DIMENSION) {
+      // Use the module constant for minimum dimension to prevent invisible overlays
+      if (rect.width < MIN_CONTENT_AREA_DIMENSION || rect.height < MIN_CONTENT_AREA_DIMENSION) {
         logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Content area bounds too small, using fallback', {
           width: rect.width,
           height: rect.height
@@ -2046,18 +2048,17 @@
      */
     destroy() {
       this._cleanupContentAreaObserver();
-      this._restoreContentAreaPosition();
+      this._cleanupContentAreaReference();
       this._cleanupIndicatorEventListener();
       this._removeOverlayElements();
     }
 
     /**
      * Clean up content area reference.
-     * Note: With fixed positioning approach, we no longer modify the content area's
-     * position, so this just clears the reference.
+     * Clears the stored reference to the content area element.
      * @private
      */
-    _restoreContentAreaPosition() {
+    _cleanupContentAreaReference() {
       this.contentArea = null;
     }
 
