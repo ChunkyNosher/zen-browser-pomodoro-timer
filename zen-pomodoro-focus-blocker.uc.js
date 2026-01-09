@@ -205,6 +205,8 @@
      * @returns {*} Sanitized data
      * @private
      */
+    // NOTE: Cyclomatic complexity (cc=9) is acceptable for this recursive sanitization logic
+    // that handles multiple data types (null, primitive, array, object) and sensitive key filtering
     _sanitizeData(data) {
       if (data === null || data === undefined) {
         return data;
@@ -1160,6 +1162,23 @@
     }
 
     /**
+     * Handle workspace mutation observer callback
+     * @private
+     */
+    _handleWorkspaceMutation() {
+      const newWorkspace = this.getActiveWorkspace();
+      if (newWorkspace === this.activeWorkspace) return;
+
+      this.activeWorkspace = newWorkspace;
+      this.needsValidation = true;
+      this.validateBlockedWorkspaces();
+
+      if (this.onWorkspaceChange) {
+        this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
+      }
+    }
+
+    /**
      * Start monitoring workspace changes
      * MEMORY LEAK FIX: Store observer for cleanup
      * PERFORMANCE FIX: Validate workspaces on change, not on every check
@@ -1174,20 +1193,7 @@
       
       // Use MutationObserver to detect workspace changes
       // PERFORMANCE FIX: Use attributeFilter to only observe 'active' attribute changes
-      this.workspaceObserver = new MutationObserver(() => {
-        const newWorkspace = this.getActiveWorkspace();
-        if (newWorkspace !== this.activeWorkspace) {
-          this.activeWorkspace = newWorkspace;
-          
-          // PERFORMANCE FIX: Validate workspaces only on workspace change
-          this.needsValidation = true;
-          this.validateBlockedWorkspaces();
-          
-          if (this.onWorkspaceChange) {
-            this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
-          }
-        }
-      });
+      this.workspaceObserver = new MutationObserver(() => this._handleWorkspaceMutation());
 
       // Try multiple containers for more reliable detection
       // Query selectors - find first valid workspace container
@@ -1377,17 +1383,11 @@
     }
 
     /**
-     * Create overlay elements
-     * SECURITY FIX: Use textContent instead of innerHTML for user content
+     * Create the overlay content container with phase label, timer display, etc.
+     * @returns {HTMLElement} The content container element
+     * @private
      */
-    createOverlay() {
-      if (this.overlay) return;
-
-      // Main overlay
-      this.overlay = document.createElement('div');
-      this.overlay.id = 'zen-pomodoro-overlay';
-      
-      // Create content container
+    _createOverlayContent() {
       const content = document.createElement('div');
       content.id = 'zen-pomodoro-content';
       
@@ -1412,6 +1412,23 @@
       message.textContent = sanitizeText(this.config.motivationalMessage);
       
       // Controls
+      const controls = this._createOverlayControls();
+      
+      content.appendChild(phaseLabel);
+      content.appendChild(timerDisplay);
+      content.appendChild(cycleProgress);
+      content.appendChild(message);
+      content.appendChild(controls);
+      
+      return content;
+    }
+
+    /**
+     * Create the overlay controls section with buttons
+     * @returns {HTMLElement} The controls container element
+     * @private
+     */
+    _createOverlayControls() {
       const controls = document.createElement('div');
       controls.id = 'zen-pomodoro-controls';
       
@@ -1435,15 +1452,14 @@
       controls.appendChild(stopButton);
       controls.appendChild(devButton);
       
-      content.appendChild(phaseLabel);
-      content.appendChild(timerDisplay);
-      content.appendChild(cycleProgress);
-      content.appendChild(message);
-      content.appendChild(controls);
-      
-      this.overlay.appendChild(content);
+      return controls;
+    }
 
-      // Persistent indicator
+    /**
+     * Create the persistent indicator element
+     * @private
+     */
+    _createIndicator() {
       this.indicator = document.createElement('div');
       this.indicator.id = 'zen-pomodoro-indicator';
       
@@ -1456,7 +1472,13 @@
       
       this.indicator.appendChild(indicatorDot);
       this.indicator.appendChild(indicatorText);
+    }
 
+    /**
+     * Attach overlay to content area or use fallback positioning
+     * @private
+     */
+    _attachOverlayToContentArea() {
       // Issue 1: Position overlay within content area instead of full window
       // Try multiple Zen Browser and Firefox specific selectors
       let contentArea = null;
@@ -1501,6 +1523,28 @@
         
         document.documentElement.appendChild(this.overlay);
       }
+    }
+
+    /**
+     * Create overlay elements
+     * SECURITY FIX: Use textContent instead of innerHTML for user content
+     */
+    createOverlay() {
+      if (this.overlay) return;
+
+      // Main overlay
+      this.overlay = document.createElement('div');
+      this.overlay.id = 'zen-pomodoro-overlay';
+      
+      // Create and append content
+      const content = this._createOverlayContent();
+      this.overlay.appendChild(content);
+
+      // Create persistent indicator
+      this._createIndicator();
+
+      // Attach overlay to content area
+      this._attachOverlayToContentArea();
       
       document.documentElement.appendChild(this.indicator);
 
