@@ -3260,7 +3260,8 @@
       // Z-INDEX FIX: Temporarily disable pointer-events on overlay so dialog can receive input
       // The overlay and dialog both use max z-index (2147483647), so we need to let
       // pointer events pass through the overlay to the dialog
-      const overlay = document.getElementById('zen-pomodoro-overlay');
+      // Use the existing overlay reference from OverlayManager if available, fall back to DOM query
+      const overlay = window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
       if (overlay) {
         overlay.style.setProperty('pointer-events', 'none', 'important');
       }
