@@ -571,6 +571,17 @@
   }
 
   /**
+   * Get the valid hold-to-start duration from config.
+   * Returns 0 if the value is not a positive number, enabling instant-start behavior.
+   * @param {Object} config - Configuration object
+   * @returns {number} Valid hold duration in milliseconds, or 0 for instant start
+   */
+  function getValidHoldDuration(config) {
+    const duration = Number(config?.holdToStartDuration);
+    return duration > 0 ? duration : 0;
+  }
+
+  /**
    * Sanitize text content to prevent XSS attacks.
    * Removes HTML-like characters (<, >) that could be used for injection.
    * This is a defense-in-depth measure since we use textContent instead of innerHTML.
@@ -1929,6 +1940,10 @@
      * Removes both active and animation classes.
      * Animation class removal allows re-triggering when show() is called again.
      * Bug Fix: Clear all inline styles that were set in show() to prevent UI artifacts
+     * 
+     * Note: After removing inline styles, the CSS rules take over:
+     * - #zen-pomodoro-overlay (without .active) has display:none, visibility:hidden
+     * - The !important flags in CSS ensure proper hiding
      */
     hide() {
       if (this.overlay) {
@@ -1939,18 +1954,14 @@
         this.overlay.classList.remove('active');
         this.overlay.classList.remove('zen-pomodoro-animate-in');
         
-        // Clear ALL inline styles that were set in show() to prevent black screen bug
-        // These must match the styles set in show() with setProperty()
+        // Clear ALL inline styles that were set in show() with setProperty()
+        // This allows the CSS rules for the base #zen-pomodoro-overlay selector
+        // to take effect (display:none, visibility:hidden, pointer-events:all)
         this.overlay.style.removeProperty('display');
         this.overlay.style.removeProperty('visibility');
         this.overlay.style.removeProperty('opacity');
         this.overlay.style.removeProperty('pointer-events');
         this.overlay.style.removeProperty('z-index');
-        
-        // Ensure overlay is completely hidden
-        this.overlay.style.display = 'none';
-        this.overlay.style.visibility = 'hidden';
-        this.overlay.style.pointerEvents = 'none';
         
         this.isVisible = false;
       }
@@ -2052,16 +2063,29 @@
       if (!this.indicator) this.createOverlay();
       
       // Reset indicator text and phase before showing to prevent flash of previous timer data
-      const indicatorText = this.indicator.querySelector('#zen-pomodoro-indicator-text');
-      const timer = window.zenPomodoroApp?.timer;
-      if (indicatorText && timer && timer.remainingTime !== undefined) {
-        const timeStr = formatTime(timer.remainingTime);
-        const phaseLabel = getShortPhaseLabel(timer.currentPhase || 'focus');
-        indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
-        this.indicator.setAttribute('data-phase', timer.currentPhase || 'focus');
-      }
+      this._resetIndicatorDisplay();
       
       this.indicator.classList.add('active');
+    }
+
+    /**
+     * Reset the indicator display with current timer data.
+     * Prevents the flash of previous timer duration when starting a new timer.
+     * @private
+     */
+    _resetIndicatorDisplay() {
+      const indicatorText = this.indicator?.querySelector('#zen-pomodoro-indicator-text');
+      if (!indicatorText) return;
+      
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer || timer.remainingTime === undefined) return;
+      
+      const timeStr = formatTime(timer.remainingTime);
+      const phase = timer.currentPhase || 'focus';
+      const phaseLabel = getShortPhaseLabel(phase);
+      
+      indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
+      this.indicator.setAttribute('data-phase', phase);
     }
 
     /**
@@ -2528,7 +2552,7 @@
       startButton.className = 'zen-pomodoro-dialog-button';
       
       // Only use hold-to-start if explicitly enabled with a positive duration
-      const holdDuration = Number(config.holdToStartDuration) || 0;
+      const holdDuration = getValidHoldDuration(config);
       if (holdDuration > 0) {
         startButton.id = 'zen-pomodoro-hold-to-start';
         startButton.textContent = `Hold to Start (${holdDuration / 1000}s)`;
@@ -2589,7 +2613,7 @@
       };
       
       // Only use hold-to-start if explicitly enabled with a positive duration
-      const holdDuration = Number(config.holdToStartDuration) || 0;
+      const holdDuration = getValidHoldDuration(config);
       if (holdDuration > 0 && window.zenPomodoroApp?.security) {
         window.zenPomodoroApp.security.setupHoldToStart(startButton, applyDurationsAndStart);
       } else {
@@ -3658,8 +3682,8 @@
      */
     setupHoldToStart(buttonElement, onComplete) {
       const config = getConfig();
-      // Ensure duration is a valid positive number, otherwise use instant click
-      const duration = Number(config.holdToStartDuration) || 0;
+      // Use helper function to get valid duration
+      const duration = getValidHoldDuration(config);
       
       if (duration <= 0) {
         // If hold-to-start is disabled, use instant click - no hold required
