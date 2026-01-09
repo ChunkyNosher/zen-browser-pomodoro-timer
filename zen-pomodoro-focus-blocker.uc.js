@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.0.7
+ * Version: 1.0.8
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -82,7 +82,7 @@
     // (for both idle and active states). Name kept for backward compatibility.
     settingsLockActiveCodeLength: 64,
     settingsLockActiveCharacterSet: 'all-typeable',
-    holdToStartDuration: 3000,
+    holdToStartDuration: 0,
     enableNotifications: true,
     enableAudioAlerts: false,
     phase: 'focus',
@@ -1503,6 +1503,16 @@
         }
       }
       
+      // Apply inline styles to ensure overlay is visible
+      // These complement the CSS but provide a fallback if CSS fails
+      this.overlay.style.position = 'absolute';
+      this.overlay.style.inset = '0';
+      this.overlay.style.width = '100%';
+      this.overlay.style.height = '100%';
+      this.overlay.style.zIndex = '2147483647';
+      this.overlay.style.pointerEvents = 'all';
+      this.overlay.style.boxSizing = 'border-box';
+      
       if (contentArea) {
         // Store reference and original position for cleanup
         this.contentArea = contentArea;
@@ -1529,7 +1539,6 @@
         this.overlay.style.left = '0';
         this.overlay.style.width = '100vw';
         this.overlay.style.height = '100vh';
-        this.overlay.style.zIndex = '99999';
         
         document.documentElement.appendChild(this.overlay);
       }
@@ -1816,8 +1825,11 @@
         this.overlay.classList.add('zen-pomodoro-animate-in');
         
         // Backup: Apply inline styles to ensure visibility
-        this.overlay.style.display = 'flex';
-        this.overlay.style.visibility = 'visible';
+        this.overlay.style.setProperty('display', 'flex', 'important');
+        this.overlay.style.setProperty('visibility', 'visible', 'important');
+        this.overlay.style.setProperty('opacity', '1', 'important');
+        this.overlay.style.setProperty('pointer-events', 'all', 'important');
+        this.overlay.style.setProperty('z-index', '2147483647', 'important');
         
         this.isVisible = true;
         
