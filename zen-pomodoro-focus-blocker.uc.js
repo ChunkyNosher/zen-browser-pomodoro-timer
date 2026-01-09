@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.0.8
+ * Version: 1.0.9
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -147,9 +147,12 @@
   /**
    * Selectors to try for content area to append overlay.
    * Order matters - earlier selectors are preferred.
+   * '#tabbrowser-tabbox' is first as it contains all tab panels and works best
+   * for properly covering browser content in Firefox/Zen browsers.
    * @constant {string[]}
    */
   const CONTENT_AREA_SELECTORS = [
+    '#tabbrowser-tabbox',
     '#tabbrowser-tabpanels',
     '#appcontent',
     '#zen-main-view',
@@ -1384,8 +1387,7 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
-      this.contentArea = null; // Store reference for cleanup
-      this.originalContentAreaPosition = null; // Store original position for restoration
+      this.contentArea = null; // Store reference for cleanup and bounds updates
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
 
@@ -1482,7 +1484,10 @@
     }
 
     /**
-     * Attach overlay to content area or use fallback positioning
+     * Attach overlay to content area or use fallback positioning.
+     * Uses fixed positioning with explicit pixel bounds to properly cover browser content.
+     * This approach ensures the overlay blocks interaction with web content
+     * by positioning it above the browser rendering layer.
      * @private
      */
     _attachOverlayToContentArea() {
@@ -1506,38 +1511,34 @@
         }
       }
       
-      // Apply inline styles to ensure overlay is visible
-      // These complement the CSS but provide a fallback if CSS fails
-      this.overlay.style.position = 'absolute';
-      this.overlay.style.inset = '0';
-      this.overlay.style.width = '100%';
-      this.overlay.style.height = '100%';
+      // Use fixed positioning with explicit bounds to properly cover browser content
+      // This ensures the overlay appears ABOVE web content rendered in the browser
+      this.overlay.style.position = 'fixed';
       this.overlay.style.zIndex = MAX_OVERLAY_Z_INDEX;
       this.overlay.style.pointerEvents = 'all';
       this.overlay.style.boxSizing = 'border-box';
       
       if (contentArea) {
-        // Store reference and original position for cleanup
+        // Store reference for cleanup and bounds updates
         this.contentArea = contentArea;
-        const computedPosition = window.getComputedStyle(contentArea).position;
-        this.originalContentAreaPosition = computedPosition;
         
-        // Only set position if not already a positioning context
-        if (computedPosition === 'static') {
-          contentArea.style.position = 'relative';
-        }
-        contentArea.appendChild(this.overlay);
+        // Calculate and set explicit bounds from content area
+        this.updateOverlayBounds();
         
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached to content area', { selector: usedSelector || 'unknown' });
+        // Append to document root to ensure it's above all browser chrome
+        document.documentElement.appendChild(this.overlay);
         
-        // Issue 1: Set up observer for content area size changes
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay attached with fixed positioning', { 
+          selector: usedSelector || 'unknown',
+          bounds: this._getContentAreaBounds()
+        });
+        
+        // Set up observer for content area size changes
         this.setupContentAreaObserver(contentArea);
       } else {
-        // Fallback: Use position fixed and append to document root
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: No content area found, using fixed positioning fallback');
+        // Fallback: Use viewport dimensions
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: No content area found, using viewport fallback');
         
-        // Apply inline styles for fixed positioning as backup
-        this.overlay.style.position = 'fixed';
         this.overlay.style.top = '0';
         this.overlay.style.left = '0';
         this.overlay.style.width = '100vw';
@@ -1545,6 +1546,56 @@
         
         document.documentElement.appendChild(this.overlay);
       }
+    }
+
+    /**
+     * Update overlay bounds to match content area position and size.
+     * Uses explicit pixel values from getBoundingClientRect() to ensure
+     * the overlay properly covers the browser content area.
+     */
+    updateOverlayBounds() {
+      if (!this.overlay || !this.contentArea) return;
+      
+      const rect = this.contentArea.getBoundingClientRect();
+      
+      // Validate bounds to ensure they are reasonable
+      // Minimum dimensions of 100px to prevent invisible overlays
+      const MIN_DIMENSION = 100;
+      if (rect.width < MIN_DIMENSION || rect.height < MIN_DIMENSION) {
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Warning: Content area bounds too small, using fallback', {
+          width: rect.width,
+          height: rect.height
+        });
+        // Fall back to viewport dimensions
+        this.overlay.style.top = '0';
+        this.overlay.style.left = '0';
+        this.overlay.style.width = '100vw';
+        this.overlay.style.height = '100vh';
+        return;
+      }
+      
+      this.overlay.style.top = `${rect.top}px`;
+      this.overlay.style.left = `${rect.left}px`;
+      this.overlay.style.width = `${rect.width}px`;
+      this.overlay.style.height = `${rect.height}px`;
+      
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay bounds updated', {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
+      });
+    }
+
+    /**
+     * Get current content area bounds for logging.
+     * @returns {Object|null} Bounds object or null if no content area
+     * @private
+     */
+    _getContentAreaBounds() {
+      if (!this.contentArea) return null;
+      const rect = this.contentArea.getBoundingClientRect();
+      return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
     }
 
     /**
@@ -1645,17 +1696,20 @@
     /**
      * Issue 1: Update overlay position to match content area
      * Ensures the overlay continues to cover the visible content area when it resizes.
+     * Now delegates to updateOverlayBounds() for fixed positioning with explicit pixel values.
      */
     updateOverlayPosition(contentArea) {
       if (!this.overlay || !contentArea) {
         return;
       }
 
-      // Ensure the overlay is positioned relative to the content area
-      // CSS handles most sizing via width/height: 100%, but we ensure positioning is correct
-      this.overlay.style.position = 'absolute';
-      this.overlay.style.top = '0';
-      this.overlay.style.left = '0';
+      // Store content area reference if not already set
+      if (!this.contentArea) {
+        this.contentArea = contentArea;
+      }
+
+      // Update bounds using fixed positioning with explicit pixel values
+      this.updateOverlayBounds();
     }
 
     /**
@@ -1827,6 +1881,9 @@
         // Animation class triggers CSS animation (removed in hide() for re-trigger)
         this.overlay.classList.add('zen-pomodoro-animate-in');
         
+        // Update overlay bounds to ensure proper positioning
+        this.updateOverlayBounds();
+        
         // Backup: Apply inline styles to ensure visibility
         this.overlay.style.setProperty('display', 'flex', 'important');
         this.overlay.style.setProperty('visibility', 'visible', 'important');
@@ -1995,16 +2052,13 @@
     }
 
     /**
-     * Restore original content area position if modified.
+     * Clean up content area reference.
+     * Note: With fixed positioning approach, we no longer modify the content area's
+     * position, so this just clears the reference.
      * @private
      */
     _restoreContentAreaPosition() {
-      if (!this.contentArea || !this.originalContentAreaPosition) return;
-      
-      const position = this.originalContentAreaPosition === 'static' ? '' : this.originalContentAreaPosition;
-      this.contentArea.style.position = position;
       this.contentArea = null;
-      this.originalContentAreaPosition = null;
     }
 
     /**

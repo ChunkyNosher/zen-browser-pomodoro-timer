@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.0.8
+ * Version: 1.0.9
  * License: MPL-2.0
  * 
  * ACCESSIBILITY FIXES:
@@ -50,15 +50,12 @@
 /* ============================================
    Main Overlay Container
    Issue 1: Position within content area, not full window
+   BUG FIX: Use fixed positioning with explicit bounds to properly
+   block user interaction with web content in the browser.
    ============================================ */
 #zen-pomodoro-overlay {
-  /* Force absolute positioning within content area */
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-width: 100% !important;
-  min-height: 100% !important;
+  /* Fixed positioning with explicit bounds set by JavaScript */
+  position: fixed !important;
   
   /* Ultra-high z-index to appear above all web content */
   z-index: var(--zen-pomodoro-max-z-index) !important;
