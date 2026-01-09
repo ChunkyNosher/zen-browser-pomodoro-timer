@@ -39,6 +39,7 @@
   
   /* Z-index hierarchy */
   --zen-pomodoro-z-index: 99999;
+  --zen-pomodoro-max-z-index: 2147483647;
   
   /* Button colors */
   --zen-pomodoro-button-bg: rgb(255 255 255 / 10%);
@@ -60,11 +61,11 @@
   min-height: 100% !important;
   
   /* Ultra-high z-index to appear above all web content */
-  z-index: 2147483647 !important;
+  z-index: var(--zen-pomodoro-max-z-index) !important;
   
   /* Background styling */
   background-color: var(--zen-pomodoro-overlay-bg, #808080) !important;
-  opacity: 1 !important;
+  opacity: var(--zen-pomodoro-overlay-opacity, 1) !important;
   
   /* Capture all pointer events to block interaction */
   pointer-events: all !important;

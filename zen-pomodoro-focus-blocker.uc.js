@@ -95,6 +95,9 @@
   // Delay for DOM settling after timer start (in milliseconds)
   const DOM_SETTLE_DELAY_MS = 100;
 
+  // Maximum z-index value for overlay (highest possible value for 32-bit signed integer)
+  const MAX_OVERLAY_Z_INDEX = '2147483647';
+
   // ============================================
   // LogManager Class
   // ============================================
@@ -1509,7 +1512,7 @@
       this.overlay.style.inset = '0';
       this.overlay.style.width = '100%';
       this.overlay.style.height = '100%';
-      this.overlay.style.zIndex = '2147483647';
+      this.overlay.style.zIndex = MAX_OVERLAY_Z_INDEX;
       this.overlay.style.pointerEvents = 'all';
       this.overlay.style.boxSizing = 'border-box';
       
@@ -1829,7 +1832,7 @@
         this.overlay.style.setProperty('visibility', 'visible', 'important');
         this.overlay.style.setProperty('opacity', '1', 'important');
         this.overlay.style.setProperty('pointer-events', 'all', 'important');
-        this.overlay.style.setProperty('z-index', '2147483647', 'important');
+        this.overlay.style.setProperty('z-index', MAX_OVERLAY_Z_INDEX, 'important');
         
         this.isVisible = true;
         
