@@ -26,7 +26,6 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 - 🔒 **Anti-Cheating Security**:
   - Settings lock with wait timer (when idle)
   - Code entry requirement during active timers
-  - Hold-to-start button to prevent impulsive starts
 
 - 📱 **Responsive Design**:
   - Overlay adapts to sidebar collapse/expansion
@@ -79,7 +78,7 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
    - **Simple Timer**: Single countdown, no breaks
    - **Pomodoro Cycles**: Multiple focus/break periods
 4. If Pomodoro mode, specify the number of cycles (default: 4)
-5. Click **"Start Timer"** (or hold if hold-to-start is enabled)
+5. Click **"Start Timer"**
 
 The timer will begin immediately, and if you're on a blocked workspace, the full-screen overlay will appear.
 
@@ -146,10 +145,6 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
   - Character sets: alphanumeric or all typeable characters
   - Prevents cheating mid-session
 
-- **Hold-to-Start Duration**: Time to hold start button
-  - Default: 3 seconds (3000ms)
-  - Prevents accidental timer starts
-
 #### Notifications
 - **Enable Notifications**: Show phase change alerts
 - **Enable Audio Alerts**: Play sound on phase transitions (requires audio file)
@@ -180,7 +175,6 @@ zen-pomodoro.timer-state - Current timer state (for crash recovery)
   "settingsLockIdleDuration": 20,
   "settingsLockActiveCodeLength": 64,
   "settingsLockActiveCharacterSet": "all-typeable",
-  "holdToStartDuration": 3000,
   "enableNotifications": true,
   "enableAudioAlerts": false
 }
@@ -270,7 +264,6 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 ### Security Features
 - Settings locks prevent unauthorized configuration changes
 - Code generation uses cryptographically secure random values
-- Hold-to-start prevents accidental timer activation
 
 ### Limitations
 - **Browser-Level Only**: Blocking works only within Zen Browser. Users can open other browsers.
@@ -326,7 +319,6 @@ See [LICENSE](LICENSE) file for full details.
 - ✅ Phase-specific overlay colors
 - ✅ Persistent corner indicator
 - ✅ Settings lock mechanisms
-- ✅ Hold-to-start security feature
 - ✅ Responsive design
 - ✅ Context menu integration
 - ✅ Configuration persistence

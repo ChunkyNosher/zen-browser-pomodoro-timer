@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.1
+ * Version: 1.1.2
  * License: MPL-2.0
  * 
  * ACCESSIBILITY FIXES:
@@ -447,30 +447,6 @@
 }
 
 /* ============================================
-   Hold-to-Start Button
-   ============================================ */
-#zen-pomodoro-hold-to-start {
-  position: relative;
-  overflow: hidden;
-}
-
-/* Hold-to-Start Button Container */
-.zen-pomodoro-hold-button-wrapper {
-  position: relative;
-  overflow: hidden;
-}
-
-#zen-pomodoro-hold-progress {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 4px;
-  background-color: #2180cd;
-  width: 0%;
-  transition: width 0.1s linear;
-}
-
-/* ============================================
    Context Menu Items
    UI/UX FIX: Moved inline styles to CSS classes
    ============================================ */
@@ -507,6 +483,9 @@
 
 /* ============================================
    Settings Lock Screen
+   Z-INDEX FIX: Lock screen must appear ABOVE the overlay (2147483647)
+   to properly cover the entire viewport including the blocking overlay.
+   Using the same max z-index ensures proper layering.
    ============================================ */
 #zen-pomodoro-lock-screen {
   position: fixed;
@@ -515,7 +494,7 @@
   width: 100%;
   height: 100%;
   background-color: rgb(0 0 0 / 90%);
-  z-index: 2147483645 !important;
+  z-index: 2147483647 !important;
   display: none;
   align-items: center;
   justify-content: center;
