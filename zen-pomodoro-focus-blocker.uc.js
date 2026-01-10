@@ -3678,13 +3678,22 @@
     }
 
     /**
+     * Check if the blocker should be shown based on timer state.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _shouldShowBlocker() {
+      return window.zenPomodoroApp?.timer?.isActive || false;
+    }
+
+    /**
      * Check if the current page is the Sine Mods settings page.
      * Shows or hides the blocker overlay based on timer state and current URL.
      * @private
      */
     _checkCurrentPage() {
       const isSineModsPage = this._isSineModsPage();
-      const timerActive = window.zenPomodoroApp?.timer?.isActive || false;
+      const timerActive = this._shouldShowBlocker();
       
       logger.log(LOG_CATEGORIES.SECURITY, 'Sine Mod page check', {
         isSineModsPage: isSineModsPage,
@@ -3692,14 +3701,15 @@
         isBlocking: this.isBlocking
       });
       
-      if (isSineModsPage && timerActive) {
-        if (!this.isBlocking) {
-          this._showBlocker();
-        }
-      } else {
-        if (this.isBlocking) {
-          this._hideBlocker();
-        }
+      const shouldBlock = isSineModsPage && timerActive;
+      
+      if (shouldBlock && !this.isBlocking) {
+        this._showBlocker();
+        return;
+      }
+      
+      if (!shouldBlock && this.isBlocking) {
+        this._hideBlocker();
       }
     }
 
@@ -3714,43 +3724,61 @@
     }
 
     /**
+     * Get the current URI spec from gBrowser.
+     * @returns {string} The current URI spec or empty string
+     * @private
+     */
+    _getCurrentURISpec() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.currentURI) {
+        return '';
+      }
+      // eslint-disable-next-line no-undef
+      return gBrowser.currentURI.spec || '';
+    }
+
+    /**
+     * Get the selected browser's current URI spec.
+     * @returns {string} The browser URI spec or empty string
+     * @private
+     */
+    _getSelectedBrowserURISpec() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.selectedBrowser) {
+        return '';
+      }
+      // eslint-disable-next-line no-undef
+      return gBrowser.selectedBrowser.currentURI?.spec || '';
+    }
+
+    /**
+     * Get the content document location href.
+     * @returns {string} The document location href or empty string
+     * @private
+     */
+    _getContentDocumentHref() {
+      // eslint-disable-next-line no-undef
+      const contentDoc = gBrowser?.selectedBrowser?.contentDocument;
+      if (!contentDoc) {
+        return '';
+      }
+      return contentDoc.location?.href || '';
+    }
+
+    /**
      * Check if the current URL is the Sine Mods settings page.
      * @returns {boolean} True if on the Sine Mods page
      * @private
      */
     _isSineModsPage() {
       try {
-        // Method 1: Check gBrowser.currentURI
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined' && gBrowser.currentURI) {
-          // eslint-disable-next-line no-undef
-          const currentURL = gBrowser.currentURI.spec || '';
-          if (this._containsSineModsURL(currentURL)) {
-            return true;
-          }
-        }
+        const urlsToCheck = [
+          this._getCurrentURISpec(),
+          this._getSelectedBrowserURISpec(),
+          this._getContentDocumentHref()
+        ];
         
-        // Method 2: Check the selected browser's URL
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
-          // eslint-disable-next-line no-undef
-          const browserURL = gBrowser.selectedBrowser.currentURI?.spec || '';
-          if (this._containsSineModsURL(browserURL)) {
-            return true;
-          }
-        }
-        
-        // Method 3: Check document location (for content loaded in browser)
-        // eslint-disable-next-line no-undef
-        const contentDoc = gBrowser?.selectedBrowser?.contentDocument;
-        if (contentDoc) {
-          const docURL = contentDoc.location?.href || '';
-          if (this._containsSineModsURL(docURL)) {
-            return true;
-          }
-        }
-        
-        return false;
+        return urlsToCheck.some(url => this._containsSineModsURL(url));
       } catch (e) {
         logger.log(LOG_CATEGORIES.SECURITY, 'Error checking Sine Mods page', { error: e.message });
         return false;
@@ -3983,45 +4011,80 @@
      * Clean up and destroy the blocker.
      */
     destroy() {
-      // Remove event listeners
+      this._removeGBrowserListeners();
+      this._removeWindowListeners();
+      this._clearIntervals();
+      this._removeBlockerOverlay();
+      this.isBlocking = false;
+    }
+
+    /**
+     * Remove gBrowser event listeners.
+     * @private
+     */
+    _removeGBrowserListeners() {
       // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined') {
+      if (typeof gBrowser === 'undefined') return;
+      
+      // eslint-disable-next-line no-undef
+      if (this.tabSelectHandler && gBrowser.tabContainer) {
         // eslint-disable-next-line no-undef
-        if (this.tabSelectHandler && gBrowser.tabContainer) {
-          // eslint-disable-next-line no-undef
-          gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
-        }
-        if (this.pageShowHandler) {
-          // eslint-disable-next-line no-undef
-          gBrowser.removeEventListener('pageshow', this.pageShowHandler);
-        }
-        if (this.progressListener) {
-          try {
-            // eslint-disable-next-line no-undef
-            gBrowser.removeProgressListener(this.progressListener);
-          } catch (e) {
-            // Ignore errors during cleanup
-          }
-        }
+        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
       }
       
+      if (this.pageShowHandler) {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
+      }
+      
+      this._removeProgressListener();
+    }
+
+    /**
+     * Remove web progress listener.
+     * @private
+     */
+    _removeProgressListener() {
+      if (!this.progressListener) return;
+      
+      try {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeProgressListener(this.progressListener);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+
+    /**
+     * Remove window event listeners.
+     * @private
+     */
+    _removeWindowListeners() {
       if (this.hashChangeHandler) {
         window.removeEventListener('hashchange', this.hashChangeHandler);
       }
-      
-      // Clear interval
+    }
+
+    /**
+     * Clear any active intervals.
+     * @private
+     */
+    _clearIntervals() {
       if (this._timerStatusInterval) {
         clearInterval(this._timerStatusInterval);
         this._timerStatusInterval = null;
       }
-      
-      // Remove overlay
+    }
+
+    /**
+     * Remove the blocker overlay from the DOM.
+     * @private
+     */
+    _removeBlockerOverlay() {
       if (this.blockerOverlay) {
         this.blockerOverlay.remove();
         this.blockerOverlay = null;
       }
-      
-      this.isBlocking = false;
     }
   }
 
