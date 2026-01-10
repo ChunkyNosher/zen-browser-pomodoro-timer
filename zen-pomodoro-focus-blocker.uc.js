@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.2
+ * Version: 1.1.3
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -18,7 +18,6 @@
  * - Hold-to-unlock for settings access
  * - Notification permission requests
  * - Custom confirmation dialogs
- * - Dev mode with bypass capabilities
  * 
  * CODE QUALITY:
  * - Proper input validation
@@ -37,9 +36,6 @@
   // ============================================
   
   const PREF_PREFIX = 'zen-pomodoro';
-  // DEV NOTE: This password is for development bypass only and will be removed
-  // before production release. It's intentionally hardcoded for testing purposes.
-  const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
   
   /**
    * Modifier keys used by the keyboard shortcut recorder.
@@ -1452,15 +1448,8 @@
       stopButton.id = 'zen-pomodoro-stop-button';
       stopButton.textContent = 'Stop Timer';
       
-      // Dev bypass button for timer overlay
-      const devButton = document.createElement('button');
-      devButton.className = 'zen-pomodoro-button dev';
-      devButton.id = 'zen-pomodoro-overlay-dev-button';
-      devButton.textContent = 'Dev';
-      
       controls.appendChild(pauseButton);
       controls.appendChild(stopButton);
-      controls.appendChild(devButton);
       
       return controls;
     }
@@ -1828,7 +1817,6 @@
     setupOverlayHandlers() {
       const pauseButton = this.overlay?.querySelector('#zen-pomodoro-pause-button');
       const stopButton = this.overlay?.querySelector('#zen-pomodoro-stop-button');
-      const devButton = this.overlay?.querySelector('#zen-pomodoro-overlay-dev-button');
       
       if (pauseButton) {
         pauseButton.addEventListener('click', () => {
@@ -1850,18 +1838,6 @@
           handleStopTimerWithLockout(() => {
             window.zenPomodoroApp.stopTimer();
           });
-        });
-      }
-      
-      // Dev bypass button handler - shows dev bypass prompt to end timer early
-      if (devButton) {
-        devButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
-            window.zenPomodoroApp.security.showDevBypassPrompt(() => {
-              // Dev bypass successful - stop the timer
-              window.zenPomodoroApp.stopTimer();
-            });
-          }
         });
       }
     }
@@ -2160,8 +2136,7 @@
     '#zen-pomodoro-settings-dialog',
     '#zen-pomodoro-lock-screen',
     '#zen-pomodoro-alert-dialog',
-    '#zen-pomodoro-confirm-dialog',
-    '#zen-pomodoro-dev-bypass-dialog'
+    '#zen-pomodoro-confirm-dialog'
   ];
   
   /**
@@ -2554,7 +2529,6 @@
       
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
-      // Always use instant-click start button (no hold-to-start)
       startButton.id = 'zen-pomodoro-start-button';
       startButton.textContent = 'Start Timer';
       
@@ -2609,7 +2583,7 @@
         }
       };
       
-      // Always use instant start - no hold required
+      // Simple click handler - starts timer immediately on click
       startButton.addEventListener('click', applyDurationsAndStart);
     }
 
@@ -3218,14 +3192,6 @@
     }
 
     /**
-     * Verify dev bypass password
-     * Returns true if password matches
-     */
-    verifyDevPassword(password) {
-      return password === DEV_MODE_PASSWORD;
-    }
-
-    /**
      * Check if settings should be locked
      */
     shouldLockSettings(timerActive) {
@@ -3239,111 +3205,10 @@
     }
 
     /**
-     * Show dev bypass password prompt dialog
-     * This is shown on the lock screen as a way to bypass during development
-     */
-    showDevBypassPrompt(onSuccess) {
-      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass prompt shown');
-      
-      // Z-INDEX FIX: Temporarily disable pointer-events on overlay so dialog can receive input
-      // The overlay and dialog both use max z-index (2147483647), so we need to let
-      // pointer events pass through the overlay to the dialog
-      // Use the existing overlay reference from OverlayManager if available, fall back to DOM query
-      const overlay = window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
-      if (overlay) {
-        overlay.style.setProperty('pointer-events', 'none', 'important');
-      }
-      
-      // Helper function to restore overlay pointer-events when dialog closes
-      const restoreOverlayPointerEvents = () => {
-        if (overlay) {
-          overlay.style.setProperty('pointer-events', 'all', 'important');
-        }
-      };
-      
-      const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-dev-bypass-dialog';
-      dialog.className = 'zen-pomodoro-dialog active';
-      
-      const h2 = document.createElement('h2');
-      h2.textContent = 'Dev Bypass';
-      
-      const p = document.createElement('p');
-      p.textContent = 'Enter developer password to bypass lockout:';
-      p.className = 'zen-pomodoro-dialog-message';
-      
-      const input = document.createElement('input');
-      input.type = 'password';
-      input.id = 'zen-pomodoro-dev-bypass-password';
-      input.placeholder = 'Enter password';
-      input.className = 'zen-pomodoro-devmode-input';
-      input.style.width = '100%';
-      input.style.marginBottom = '16px';
-      
-      const buttonDiv = document.createElement('div');
-      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-      
-      const cancelButton = document.createElement('button');
-      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-      cancelButton.textContent = 'Cancel';
-      
-      const submitButton = document.createElement('button');
-      submitButton.className = 'zen-pomodoro-dialog-button';
-      submitButton.textContent = 'Bypass';
-      
-      buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(submitButton);
-      
-      dialog.appendChild(h2);
-      dialog.appendChild(p);
-      dialog.appendChild(input);
-      dialog.appendChild(buttonDiv);
-      
-      document.documentElement.appendChild(dialog);
-      
-      // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
-      
-      // Focus input
-      input.focus();
-      
-      cancelButton.addEventListener('click', () => {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass cancelled');
-        restoreOverlayPointerEvents();
-        dialog.remove();
-      });
-      
-      submitButton.addEventListener('click', () => {
-        const password = input.value;
-        if (this.verifyDevPassword(password)) {
-          restoreOverlayPointerEvents();
-          dialog.remove();
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful');
-          console.log('[DEV BYPASS] Lock screen bypassed');
-          onSuccess();
-        } else {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - incorrect password');
-          if (window.zenPomodoroApp) {
-            window.zenPomodoroApp.showCustomAlert('Incorrect Password', 'Please try again.');
-          }
-          input.value = '';
-          input.focus();
-        }
-      });
-      
-      // Allow Enter key to submit
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          submitButton.click();
-        }
-      });
-    }
-
-    /**
      * Show settings lock screen
      * UI/UX FIX: Replace alert() with custom dialog
      * MEMORY LEAK FIX: Store and clear interval properly
-     * NEW: Added cancel button, hold-to-unlock, and dev bypass button
+     * NEW: Added cancel button, hold-to-unlock
      * NEW: Configurable lockout methods (hold vs code) for idle and active states
      * Z-INDEX FIX: Temporarily disable overlay pointer-events so lock screen can receive input
      */
@@ -3422,12 +3287,11 @@
     }
 
     /**
-     * Create standard lock screen button row with cancel and dev bypass buttons.
-     * @param {Function} onUnlock - Callback when unlock succeeds
-     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLElement, devBypassButton: HTMLElement}}
+     * Create standard lock screen button row with cancel button.
+     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLElement}}
      * @private
      */
-    _createLockButtonRow(onUnlock) {
+    _createLockButtonRow() {
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
       
@@ -3436,24 +3300,12 @@
       cancelButton.id = 'zen-pomodoro-lock-cancel';
       cancelButton.textContent = 'Cancel';
       
-      const devBypassButton = document.createElement('button');
-      devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
-      devBypassButton.id = 'zen-pomodoro-dev-bypass';
-      devBypassButton.textContent = 'Dev Bypass';
-      
-      // Attach event handlers
+      // Attach event handler
       cancelButton.addEventListener('click', () => this.cleanupLockScreen());
-      devBypassButton.addEventListener('click', () => {
-        this.showDevBypassPrompt(() => {
-          this.cleanupLockScreen();
-          onUnlock();
-        });
-      });
       
       buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(devBypassButton);
       
-      return { buttonDiv, cancelButton, devBypassButton };
+      return { buttonDiv, cancelButton };
     }
 
     /**
@@ -3505,7 +3357,7 @@
         }
       });
       
-      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      const { buttonDiv } = this._createLockButtonRow();
       
       const unlockButton = document.createElement('button');
       unlockButton.className = 'zen-pomodoro-dialog-button';
@@ -3562,7 +3414,7 @@
       pSub.textContent = 'seconds remaining - hold button to count down';
       
       const { holdButton, holdProgress } = this._createHoldButton();
-      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      const { buttonDiv } = this._createLockButtonRow();
       buttonDiv.appendChild(holdButton);
       
       lockContent.appendChild(h2);
