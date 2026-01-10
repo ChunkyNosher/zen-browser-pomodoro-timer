@@ -2531,6 +2531,8 @@
       startButton.className = 'zen-pomodoro-dialog-button';
       startButton.id = 'zen-pomodoro-start-button';
       startButton.textContent = 'Start Timer';
+      // Mark as instant-click button - no hold required
+      startButton.setAttribute('data-instant-click', 'true');
       
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(startButton);
@@ -2568,6 +2570,7 @@
      */
     _setupStartHandler(dialog, config, modeSelect, startButton) {
       const applyDurationsAndStart = () => {
+        logger.log(LOG_CATEGORIES.MENU, 'Start button clicked - starting timer immediately');
         const mode = modeSelect.value;
         const cyclesInput = dialog.querySelector('#zen-pomodoro-cycles-input');
         const cycles = cyclesInput
@@ -2583,7 +2586,7 @@
         }
       };
       
-      // Simple click handler - starts timer immediately on click
+      // Instant click handler - timer starts immediately on click (no hold required)
       startButton.addEventListener('click', applyDurationsAndStart);
     }
 
@@ -3561,6 +3564,468 @@
   }
 
   // ============================================
+  // Sine Mod Blocker Module
+  // ============================================
+  
+  /**
+   * Delay (in ms) after page navigation before checking for Sine Mods page.
+   * This allows the URL to be fully updated before checking.
+   * @constant {number}
+   */
+  const SINE_PAGE_CHECK_DELAY_MS = 50;
+
+  /**
+   * Delay (in ms) before hiding the blocker overlay after navigation.
+   * This ensures the navigation has completed before removing the overlay.
+   * @constant {number}
+   */
+  const SINE_BLOCKER_HIDE_DELAY_MS = 100;
+
+  /**
+   * SineModBlocker class prevents users from disabling the Pomodoro mod
+   * via the Sine Mod Menu (about:preferences#sineMods) while the timer is active.
+   * 
+   * When the timer is running and the user navigates to the Sine Mods settings page,
+   * a blocking overlay appears covering the entire window, offering options to
+   * go back or stop the timer (with the same security lock as stopping the timer normally).
+   */
+  class SineModBlocker {
+    constructor() {
+      this.blockerOverlay = null;
+      this.isBlocking = false;
+      this.tabSelectHandler = null;
+      this.pageShowHandler = null;
+      this.hashChangeHandler = null;
+      this.progressListener = null;
+    }
+
+    /**
+     * Initialize the Sine Mod Blocker.
+     * Sets up listeners for tab changes and URL navigation.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
+      this._setupListeners();
+      // Check immediately in case we're already on the page
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Set up all event listeners for detecting navigation to Sine Mods page.
+     * @private
+     */
+    _setupListeners() {
+      // Tab select listener - fires when user switches tabs
+      this.tabSelectHandler = () => this._checkCurrentPage();
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
+      }
+      
+      // Page show listener - fires when page is loaded/shown
+      this.pageShowHandler = () => {
+        // Small delay to ensure URL is updated
+        setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
+      };
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        gBrowser.addEventListener('pageshow', this.pageShowHandler);
+      }
+      
+      // Hash change listener - for when user navigates within about:preferences
+      this.hashChangeHandler = () => this._checkCurrentPage();
+      window.addEventListener('hashchange', this.hashChangeHandler);
+      
+      // Progress listener for URL changes within tabs
+      this._setupProgressListener();
+    }
+
+    /**
+     * Set up a web progress listener to detect URL changes.
+     * This catches navigation within the same tab more reliably.
+     * @private
+     */
+    _setupProgressListener() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined') return;
+      
+      try {
+        this.progressListener = {
+          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
+          
+          // eslint-disable-next-line no-unused-vars
+          onLocationChange: (webProgress, request, location) => {
+            // Check if this is a top-level navigation
+            if (webProgress.isTopLevel) {
+              setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
+            }
+          },
+          
+          onStateChange: () => {},
+          onProgressChange: () => {},
+          onStatusChange: () => {},
+          onSecurityChange: () => {},
+          onContentBlockingEvent: () => {}
+        };
+        
+        // eslint-disable-next-line no-undef
+        gBrowser.addProgressListener(this.progressListener);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
+      }
+    }
+
+    /**
+     * Check if the current page is the Sine Mods settings page.
+     * Shows or hides the blocker overlay based on timer state and current URL.
+     * @private
+     */
+    _checkCurrentPage() {
+      const isSineModsPage = this._isSineModsPage();
+      const timerActive = window.zenPomodoroApp?.timer?.isActive || false;
+      
+      logger.log(LOG_CATEGORIES.SECURITY, 'Sine Mod page check', {
+        isSineModsPage: isSineModsPage,
+        timerActive: timerActive,
+        isBlocking: this.isBlocking
+      });
+      
+      if (isSineModsPage && timerActive) {
+        if (!this.isBlocking) {
+          this._showBlocker();
+        }
+      } else {
+        if (this.isBlocking) {
+          this._hideBlocker();
+        }
+      }
+    }
+
+    /**
+     * Check if a URL contains the Sine Mods settings page pattern.
+     * @param {string} url - The URL to check
+     * @returns {boolean} True if URL is the Sine Mods page
+     * @private
+     */
+    _containsSineModsURL(url) {
+      return url.includes('about:preferences') && url.includes('sineMods');
+    }
+
+    /**
+     * Check if the current URL is the Sine Mods settings page.
+     * @returns {boolean} True if on the Sine Mods page
+     * @private
+     */
+    _isSineModsPage() {
+      try {
+        // Method 1: Check gBrowser.currentURI
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.currentURI) {
+          // eslint-disable-next-line no-undef
+          const currentURL = gBrowser.currentURI.spec || '';
+          if (this._containsSineModsURL(currentURL)) {
+            return true;
+          }
+        }
+        
+        // Method 2: Check the selected browser's URL
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const browserURL = gBrowser.selectedBrowser.currentURI?.spec || '';
+          if (this._containsSineModsURL(browserURL)) {
+            return true;
+          }
+        }
+        
+        // Method 3: Check document location (for content loaded in browser)
+        // eslint-disable-next-line no-undef
+        const contentDoc = gBrowser?.selectedBrowser?.contentDocument;
+        if (contentDoc) {
+          const docURL = contentDoc.location?.href || '';
+          if (this._containsSineModsURL(docURL)) {
+            return true;
+          }
+        }
+        
+        return false;
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error checking Sine Mods page', { error: e.message });
+        return false;
+      }
+    }
+
+    /**
+     * Show the blocker overlay.
+     * @private
+     */
+    _showBlocker() {
+      if (this.blockerOverlay) return;
+      
+      logger.log(LOG_CATEGORIES.SECURITY, 'Showing Sine Mod blocker overlay');
+      this.isBlocking = true;
+      
+      this._createBlockerOverlay();
+      document.documentElement.appendChild(this.blockerOverlay);
+    }
+
+    /**
+     * Create the blocker overlay element with all its content.
+     * @private
+     */
+    _createBlockerOverlay() {
+      this.blockerOverlay = document.createElement('div');
+      this.blockerOverlay.id = 'zen-pomodoro-sine-blocker';
+      this.blockerOverlay.className = 'active';
+      
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-sine-blocker-content';
+      
+      // Icon (lock symbol)
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-sine-blocker-icon';
+      icon.textContent = '🔒';
+      
+      // Title
+      const title = document.createElement('h2');
+      title.id = 'zen-pomodoro-sine-blocker-title';
+      title.textContent = 'Mod Settings Locked';
+      
+      // Message
+      const message = document.createElement('p');
+      message.id = 'zen-pomodoro-sine-blocker-message';
+      message.textContent = 'The Pomodoro timer is currently active. Mod settings are locked to prevent disabling the focus session.';
+      
+      // Timer status
+      const timerStatus = document.createElement('div');
+      timerStatus.id = 'zen-pomodoro-sine-blocker-timer';
+      this._updateTimerStatus(timerStatus);
+      
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-sine-blocker-buttons';
+      
+      // Go Back button
+      const goBackButton = document.createElement('button');
+      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
+      goBackButton.textContent = 'Go Back';
+      goBackButton.addEventListener('click', () => this._handleGoBack());
+      
+      // Stop Timer button
+      const stopTimerButton = document.createElement('button');
+      stopTimerButton.className = 'zen-pomodoro-dialog-button';
+      stopTimerButton.textContent = 'Stop Timer';
+      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
+      
+      buttons.appendChild(goBackButton);
+      buttons.appendChild(stopTimerButton);
+      
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(timerStatus);
+      content.appendChild(buttons);
+      
+      this.blockerOverlay.appendChild(content);
+      
+      // Set up timer status updates
+      this._startTimerStatusUpdates(timerStatus);
+    }
+
+    /**
+     * Update the timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _updateTimerStatus(statusElement) {
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer) {
+        statusElement.textContent = '';
+        return;
+      }
+      
+      const status = timer.getStatus();
+      if (!status) {
+        statusElement.textContent = '';
+        return;
+      }
+      
+      const timeStr = formatTime(status.remainingTime);
+      const phaseLabel = getShortPhaseLabel(status.currentPhase);
+      
+      statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+    }
+
+    /**
+     * Start interval to update timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _startTimerStatusUpdates(statusElement) {
+      // Update immediately
+      this._updateTimerStatus(statusElement);
+      
+      // Update every second
+      this._timerStatusInterval = setInterval(() => {
+        if (this.isBlocking && statusElement) {
+          this._updateTimerStatus(statusElement);
+          
+          // Also check if timer is still active
+          if (!window.zenPomodoroApp?.timer?.isActive) {
+            this._hideBlocker();
+          }
+        }
+      }, 1000);
+    }
+
+    /**
+     * Handle the "Go Back" button click.
+     * Navigates the user away from the Sine Mods page.
+     * @private
+     */
+    _handleGoBack() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on Sine Mod blocker');
+      
+      try {
+        // Try to go back in history
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const webNav = gBrowser.selectedBrowser.webNavigation;
+          if (webNav && webNav.canGoBack) {
+            webNav.goBack();
+            // Hide blocker after navigation
+            setTimeout(() => this._hideBlocker(), SINE_BLOCKER_HIDE_DELAY_MS);
+            return;
+          }
+        }
+        
+        // Fallback: Navigate to main preferences page without hash
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined') {
+          // eslint-disable-next-line no-undef
+          gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:preferences'), {
+            triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+          });
+          setTimeout(() => this._hideBlocker(), SINE_BLOCKER_HIDE_DELAY_MS);
+          return;
+        }
+        
+        // Last resort: Just hide the blocker
+        this._hideBlocker();
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back', { error: e.message });
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Handle the "Stop Timer" button click.
+     * Uses the same security lockout as stopping the timer normally.
+     * @private
+     */
+    _handleStopTimer() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Stop Timer on Sine Mod blocker');
+      
+      // Use the existing handleStopTimerWithLockout utility function
+      // which shows the security lock screen before allowing timer stop
+      handleStopTimerWithLockout(() => {
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.stopTimer();
+          // Hide the blocker after timer is stopped
+          this._hideBlocker();
+        }
+      });
+    }
+
+    /**
+     * Hide the blocker overlay.
+     * @private
+     */
+    _hideBlocker() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Hiding Sine Mod blocker overlay');
+      this.isBlocking = false;
+      
+      // Clear timer status update interval
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+      
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+
+    /**
+     * Called when the timer starts.
+     * Re-checks if we need to show the blocker.
+     */
+    onTimerStart() {
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Called when the timer stops.
+     * Hides the blocker if it's showing.
+     */
+    onTimerStop() {
+      if (this.isBlocking) {
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Clean up and destroy the blocker.
+     */
+    destroy() {
+      // Remove event listeners
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        if (this.tabSelectHandler && gBrowser.tabContainer) {
+          // eslint-disable-next-line no-undef
+          gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
+        }
+        if (this.pageShowHandler) {
+          // eslint-disable-next-line no-undef
+          gBrowser.removeEventListener('pageshow', this.pageShowHandler);
+        }
+        if (this.progressListener) {
+          try {
+            // eslint-disable-next-line no-undef
+            gBrowser.removeProgressListener(this.progressListener);
+          } catch (e) {
+            // Ignore errors during cleanup
+          }
+        }
+      }
+      
+      if (this.hashChangeHandler) {
+        window.removeEventListener('hashchange', this.hashChangeHandler);
+      }
+      
+      // Clear interval
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+      
+      // Remove overlay
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+      
+      this.isBlocking = false;
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
   
@@ -3571,6 +4036,7 @@
       this.overlay = new OverlayManager();
       this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
+      this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -3619,6 +4085,10 @@
       
       logger.log(LOG_CATEGORIES.INIT, 'Starting workspace monitoring');
       this.workspace.startMonitoring();
+      
+      // Initialize Sine Mod Blocker
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
+      this.sineModBlocker.init();
       
       // Setup timer callbacks
       this.timer.onTick = (time, phase, cycle, total) => {
@@ -3691,6 +4161,9 @@
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
       
+      // Notify Sine Mod Blocker that timer started
+      this.sineModBlocker.onTimerStart();
+      
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -3707,6 +4180,9 @@
       this.timer.stop();
       this.overlay.hide();
       this.overlay.hideIndicator();
+      
+      // Notify Sine Mod Blocker that timer stopped
+      this.sineModBlocker.onTimerStop();
     }
 
     /**
