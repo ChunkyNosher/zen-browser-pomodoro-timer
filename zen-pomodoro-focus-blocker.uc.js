@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.1
+ * Version: 1.1.2
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -15,7 +15,6 @@
  * - Native context menu integration (XUL-based)
  * - Workspace selection UI in settings
  * - Security lock screens with cancel buttons
- * - Hold-to-start integration
  * - Hold-to-unlock for settings access
  * - Notification permission requests
  * - Custom confirmation dialogs
@@ -82,7 +81,6 @@
     // (for both idle and active states). Name kept for backward compatibility.
     settingsLockActiveCodeLength: 64,
     settingsLockActiveCharacterSet: 'all-typeable',
-    holdToStartDuration: 0,
     enableNotifications: true,
     enableAudioAlerts: false,
     phase: 'focus',
@@ -568,17 +566,6 @@
     const isInRange = parsed >= min && parsed <= max;
     
     return (isValidNumber && isInRange) ? parsed : defaultValue;
-  }
-
-  /**
-   * Get the valid hold-to-start duration from config.
-   * Returns 0 if the value is not a positive number, enabling instant-start behavior.
-   * @param {Object} config - Configuration object
-   * @returns {number} Valid hold duration in milliseconds, or 0 for instant start
-   */
-  function getValidHoldDuration(config) {
-    const duration = Number(config?.holdToStartDuration);
-    return duration > 0 ? duration : 0;
   }
 
   /**
@@ -3227,6 +3214,7 @@
       this.lockTimerElement = null; // PERFORMANCE FIX: Initialize timer element reference for caching
       this.holdDuration = 3000;
       this.holdToUnlockIntervalId = null; // Store hold-to-unlock interval (renamed for consistency)
+      this._overlayPointerEventsDisabled = false; // Z-INDEX FIX: Track if overlay pointer-events were disabled
     }
 
     /**
@@ -3357,6 +3345,7 @@
      * MEMORY LEAK FIX: Store and clear interval properly
      * NEW: Added cancel button, hold-to-unlock, and dev bypass button
      * NEW: Configurable lockout methods (hold vs code) for idle and active states
+     * Z-INDEX FIX: Temporarily disable overlay pointer-events so lock screen can receive input
      */
     showLockScreen(timerActive, onUnlock) {
       const config = getConfig();
@@ -3366,6 +3355,17 @@
         timerActive: timerActive,
         method: method
       });
+      
+      // Z-INDEX FIX: Temporarily disable pointer-events on overlay so lock screen can receive input.
+      // Both lock screen and overlay use the CSS specification maximum z-index (2147483647).
+      // Since we cannot use a higher z-index value, we disable pointer-events on the overlay
+      // to allow the lock screen (which appears later in DOM order) to receive user interaction.
+      const overlay = window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
+      if (overlay) {
+        overlay.style.setProperty('pointer-events', 'none', 'important');
+      }
+      // Store reference to restore later
+      this._overlayPointerEventsDisabled = !!overlay;
       
       this._initializeLockScreen();
       const lockContent = this._createLockContent();
@@ -3680,6 +3680,7 @@
     /**
      * Cleanup lock screen
      * MEMORY LEAK FIX: Clear interval and cached element reference on cleanup
+     * Z-INDEX FIX: Restore overlay pointer-events when lock screen is closed
      */
     cleanupLockScreen() {
       if (this.lockIntervalId) {
@@ -3695,65 +3696,15 @@
         this.lockScreen.remove();
         this.lockScreen = null;
       }
-    }
-
-    /**
-     * Implement hold-to-start button
-     * MISSING FEATURE: Hold-to-start implementation
-     * MEMORY LEAK FIX: Added cleanup for interval on mouseup/mouseleave
-     */
-    setupHoldToStart(buttonElement, onComplete) {
-      const config = getConfig();
-      // Use helper function to get valid duration
-      const duration = getValidHoldDuration(config);
       
-      if (duration <= 0) {
-        // If hold-to-start is disabled, use instant click - no hold required
-        buttonElement.addEventListener('click', onComplete);
-        return;
-      }
-      
-      let progress = 0;
-      let interval = null;
-      
-      const progressBar = document.createElement('div');
-      progressBar.id = 'zen-pomodoro-hold-progress';
-      buttonElement.classList.add('zen-pomodoro-hold-button-wrapper');
-      buttonElement.appendChild(progressBar);
-      
-      const startHold = () => {
-        progress = 0;
-        progressBar.style.width = '0%';
-        interval = setInterval(() => {
-          progress += 100;
-          const percent = (progress / duration) * 100;
-          progressBar.style.width = `${percent}%`;
-          
-          if (progress >= duration) {
-            // MEMORY LEAK FIX: Clear interval on completion
-            if (interval) {
-              clearInterval(interval);
-              interval = null;
-            }
-            progressBar.style.width = '0%';
-            onComplete();
-          }
-        }, 100);
-      };
-      
-      const stopHold = () => {
-        // MEMORY LEAK FIX: Always clear interval when stopping
-        if (interval) {
-          clearInterval(interval);
-          interval = null;
+      // Z-INDEX FIX: Restore overlay pointer-events if they were disabled
+      if (this._overlayPointerEventsDisabled) {
+        const overlay = window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
+        if (overlay) {
+          overlay.style.setProperty('pointer-events', 'all', 'important');
         }
-        progress = 0;
-        progressBar.style.width = '0%';
-      };
-      
-      buttonElement.addEventListener('mousedown', startHold);
-      buttonElement.addEventListener('mouseup', stopHold);
-      buttonElement.addEventListener('mouseleave', stopHold);
+        this._overlayPointerEventsDisabled = false;
+      }
     }
   }
 
