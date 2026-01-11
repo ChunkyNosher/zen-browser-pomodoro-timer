@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)
-![Version](https://img.shields.io/badge/version-1.1.3-green.svg)
+![Version](https://img.shields.io/badge/version-1.1.5-green.svg)
 
 ## ✨ Features
 
@@ -172,8 +172,12 @@ zen-pomodoro.timer-state - Current timer state (for crash recovery)
   "blockedWorkspaces": ["workspace-uuid-1", "workspace-uuid-2"],
   "overlayColor": "#808080",
   "motivationalMessage": "Get back to work.",
-  "settingsLockIdleDuration": 20,
-  "settingsLockActiveCodeLength": 64,
+  "settingsLockIdleMethod": "hold",
+  "settingsLockActiveMethod": "code",
+  "settingsLockIdleHoldDuration": 10,
+  "settingsLockActiveHoldDuration": 25,
+  "settingsLockIdleCodeLength": 48,
+  "settingsLockActiveCodeLength": 96,
   "settingsLockActiveCharacterSet": "all-typeable",
   "enableNotifications": true,
   "enableAudioAlerts": false

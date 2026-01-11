@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.4
+ * Version: 1.1.5
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -66,16 +66,18 @@
     blockedWorkspaces: [],
     overlayColor: '#808080',
     motivationalMessage: 'Get back to work.',
-    // Note: Despite the name, this duration is used whenever the "hold" method is selected
-    // (for both idle and active states). Name kept for backward compatibility.
-    settingsLockIdleDuration: 20,
     /** @type {'hold'|'code'} Method to use when timer is idle */
     settingsLockIdleMethod: LOCKOUT_METHODS.HOLD,
     /** @type {'hold'|'code'} Method to use when timer is active */
     settingsLockActiveMethod: LOCKOUT_METHODS.CODE,
-    // Note: Despite the name, this code length is used whenever the "code" method is selected
-    // (for both idle and active states). Name kept for backward compatibility.
-    settingsLockActiveCodeLength: 64,
+    /** Hold duration in seconds when timer is idle */
+    settingsLockIdleHoldDuration: 10,
+    /** Hold duration in seconds when timer is active */
+    settingsLockActiveHoldDuration: 25,
+    /** Code length when timer is idle */
+    settingsLockIdleCodeLength: 48,
+    /** Code length when timer is active */
+    settingsLockActiveCodeLength: 96,
     settingsLockActiveCharacterSet: 'all-typeable',
     enableNotifications: true,
     enableAudioAlerts: false,
@@ -1407,16 +1409,18 @@
       timerDisplay.id = 'zen-pomodoro-timer-display';
       timerDisplay.textContent = '25:00';
       
-      // Cycle progress - hidden initially for simple mode
+      // Cycle progress - hidden initially, only shown for pomodoro mode
       const cycleProgress = document.createElement('div');
       cycleProgress.id = 'zen-pomodoro-cycle-progress';
       const timerMode = window.zenPomodoroApp?.timer?.mode;
-      if (timerMode === 'simple') {
-        cycleProgress.style.display = 'none';
-      } else {
+      // Only show cycle progress for pomodoro mode (not simple mode or undefined)
+      if (timerMode === 'pomodoro') {
         // Use configured cycle count instead of hardcoded value
         const totalCycles = this.config.cycles || 4;
         cycleProgress.textContent = `Cycle 1 of ${totalCycles}`;
+      } else {
+        // Hide for simple mode or when timer mode is not yet set
+        cycleProgress.style.display = 'none';
       }
       
       // Motivational message - SECURITY FIX: Use textContent
@@ -2003,9 +2007,9 @@
       const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
       if (!cycleProgress) return;
       
-      // Don't show cycle progress for simple timer mode - only pomodoro mode has cycles
+      // Only show cycle progress for pomodoro mode during focus phase
       const timerMode = window.zenPomodoroApp?.timer?.mode;
-      const shouldShow = phase === 'focus' && timerMode !== 'simple';
+      const shouldShow = phase === 'focus' && timerMode === 'pomodoro';
       cycleProgress.style.display = shouldShow ? 'block' : 'none';
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
@@ -2938,25 +2942,29 @@
       activeMethodRow.appendChild(activeMethodLabel);
       activeMethodRow.appendChild(activeMethodSelect);
       
-      // Hold duration setting (used for both idle and active when hold method is selected)
-      const lockHoldDurationRow = this.createInputRow('Button Hold Time (seconds):', 'hold-duration', 
-        { value: config.settingsLockIdleDuration, min: 1, max: 300 });
+      // Separate hold duration settings for idle and active states
+      const idleHoldDurationRow = this.createInputRow('Idle Hold Time (seconds):', 'idle-hold-duration', 
+        { value: config.settingsLockIdleHoldDuration, min: 1, max: 300 });
+      const activeHoldDurationRow = this.createInputRow('Active Hold Time (seconds):', 'active-hold-duration', 
+        { value: config.settingsLockActiveHoldDuration, min: 1, max: 300 });
       
-      // Code length setting (used for both idle and active when code method is selected)
-      const lockCodeLengthRow = this.createInputRow('Code Length (8-128):', 'code-length', 
+      // Separate code length settings for idle and active states
+      const idleCodeLengthRow = this.createInputRow('Idle Code Length (8-128):', 'idle-code-length', 
+        { value: config.settingsLockIdleCodeLength, min: 8, max: 128 });
+      const activeCodeLengthRow = this.createInputRow('Active Code Length (8-128):', 'active-code-length', 
         { value: config.settingsLockActiveCodeLength, min: 8, max: 128 });
       
-      // Only show hold/code settings when at least one lockout method uses them
+      // Show/hide settings based on the selected method for each state
       const updateLockoutVisibility = () => {
-        const usesHold =
-          idleMethodSelect.value === LOCKOUT_METHODS.HOLD ||
-          activeMethodSelect.value === LOCKOUT_METHODS.HOLD;
-        const usesCode =
-          idleMethodSelect.value === LOCKOUT_METHODS.CODE ||
-          activeMethodSelect.value === LOCKOUT_METHODS.CODE;
+        const idleUsesHold = idleMethodSelect.value === LOCKOUT_METHODS.HOLD;
+        const idleUsesCode = idleMethodSelect.value === LOCKOUT_METHODS.CODE;
+        const activeUsesHold = activeMethodSelect.value === LOCKOUT_METHODS.HOLD;
+        const activeUsesCode = activeMethodSelect.value === LOCKOUT_METHODS.CODE;
 
-        lockHoldDurationRow.style.display = usesHold ? '' : 'none';
-        lockCodeLengthRow.style.display = usesCode ? '' : 'none';
+        idleHoldDurationRow.style.display = idleUsesHold ? '' : 'none';
+        activeHoldDurationRow.style.display = activeUsesHold ? '' : 'none';
+        idleCodeLengthRow.style.display = idleUsesCode ? '' : 'none';
+        activeCodeLengthRow.style.display = activeUsesCode ? '' : 'none';
       };
 
       idleMethodSelect.addEventListener('change', updateLockoutVisibility);
@@ -2966,8 +2974,10 @@
       lockoutSection.appendChild(lockoutTitle);
       lockoutSection.appendChild(idleMethodRow);
       lockoutSection.appendChild(activeMethodRow);
-      lockoutSection.appendChild(lockHoldDurationRow);
-      lockoutSection.appendChild(lockCodeLengthRow);
+      lockoutSection.appendChild(idleHoldDurationRow);
+      lockoutSection.appendChild(activeHoldDurationRow);
+      lockoutSection.appendChild(idleCodeLengthRow);
+      lockoutSection.appendChild(activeCodeLengthRow);
       
       // ========================================
       // Assemble config section
@@ -3124,16 +3134,36 @@
     _saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect) {
       config.settingsLockIdleMethod = idleMethodSelect.value;
       config.settingsLockActiveMethod = activeMethodSelect.value;
-      const holdDurationInput = dialog.querySelector('#hold-duration');
-      if (holdDurationInput) {
-        config.settingsLockIdleDuration = validateIntegerInput(
-          holdDurationInput.value, 1, 300, config.settingsLockIdleDuration
+      
+      // Save idle hold duration
+      const idleHoldDurationInput = dialog.querySelector('#idle-hold-duration');
+      if (idleHoldDurationInput) {
+        config.settingsLockIdleHoldDuration = validateIntegerInput(
+          idleHoldDurationInput.value, 1, 300, config.settingsLockIdleHoldDuration
         );
       }
-      const codeLengthInput = dialog.querySelector('#code-length');
-      if (codeLengthInput) {
+      
+      // Save active hold duration
+      const activeHoldDurationInput = dialog.querySelector('#active-hold-duration');
+      if (activeHoldDurationInput) {
+        config.settingsLockActiveHoldDuration = validateIntegerInput(
+          activeHoldDurationInput.value, 1, 300, config.settingsLockActiveHoldDuration
+        );
+      }
+      
+      // Save idle code length
+      const idleCodeLengthInput = dialog.querySelector('#idle-code-length');
+      if (idleCodeLengthInput) {
+        config.settingsLockIdleCodeLength = validateIntegerInput(
+          idleCodeLengthInput.value, 8, 128, config.settingsLockIdleCodeLength
+        );
+      }
+      
+      // Save active code length
+      const activeCodeLengthInput = dialog.querySelector('#active-code-length');
+      if (activeCodeLengthInput) {
         config.settingsLockActiveCodeLength = validateIntegerInput(
-          codeLengthInput.value, 8, 128, config.settingsLockActiveCodeLength
+          activeCodeLengthInput.value, 8, 128, config.settingsLockActiveCodeLength
         );
       }
     }
@@ -3215,9 +3245,19 @@
       const config = getConfig();
       
       if (timerActive) {
-        return config.settingsLockActiveCodeLength > 0;
+        // Check based on active method
+        if (config.settingsLockActiveMethod === LOCKOUT_METHODS.CODE) {
+          return config.settingsLockActiveCodeLength > 0;
+        } else {
+          return config.settingsLockActiveHoldDuration > 0;
+        }
       } else {
-        return config.settingsLockIdleDuration > 0;
+        // Check based on idle method
+        if (config.settingsLockIdleMethod === LOCKOUT_METHODS.CODE) {
+          return config.settingsLockIdleCodeLength > 0;
+        } else {
+          return config.settingsLockIdleHoldDuration > 0;
+        }
       }
     }
 
@@ -3334,13 +3374,17 @@
      * @private
      */
     _setupCodeEntryMode(lockContent, config, timerActive, onUnlock) {
+      const codeLength = timerActive 
+        ? config.settingsLockActiveCodeLength 
+        : config.settingsLockIdleCodeLength;
       const code = generateRandomCode(
-        config.settingsLockActiveCodeLength,
+        codeLength,
         config.settingsLockActiveCharacterSet
       );
       
       logger.log(LOG_CATEGORIES.SECURITY, 'Code entry mode initialized', {
-        codeLength: config.settingsLockActiveCodeLength
+        codeLength: codeLength,
+        timerActive: timerActive
       });
       
       const h2 = document.createElement('h2');
@@ -3412,7 +3456,9 @@
      * @private
      */
     _setupHoldToUnlockMode(lockContent, config, timerActive, onUnlock) {
-      const waitTime = config.settingsLockIdleDuration;
+      const waitTime = timerActive 
+        ? config.settingsLockActiveHoldDuration 
+        : config.settingsLockIdleHoldDuration;
       
       const h2 = document.createElement('h2');
       h2.textContent = 'Settings Locked';
