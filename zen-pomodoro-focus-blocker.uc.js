@@ -4442,13 +4442,59 @@
         onConfirm();
       });
     }
+
+    /**
+     * Clean up and destroy the application.
+     * MEMORY LEAK FIX: Properly cleanup all modules when browser shuts down.
+     * This method is called when the browser window is unloading.
+     */
+    destroy() {
+      logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
+      
+      // Clean up all modules that have destroy methods
+      if (this.sineModBlocker) {
+        this.sineModBlocker.destroy();
+      }
+      
+      if (this.keyboardShortcut) {
+        this.keyboardShortcut.destroy();
+      }
+      
+      if (this.overlay) {
+        this.overlay.destroy();
+      }
+      
+      if (this.workspace) {
+        this.workspace.stopMonitoring();
+      }
+      
+      if (this.timer) {
+        this.timer.stop();
+      }
+      
+      if (this.security) {
+        this.security.cleanupLockScreen();
+      }
+      
+      this.initialized = false;
+      
+      logger.log(LOG_CATEGORIES.INIT, 'Application cleanup complete');
+    }
   }
 
   // ============================================
   // Initialize Application
   // ============================================
   
-  // Start the app
-  new ZenPomodoroApp();
+  // Create and store the app instance for cleanup
+  const app = new ZenPomodoroApp();
+  
+  // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
+  // This ensures SineModBlocker and other modules are properly destroyed
+  window.addEventListener('unload', () => {
+    if (app) {
+      app.destroy();
+    }
+  }, { once: true });
 
 })();
