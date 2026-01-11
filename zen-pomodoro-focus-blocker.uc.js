@@ -3374,9 +3374,7 @@
      * @private
      */
     _setupCodeEntryMode(lockContent, config, timerActive, onUnlock) {
-      const codeLength = timerActive 
-        ? config.settingsLockActiveCodeLength 
-        : config.settingsLockIdleCodeLength;
+      const codeLength = timerActive ? config.settingsLockActiveCodeLength : config.settingsLockIdleCodeLength;
       const code = generateRandomCode(
         codeLength,
         config.settingsLockActiveCharacterSet
@@ -3456,9 +3454,7 @@
      * @private
      */
     _setupHoldToUnlockMode(lockContent, config, timerActive, onUnlock) {
-      const waitTime = timerActive 
-        ? config.settingsLockActiveHoldDuration 
-        : config.settingsLockIdleHoldDuration;
+      const waitTime = timerActive ? config.settingsLockActiveHoldDuration : config.settingsLockIdleHoldDuration;
       
       const h2 = document.createElement('h2');
       h2.textContent = 'Settings Locked';
