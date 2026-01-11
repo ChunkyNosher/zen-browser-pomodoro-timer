@@ -311,8 +311,14 @@
   font-weight: 700;
 
   /* Issue 8: Make dialog header draggable */
-  cursor: move;
-  user-select: none;
+  cursor: move !important;
+  user-select: none !important;
+  touch-action: none;
+}
+
+/* Explicit drag handle styling */
+.zen-pomodoro-dialog h2[data-drag-handle="true"] {
+  cursor: move !important;
 }
 
 .zen-pomodoro-dialog p {
@@ -810,11 +816,11 @@
    Issue 8: Draggable Dialog Support
    ============================================ */
 .zen-pomodoro-dialog.dragging {
-  user-select: none;
+  user-select: none !important;
 }
 
 .zen-pomodoro-dialog.dragging h2 {
-  cursor: grabbing;
+  cursor: grabbing !important;
 }
 
 /* ============================================

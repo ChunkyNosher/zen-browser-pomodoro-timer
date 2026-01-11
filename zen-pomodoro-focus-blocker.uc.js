@@ -418,30 +418,49 @@
    */
   function setupDialogDrag(dialog) {
     const header = dialog.querySelector('h2');
-    if (!header) return;
+    if (!header) {
+      console.warn('[ZenPomodoro] setupDialogDrag: No h2 found in dialog', dialog?.id);
+      return;
+    }
+    
+    // Mark header as drag handle for debugging and styling
+    header.setAttribute('data-drag-handle', 'true');
     
     let isDragging = false;
     let startX, startY;
     let startLeft, startTop;
     let dialogWidth, dialogHeight;
     
+    // Helper to get client coordinates from mouse or touch event
+    const getClientCoords = (e) => {
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+      return { x: e.clientX, y: e.clientY };
+    };
+    
     // Clean up function to remove document-level listeners
     const cleanupDrag = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
       isDragging = false;
     };
     
-    const onMouseDown = (e) => {
-      // Only start drag on left mouse button
-      if (e.button !== 0) return;
+    const startDrag = (e) => {
+      // For mouse events, only start drag on left mouse button
+      if (e.type === 'mousedown' && e.button !== 0) return;
       
+      // Stop propagation to prevent any parent handlers from interfering
+      e.stopPropagation();
       e.preventDefault();
       isDragging = true;
       
       const rect = dialog.getBoundingClientRect();
-      startX = e.clientX;
-      startY = e.clientY;
+      const coords = getClientCoords(e);
+      startX = coords.x;
+      startY = coords.y;
       
       // If dialog is centered with transform, convert to left/top positioning
       const computedStyle = window.getComputedStyle(dialog);
@@ -458,15 +477,21 @@
       
       dialog.classList.add('dragging');
       
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+      // Add document-level event listeners for drag tracking
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
     };
     
-    const onMouseMove = (e) => {
+    const onMove = (e) => {
       if (!isDragging) return;
       
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
+      e.preventDefault();
+      
+      const coords = getClientCoords(e);
+      const deltaX = coords.x - startX;
+      const deltaY = coords.y - startY;
       
       let newLeft = startLeft + deltaX;
       let newTop = startTop + deltaY;
@@ -499,17 +524,21 @@
       dialog.style.top = `${newTop}px`;
     };
     
-    const onMouseUp = () => {
+    const onEnd = () => {
       if (!isDragging) return;
       
       isDragging = false;
       dialog.classList.remove('dragging');
       
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
     };
     
-    header.addEventListener('mousedown', onMouseDown);
+    // Add event listeners to header for both mouse and touch
+    header.addEventListener('mousedown', startDrag, { capture: true });
+    header.addEventListener('touchstart', startDrag, { capture: true, passive: false });
     
     // Use MutationObserver to clean up when dialog is removed from DOM
     const observer = new MutationObserver((mutations) => {
@@ -517,7 +546,8 @@
         for (const removedNode of mutation.removedNodes) {
           if (removedNode === dialog) {
             cleanupDrag();
-            header.removeEventListener('mousedown', onMouseDown);
+            header.removeEventListener('mousedown', startDrag, { capture: true });
+            header.removeEventListener('touchstart', startDrag, { capture: true });
             observer.disconnect();
             return;
           }
