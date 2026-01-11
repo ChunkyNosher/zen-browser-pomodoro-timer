@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.3
+ * Version: 1.1.4
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -1407,10 +1407,17 @@
       timerDisplay.id = 'zen-pomodoro-timer-display';
       timerDisplay.textContent = '25:00';
       
-      // Cycle progress
+      // Cycle progress - hidden initially for simple mode
       const cycleProgress = document.createElement('div');
       cycleProgress.id = 'zen-pomodoro-cycle-progress';
-      cycleProgress.textContent = 'Cycle 1 of 4';
+      const timerMode = window.zenPomodoroApp?.timer?.mode;
+      if (timerMode === 'simple') {
+        cycleProgress.style.display = 'none';
+      } else {
+        // Use configured cycle count instead of hardcoded value
+        const totalCycles = this.config.cycles || 4;
+        cycleProgress.textContent = `Cycle 1 of ${totalCycles}`;
+      }
       
       // Motivational message - SECURITY FIX: Use textContent
       const message = document.createElement('div');
@@ -1996,7 +2003,9 @@
       const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
       if (!cycleProgress) return;
       
-      const shouldShow = phase === 'focus';
+      // Don't show cycle progress for simple timer mode - only pomodoro mode has cycles
+      const timerMode = window.zenPomodoroApp?.timer?.mode;
+      const shouldShow = phase === 'focus' && timerMode !== 'simple';
       cycleProgress.style.display = shouldShow ? 'block' : 'none';
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
@@ -2301,7 +2310,12 @@
         const statusText = document.createElement('div');
         statusText.style.fontSize = '18px';
         statusText.style.fontWeight = '600';
-        statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+        // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
+        if (status.mode === 'simple') {
+          statusText.textContent = `${phaseStr}: ${timeStr}`;
+        } else {
+          statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+        }
         statusRow.appendChild(statusText);
         
         const pauseResumeBtn = document.createElement('button');
@@ -3884,7 +3898,12 @@
       const timeStr = formatTime(status.remainingTime);
       const phaseLabel = getShortPhaseLabel(status.currentPhase);
       
-      statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+      // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
+      if (status.mode === 'simple') {
+        statusElement.textContent = `${phaseLabel}: ${timeStr}`;
+      } else {
+        statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+      }
     }
 
     /**
