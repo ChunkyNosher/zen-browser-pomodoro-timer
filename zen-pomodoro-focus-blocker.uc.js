@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.2
+ * Version: 1.1.3
  * License: MPL-2.0
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -18,7 +18,6 @@
  * - Hold-to-unlock for settings access
  * - Notification permission requests
  * - Custom confirmation dialogs
- * - Dev mode with bypass capabilities
  * 
  * CODE QUALITY:
  * - Proper input validation
@@ -37,9 +36,6 @@
   // ============================================
   
   const PREF_PREFIX = 'zen-pomodoro';
-  // DEV NOTE: This password is for development bypass only and will be removed
-  // before production release. It's intentionally hardcoded for testing purposes.
-  const DEV_MODE_PASSWORD = 'Chunky-Nosher!';
   
   /**
    * Modifier keys used by the keyboard shortcut recorder.
@@ -1452,15 +1448,8 @@
       stopButton.id = 'zen-pomodoro-stop-button';
       stopButton.textContent = 'Stop Timer';
       
-      // Dev bypass button for timer overlay
-      const devButton = document.createElement('button');
-      devButton.className = 'zen-pomodoro-button dev';
-      devButton.id = 'zen-pomodoro-overlay-dev-button';
-      devButton.textContent = 'Dev';
-      
       controls.appendChild(pauseButton);
       controls.appendChild(stopButton);
-      controls.appendChild(devButton);
       
       return controls;
     }
@@ -1828,7 +1817,6 @@
     setupOverlayHandlers() {
       const pauseButton = this.overlay?.querySelector('#zen-pomodoro-pause-button');
       const stopButton = this.overlay?.querySelector('#zen-pomodoro-stop-button');
-      const devButton = this.overlay?.querySelector('#zen-pomodoro-overlay-dev-button');
       
       if (pauseButton) {
         pauseButton.addEventListener('click', () => {
@@ -1850,18 +1838,6 @@
           handleStopTimerWithLockout(() => {
             window.zenPomodoroApp.stopTimer();
           });
-        });
-      }
-      
-      // Dev bypass button handler - shows dev bypass prompt to end timer early
-      if (devButton) {
-        devButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.security) {
-            window.zenPomodoroApp.security.showDevBypassPrompt(() => {
-              // Dev bypass successful - stop the timer
-              window.zenPomodoroApp.stopTimer();
-            });
-          }
         });
       }
     }
@@ -2160,8 +2136,7 @@
     '#zen-pomodoro-settings-dialog',
     '#zen-pomodoro-lock-screen',
     '#zen-pomodoro-alert-dialog',
-    '#zen-pomodoro-confirm-dialog',
-    '#zen-pomodoro-dev-bypass-dialog'
+    '#zen-pomodoro-confirm-dialog'
   ];
   
   /**
@@ -2554,9 +2529,10 @@
       
       const startButton = document.createElement('button');
       startButton.className = 'zen-pomodoro-dialog-button';
-      // Always use instant-click start button (no hold-to-start)
       startButton.id = 'zen-pomodoro-start-button';
       startButton.textContent = 'Start Timer';
+      // Mark as instant-click button - no hold required
+      startButton.setAttribute('data-instant-click', 'true');
       
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(startButton);
@@ -2594,6 +2570,7 @@
      */
     _setupStartHandler(dialog, config, modeSelect, startButton) {
       const applyDurationsAndStart = () => {
+        logger.log(LOG_CATEGORIES.MENU, 'Start button clicked - starting timer immediately');
         const mode = modeSelect.value;
         const cyclesInput = dialog.querySelector('#zen-pomodoro-cycles-input');
         const cycles = cyclesInput
@@ -2609,7 +2586,7 @@
         }
       };
       
-      // Always use instant start - no hold required
+      // Instant click handler - timer starts immediately on click (no hold required)
       startButton.addEventListener('click', applyDurationsAndStart);
     }
 
@@ -3218,14 +3195,6 @@
     }
 
     /**
-     * Verify dev bypass password
-     * Returns true if password matches
-     */
-    verifyDevPassword(password) {
-      return password === DEV_MODE_PASSWORD;
-    }
-
-    /**
      * Check if settings should be locked
      */
     shouldLockSettings(timerActive) {
@@ -3239,111 +3208,10 @@
     }
 
     /**
-     * Show dev bypass password prompt dialog
-     * This is shown on the lock screen as a way to bypass during development
-     */
-    showDevBypassPrompt(onSuccess) {
-      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass prompt shown');
-      
-      // Z-INDEX FIX: Temporarily disable pointer-events on overlay so dialog can receive input
-      // The overlay and dialog both use max z-index (2147483647), so we need to let
-      // pointer events pass through the overlay to the dialog
-      // Use the existing overlay reference from OverlayManager if available, fall back to DOM query
-      const overlay = window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
-      if (overlay) {
-        overlay.style.setProperty('pointer-events', 'none', 'important');
-      }
-      
-      // Helper function to restore overlay pointer-events when dialog closes
-      const restoreOverlayPointerEvents = () => {
-        if (overlay) {
-          overlay.style.setProperty('pointer-events', 'all', 'important');
-        }
-      };
-      
-      const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-dev-bypass-dialog';
-      dialog.className = 'zen-pomodoro-dialog active';
-      
-      const h2 = document.createElement('h2');
-      h2.textContent = 'Dev Bypass';
-      
-      const p = document.createElement('p');
-      p.textContent = 'Enter developer password to bypass lockout:';
-      p.className = 'zen-pomodoro-dialog-message';
-      
-      const input = document.createElement('input');
-      input.type = 'password';
-      input.id = 'zen-pomodoro-dev-bypass-password';
-      input.placeholder = 'Enter password';
-      input.className = 'zen-pomodoro-devmode-input';
-      input.style.width = '100%';
-      input.style.marginBottom = '16px';
-      
-      const buttonDiv = document.createElement('div');
-      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-      
-      const cancelButton = document.createElement('button');
-      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-      cancelButton.textContent = 'Cancel';
-      
-      const submitButton = document.createElement('button');
-      submitButton.className = 'zen-pomodoro-dialog-button';
-      submitButton.textContent = 'Bypass';
-      
-      buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(submitButton);
-      
-      dialog.appendChild(h2);
-      dialog.appendChild(p);
-      dialog.appendChild(input);
-      dialog.appendChild(buttonDiv);
-      
-      document.documentElement.appendChild(dialog);
-      
-      // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
-      
-      // Focus input
-      input.focus();
-      
-      cancelButton.addEventListener('click', () => {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass cancelled');
-        restoreOverlayPointerEvents();
-        dialog.remove();
-      });
-      
-      submitButton.addEventListener('click', () => {
-        const password = input.value;
-        if (this.verifyDevPassword(password)) {
-          restoreOverlayPointerEvents();
-          dialog.remove();
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful');
-          console.log('[DEV BYPASS] Lock screen bypassed');
-          onSuccess();
-        } else {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - incorrect password');
-          if (window.zenPomodoroApp) {
-            window.zenPomodoroApp.showCustomAlert('Incorrect Password', 'Please try again.');
-          }
-          input.value = '';
-          input.focus();
-        }
-      });
-      
-      // Allow Enter key to submit
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          submitButton.click();
-        }
-      });
-    }
-
-    /**
      * Show settings lock screen
      * UI/UX FIX: Replace alert() with custom dialog
      * MEMORY LEAK FIX: Store and clear interval properly
-     * NEW: Added cancel button, hold-to-unlock, and dev bypass button
+     * NEW: Added cancel button, hold-to-unlock
      * NEW: Configurable lockout methods (hold vs code) for idle and active states
      * Z-INDEX FIX: Temporarily disable overlay pointer-events so lock screen can receive input
      */
@@ -3422,12 +3290,11 @@
     }
 
     /**
-     * Create standard lock screen button row with cancel and dev bypass buttons.
-     * @param {Function} onUnlock - Callback when unlock succeeds
-     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLElement, devBypassButton: HTMLElement}}
+     * Create standard lock screen button row with cancel button.
+     * @returns {{buttonDiv: HTMLElement, cancelButton: HTMLElement}}
      * @private
      */
-    _createLockButtonRow(onUnlock) {
+    _createLockButtonRow() {
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
       
@@ -3436,24 +3303,12 @@
       cancelButton.id = 'zen-pomodoro-lock-cancel';
       cancelButton.textContent = 'Cancel';
       
-      const devBypassButton = document.createElement('button');
-      devBypassButton.className = 'zen-pomodoro-dialog-button secondary small';
-      devBypassButton.id = 'zen-pomodoro-dev-bypass';
-      devBypassButton.textContent = 'Dev Bypass';
-      
-      // Attach event handlers
+      // Attach event handler
       cancelButton.addEventListener('click', () => this.cleanupLockScreen());
-      devBypassButton.addEventListener('click', () => {
-        this.showDevBypassPrompt(() => {
-          this.cleanupLockScreen();
-          onUnlock();
-        });
-      });
       
       buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(devBypassButton);
       
-      return { buttonDiv, cancelButton, devBypassButton };
+      return { buttonDiv, cancelButton };
     }
 
     /**
@@ -3505,7 +3360,7 @@
         }
       });
       
-      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      const { buttonDiv } = this._createLockButtonRow();
       
       const unlockButton = document.createElement('button');
       unlockButton.className = 'zen-pomodoro-dialog-button';
@@ -3562,7 +3417,7 @@
       pSub.textContent = 'seconds remaining - hold button to count down';
       
       const { holdButton, holdProgress } = this._createHoldButton();
-      const { buttonDiv } = this._createLockButtonRow(onUnlock);
+      const { buttonDiv } = this._createLockButtonRow();
       buttonDiv.appendChild(holdButton);
       
       lockContent.appendChild(h2);
@@ -3709,6 +3564,531 @@
   }
 
   // ============================================
+  // Sine Mod Blocker Module
+  // ============================================
+  
+  /**
+   * Delay (in ms) after page navigation before checking for Sine Mods page.
+   * This allows the URL to be fully updated before checking.
+   * @constant {number}
+   */
+  const SINE_PAGE_CHECK_DELAY_MS = 50;
+
+  /**
+   * Delay (in ms) before hiding the blocker overlay after navigation.
+   * This ensures the navigation has completed before removing the overlay.
+   * @constant {number}
+   */
+  const SINE_BLOCKER_HIDE_DELAY_MS = 100;
+
+  /**
+   * SineModBlocker class prevents users from disabling the Pomodoro mod
+   * via the Sine Mod Menu (about:preferences#sineMods) while the timer is active.
+   * 
+   * When the timer is running and the user navigates to the Sine Mods settings page,
+   * a blocking overlay appears covering the entire window, offering options to
+   * go back or stop the timer (with the same security lock as stopping the timer normally).
+   */
+  class SineModBlocker {
+    constructor() {
+      this.blockerOverlay = null;
+      this.isBlocking = false;
+      this.tabSelectHandler = null;
+      this.pageShowHandler = null;
+      this.hashChangeHandler = null;
+      this.progressListener = null;
+    }
+
+    /**
+     * Initialize the Sine Mod Blocker.
+     * Sets up listeners for tab changes and URL navigation.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
+      this._setupListeners();
+      // Check immediately in case we're already on the page
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Set up all event listeners for detecting navigation to Sine Mods page.
+     * @private
+     */
+    _setupListeners() {
+      // Tab select listener - fires when user switches tabs
+      this.tabSelectHandler = () => this._checkCurrentPage();
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
+      }
+      
+      // Page show listener - fires when page is loaded/shown
+      this.pageShowHandler = () => {
+        // Small delay to ensure URL is updated
+        setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
+      };
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        gBrowser.addEventListener('pageshow', this.pageShowHandler);
+      }
+      
+      // Hash change listener - for when user navigates within about:preferences
+      this.hashChangeHandler = () => this._checkCurrentPage();
+      window.addEventListener('hashchange', this.hashChangeHandler);
+      
+      // Progress listener for URL changes within tabs
+      this._setupProgressListener();
+    }
+
+    /**
+     * Set up a web progress listener to detect URL changes.
+     * This catches navigation within the same tab more reliably.
+     * @private
+     */
+    _setupProgressListener() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined') return;
+      
+      try {
+        this.progressListener = {
+          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
+          
+          // eslint-disable-next-line no-unused-vars
+          onLocationChange: (webProgress, request, location) => {
+            // Check if this is a top-level navigation
+            if (webProgress.isTopLevel) {
+              setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
+            }
+          },
+          
+          onStateChange: () => {},
+          onProgressChange: () => {},
+          onStatusChange: () => {},
+          onSecurityChange: () => {},
+          onContentBlockingEvent: () => {}
+        };
+        
+        // eslint-disable-next-line no-undef
+        gBrowser.addProgressListener(this.progressListener);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
+      }
+    }
+
+    /**
+     * Check if the blocker should be shown based on timer state.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _shouldShowBlocker() {
+      return window.zenPomodoroApp?.timer?.isActive || false;
+    }
+
+    /**
+     * Check if the current page is the Sine Mods settings page.
+     * Shows or hides the blocker overlay based on timer state and current URL.
+     * @private
+     */
+    _checkCurrentPage() {
+      const isSineModsPage = this._isSineModsPage();
+      const timerActive = this._shouldShowBlocker();
+      
+      logger.log(LOG_CATEGORIES.SECURITY, 'Sine Mod page check', {
+        isSineModsPage: isSineModsPage,
+        timerActive: timerActive,
+        isBlocking: this.isBlocking
+      });
+      
+      const shouldBlock = isSineModsPage && timerActive;
+      
+      if (shouldBlock && !this.isBlocking) {
+        this._showBlocker();
+        return;
+      }
+      
+      if (!shouldBlock && this.isBlocking) {
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Check if a URL contains the Sine Mods settings page pattern.
+     * @param {string} url - The URL to check
+     * @returns {boolean} True if URL is the Sine Mods page
+     * @private
+     */
+    _containsSineModsURL(url) {
+      return url.includes('about:preferences') && url.includes('sineMods');
+    }
+
+    /**
+     * Get the current URI spec from gBrowser.
+     * @returns {string} The current URI spec or empty string
+     * @private
+     */
+    _getCurrentURISpec() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.currentURI) {
+        return '';
+      }
+      // eslint-disable-next-line no-undef
+      return gBrowser.currentURI.spec || '';
+    }
+
+    /**
+     * Get the selected browser's current URI spec.
+     * @returns {string} The browser URI spec or empty string
+     * @private
+     */
+    _getSelectedBrowserURISpec() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.selectedBrowser) {
+        return '';
+      }
+      // eslint-disable-next-line no-undef
+      return gBrowser.selectedBrowser.currentURI?.spec || '';
+    }
+
+    /**
+     * Get the content document location href.
+     * @returns {string} The document location href or empty string
+     * @private
+     */
+    _getContentDocumentHref() {
+      // eslint-disable-next-line no-undef
+      const contentDoc = gBrowser?.selectedBrowser?.contentDocument;
+      if (!contentDoc) {
+        return '';
+      }
+      return contentDoc.location?.href || '';
+    }
+
+    /**
+     * Check if the current URL is the Sine Mods settings page.
+     * @returns {boolean} True if on the Sine Mods page
+     * @private
+     */
+    _isSineModsPage() {
+      try {
+        const urlsToCheck = [
+          this._getCurrentURISpec(),
+          this._getSelectedBrowserURISpec(),
+          this._getContentDocumentHref()
+        ];
+        
+        return urlsToCheck.some(url => this._containsSineModsURL(url));
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error checking Sine Mods page', { error: e.message });
+        return false;
+      }
+    }
+
+    /**
+     * Show the blocker overlay.
+     * @private
+     */
+    _showBlocker() {
+      if (this.blockerOverlay) return;
+      
+      logger.log(LOG_CATEGORIES.SECURITY, 'Showing Sine Mod blocker overlay');
+      this.isBlocking = true;
+      
+      this._createBlockerOverlay();
+      document.documentElement.appendChild(this.blockerOverlay);
+    }
+
+    /**
+     * Create the blocker overlay element with all its content.
+     * @private
+     */
+    _createBlockerOverlay() {
+      this.blockerOverlay = document.createElement('div');
+      this.blockerOverlay.id = 'zen-pomodoro-sine-blocker';
+      this.blockerOverlay.className = 'active';
+      
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-sine-blocker-content';
+      
+      // Icon (lock symbol)
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-sine-blocker-icon';
+      icon.textContent = '🔒';
+      
+      // Title
+      const title = document.createElement('h2');
+      title.id = 'zen-pomodoro-sine-blocker-title';
+      title.textContent = 'Mod Settings Locked';
+      
+      // Message
+      const message = document.createElement('p');
+      message.id = 'zen-pomodoro-sine-blocker-message';
+      message.textContent = 'The Pomodoro timer is currently active. Mod settings are locked to prevent disabling the focus session.';
+      
+      // Timer status
+      const timerStatus = document.createElement('div');
+      timerStatus.id = 'zen-pomodoro-sine-blocker-timer';
+      this._updateTimerStatus(timerStatus);
+      
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-sine-blocker-buttons';
+      
+      // Go Back button
+      const goBackButton = document.createElement('button');
+      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
+      goBackButton.textContent = 'Go Back';
+      goBackButton.addEventListener('click', () => this._handleGoBack());
+      
+      // Stop Timer button
+      const stopTimerButton = document.createElement('button');
+      stopTimerButton.className = 'zen-pomodoro-dialog-button';
+      stopTimerButton.textContent = 'Stop Timer';
+      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
+      
+      buttons.appendChild(goBackButton);
+      buttons.appendChild(stopTimerButton);
+      
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(timerStatus);
+      content.appendChild(buttons);
+      
+      this.blockerOverlay.appendChild(content);
+      
+      // Set up timer status updates
+      this._startTimerStatusUpdates(timerStatus);
+    }
+
+    /**
+     * Update the timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _updateTimerStatus(statusElement) {
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer) {
+        statusElement.textContent = '';
+        return;
+      }
+      
+      const status = timer.getStatus();
+      if (!status) {
+        statusElement.textContent = '';
+        return;
+      }
+      
+      const timeStr = formatTime(status.remainingTime);
+      const phaseLabel = getShortPhaseLabel(status.currentPhase);
+      
+      statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+    }
+
+    /**
+     * Start interval to update timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _startTimerStatusUpdates(statusElement) {
+      // Update immediately
+      this._updateTimerStatus(statusElement);
+      
+      // Update every second
+      this._timerStatusInterval = setInterval(() => {
+        if (this.isBlocking && statusElement) {
+          this._updateTimerStatus(statusElement);
+          
+          // Also check if timer is still active
+          if (!window.zenPomodoroApp?.timer?.isActive) {
+            this._hideBlocker();
+          }
+        }
+      }, 1000);
+    }
+
+    /**
+     * Handle the "Go Back" button click.
+     * Navigates the user away from the Sine Mods page.
+     * @private
+     */
+    _handleGoBack() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on Sine Mod blocker');
+      
+      try {
+        // Try to go back in history
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const webNav = gBrowser.selectedBrowser.webNavigation;
+          if (webNav && webNav.canGoBack) {
+            webNav.goBack();
+            // Hide blocker after navigation
+            setTimeout(() => this._hideBlocker(), SINE_BLOCKER_HIDE_DELAY_MS);
+            return;
+          }
+        }
+        
+        // Fallback: Navigate to main preferences page without hash
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined') {
+          // eslint-disable-next-line no-undef
+          gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:preferences'), {
+            triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+          });
+          setTimeout(() => this._hideBlocker(), SINE_BLOCKER_HIDE_DELAY_MS);
+          return;
+        }
+        
+        // Last resort: Just hide the blocker
+        this._hideBlocker();
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back', { error: e.message });
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Handle the "Stop Timer" button click.
+     * Uses the same security lockout as stopping the timer normally.
+     * @private
+     */
+    _handleStopTimer() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Stop Timer on Sine Mod blocker');
+      
+      // Use the existing handleStopTimerWithLockout utility function
+      // which shows the security lock screen before allowing timer stop
+      handleStopTimerWithLockout(() => {
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.stopTimer();
+          // Hide the blocker after timer is stopped
+          this._hideBlocker();
+        }
+      });
+    }
+
+    /**
+     * Hide the blocker overlay.
+     * @private
+     */
+    _hideBlocker() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Hiding Sine Mod blocker overlay');
+      this.isBlocking = false;
+      
+      // Clear timer status update interval
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+      
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+
+    /**
+     * Called when the timer starts.
+     * Re-checks if we need to show the blocker.
+     */
+    onTimerStart() {
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Called when the timer stops.
+     * Hides the blocker if it's showing.
+     */
+    onTimerStop() {
+      if (this.isBlocking) {
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Clean up and destroy the blocker.
+     */
+    destroy() {
+      this._removeGBrowserListeners();
+      this._removeWindowListeners();
+      this._clearIntervals();
+      this._removeBlockerOverlay();
+      this.isBlocking = false;
+    }
+
+    /**
+     * Remove gBrowser event listeners.
+     * @private
+     */
+    _removeGBrowserListeners() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined') return;
+      
+      // eslint-disable-next-line no-undef
+      if (this.tabSelectHandler && gBrowser.tabContainer) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
+      }
+      
+      if (this.pageShowHandler) {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
+      }
+      
+      this._removeProgressListener();
+    }
+
+    /**
+     * Remove web progress listener.
+     * @private
+     */
+    _removeProgressListener() {
+      if (!this.progressListener) return;
+      
+      try {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeProgressListener(this.progressListener);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+
+    /**
+     * Remove window event listeners.
+     * @private
+     */
+    _removeWindowListeners() {
+      if (this.hashChangeHandler) {
+        window.removeEventListener('hashchange', this.hashChangeHandler);
+      }
+    }
+
+    /**
+     * Clear any active intervals.
+     * @private
+     */
+    _clearIntervals() {
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+    }
+
+    /**
+     * Remove the blocker overlay from the DOM.
+     * @private
+     */
+    _removeBlockerOverlay() {
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
   
@@ -3719,6 +4099,7 @@
       this.overlay = new OverlayManager();
       this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
+      this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -3767,6 +4148,10 @@
       
       logger.log(LOG_CATEGORIES.INIT, 'Starting workspace monitoring');
       this.workspace.startMonitoring();
+      
+      // Initialize Sine Mod Blocker
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
+      this.sineModBlocker.init();
       
       // Setup timer callbacks
       this.timer.onTick = (time, phase, cycle, total) => {
@@ -3839,6 +4224,9 @@
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
       
+      // Notify Sine Mod Blocker that timer started
+      this.sineModBlocker.onTimerStart();
+      
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -3855,6 +4243,9 @@
       this.timer.stop();
       this.overlay.hide();
       this.overlay.hideIndicator();
+      
+      // Notify Sine Mod Blocker that timer stopped
+      this.sineModBlocker.onTimerStop();
     }
 
     /**
@@ -4051,13 +4442,59 @@
         onConfirm();
       });
     }
+
+    /**
+     * Clean up and destroy the application.
+     * MEMORY LEAK FIX: Properly cleanup all modules when browser shuts down.
+     * This method is called when the browser window is unloading.
+     */
+    destroy() {
+      logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
+      
+      // Clean up all modules that have destroy methods
+      if (this.sineModBlocker) {
+        this.sineModBlocker.destroy();
+      }
+      
+      if (this.keyboardShortcut) {
+        this.keyboardShortcut.destroy();
+      }
+      
+      if (this.overlay) {
+        this.overlay.destroy();
+      }
+      
+      if (this.workspace) {
+        this.workspace.stopMonitoring();
+      }
+      
+      if (this.timer) {
+        this.timer.stop();
+      }
+      
+      if (this.security) {
+        this.security.cleanupLockScreen();
+      }
+      
+      this.initialized = false;
+      
+      logger.log(LOG_CATEGORIES.INIT, 'Application cleanup complete');
+    }
   }
 
   // ============================================
   // Initialize Application
   // ============================================
   
-  // Start the app
-  new ZenPomodoroApp();
+  // Create and store the app instance for cleanup
+  const app = new ZenPomodoroApp();
+  
+  // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
+  // This ensures SineModBlocker and other modules are properly destroyed
+  window.addEventListener('unload', () => {
+    if (app) {
+      app.destroy();
+    }
+  }, { once: true });
 
 })();
