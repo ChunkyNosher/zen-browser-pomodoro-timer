@@ -1414,7 +1414,9 @@
       if (timerMode === 'simple') {
         cycleProgress.style.display = 'none';
       } else {
-        cycleProgress.textContent = 'Cycle 1 of 4';
+        // Use configured cycle count instead of hardcoded value
+        const totalCycles = this.config.cycles || 4;
+        cycleProgress.textContent = `Cycle 1 of ${totalCycles}`;
       }
       
       // Motivational message - SECURITY FIX: Use textContent
