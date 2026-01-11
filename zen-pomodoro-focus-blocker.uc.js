@@ -419,7 +419,7 @@
   function setupDialogDrag(dialog) {
     const header = dialog.querySelector('h2');
     if (!header) {
-      console.warn('[ZenPomodoro] setupDialogDrag: No h2 found in dialog', dialog?.id);
+      console.warn('[ZenPomodoro] setupDialogDrag: No h2 found in dialog', dialog?.id || dialog?.tagName || 'unknown');
       return;
     }
     
@@ -433,7 +433,8 @@
     
     // Helper to get client coordinates from mouse or touch event
     const getClientCoords = (e) => {
-      if (e.touches && e.touches.length > 0) {
+      // Use type checking for more robust touch detection
+      if (e.type && e.type.startsWith('touch') && e.touches && e.touches.length > 0) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
       return { x: e.clientX, y: e.clientY };
