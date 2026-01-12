@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.5
+ * Version: 1.1.6
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -1057,6 +1057,66 @@
 }
 
 .zen-pomodoro-ruleset-textarea:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+/* ============================================
+   Rule Item Styles (New UI)
+   ============================================ */
+.zen-pomodoro-rules-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.zen-pomodoro-empty-rules {
+  color: #888;
+  font-style: italic;
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
+.zen-pomodoro-rule-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: #1e1d26;
+  border-radius: 4px;
+  border: 1px solid #3a3944;
+}
+
+.zen-pomodoro-rule-pattern {
+  flex: 1;
+  background-color: #2b2a33;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  min-width: 120px;
+}
+
+.zen-pomodoro-rule-pattern:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+.zen-pomodoro-rule-select {
+  background-color: #2b2a33;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.zen-pomodoro-rule-select:focus {
   outline: none;
   border-color: #2180cd;
 }

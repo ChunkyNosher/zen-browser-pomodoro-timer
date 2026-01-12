@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.5
+ * Version: 1.1.6
  * License: MIT
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -89,10 +89,8 @@
         id: 'default',
         name: 'Default Blocklist',
         enabled: true,
-        sites: [], // URL patterns: "youtube.com", "*.reddit.com", "+allowed.site.com"
-        blockKeywords: [], // Keywords to block: "minecraft", "gaming"
-        allowKeywords: [], // Keywords to allow even if site matches: "tutorial", "work"
-        checkTitleOnly: false // If true, only check page title, not full content
+        rules: [], // Array of rule objects: { id, pattern, type: 'website'|'keyword', condition: 'block'|'allow' }
+        checkTitleOnly: false
       }
     ],
     /** Rulesets to enable when timer starts */
@@ -113,6 +111,20 @@
 
   // Debounce delay for content observer checks (in milliseconds)
   const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
+
+  /**
+   * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
+   * Used to safely include literal strings in dynamically constructed regular expressions.
+   * @constant {RegExp}
+   */
+  const REGEX_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
+
+  /**
+   * Regex pattern for escaping regex metacharacters except asterisk (for wildcard patterns).
+   * Asterisk (*) is preserved so it can be converted to .* for glob-style matching.
+   * @constant {RegExp}
+   */
+  const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = /[.+?^${}()|[\]\\]/g;
 
   // ============================================
   // LogManager Class
@@ -3553,7 +3565,11 @@
       enableCheckbox.type = 'checkbox';
       enableCheckbox.checked = ruleset.enabled;
       enableCheckbox.addEventListener('change', () => {
-        config.rulesets[index].enabled = enableCheckbox.checked;
+        // Find by ID to avoid stale index issues
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].enabled = enableCheckbox.checked;
+        }
       });
       
       // Name input
@@ -3563,7 +3579,10 @@
       nameInput.value = ruleset.name;
       nameInput.placeholder = 'Ruleset Name';
       nameInput.addEventListener('change', () => {
-        config.rulesets[index].name = nameInput.value || 'Unnamed Ruleset';
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].name = nameInput.value || 'Unnamed Ruleset';
+        }
       });
       
       // Expand/collapse toggle
@@ -3581,17 +3600,17 @@
         }
       });
       
-      // Delete button
+      // Delete button - use ID instead of index
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'zen-pomodoro-dialog-button secondary small';
       deleteBtn.textContent = '🗑️';
       deleteBtn.addEventListener('click', () => {
-        if (config.rulesets.length > 1) {
-          config.rulesets.splice(index, 1);
-          // Also remove from active rulesets
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (config.rulesets.length > 1 && rulesetIndex !== -1) {
+          config.rulesets.splice(rulesetIndex, 1);
           config.activeRulesets = config.activeRulesets.filter(id => id !== ruleset.id);
           this._renderRulesets(container, config);
-        } else {
+        } else if (config.rulesets.length <= 1) {
           window.zenPomodoroApp?.showCustomAlert('Cannot Delete', 'You must have at least one ruleset.');
         }
       });
@@ -3606,79 +3625,37 @@
       details.className = 'zen-pomodoro-ruleset-details';
       details.style.display = 'none';
       
-      // Sites textarea
-      const sitesLabel = document.createElement('label');
-      sitesLabel.textContent = 'Blocked Sites (one per line):';
-      sitesLabel.className = 'zen-pomodoro-ruleset-label';
+      // Rules container
+      const rulesContainer = document.createElement('div');
+      rulesContainer.className = 'zen-pomodoro-rules-container';
+      rulesContainer.id = `rules-container-${ruleset.id}`;
       
-      const sitesHelp = document.createElement('div');
-      sitesHelp.className = 'zen-pomodoro-ruleset-help';
-      sitesHelp.textContent = 'Use: "site.com", "*.site.com" (wildcard), "+allowed.site.com" (exception)';
+      // Render existing rules
+      this._renderRules(rulesContainer, ruleset, config);
       
-      const sitesTextarea = document.createElement('textarea');
-      sitesTextarea.className = 'zen-pomodoro-ruleset-textarea';
-      sitesTextarea.value = (ruleset.sites || []).join('\n');
-      sitesTextarea.placeholder = 'youtube.com\n*.reddit.com\n+docs.google.com';
-      sitesTextarea.rows = 5;
-      sitesTextarea.addEventListener('change', () => {
-        config.rulesets[index].sites = sitesTextarea.value
-          .split('\n')
-          .map(s => s.trim())
-          .filter(s => s.length > 0);
-      });
-      
-      // Block keywords textarea
-      const blockKeywordsLabel = document.createElement('label');
-      blockKeywordsLabel.textContent = 'Block Keywords (page content):';
-      blockKeywordsLabel.className = 'zen-pomodoro-ruleset-label';
-      
-      const blockKeywordsHelp = document.createElement('div');
-      blockKeywordsHelp.className = 'zen-pomodoro-ruleset-help';
-      blockKeywordsHelp.textContent = 'Pages containing these words will be blocked (one per line)';
-      
-      const blockKeywordsTextarea = document.createElement('textarea');
-      blockKeywordsTextarea.className = 'zen-pomodoro-ruleset-textarea';
-      blockKeywordsTextarea.value = (ruleset.blockKeywords || []).join('\n');
-      blockKeywordsTextarea.placeholder = 'gaming\nminecraft\nnetflix';
-      blockKeywordsTextarea.rows = 3;
-      blockKeywordsTextarea.addEventListener('change', () => {
-        config.rulesets[index].blockKeywords = blockKeywordsTextarea.value
-          .split('\n')
-          .map(s => s.trim().toLowerCase())
-          .filter(s => s.length > 0);
-      });
-      
-      // Allow keywords textarea
-      const allowKeywordsLabel = document.createElement('label');
-      allowKeywordsLabel.textContent = 'Allow Keywords (override blocks):';
-      allowKeywordsLabel.className = 'zen-pomodoro-ruleset-label';
-      
-      const allowKeywordsHelp = document.createElement('div');
-      allowKeywordsHelp.className = 'zen-pomodoro-ruleset-help';
-      allowKeywordsHelp.textContent = 'Pages containing these words will NOT be blocked (one per line)';
-      
-      const allowKeywordsTextarea = document.createElement('textarea');
-      allowKeywordsTextarea.className = 'zen-pomodoro-ruleset-textarea';
-      allowKeywordsTextarea.value = (ruleset.allowKeywords || []).join('\n');
-      allowKeywordsTextarea.placeholder = 'tutorial\nwork\neducation';
-      allowKeywordsTextarea.rows = 3;
-      allowKeywordsTextarea.addEventListener('change', () => {
-        config.rulesets[index].allowKeywords = allowKeywordsTextarea.value
-          .split('\n')
-          .map(s => s.trim().toLowerCase())
-          .filter(s => s.length > 0);
+      // Add Rule button
+      const addRuleBtn = document.createElement('button');
+      addRuleBtn.className = 'zen-pomodoro-dialog-button secondary';
+      addRuleBtn.textContent = '+ Add Rule/Condition';
+      addRuleBtn.style.marginTop = '12px';
+      addRuleBtn.addEventListener('click', () => {
+        this._addNewRule(rulesContainer, ruleset, config);
       });
       
       // Check title only checkbox
       const titleOnlyRow = document.createElement('div');
       titleOnlyRow.className = 'zen-pomodoro-checkbox-row';
+      titleOnlyRow.style.marginTop = '12px';
       
       const titleOnlyCheckbox = document.createElement('input');
       titleOnlyCheckbox.type = 'checkbox';
       titleOnlyCheckbox.id = `title-only-${ruleset.id}`;
       titleOnlyCheckbox.checked = ruleset.checkTitleOnly || false;
       titleOnlyCheckbox.addEventListener('change', () => {
-        config.rulesets[index].checkTitleOnly = titleOnlyCheckbox.checked;
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].checkTitleOnly = titleOnlyCheckbox.checked;
+        }
       });
       
       const titleOnlyLabel = document.createElement('label');
@@ -3689,15 +3666,8 @@
       titleOnlyRow.appendChild(titleOnlyLabel);
       
       // Assemble details
-      details.appendChild(sitesLabel);
-      details.appendChild(sitesHelp);
-      details.appendChild(sitesTextarea);
-      details.appendChild(blockKeywordsLabel);
-      details.appendChild(blockKeywordsHelp);
-      details.appendChild(blockKeywordsTextarea);
-      details.appendChild(allowKeywordsLabel);
-      details.appendChild(allowKeywordsHelp);
-      details.appendChild(allowKeywordsTextarea);
+      details.appendChild(rulesContainer);
+      details.appendChild(addRuleBtn);
       details.appendChild(titleOnlyRow);
       
       item.appendChild(headerRow);
@@ -3707,20 +3677,204 @@
     }
 
     /**
+     * Render individual rules in a container
+     * @param {HTMLElement} container - Rules container
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _renderRules(container, ruleset, config) {
+      container.innerHTML = '';
+      const rules = ruleset.rules || [];
+      
+      if (rules.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'zen-pomodoro-empty-rules';
+        emptyMsg.textContent = 'No rules configured. Click "Add Rule/Condition" to add one.';
+        container.appendChild(emptyMsg);
+        return;
+      }
+      
+      rules.forEach((rule) => {
+        const ruleEl = this._createRuleElement(rule, ruleset, config, container);
+        container.appendChild(ruleEl);
+      });
+    }
+
+    /**
+     * Create a single rule element
+     * @param {Object} rule - Rule data { id, pattern, type, condition }
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @param {HTMLElement} container - Rules container
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createRuleElement(rule, ruleset, config, container) {
+      const ruleEl = document.createElement('div');
+      ruleEl.className = 'zen-pomodoro-rule-item';
+      ruleEl.dataset.ruleId = rule.id;
+      
+      // Pattern input
+      const patternInput = document.createElement('input');
+      patternInput.type = 'text';
+      patternInput.className = 'zen-pomodoro-rule-pattern';
+      patternInput.value = rule.pattern || '';
+      patternInput.placeholder = rule.type === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
+      patternInput.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].pattern = patternInput.value.trim();
+          }
+        }
+      });
+      
+      // Type dropdown (Website/Keyword)
+      const typeSelect = document.createElement('select');
+      typeSelect.className = 'zen-pomodoro-rule-select';
+      
+      const websiteOption = document.createElement('option');
+      websiteOption.value = 'website';
+      websiteOption.textContent = 'Website';
+      if (rule.type === 'website') websiteOption.selected = true;
+      typeSelect.appendChild(websiteOption);
+      
+      const keywordOption = document.createElement('option');
+      keywordOption.value = 'keyword';
+      keywordOption.textContent = 'Keyword';
+      if (rule.type === 'keyword') keywordOption.selected = true;
+      typeSelect.appendChild(keywordOption);
+      
+      typeSelect.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].type = typeSelect.value;
+            // Update placeholder
+            patternInput.placeholder = typeSelect.value === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
+          }
+        }
+      });
+      
+      // Condition dropdown (Block/Allow)
+      const conditionSelect = document.createElement('select');
+      conditionSelect.className = 'zen-pomodoro-rule-select';
+      
+      const blockOption = document.createElement('option');
+      blockOption.value = 'block';
+      blockOption.textContent = 'Block';
+      if (rule.condition === 'block') blockOption.selected = true;
+      conditionSelect.appendChild(blockOption);
+      
+      const allowOption = document.createElement('option');
+      allowOption.value = 'allow';
+      allowOption.textContent = 'Allow';
+      if (rule.condition === 'allow') allowOption.selected = true;
+      conditionSelect.appendChild(allowOption);
+      
+      conditionSelect.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].condition = conditionSelect.value;
+          }
+        }
+      });
+      
+      // Delete rule button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Delete rule';
+      deleteBtn.addEventListener('click', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules.splice(ruleIndex, 1);
+            this._renderRules(container, config.rulesets[rulesetIndex], config);
+          }
+        }
+      });
+      
+      ruleEl.appendChild(patternInput);
+      ruleEl.appendChild(typeSelect);
+      ruleEl.appendChild(conditionSelect);
+      ruleEl.appendChild(deleteBtn);
+      
+      return ruleEl;
+    }
+
+    /**
+     * Add a new rule to a ruleset
+     * @param {HTMLElement} container - Rules container
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _addNewRule(container, ruleset, config) {
+      const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+      if (rulesetIndex === -1) return;
+      
+      if (!config.rulesets[rulesetIndex].rules) {
+        config.rulesets[rulesetIndex].rules = [];
+      }
+      
+      const newRule = {
+        id: this._generateRuleId(),
+        pattern: '',
+        type: 'website',
+        condition: 'block'
+      };
+      
+      config.rulesets[rulesetIndex].rules.push(newRule);
+      this._renderRules(container, config.rulesets[rulesetIndex], config);
+    }
+
+    /**
+     * Generate a unique rule ID using crypto.randomUUID with fallback
+     * @returns {string} Unique rule ID
+     * @private
+     */
+    _generateRuleId() {
+      if (typeof crypto?.randomUUID === 'function') {
+        return 'rule-' + crypto.randomUUID();
+      }
+      // Fallback: timestamp + random string for uniqueness
+      return 'rule-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+    }
+
+    /**
+     * Generate a unique ruleset ID using crypto.randomUUID with fallback
+     * @returns {string} Unique ruleset ID
+     * @private
+     */
+    _generateRulesetId() {
+      if (typeof crypto?.randomUUID === 'function') {
+        return 'ruleset-' + crypto.randomUUID();
+      }
+      // Fallback: timestamp + random string for uniqueness
+      return 'ruleset-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+    }
+
+    /**
      * Add a new ruleset
      * @param {HTMLElement} container - Container element
      * @param {Object} config - Configuration object
      * @private
      */
     _addNewRuleset(container, config) {
-      const newId = 'ruleset-' + Date.now();
+      const newId = this._generateRulesetId();
+      
       const newRuleset = {
         id: newId,
         name: 'New Ruleset',
         enabled: true,
-        sites: [],
-        blockKeywords: [],
-        allowKeywords: [],
+        rules: [],
         checkTitleOnly: false
       };
       
@@ -3772,6 +3926,13 @@
         if (!file) return;
         
         const reader = new FileReader();
+        
+        // Add error handler for FileReader
+        reader.onerror = () => {
+          logger.log(LOG_CATEGORIES.SETTINGS, 'FileReader error during import', { error: reader.error?.message });
+          window.zenPomodoroApp?.showCustomAlert('Import Failed', 'Could not read the file. Please try again.');
+        };
+        
         reader.onload = (event) => {
           try {
             const importData = JSON.parse(event.target.result);
@@ -3783,16 +3944,36 @@
             // Validate and add rulesets
             const importedCount = importData.rulesets.length;
             importData.rulesets.forEach(ruleset => {
-              // Generate new ID to avoid conflicts using crypto.randomUUID if available
-              ruleset.id = typeof crypto !== 'undefined' && crypto.randomUUID 
-                ? 'imported-' + crypto.randomUUID()
-                : 'imported-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+              // Generate new ID to avoid conflicts
+              ruleset.id = 'imported-' + this._generateRulesetId().replace('ruleset-', '');
               ruleset.name = ruleset.name || 'Imported Ruleset';
               ruleset.enabled = ruleset.enabled !== false;
-              ruleset.sites = Array.isArray(ruleset.sites) ? ruleset.sites : [];
-              ruleset.blockKeywords = Array.isArray(ruleset.blockKeywords) ? ruleset.blockKeywords : [];
-              ruleset.allowKeywords = Array.isArray(ruleset.allowKeywords) ? ruleset.allowKeywords : [];
               ruleset.checkTitleOnly = !!ruleset.checkTitleOnly;
+              
+              // Convert old format (sites/blockKeywords/allowKeywords) to new format (rules array)
+              if (Array.isArray(ruleset.sites) || Array.isArray(ruleset.blockKeywords) || Array.isArray(ruleset.allowKeywords)) {
+                ruleset.rules = this._convertOldFormatToRules(ruleset);
+                // Clean up old format properties
+                delete ruleset.sites;
+                delete ruleset.blockKeywords;
+                delete ruleset.allowKeywords;
+              }
+              
+              // Ensure rules array exists and is valid
+              if (!Array.isArray(ruleset.rules)) {
+                ruleset.rules = [];
+              }
+              
+              // Validate each rule in the rules array
+              ruleset.rules = ruleset.rules.filter(rule => {
+                if (!rule || typeof rule !== 'object') return false;
+                // Ensure required properties exist
+                rule.id = rule.id || this._generateRuleId();
+                rule.pattern = typeof rule.pattern === 'string' ? rule.pattern : '';
+                rule.type = ['website', 'keyword'].includes(rule.type) ? rule.type : 'website';
+                rule.condition = ['block', 'allow'].includes(rule.condition) ? rule.condition : 'block';
+                return true;
+              });
             });
             
             config.rulesets = [...(config.rulesets || []), ...importData.rulesets];
@@ -3810,6 +3991,77 @@
       });
       
       input.click();
+    }
+
+    /**
+     * Convert old ruleset format (sites/blockKeywords/allowKeywords arrays) to new rules format
+     * @param {Object} ruleset - Ruleset with old format
+     * @returns {Array} Array of rule objects
+     * @private
+     */
+    _convertOldFormatToRules(ruleset) {
+      const rules = [];
+      
+      // Convert sites array
+      if (Array.isArray(ruleset.sites)) {
+        ruleset.sites.forEach(site => {
+          const rule = this._convertSiteToRule(site);
+          if (rule) rules.push(rule);
+        });
+      }
+      
+      // Convert blockKeywords array
+      this._convertKeywordsToRules(ruleset.blockKeywords, 'block', rules);
+      
+      // Convert allowKeywords array
+      this._convertKeywordsToRules(ruleset.allowKeywords, 'allow', rules);
+      
+      return rules;
+    }
+
+    /**
+     * Convert a site pattern to a rule object
+     * @param {string} site - Site pattern (may include + prefix for allow)
+     * @returns {Object|null} Rule object or null if invalid
+     * @private
+     */
+    _convertSiteToRule(site) {
+      if (!site || typeof site !== 'string') return null;
+      const trimmed = site.trim();
+      if (!trimmed) return null;
+      
+      // Check for + prefix (allow exception)
+      const isAllow = trimmed.startsWith('+');
+      return {
+        id: this._generateRuleId(),
+        pattern: isAllow ? trimmed.substring(1) : trimmed,
+        type: 'website',
+        condition: isAllow ? 'allow' : 'block'
+      };
+    }
+
+    /**
+     * Convert keywords array to rules and add to rules array
+     * @param {Array} keywords - Array of keywords
+     * @param {string} condition - 'block' or 'allow'
+     * @param {Array} rules - Array to add rules to
+     * @private
+     */
+    _convertKeywordsToRules(keywords, condition, rules) {
+      if (!Array.isArray(keywords)) return;
+      
+      keywords.forEach(keyword => {
+        if (!keyword || typeof keyword !== 'string') return;
+        const trimmed = keyword.trim();
+        if (!trimmed) return;
+        
+        rules.push({
+          id: this._generateRuleId(),
+          pattern: trimmed,
+          type: 'keyword',
+          condition: condition
+        });
+      });
     }
   }
 
@@ -4796,7 +5048,8 @@
           }
         }
       } catch (e) {
-        // Ignore - content document may not be accessible
+        // Log content access denied errors for debugging
+        logger.log(LOG_CATEGORIES.SECURITY, 'Content document access denied', { error: e.message });
       }
 
       // Reload config and check against active rulesets
@@ -4840,6 +5093,25 @@
       }
 
       if (!contentDoc || !contentDoc.body) return;
+      
+      // Only observe if there are keyword rules configured (performance optimization)
+      const config = getConfig();
+      const activeRulesets = config.activeRulesets || ['default'];
+      const rulesets = config.rulesets || [];
+      
+      let hasKeywordRules = false;
+      for (const rulesetId of activeRulesets) {
+        const ruleset = rulesets.find(r => r.id === rulesetId);
+        if (ruleset && ruleset.rules) {
+          hasKeywordRules = ruleset.rules.some(r => r.type === 'keyword' && r.pattern);
+          if (hasKeywordRules) break;
+        }
+      }
+      
+      if (!hasKeywordRules) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Skipping content observer - no keyword rules configured');
+        return;
+      }
 
       this.contentObserver = new MutationObserver(() => {
         // Debounce to avoid excessive checks
@@ -4948,44 +5220,117 @@
      * @private
      */
     _checkUrlAgainstRuleset(url, ruleset) {
-      const sites = ruleset.sites || [];
-      const blockKeywords = ruleset.blockKeywords || [];
-      const allowKeywords = ruleset.allowKeywords || [];
+      const rules = ruleset.rules || [];
       const checkTitleOnly = ruleset.checkTitleOnly || false;
-
-      // First check for URL exceptions (+ prefix)
-      if (this._urlMatchesException(url, sites)) {
+      
+      // Separate rules by type and condition
+      const rulesByCategory = this._categorizeRules(rules);
+      
+      // First check URL allow rules (exceptions)
+      if (this._urlMatchesAnyRule(url, rulesByCategory.websiteAllow)) {
         return { blocked: false, reason: null };
       }
-
-      // Check allow keywords in page content (override blocks)
-      if (allowKeywords.length > 0) {
-        const pageText = this._getPageText(checkTitleOnly);
-        for (const keyword of allowKeywords) {
-          if (pageText.toLowerCase().includes(keyword.toLowerCase())) {
-            logger.log(LOG_CATEGORIES.SECURITY, 'Page allowed by keyword', { keyword });
-            return { blocked: false, reason: null };
-          }
+      
+      // Get page text once for all keyword checks (performance fix)
+      let pageText = null;
+      const getPageTextOnce = () => {
+        if (pageText === null) {
+          pageText = this._getPageText(checkTitleOnly);
         }
+        return pageText;
+      };
+      
+      // Check allow keywords (override blocks)
+      const allowKeywordMatch = this._findMatchingKeyword(rulesByCategory.keywordAllow, getPageTextOnce);
+      if (allowKeywordMatch) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Page allowed by keyword', { keyword: allowKeywordMatch });
+        return { blocked: false, reason: null };
       }
-
-      // Check URL blocks (patterns without + or ~ prefix)
-      const blockingPattern = this._findBlockingPattern(url, sites);
-      if (blockingPattern) {
-        return { blocked: true, reason: `URL matches pattern: ${blockingPattern}` };
+      
+      // Check URL blocks
+      const blockingUrlRule = this._findMatchingUrlRule(url, rulesByCategory.websiteBlock);
+      if (blockingUrlRule) {
+        return { blocked: true, reason: `URL matches pattern: ${blockingUrlRule.pattern}` };
       }
-
-      // Check keyword blocks in page content
-      if (blockKeywords.length > 0) {
-        const pageText = this._getPageText(checkTitleOnly);
-        for (const keyword of blockKeywords) {
-          if (pageText.toLowerCase().includes(keyword.toLowerCase())) {
-            return { blocked: true, reason: `Page contains blocked keyword: "${keyword}"` };
-          }
-        }
+      
+      // Check keyword blocks
+      const blockKeywordMatch = this._findMatchingKeyword(rulesByCategory.keywordBlock, getPageTextOnce);
+      if (blockKeywordMatch) {
+        return { blocked: true, reason: `Page contains blocked keyword: "${blockKeywordMatch}"` };
       }
-
+      
       return { blocked: false, reason: null };
+    }
+
+    /**
+     * Categorize rules into groups by type and condition
+     * @param {Array} rules - Array of rule objects
+     * @returns {Object} Categorized rules
+     * @private
+     */
+    _categorizeRules(rules) {
+      return {
+        websiteBlock: rules.filter(r => r.type === 'website' && r.condition === 'block' && r.pattern),
+        websiteAllow: rules.filter(r => r.type === 'website' && r.condition === 'allow' && r.pattern),
+        keywordBlock: rules.filter(r => r.type === 'keyword' && r.condition === 'block' && r.pattern),
+        keywordAllow: rules.filter(r => r.type === 'keyword' && r.condition === 'allow' && r.pattern)
+      };
+    }
+
+    /**
+     * Check if URL matches any rule in the list
+     * @param {string} url - URL to check
+     * @param {Array} rules - Array of rules to check against
+     * @returns {boolean} True if URL matches any rule
+     * @private
+     */
+    _urlMatchesAnyRule(url, rules) {
+      return rules.some(rule => this._matchesUrlPattern(url, rule.pattern));
+    }
+
+    /**
+     * Find the first URL rule that matches
+     * @param {string} url - URL to check
+     * @param {Array} rules - Array of rules to check against
+     * @returns {Object|null} Matching rule or null
+     * @private
+     */
+    _findMatchingUrlRule(url, rules) {
+      return rules.find(rule => this._matchesUrlPattern(url, rule.pattern)) || null;
+    }
+
+    /**
+     * Find the first matching keyword in page text
+     * @param {Array} rules - Array of keyword rules
+     * @param {Function} getPageText - Function to get page text (lazy evaluation)
+     * @returns {string|null} Matching keyword or null
+     * @private
+     */
+    _findMatchingKeyword(rules, getPageText) {
+      for (const rule of rules) {
+        const text = getPageText();
+        if (this._keywordMatches(text, rule.pattern)) {
+          return rule.pattern;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Check if keyword matches in text using word boundary matching
+     * to avoid false positives like "king" matching "working"
+     * @param {string} text - Page text to search
+     * @param {string} keyword - Keyword to find
+     * @returns {boolean} True if keyword matches
+     * @private
+     */
+    _keywordMatches(text, keyword) {
+      if (!text || !keyword) return false;
+      // Use word boundary matching to avoid false positives
+      // $& in replacement string refers to the matched character
+      const escapedKeyword = keyword.replace(REGEX_ESCAPE_PATTERN, '\\$&');
+      const regex = new RegExp('\\b' + escapedKeyword + '\\b', 'i');
+      return regex.test(text);
     }
 
     /**
@@ -5041,8 +5386,9 @@
      * @private
      */
     _matchesWildcardPattern(hostname, fullUrl, normalizedPattern) {
+      // $& in replacement string refers to the matched character
       const regexPattern = normalizedPattern
-        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(REGEX_ESCAPE_PATTERN_KEEP_ASTERISK, '\\$&')
         .replace(/\*/g, '.*');
       const regex = new RegExp('^' + regexPattern, 'i');
       return regex.test(hostname) || regex.test(fullUrl);
