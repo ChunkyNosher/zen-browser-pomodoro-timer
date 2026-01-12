@@ -2,8 +2,8 @@
 
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
-![License](https://img.shields.io/badge/license-MPL--2.0-blue.svg)
-![Version](https://img.shields.io/badge/version-1.1.5-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.6-green.svg)
 
 ## ✨ Features
 
@@ -297,7 +297,7 @@ When reporting bugs, please include:
 
 ## 📜 License
 
-This project is licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
+This project is licensed under the **MIT License**.
 
 See [LICENSE](LICENSE) file for full details.
 

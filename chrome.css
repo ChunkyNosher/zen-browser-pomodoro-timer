@@ -1,7 +1,7 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.5
- * License: MPL-2.0
+ * Version: 1.1.6
+ * License: MIT
  * 
  * ACCESSIBILITY FIXES:
  * - Added prefers-reduced-motion support for animations
@@ -232,7 +232,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  z-index: 2147483646; /* z-index one less than max to ensure dialogs appear above indicator */
+  z-index: 2147483647 !important; /* Same as max z-index to ensure visibility above lockout screens */
   display: none;
   align-items: center;
   gap: 8px;
@@ -893,4 +893,230 @@
 #zen-pomodoro-sine-blocker-buttons {
   display: flex;
   gap: 16px;
+}
+
+/* ============================================
+   Website Blocker Overlay (LeechBlock-style)
+   ============================================ */
+#zen-pomodoro-website-blocker {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgb(30 29 38 / 98%) !important;
+  z-index: var(--zen-pomodoro-max-z-index) !important;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  pointer-events: all !important;
+}
+
+#zen-pomodoro-website-blocker.active {
+  display: flex !important;
+}
+
+#zen-pomodoro-website-blocker-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 500px;
+  padding: 32px;
+  background-color: #2b2a33;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
+}
+
+#zen-pomodoro-website-blocker-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+#zen-pomodoro-website-blocker-content h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 16px;
+}
+
+#zen-pomodoro-website-blocker-content p {
+  font-size: 16px;
+  color: #ccc;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+.zen-pomodoro-blocker-ruleset {
+  font-size: 14px;
+  color: #888;
+  background-color: rgb(255 255 255 / 5%);
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+#zen-pomodoro-website-blocker-timer {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2180cd;
+  margin-bottom: 24px;
+  padding: 12px 24px;
+  background-color: rgb(33 128 205 / 15%);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+#zen-pomodoro-website-blocker-buttons {
+  display: flex;
+  gap: 16px;
+}
+
+/* ============================================
+   Ruleset Management UI
+   ============================================ */
+.zen-pomodoro-rulesets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: #1e1d26;
+  border-radius: 6px;
+  border: 1px solid #3a3944;
+}
+
+.zen-pomodoro-empty-rulesets {
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  padding: 16px;
+}
+
+.zen-pomodoro-ruleset-item {
+  background-color: #2b2a33;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #3a3944;
+}
+
+.zen-pomodoro-ruleset-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zen-pomodoro-ruleset-name {
+  flex: 1;
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+.zen-pomodoro-ruleset-details {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #3a3944;
+}
+
+.zen-pomodoro-ruleset-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ccc;
+  margin: 12px 0 4px;
+}
+
+.zen-pomodoro-ruleset-label:first-child {
+  margin-top: 0;
+}
+
+.zen-pomodoro-ruleset-help {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.zen-pomodoro-ruleset-textarea {
+  width: 100%;
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  resize: vertical;
+  min-height: 60px;
+  box-sizing: border-box;
+}
+
+.zen-pomodoro-ruleset-textarea:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+/* ============================================
+   Rule Item Styles (New UI)
+   ============================================ */
+.zen-pomodoro-rules-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.zen-pomodoro-empty-rules {
+  color: #888;
+  font-style: italic;
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
+.zen-pomodoro-rule-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: #1e1d26;
+  border-radius: 4px;
+  border: 1px solid #3a3944;
+}
+
+.zen-pomodoro-rule-pattern {
+  flex: 1;
+  background-color: #2b2a33;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  min-width: 120px;
+}
+
+.zen-pomodoro-rule-pattern:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+.zen-pomodoro-rule-select {
+  background-color: #2b2a33;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.zen-pomodoro-rule-select:focus {
+  outline: none;
+  border-color: #2180cd;
 }

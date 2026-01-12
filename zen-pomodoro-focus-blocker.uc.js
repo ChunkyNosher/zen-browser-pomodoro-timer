@@ -1,7 +1,7 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.5
- * License: MPL-2.0
+ * Version: 1.1.6
+ * License: MIT
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
  * 
@@ -82,7 +82,19 @@
     enableNotifications: true,
     enableAudioAlerts: false,
     phase: 'focus',
-    keyboardShortcut: 'Alt+Shift+P'
+    keyboardShortcut: 'Alt+Shift+P',
+    /** Website blocking rulesets (LeechBlock-style) */
+    rulesets: [
+      {
+        id: 'default',
+        name: 'Default Blocklist',
+        enabled: true,
+        rules: [], // Array of rule objects: { id, pattern, type: 'website'|'keyword', condition: 'block'|'allow' }
+        checkTitleOnly: false
+      }
+    ],
+    /** Rulesets to enable when timer starts */
+    activeRulesets: ['default']
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -96,6 +108,23 @@
 
   // Minimum content area dimension for valid overlay bounds (in pixels)
   const MIN_CONTENT_AREA_DIMENSION = 100;
+
+  // Debounce delay for content observer checks (in milliseconds)
+  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
+
+  /**
+   * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
+   * Used to safely include literal strings in dynamically constructed regular expressions.
+   * @constant {RegExp}
+   */
+  const REGEX_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
+
+  /**
+   * Regex pattern for escaping regex metacharacters except asterisk (for wildcard patterns).
+   * Asterisk (*) is preserved so it can be converted to .* for glob-style matching.
+   * @constant {RegExp}
+   */
+  const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = /[.+?^${}()|[\]\\]/g;
 
   // ============================================
   // LogManager Class
@@ -463,13 +492,22 @@
       startX = coords.x;
       startY = coords.y;
       
-      // If dialog is centered with transform, convert to left/top positioning
+      // Convert from CSS centering (transform + percentage top/left) to absolute pixel positioning
       const computedStyle = window.getComputedStyle(dialog);
+      
+      // Store the actual position from getBoundingClientRect before making changes
+      const actualLeft = rect.left;
+      const actualTop = rect.top;
+      
+      // Clear transform-based centering
       if (computedStyle.transform !== 'none') {
         dialog.style.transform = 'none';
-        dialog.style.left = `${rect.left}px`;
-        dialog.style.top = `${rect.top}px`;
       }
+      
+      // Always set position to fixed and use pixel values to override CSS percentage positioning
+      dialog.style.position = 'fixed';
+      dialog.style.left = `${actualLeft}px`;
+      dialog.style.top = `${actualTop}px`;
       
       startLeft = rect.left;
       startTop = rect.top;
@@ -803,6 +841,147 @@
       window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
     } else {
       showStopConfirmation();
+    }
+  }
+
+  // ============================================
+  // Shared Blocker Utilities
+  // ============================================
+
+  /**
+   * Create a shared progress listener for monitoring URL changes.
+   * Used by both SineModBlocker and WebsiteBlocker.
+   * @param {function} checkCallback - Callback to call on location change
+   * @param {number} delayMs - Delay before calling callback
+   * @returns {Object|null} Progress listener object or null on failure
+   */
+  function createProgressListener(checkCallback, delayMs) {
+    try {
+      return {
+        QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
+        
+        // eslint-disable-next-line no-unused-vars
+        onLocationChange: (webProgress, _request, _location) => {
+          if (webProgress.isTopLevel) {
+            setTimeout(checkCallback, delayMs);
+          }
+        },
+        
+        onStateChange: () => {},
+        onProgressChange: () => {},
+        onStatusChange: () => {},
+        onSecurityChange: () => {},
+        onContentBlockingEvent: () => {}
+      };
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.INIT, 'Failed to create progress listener', { error: e.message });
+      return null;
+    }
+  }
+
+  /**
+   * Set up common gBrowser event listeners for URL monitoring.
+   * @param {Object} context - The blocker instance (this)
+   * @param {function} checkCallback - Callback to call on events
+   * @param {number} delayMs - Delay for progress listener
+   */
+  function setupBrowserListeners(context, checkCallback, delayMs) {
+    // Tab select listener
+    context.tabSelectHandler = () => checkCallback();
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.addEventListener('TabSelect', context.tabSelectHandler);
+    }
+    
+    // Page show listener
+    context.pageShowHandler = () => {
+      setTimeout(checkCallback, delayMs);
+    };
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined') {
+      // eslint-disable-next-line no-undef
+      gBrowser.addEventListener('pageshow', context.pageShowHandler);
+    }
+    
+    // Progress listener
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined') {
+      context.progressListener = createProgressListener(checkCallback, delayMs);
+      if (context.progressListener) {
+        try {
+          // eslint-disable-next-line no-undef
+          gBrowser.addProgressListener(context.progressListener);
+        } catch (e) {
+          logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove gBrowser event listeners.
+   * @param {Object} context - The blocker instance (this)
+   */
+  function removeBrowserListeners(context) {
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser === 'undefined') return;
+    
+    // eslint-disable-next-line no-undef
+    if (context.tabSelectHandler && gBrowser.tabContainer) {
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.removeEventListener('TabSelect', context.tabSelectHandler);
+    }
+    
+    if (context.pageShowHandler) {
+      // eslint-disable-next-line no-undef
+      gBrowser.removeEventListener('pageshow', context.pageShowHandler);
+    }
+    
+    if (context.progressListener) {
+      try {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeProgressListener(context.progressListener);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+  }
+
+  /**
+   * Handle "Go Back" navigation for blocker overlays.
+   * @param {function} hideBlockerCallback - Callback to hide the blocker
+   * @param {number} delayMs - Delay before hiding blocker
+   */
+  function handleBlockerGoBack(hideBlockerCallback, delayMs) {
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+        // eslint-disable-next-line no-undef
+        const webNav = gBrowser.selectedBrowser.webNavigation;
+        if (webNav && webNav.canGoBack) {
+          webNav.goBack();
+          setTimeout(hideBlockerCallback, delayMs);
+          return;
+        }
+      }
+      
+      // Fallback: Navigate to about:blank
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:blank'), {
+          triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({})
+        });
+        setTimeout(hideBlockerCallback, delayMs);
+        return;
+      }
+      
+      // Last resort: Just hide the blocker
+      hideBlockerCallback();
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back', { error: e.message });
+      hideBlockerCallback();
     }
   }
 
@@ -2508,8 +2687,54 @@
         { value: config.cycles, min: '1', max: '20' });
       cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
       
+      // Ruleset selection for start timer dialog
+      const activeRulesetsRow = document.createElement('div');
+      activeRulesetsRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
+      activeRulesetsRow.id = 'zen-pomodoro-active-rulesets-row';
+      
+      const activeRulesetsLabel = document.createElement('label');
+      activeRulesetsLabel.textContent = 'Active Blocking Rulesets:';
+      
+      const activeRulesetsContainer = document.createElement('div');
+      activeRulesetsContainer.className = 'zen-pomodoro-workspace-list';
+      activeRulesetsContainer.id = 'zen-pomodoro-active-rulesets-container';
+      
+      // Render ruleset checkboxes
+      const rulesets = config.rulesets || [];
+      if (rulesets.length === 0) {
+        const noRulesets = document.createElement('p');
+        noRulesets.style.color = '#888';
+        noRulesets.style.fontSize = '12px';
+        noRulesets.textContent = 'No rulesets configured. Add rulesets in Settings.';
+        activeRulesetsContainer.appendChild(noRulesets);
+      } else {
+        rulesets.forEach(ruleset => {
+          const checkboxRow = document.createElement('div');
+          checkboxRow.className = 'zen-pomodoro-checkbox-row';
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `active-ruleset-${ruleset.id}`;
+          checkbox.value = ruleset.id;
+          checkbox.checked = (config.activeRulesets || ['default']).includes(ruleset.id);
+          checkbox.disabled = !ruleset.enabled;
+          
+          const label = document.createElement('label');
+          label.htmlFor = checkbox.id;
+          label.textContent = ruleset.name + (ruleset.enabled ? '' : ' (disabled)');
+          if (!ruleset.enabled) label.style.color = '#666';
+          
+          checkboxRow.appendChild(checkbox);
+          checkboxRow.appendChild(label);
+          activeRulesetsContainer.appendChild(checkboxRow);
+        });
+      }
+      
+      activeRulesetsRow.appendChild(activeRulesetsLabel);
+      activeRulesetsRow.appendChild(activeRulesetsContainer);
+      
       // Add to config section
-      [modeRow, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow]
+      [modeRow, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow, activeRulesetsRow]
         .forEach(row => configSection.appendChild(row));
       
       // Buttons
@@ -2627,6 +2852,18 @@
           : config.cycles;
         
         const sessionOverrides = this._buildSessionOverrides(dialog, mode, config);
+        
+        // Save selected active rulesets to config
+        const activeRulesetsContainer = dialog.querySelector('#zen-pomodoro-active-rulesets-container');
+        if (activeRulesetsContainer) {
+          const selectedRulesets = [];
+          activeRulesetsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            selectedRulesets.push(checkbox.value);
+          });
+          config.activeRulesets = selectedRulesets;
+          saveConfig(config);
+          logger.log(LOG_CATEGORIES.SETTINGS, 'Active rulesets saved', { rulesets: selectedRulesets });
+        }
         
         dialog.remove();
         
@@ -2810,9 +3047,8 @@
       // ========================================
       // Simple Timer Duration (only visible for simple mode)
       // ========================================
-      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', 
+      const simpleDurationRow = createLabeledInputRow('Simple Timer Duration (min):', 'simple-duration', 
         { value: config.simpleDuration, min: 1, max: 180 });
-      simpleDurationRow.id = 'simple-duration-row';
       if (config.timerMode !== 'simple') {
         simpleDurationRow.classList.add('hidden');
       }
@@ -2820,30 +3056,26 @@
       // ========================================
       // Pomodoro-specific options
       // ========================================
-      const focusRow = this.createInputRow('Focus Duration (min):', 'focus-duration', 
+      const focusRow = createLabeledInputRow('Focus Duration (min):', 'focus-duration', 
         { value: config.focusDuration, min: 1, max: 120 });
-      focusRow.id = 'focus-duration-row';
       if (config.timerMode === 'simple') {
         focusRow.classList.add('hidden');
       }
       
-      const breakRow = this.createInputRow('Break Duration (min):', 'break-duration', 
+      const breakRow = createLabeledInputRow('Break Duration (min):', 'break-duration', 
         { value: config.breakDuration, min: 1, max: 30 });
-      breakRow.id = 'break-duration-row';
       if (config.timerMode === 'simple') {
         breakRow.classList.add('hidden');
       }
       
-      const longBreakRow = this.createInputRow('Long Break (min):', 'long-break-duration', 
+      const longBreakRow = createLabeledInputRow('Long Break (min):', 'long-break-duration', 
         { value: config.longBreakDuration, min: 5, max: 60 });
-      longBreakRow.id = 'long-break-duration-row';
       if (config.timerMode === 'simple') {
         longBreakRow.classList.add('hidden');
       }
       
-      const cyclesRow = this.createInputRow('Number of Cycles:', 'cycles', 
+      const cyclesRow = createLabeledInputRow('Number of Cycles:', 'cycles', 
         { value: config.cycles, min: 1, max: 20 });
-      cyclesRow.id = 'cycles-row';
       if (config.timerMode === 'simple') {
         cyclesRow.classList.add('hidden');
       }
@@ -2918,6 +3150,64 @@
       workspaceRow.appendChild(workspaceContainer);
       
       // ========================================
+      // Website Blocking Rulesets Section
+      // ========================================
+      const rulesetsSection = document.createElement('div');
+      rulesetsSection.className = 'zen-pomodoro-lockout-section';
+      
+      const rulesetsTitle = document.createElement('div');
+      rulesetsTitle.className = 'zen-pomodoro-lockout-section-title';
+      rulesetsTitle.textContent = '🚫 Website Blocking Rulesets';
+      
+      // Rulesets container
+      const rulesetsContainer = document.createElement('div');
+      rulesetsContainer.className = 'zen-pomodoro-rulesets-container';
+      rulesetsContainer.id = 'zen-pomodoro-rulesets-container';
+      
+      // Render existing rulesets
+      this._renderRulesets(rulesetsContainer, config);
+      
+      // Add New Ruleset button
+      const addRulesetRow = document.createElement('div');
+      addRulesetRow.className = 'zen-pomodoro-config-row';
+      
+      const addRulesetButton = document.createElement('button');
+      addRulesetButton.className = 'zen-pomodoro-dialog-button secondary';
+      addRulesetButton.id = 'zen-pomodoro-add-ruleset';
+      addRulesetButton.textContent = '+ Add Ruleset';
+      addRulesetButton.addEventListener('click', () => {
+        this._addNewRuleset(rulesetsContainer, config);
+      });
+      addRulesetRow.appendChild(addRulesetButton);
+      
+      // Export/Import buttons
+      const exportImportRow = document.createElement('div');
+      exportImportRow.className = 'zen-pomodoro-config-row';
+      exportImportRow.style.gap = '8px';
+      
+      const exportRulesetsButton = document.createElement('button');
+      exportRulesetsButton.className = 'zen-pomodoro-dialog-button secondary small';
+      exportRulesetsButton.textContent = 'Export Rulesets';
+      exportRulesetsButton.addEventListener('click', () => {
+        this._exportRulesets(config);
+      });
+      
+      const importRulesetsButton = document.createElement('button');
+      importRulesetsButton.className = 'zen-pomodoro-dialog-button secondary small';
+      importRulesetsButton.textContent = 'Import Rulesets';
+      importRulesetsButton.addEventListener('click', () => {
+        this._importRulesets(rulesetsContainer, config);
+      });
+      
+      exportImportRow.appendChild(exportRulesetsButton);
+      exportImportRow.appendChild(importRulesetsButton);
+      
+      rulesetsSection.appendChild(rulesetsTitle);
+      rulesetsSection.appendChild(rulesetsContainer);
+      rulesetsSection.appendChild(addRulesetRow);
+      rulesetsSection.appendChild(exportImportRow);
+
+      // ========================================
       // Lockout Methods Section
       // ========================================
       const lockoutSection = document.createElement('div');
@@ -2974,15 +3264,15 @@
       activeMethodRow.appendChild(activeMethodSelect);
       
       // Separate hold duration settings for idle and active states
-      const idleHoldDurationRow = this.createInputRow('Idle Hold Time (seconds):', 'idle-hold-duration', 
+      const idleHoldDurationRow = createLabeledInputRow('Idle Hold Time (seconds):', 'idle-hold-duration', 
         { value: config.settingsLockIdleHoldDuration, min: 1, max: 300 });
-      const activeHoldDurationRow = this.createInputRow('Active Hold Time (seconds):', 'active-hold-duration', 
+      const activeHoldDurationRow = createLabeledInputRow('Active Hold Time (seconds):', 'active-hold-duration', 
         { value: config.settingsLockActiveHoldDuration, min: 1, max: 300 });
       
       // Separate code length settings for idle and active states
-      const idleCodeLengthRow = this.createInputRow('Idle Code Length (8-128):', 'idle-code-length', 
+      const idleCodeLengthRow = createLabeledInputRow('Idle Code Length (8-128):', 'idle-code-length', 
         { value: config.settingsLockIdleCodeLength, min: 8, max: 128 });
-      const activeCodeLengthRow = this.createInputRow('Active Code Length (8-128):', 'active-code-length', 
+      const activeCodeLengthRow = createLabeledInputRow('Active Code Length (8-128):', 'active-code-length', 
         { value: config.settingsLockActiveCodeLength, min: 8, max: 128 });
       
       // Show/hide settings based on the selected method for each state
@@ -3022,6 +3312,7 @@
       configSection.appendChild(cyclesRow);
       configSection.appendChild(messageRow);
       configSection.appendChild(workspaceRow);
+      configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       
       // Buttons
@@ -3228,30 +3519,549 @@
     }
 
     /**
-     * Helper to create input row.
-     * @param {string} labelText - Label text
-     * @param {string} inputId - Input element ID
-     * @param {Object} options - Input options (value, min, max)
-     * @returns {HTMLElement} The row element
+     * Render rulesets in container
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
      */
-    createInputRow(labelText, inputId, options = {}) {
-      const row = document.createElement('div');
-      row.className = 'zen-pomodoro-config-row';
+    _renderRulesets(container, config) {
+      container.innerHTML = '';
+      const rulesets = config.rulesets || [];
       
-      const label = document.createElement('label');
-      label.textContent = labelText;
+      if (rulesets.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'zen-pomodoro-empty-rulesets';
+        emptyMsg.textContent = 'No rulesets configured. Add one to start blocking websites.';
+        container.appendChild(emptyMsg);
+        return;
+      }
       
+      rulesets.forEach((ruleset, index) => {
+        const rulesetItem = this._createRulesetItem(ruleset, index, container, config);
+        container.appendChild(rulesetItem);
+      });
+    }
+
+    /**
+     * Create a ruleset item element
+     * @param {Object} ruleset - Ruleset data
+     * @param {number} index - Ruleset index
+     * @param {HTMLElement} container - Parent container
+     * @param {Object} config - Configuration object
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createRulesetItem(ruleset, index, container, config) {
+      const item = document.createElement('div');
+      item.className = 'zen-pomodoro-ruleset-item';
+      item.dataset.rulesetId = ruleset.id;
+      
+      // Header row with name and controls
+      const headerRow = document.createElement('div');
+      headerRow.className = 'zen-pomodoro-ruleset-header';
+      
+      // Enable checkbox
+      const enableCheckbox = document.createElement('input');
+      enableCheckbox.type = 'checkbox';
+      enableCheckbox.checked = ruleset.enabled;
+      enableCheckbox.addEventListener('change', () => {
+        // Find by ID to avoid stale index issues
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].enabled = enableCheckbox.checked;
+        }
+      });
+      
+      // Name input
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'zen-pomodoro-ruleset-name';
+      nameInput.value = ruleset.name;
+      nameInput.placeholder = 'Ruleset Name';
+      nameInput.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].name = nameInput.value || 'Unnamed Ruleset';
+        }
+      });
+      
+      // Expand/collapse toggle
+      const expandBtn = document.createElement('button');
+      expandBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      expandBtn.textContent = '▼';
+      expandBtn.addEventListener('click', () => {
+        const details = item.querySelector('.zen-pomodoro-ruleset-details');
+        if (details.style.display === 'none') {
+          details.style.display = 'block';
+          expandBtn.textContent = '▲';
+        } else {
+          details.style.display = 'none';
+          expandBtn.textContent = '▼';
+        }
+      });
+      
+      // Delete button - use ID instead of index
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      deleteBtn.textContent = '🗑️';
+      deleteBtn.addEventListener('click', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (config.rulesets.length > 1 && rulesetIndex !== -1) {
+          config.rulesets.splice(rulesetIndex, 1);
+          config.activeRulesets = config.activeRulesets.filter(id => id !== ruleset.id);
+          this._renderRulesets(container, config);
+        } else if (config.rulesets.length <= 1) {
+          window.zenPomodoroApp?.showCustomAlert('Cannot Delete', 'You must have at least one ruleset.');
+        }
+      });
+      
+      headerRow.appendChild(enableCheckbox);
+      headerRow.appendChild(nameInput);
+      headerRow.appendChild(expandBtn);
+      headerRow.appendChild(deleteBtn);
+      
+      // Details section (collapsible)
+      const details = document.createElement('div');
+      details.className = 'zen-pomodoro-ruleset-details';
+      details.style.display = 'none';
+      
+      // Rules container
+      const rulesContainer = document.createElement('div');
+      rulesContainer.className = 'zen-pomodoro-rules-container';
+      rulesContainer.id = `rules-container-${ruleset.id}`;
+      
+      // Render existing rules
+      this._renderRules(rulesContainer, ruleset, config);
+      
+      // Add Rule button
+      const addRuleBtn = document.createElement('button');
+      addRuleBtn.className = 'zen-pomodoro-dialog-button secondary';
+      addRuleBtn.textContent = '+ Add Rule/Condition';
+      addRuleBtn.style.marginTop = '12px';
+      addRuleBtn.addEventListener('click', () => {
+        this._addNewRule(rulesContainer, ruleset, config);
+      });
+      
+      // Check title only checkbox
+      const titleOnlyRow = document.createElement('div');
+      titleOnlyRow.className = 'zen-pomodoro-checkbox-row';
+      titleOnlyRow.style.marginTop = '12px';
+      
+      const titleOnlyCheckbox = document.createElement('input');
+      titleOnlyCheckbox.type = 'checkbox';
+      titleOnlyCheckbox.id = `title-only-${ruleset.id}`;
+      titleOnlyCheckbox.checked = ruleset.checkTitleOnly || false;
+      titleOnlyCheckbox.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          config.rulesets[rulesetIndex].checkTitleOnly = titleOnlyCheckbox.checked;
+        }
+      });
+      
+      const titleOnlyLabel = document.createElement('label');
+      titleOnlyLabel.htmlFor = `title-only-${ruleset.id}`;
+      titleOnlyLabel.textContent = 'Check keywords in page title only (faster)';
+      
+      titleOnlyRow.appendChild(titleOnlyCheckbox);
+      titleOnlyRow.appendChild(titleOnlyLabel);
+      
+      // Assemble details
+      details.appendChild(rulesContainer);
+      details.appendChild(addRuleBtn);
+      details.appendChild(titleOnlyRow);
+      
+      item.appendChild(headerRow);
+      item.appendChild(details);
+      
+      return item;
+    }
+
+    /**
+     * Render individual rules in a container
+     * @param {HTMLElement} container - Rules container
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _renderRules(container, ruleset, config) {
+      container.innerHTML = '';
+      const rules = ruleset.rules || [];
+      
+      if (rules.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'zen-pomodoro-empty-rules';
+        emptyMsg.textContent = 'No rules configured. Click "Add Rule/Condition" to add one.';
+        container.appendChild(emptyMsg);
+        return;
+      }
+      
+      rules.forEach((rule) => {
+        const ruleEl = this._createRuleElement(rule, ruleset, config, container);
+        container.appendChild(ruleEl);
+      });
+    }
+
+    /**
+     * Create a single rule element
+     * @param {Object} rule - Rule data { id, pattern, type, condition }
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @param {HTMLElement} container - Rules container
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createRuleElement(rule, ruleset, config, container) {
+      const ruleEl = document.createElement('div');
+      ruleEl.className = 'zen-pomodoro-rule-item';
+      ruleEl.dataset.ruleId = rule.id;
+      
+      // Pattern input
+      const patternInput = document.createElement('input');
+      patternInput.type = 'text';
+      patternInput.className = 'zen-pomodoro-rule-pattern';
+      patternInput.value = rule.pattern || '';
+      patternInput.placeholder = rule.type === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
+      patternInput.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].pattern = patternInput.value.trim();
+          }
+        }
+      });
+      
+      // Type dropdown (Website/Keyword)
+      const typeSelect = document.createElement('select');
+      typeSelect.className = 'zen-pomodoro-rule-select';
+      
+      const websiteOption = document.createElement('option');
+      websiteOption.value = 'website';
+      websiteOption.textContent = 'Website';
+      if (rule.type === 'website') websiteOption.selected = true;
+      typeSelect.appendChild(websiteOption);
+      
+      const keywordOption = document.createElement('option');
+      keywordOption.value = 'keyword';
+      keywordOption.textContent = 'Keyword';
+      if (rule.type === 'keyword') keywordOption.selected = true;
+      typeSelect.appendChild(keywordOption);
+      
+      typeSelect.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].type = typeSelect.value;
+            // Update placeholder
+            patternInput.placeholder = typeSelect.value === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
+          }
+        }
+      });
+      
+      // Condition dropdown (Block/Allow)
+      const conditionSelect = document.createElement('select');
+      conditionSelect.className = 'zen-pomodoro-rule-select';
+      
+      const blockOption = document.createElement('option');
+      blockOption.value = 'block';
+      blockOption.textContent = 'Block';
+      if (rule.condition === 'block') blockOption.selected = true;
+      conditionSelect.appendChild(blockOption);
+      
+      const allowOption = document.createElement('option');
+      allowOption.value = 'allow';
+      allowOption.textContent = 'Allow';
+      if (rule.condition === 'allow') allowOption.selected = true;
+      conditionSelect.appendChild(allowOption);
+      
+      conditionSelect.addEventListener('change', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules[ruleIndex].condition = conditionSelect.value;
+          }
+        }
+      });
+      
+      // Delete rule button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = 'Delete rule';
+      deleteBtn.addEventListener('click', () => {
+        const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+        if (rulesetIndex !== -1) {
+          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex(r => r.id === rule.id);
+          if (ruleIndex !== -1) {
+            config.rulesets[rulesetIndex].rules.splice(ruleIndex, 1);
+            this._renderRules(container, config.rulesets[rulesetIndex], config);
+          }
+        }
+      });
+      
+      ruleEl.appendChild(patternInput);
+      ruleEl.appendChild(typeSelect);
+      ruleEl.appendChild(conditionSelect);
+      ruleEl.appendChild(deleteBtn);
+      
+      return ruleEl;
+    }
+
+    /**
+     * Add a new rule to a ruleset
+     * @param {HTMLElement} container - Rules container
+     * @param {Object} ruleset - Parent ruleset
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _addNewRule(container, ruleset, config) {
+      const rulesetIndex = config.rulesets.findIndex(r => r.id === ruleset.id);
+      if (rulesetIndex === -1) return;
+      
+      if (!config.rulesets[rulesetIndex].rules) {
+        config.rulesets[rulesetIndex].rules = [];
+      }
+      
+      const newRule = {
+        id: this._generateRuleId(),
+        pattern: '',
+        type: 'website',
+        condition: 'block'
+      };
+      
+      config.rulesets[rulesetIndex].rules.push(newRule);
+      this._renderRules(container, config.rulesets[rulesetIndex], config);
+    }
+
+    /**
+     * Generate a unique rule ID using crypto.randomUUID with fallback
+     * @returns {string} Unique rule ID
+     * @private
+     */
+    _generateRuleId() {
+      if (typeof crypto?.randomUUID === 'function') {
+        return 'rule-' + crypto.randomUUID();
+      }
+      // Fallback: timestamp + random string for uniqueness
+      return 'rule-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+    }
+
+    /**
+     * Generate a unique ruleset ID using crypto.randomUUID with fallback
+     * @returns {string} Unique ruleset ID
+     * @private
+     */
+    _generateRulesetId() {
+      if (typeof crypto?.randomUUID === 'function') {
+        return 'ruleset-' + crypto.randomUUID();
+      }
+      // Fallback: timestamp + random string for uniqueness
+      return 'ruleset-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+    }
+
+    /**
+     * Add a new ruleset
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _addNewRuleset(container, config) {
+      const newId = this._generateRulesetId();
+      
+      const newRuleset = {
+        id: newId,
+        name: 'New Ruleset',
+        enabled: true,
+        rules: [],
+        checkTitleOnly: false
+      };
+      
+      if (!config.rulesets) config.rulesets = [];
+      config.rulesets.push(newRuleset);
+      
+      this._renderRulesets(container, config);
+      logger.log(LOG_CATEGORIES.SETTINGS, 'New ruleset added', { id: newId });
+    }
+
+    /**
+     * Export rulesets to JSON file
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _exportRulesets(config) {
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        rulesets: config.rulesets || []
+      };
+      
+      const data = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zen-pomodoro-rulesets-${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), URL_REVOKE_DELAY_MS);
+      
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets exported', { count: config.rulesets.length });
+      window.zenPomodoroApp?.showCustomAlert('Export Complete', `Exported ${config.rulesets.length} rulesets.`);
+    }
+
+    /**
+     * Import rulesets from JSON file
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _importRulesets(container, config) {
       const input = document.createElement('input');
-      input.type = 'number';
-      input.id = inputId;
-      if (options.value !== undefined) input.value = options.value;
-      if (options.min !== undefined) input.min = options.min;
-      if (options.max !== undefined) input.max = options.max;
+      input.type = 'file';
+      input.accept = '.json';
       
-      row.appendChild(label);
-      row.appendChild(input);
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        
+        // Add error handler for FileReader
+        reader.onerror = () => {
+          logger.log(LOG_CATEGORIES.SETTINGS, 'FileReader error during import', { error: reader.error?.message });
+          window.zenPomodoroApp?.showCustomAlert('Import Failed', 'Could not read the file. Please try again.');
+        };
+        
+        reader.onload = (event) => {
+          try {
+            const importData = JSON.parse(event.target.result);
+            
+            if (!importData.rulesets || !Array.isArray(importData.rulesets)) {
+              throw new Error('Invalid rulesets format');
+            }
+            
+            // Validate and add rulesets
+            const importedCount = importData.rulesets.length;
+            importData.rulesets.forEach(ruleset => {
+              // Generate new ID to avoid conflicts
+              ruleset.id = 'imported-' + this._generateRulesetId().replace('ruleset-', '');
+              ruleset.name = ruleset.name || 'Imported Ruleset';
+              ruleset.enabled = ruleset.enabled !== false;
+              ruleset.checkTitleOnly = !!ruleset.checkTitleOnly;
+              
+              // Convert old format (sites/blockKeywords/allowKeywords) to new format (rules array)
+              if (Array.isArray(ruleset.sites) || Array.isArray(ruleset.blockKeywords) || Array.isArray(ruleset.allowKeywords)) {
+                ruleset.rules = this._convertOldFormatToRules(ruleset);
+                // Clean up old format properties
+                delete ruleset.sites;
+                delete ruleset.blockKeywords;
+                delete ruleset.allowKeywords;
+              }
+              
+              // Ensure rules array exists and is valid
+              if (!Array.isArray(ruleset.rules)) {
+                ruleset.rules = [];
+              }
+              
+              // Validate each rule in the rules array
+              ruleset.rules = ruleset.rules.filter(rule => {
+                if (!rule || typeof rule !== 'object') return false;
+                // Ensure required properties exist
+                rule.id = rule.id || this._generateRuleId();
+                rule.pattern = typeof rule.pattern === 'string' ? rule.pattern : '';
+                rule.type = ['website', 'keyword'].includes(rule.type) ? rule.type : 'website';
+                rule.condition = ['block', 'allow'].includes(rule.condition) ? rule.condition : 'block';
+                return true;
+              });
+            });
+            
+            config.rulesets = [...(config.rulesets || []), ...importData.rulesets];
+            this._renderRulesets(container, config);
+            
+            logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets imported', { count: importedCount });
+            window.zenPomodoroApp?.showCustomAlert('Import Complete', `Imported ${importedCount} rulesets.`);
+          } catch (err) {
+            logger.log(LOG_CATEGORIES.SETTINGS, 'Ruleset import failed', { error: err.message });
+            window.zenPomodoroApp?.showCustomAlert('Import Failed', 'Could not parse the rulesets file. Please ensure it is a valid JSON file.');
+          }
+        };
+        
+        reader.readAsText(file);
+      });
       
-      return row;
+      input.click();
+    }
+
+    /**
+     * Convert old ruleset format (sites/blockKeywords/allowKeywords arrays) to new rules format
+     * @param {Object} ruleset - Ruleset with old format
+     * @returns {Array} Array of rule objects
+     * @private
+     */
+    _convertOldFormatToRules(ruleset) {
+      const rules = [];
+      
+      // Convert sites array
+      if (Array.isArray(ruleset.sites)) {
+        ruleset.sites.forEach(site => {
+          const rule = this._convertSiteToRule(site);
+          if (rule) rules.push(rule);
+        });
+      }
+      
+      // Convert blockKeywords array
+      this._convertKeywordsToRules(ruleset.blockKeywords, 'block', rules);
+      
+      // Convert allowKeywords array
+      this._convertKeywordsToRules(ruleset.allowKeywords, 'allow', rules);
+      
+      return rules;
+    }
+
+    /**
+     * Convert a site pattern to a rule object
+     * @param {string} site - Site pattern (may include + prefix for allow)
+     * @returns {Object|null} Rule object or null if invalid
+     * @private
+     */
+    _convertSiteToRule(site) {
+      if (!site || typeof site !== 'string') return null;
+      const trimmed = site.trim();
+      if (!trimmed) return null;
+      
+      // Check for + prefix (allow exception)
+      const isAllow = trimmed.startsWith('+');
+      return {
+        id: this._generateRuleId(),
+        pattern: isAllow ? trimmed.substring(1) : trimmed,
+        type: 'website',
+        condition: isAllow ? 'allow' : 'block'
+      };
+    }
+
+    /**
+     * Convert keywords array to rules and add to rules array
+     * @param {Array} keywords - Array of keywords
+     * @param {string} condition - 'block' or 'allow'
+     * @param {Array} rules - Array to add rules to
+     * @private
+     */
+    _convertKeywordsToRules(keywords, condition, rules) {
+      if (!Array.isArray(keywords)) return;
+      
+      keywords.forEach(keyword => {
+        if (!keyword || typeof keyword !== 'string') return;
+        const trimmed = keyword.trim();
+        if (!trimmed) return;
+        
+        rules.push({
+          id: this._generateRuleId(),
+          pattern: trimmed,
+          type: 'keyword',
+          condition: condition
+        });
+      });
     }
   }
 
@@ -3702,66 +4512,11 @@
      * @private
      */
     _setupListeners() {
-      // Tab select listener - fires when user switches tabs
-      this.tabSelectHandler = () => this._checkCurrentPage();
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
-      }
+      setupBrowserListeners(this, () => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
       
-      // Page show listener - fires when page is loaded/shown
-      this.pageShowHandler = () => {
-        // Small delay to ensure URL is updated
-        setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
-      };
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined') {
-        // eslint-disable-next-line no-undef
-        gBrowser.addEventListener('pageshow', this.pageShowHandler);
-      }
-      
-      // Hash change listener - for when user navigates within about:preferences
+      // Hash change listener - specific to Sine (for about:preferences navigation)
       this.hashChangeHandler = () => this._checkCurrentPage();
       window.addEventListener('hashchange', this.hashChangeHandler);
-      
-      // Progress listener for URL changes within tabs
-      this._setupProgressListener();
-    }
-
-    /**
-     * Set up a web progress listener to detect URL changes.
-     * This catches navigation within the same tab more reliably.
-     * @private
-     */
-    _setupProgressListener() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-      
-      try {
-        this.progressListener = {
-          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
-          
-          // eslint-disable-next-line no-unused-vars
-          onLocationChange: (webProgress, request, location) => {
-            // Check if this is a top-level navigation
-            if (webProgress.isTopLevel) {
-              setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
-            }
-          },
-          
-          onStateChange: () => {},
-          onProgressChange: () => {},
-          onStatusChange: () => {},
-          onSecurityChange: () => {},
-          onContentBlockingEvent: () => {}
-        };
-        
-        // eslint-disable-next-line no-undef
-        gBrowser.addProgressListener(this.progressListener);
-      } catch (e) {
-        logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
-      }
     }
 
     /**
@@ -4004,6 +4759,7 @@
     /**
      * Handle the "Go Back" button click.
      * Navigates the user away from the Sine Mods page.
+     * Uses shared utility for common navigation logic, but has Sine-specific fallback.
      * @private
      */
     _handleGoBack() {
@@ -4023,7 +4779,7 @@
           }
         }
         
-        // Fallback: Navigate to main preferences page without hash
+        // Sine-specific fallback: Navigate to main preferences page without hash
         // eslint-disable-next-line no-undef
         if (typeof gBrowser !== 'undefined') {
           // eslint-disable-next-line no-undef
@@ -4115,36 +4871,7 @@
      * @private
      */
     _removeGBrowserListeners() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-      
-      // eslint-disable-next-line no-undef
-      if (this.tabSelectHandler && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
-      }
-      
-      if (this.pageShowHandler) {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
-      }
-      
-      this._removeProgressListener();
-    }
-
-    /**
-     * Remove web progress listener.
-     * @private
-     */
-    _removeProgressListener() {
-      if (!this.progressListener) return;
-      
-      try {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeProgressListener(this.progressListener);
-      } catch (e) {
-        // Ignore errors during cleanup
-      }
+      removeBrowserListeners(this);
     }
 
     /**
@@ -4155,6 +4882,813 @@
       if (this.hashChangeHandler) {
         window.removeEventListener('hashchange', this.hashChangeHandler);
       }
+    }
+
+    /**
+     * Clear any active intervals.
+     * @private
+     */
+    _clearIntervals() {
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+    }
+
+    /**
+     * Remove the blocker overlay from the DOM.
+     * @private
+     */
+    _removeBlockerOverlay() {
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+  }
+
+  // ============================================
+  // Website Blocker Module (LeechBlock-Style)
+  // ============================================
+
+  /**
+   * Delay (in ms) after page navigation before checking for blocked websites.
+   * This allows the URL to be fully updated before checking.
+   * @constant {number}
+   */
+  const WEBSITE_BLOCKER_CHECK_DELAY_MS = 100;
+
+  /**
+   * Delay (in ms) before hiding the blocker overlay after navigation.
+   * This ensures the navigation has completed before removing the overlay.
+   * @constant {number}
+   */
+  const WEBSITE_BLOCKER_HIDE_DELAY_MS = 100;
+
+  /**
+   * WebsiteBlocker class implements LeechBlock-style website blocking
+   * during Pomodoro focus sessions. Supports URL pattern matching with wildcards,
+   * exceptions, and keyword-based blocking.
+   * 
+   * Features:
+   * - Domain blocking: "youtube.com" - blocks entire domain
+   * - Wildcard subdomains: "*.youtube.com" - blocks all subdomains
+   * - Path-specific blocking: "youtube.com/watch" - blocks specific paths
+   * - Exceptions with + prefix: "+docs.google.com" - allows specific sites
+   * - Multiple named rulesets with independent configurations
+   */
+  class WebsiteBlocker {
+    constructor() {
+      this.config = getConfig();
+      this.blockerOverlay = null;
+      this.isBlocking = false;
+      this.currentlyBlockedReason = null;
+      this.tabSelectHandler = null;
+      this.pageShowHandler = null;
+      this.progressListener = null;
+      this._timerStatusInterval = null;
+      this.contentObserver = null; // MutationObserver for dynamic page content
+      this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
+    }
+
+    /**
+     * Initialize the website blocker.
+     * Sets up listeners for tab changes and URL navigation.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Website Blocker');
+      this._setupListeners();
+      // Check immediately in case we're already on a blocked page
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Set up all event listeners for detecting navigation to blocked websites.
+     * @private
+     */
+    _setupListeners() {
+      setupBrowserListeners(this, () => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
+    }
+
+    /**
+     * Check if the blocker should be shown based on timer state.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _shouldShowBlocker() {
+      return window.zenPomodoroApp?.timer?.isActive || false;
+    }
+
+    /**
+     * Get the current page URL from gBrowser.
+     * @returns {string|null} Current URL or null if unavailable
+     * @private
+     */
+    _getCurrentUrl() {
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.currentURI) {
+          // eslint-disable-next-line no-undef
+          return gBrowser.currentURI.spec;
+        }
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error getting current URL', { error: e.message });
+      }
+      return null;
+    }
+
+    /**
+     * Check if a URL is an internal browser page that should be skipped.
+     * @param {string} url - URL to check
+     * @returns {boolean} True if URL is an internal browser page
+     * @private
+     */
+    _isInternalBrowserPage(url) {
+      const internalPrefixes = ['about:', 'chrome:', 'moz-extension:'];
+      return internalPrefixes.some(prefix => url.startsWith(prefix));
+    }
+
+    /**
+     * Hide blocker if currently showing.
+     * @private
+     */
+    _hideBlockerIfShowing() {
+      if (this.isBlocking) this._hideBlocker();
+    }
+
+    /**
+     * Check if current page should be blocked.
+     * Shows or hides the blocker overlay based on timer state and current URL.
+     * @private
+     */
+    _checkCurrentPage() {
+      // If timer is not active, hide any existing blocker
+      if (!this._shouldShowBlocker()) {
+        this._hideBlockerIfShowing();
+        return;
+      }
+
+      const currentUrl = this._getCurrentUrl();
+      if (!currentUrl) return;
+
+      // Skip internal browser pages
+      if (this._isInternalBrowserPage(currentUrl)) {
+        this._hideBlockerIfShowing();
+        return;
+      }
+
+      // Setup content observer for dynamic pages (keyword checking)
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const contentDoc = gBrowser.selectedBrowser.contentDocument;
+          if (contentDoc && contentDoc.body) {
+            this._setupContentObserver(contentDoc);
+          }
+        }
+      } catch (e) {
+        // Log content access denied errors for debugging
+        logger.log(LOG_CATEGORIES.SECURITY, 'Content document access denied', { error: e.message });
+      }
+
+      // Reload config and check against active rulesets
+      this.config = getConfig();
+      const blockResult = this._checkUrlAgainstActiveRulesets(
+        currentUrl,
+        this.config.activeRulesets || ['default'],
+        this.config.rulesets || []
+      );
+
+      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker page check', {
+        url: currentUrl,
+        blocked: blockResult.blocked,
+        isBlocking: this.isBlocking
+      });
+
+      if (blockResult.blocked) {
+        this._showBlocker(blockResult.reason, blockResult.rulesetName);
+      } else {
+        this._hideBlockerIfShowing();
+      }
+    }
+
+    /**
+     * Setup content observer for dynamic pages.
+     * Re-checks keywords when page content changes significantly.
+     * @param {Document} contentDoc - Content document to observe
+     * @private
+     */
+    _setupContentObserver(contentDoc) {
+      // Clean up any existing observer
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+      
+      // Clear any existing debounce timeout
+      if (this._contentObserverDebounceTimeout) {
+        clearTimeout(this._contentObserverDebounceTimeout);
+        this._contentObserverDebounceTimeout = null;
+      }
+
+      if (!contentDoc || !contentDoc.body) return;
+      
+      // Only observe if there are keyword rules configured (performance optimization)
+      const config = getConfig();
+      const activeRulesets = config.activeRulesets || ['default'];
+      const rulesets = config.rulesets || [];
+      
+      let hasKeywordRules = false;
+      for (const rulesetId of activeRulesets) {
+        const ruleset = rulesets.find(r => r.id === rulesetId);
+        if (ruleset && ruleset.rules) {
+          hasKeywordRules = ruleset.rules.some(r => r.type === 'keyword' && r.pattern);
+          if (hasKeywordRules) break;
+        }
+      }
+      
+      if (!hasKeywordRules) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Skipping content observer - no keyword rules configured');
+        return;
+      }
+
+      this.contentObserver = new MutationObserver(() => {
+        // Debounce to avoid excessive checks
+        if (this._contentObserverDebounceTimeout) {
+          clearTimeout(this._contentObserverDebounceTimeout);
+        }
+        this._contentObserverDebounceTimeout = setTimeout(() => {
+          if (window.zenPomodoroApp?.timer?.isActive) {
+            this._checkCurrentPage();
+          }
+        }, CONTENT_OBSERVER_DEBOUNCE_DELAY_MS);
+      });
+
+      this.contentObserver.observe(contentDoc.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    }
+
+    /**
+     * Check URL against all active rulesets.
+     * @param {string} url - URL to check
+     * @param {string[]} activeRulesets - List of active ruleset IDs
+     * @param {Object[]} rulesets - All available rulesets
+     * @returns {{blocked: boolean, reason: string|null, rulesetName: string|null}} Block result
+     * @private
+     */
+    _checkUrlAgainstActiveRulesets(url, activeRulesets, rulesets) {
+      for (const rulesetId of activeRulesets) {
+        const ruleset = rulesets.find(r => r.id === rulesetId);
+        if (!ruleset || !ruleset.enabled) continue;
+
+        const blockResult = this._checkUrlAgainstRuleset(url, ruleset);
+        if (blockResult.blocked) {
+          return { blocked: true, reason: blockResult.reason, rulesetName: ruleset.name };
+        }
+      }
+      return { blocked: false, reason: null, rulesetName: null };
+    }
+
+    /**
+     * Check if a pattern is an exception pattern (starts with +).
+     * @param {string} pattern - Pattern to check
+     * @returns {boolean} True if pattern is an exception
+     * @private
+     */
+    _isExceptionPattern(pattern) {
+      return pattern.startsWith('+');
+    }
+
+    /**
+     * Check if a pattern is a block pattern (not + or ~ prefix).
+     * @param {string} pattern - Pattern to check
+     * @returns {boolean} True if pattern is a block pattern
+     * @private
+     */
+    _isBlockPattern(pattern) {
+      return !pattern.startsWith('+') && !pattern.startsWith('~');
+    }
+
+    /**
+     * Check if URL matches any exception pattern in the sites list.
+     * @param {string} url - URL to check
+     * @param {string[]} sites - List of site patterns
+     * @returns {boolean} True if URL matches an exception pattern
+     * @private
+     */
+    _urlMatchesException(url, sites) {
+      for (const pattern of sites) {
+        if (!this._isExceptionPattern(pattern)) continue;
+        
+        const exceptionPattern = pattern.substring(1);
+        if (this._matchesUrlPattern(url, exceptionPattern)) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'URL matches exception pattern', {
+            url: url,
+            pattern: exceptionPattern
+          });
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Find a blocking pattern that matches the URL.
+     * @param {string} url - URL to check
+     * @param {string[]} sites - List of site patterns
+     * @returns {string|null} Matching block pattern or null
+     * @private
+     */
+    _findBlockingPattern(url, sites) {
+      for (const pattern of sites) {
+        if (this._isBlockPattern(pattern) && this._matchesUrlPattern(url, pattern)) {
+          return pattern;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Check URL against a ruleset (includes keyword checking).
+     * @param {string} url - URL to check
+     * @param {Object} ruleset - Ruleset configuration
+     * @returns {{blocked: boolean, reason: string|null}} Block result
+     * @private
+     */
+    _checkUrlAgainstRuleset(url, ruleset) {
+      const rules = ruleset.rules || [];
+      const checkTitleOnly = ruleset.checkTitleOnly || false;
+      
+      // Separate rules by type and condition
+      const rulesByCategory = this._categorizeRules(rules);
+      
+      // First check URL allow rules (exceptions)
+      if (this._urlMatchesAnyRule(url, rulesByCategory.websiteAllow)) {
+        return { blocked: false, reason: null };
+      }
+      
+      // Get page text once for all keyword checks (performance fix)
+      let pageText = null;
+      const getPageTextOnce = () => {
+        if (pageText === null) {
+          pageText = this._getPageText(checkTitleOnly);
+        }
+        return pageText;
+      };
+      
+      // Check allow keywords (override blocks)
+      const allowKeywordMatch = this._findMatchingKeyword(rulesByCategory.keywordAllow, getPageTextOnce);
+      if (allowKeywordMatch) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Page allowed by keyword', { keyword: allowKeywordMatch });
+        return { blocked: false, reason: null };
+      }
+      
+      // Check URL blocks
+      const blockingUrlRule = this._findMatchingUrlRule(url, rulesByCategory.websiteBlock);
+      if (blockingUrlRule) {
+        return { blocked: true, reason: `URL matches pattern: ${blockingUrlRule.pattern}` };
+      }
+      
+      // Check keyword blocks
+      const blockKeywordMatch = this._findMatchingKeyword(rulesByCategory.keywordBlock, getPageTextOnce);
+      if (blockKeywordMatch) {
+        return { blocked: true, reason: `Page contains blocked keyword: "${blockKeywordMatch}"` };
+      }
+      
+      return { blocked: false, reason: null };
+    }
+
+    /**
+     * Categorize rules into groups by type and condition
+     * @param {Array} rules - Array of rule objects
+     * @returns {Object} Categorized rules
+     * @private
+     */
+    _categorizeRules(rules) {
+      return {
+        websiteBlock: rules.filter(r => r.type === 'website' && r.condition === 'block' && r.pattern),
+        websiteAllow: rules.filter(r => r.type === 'website' && r.condition === 'allow' && r.pattern),
+        keywordBlock: rules.filter(r => r.type === 'keyword' && r.condition === 'block' && r.pattern),
+        keywordAllow: rules.filter(r => r.type === 'keyword' && r.condition === 'allow' && r.pattern)
+      };
+    }
+
+    /**
+     * Check if URL matches any rule in the list
+     * @param {string} url - URL to check
+     * @param {Array} rules - Array of rules to check against
+     * @returns {boolean} True if URL matches any rule
+     * @private
+     */
+    _urlMatchesAnyRule(url, rules) {
+      return rules.some(rule => this._matchesUrlPattern(url, rule.pattern));
+    }
+
+    /**
+     * Find the first URL rule that matches
+     * @param {string} url - URL to check
+     * @param {Array} rules - Array of rules to check against
+     * @returns {Object|null} Matching rule or null
+     * @private
+     */
+    _findMatchingUrlRule(url, rules) {
+      return rules.find(rule => this._matchesUrlPattern(url, rule.pattern)) || null;
+    }
+
+    /**
+     * Find the first matching keyword in page text
+     * @param {Array} rules - Array of keyword rules
+     * @param {Function} getPageText - Function to get page text (lazy evaluation)
+     * @returns {string|null} Matching keyword or null
+     * @private
+     */
+    _findMatchingKeyword(rules, getPageText) {
+      for (const rule of rules) {
+        const text = getPageText();
+        if (this._keywordMatches(text, rule.pattern)) {
+          return rule.pattern;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Check if keyword matches in text using word boundary matching
+     * to avoid false positives like "king" matching "working"
+     * @param {string} text - Page text to search
+     * @param {string} keyword - Keyword to find
+     * @returns {boolean} True if keyword matches
+     * @private
+     */
+    _keywordMatches(text, keyword) {
+      if (!text || !keyword) return false;
+      // Use word boundary matching to avoid false positives
+      // $& in replacement string refers to the matched character
+      const escapedKeyword = keyword.replace(REGEX_ESCAPE_PATTERN, '\\$&');
+      const regex = new RegExp('\\b' + escapedKeyword + '\\b', 'i');
+      return regex.test(text);
+    }
+
+    /**
+     * Get page text content for keyword checking.
+     * @param {boolean} titleOnly - If true, only return page title
+     * @returns {string} Page text content
+     * @private
+     */
+    _getPageText(titleOnly = false) {
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser === 'undefined' || !gBrowser.selectedBrowser) {
+          return '';
+        }
+
+        // eslint-disable-next-line no-undef
+        const contentDoc = gBrowser.selectedBrowser.contentDocument;
+        if (!contentDoc) return '';
+
+        if (titleOnly) {
+          return contentDoc.title || '';
+        }
+
+        // Get title + body text
+        const title = contentDoc.title || '';
+        const bodyText = contentDoc.body?.innerText || contentDoc.body?.textContent || '';
+
+        return title + ' ' + bodyText;
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Failed to get page text', { error: e.message });
+        return '';
+      }
+    }
+
+    /**
+     * Normalize a URL pattern by removing protocol and www prefix.
+     * @param {string} pattern - Pattern to normalize
+     * @returns {string} Normalized pattern
+     * @private
+     */
+    _normalizePattern(pattern) {
+      return pattern.toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '');
+    }
+
+    /**
+     * Check if URL matches a wildcard pattern.
+     * @param {string} hostname - URL hostname
+     * @param {string} fullUrl - Full URL (hostname + pathname)
+     * @param {string} normalizedPattern - Normalized pattern with wildcards
+     * @returns {boolean} True if URL matches wildcard pattern
+     * @private
+     */
+    _matchesWildcardPattern(hostname, fullUrl, normalizedPattern) {
+      // $& in replacement string refers to the matched character
+      const regexPattern = normalizedPattern
+        .replace(REGEX_ESCAPE_PATTERN_KEEP_ASTERISK, '\\$&')
+        .replace(/\*/g, '.*');
+      const regex = new RegExp('^' + regexPattern, 'i');
+      return regex.test(hostname) || regex.test(fullUrl);
+    }
+
+    /**
+     * Check if URL matches a simple (non-wildcard) pattern.
+     * @param {string} hostname - URL hostname (without www)
+     * @param {string} pathname - URL pathname
+     * @param {string} normalizedPattern - Normalized pattern
+     * @returns {boolean} True if URL matches simple pattern
+     * @private
+     */
+    _matchesSimplePattern(hostname, pathname, normalizedPattern) {
+      const normalizedHostname = hostname.replace(/^www\./, '');
+      const fullPath = normalizedHostname + pathname;
+      
+      return normalizedHostname === normalizedPattern ||
+             normalizedHostname.endsWith('.' + normalizedPattern) ||
+             fullPath.startsWith(normalizedPattern);
+    }
+
+    /**
+     * Match URL against pattern (supports wildcards).
+     * @param {string} url - URL to check
+     * @param {string} pattern - Pattern to match (supports * wildcard)
+     * @returns {boolean} True if URL matches pattern
+     * @private
+     */
+    _matchesUrlPattern(url, pattern) {
+      try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.toLowerCase();
+        const pathname = urlObj.pathname.toLowerCase();
+        const fullUrl = hostname + pathname;
+        const normalizedPattern = this._normalizePattern(pattern);
+
+        // Handle wildcard patterns
+        if (normalizedPattern.includes('*')) {
+          return this._matchesWildcardPattern(hostname, fullUrl, normalizedPattern);
+        }
+
+        // Simple domain/path matching
+        return this._matchesSimplePattern(hostname, pathname, normalizedPattern);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error matching URL pattern', {
+          url: url,
+          pattern: pattern,
+          error: e.message
+        });
+        return false;
+      }
+    }
+
+    /**
+     * Show the blocker overlay.
+     * @param {string} reason - Reason for blocking
+     * @param {string} rulesetName - Name of the ruleset that triggered the block
+     * @private
+     */
+    _showBlocker(reason, rulesetName) {
+      if (this.blockerOverlay) return;
+
+      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker triggered', {
+        reason: reason,
+        rulesetName: rulesetName
+      });
+      this.isBlocking = true;
+      this.currentlyBlockedReason = reason;
+
+      this._createBlockerOverlay(reason, rulesetName);
+      document.documentElement.appendChild(this.blockerOverlay);
+    }
+
+    /**
+     * Create the blocker overlay element with all its content.
+     * @param {string} reason - Reason for blocking
+     * @param {string} rulesetName - Name of the ruleset that triggered the block
+     * @private
+     */
+    _createBlockerOverlay(reason, rulesetName) {
+      this.blockerOverlay = document.createElement('div');
+      this.blockerOverlay.id = 'zen-pomodoro-website-blocker';
+      this.blockerOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-website-blocker-content';
+
+      // Icon (block symbol)
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-website-blocker-icon';
+      icon.textContent = '🚫';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Website Blocked';
+
+      // Message - show keyword info if blocked by keyword
+      const message = document.createElement('p');
+      message.textContent = reason && reason.includes('keyword')
+        ? `Blocked: ${reason}`
+        : 'This website is blocked during your focus session.';
+
+      // Ruleset info
+      const rulesetInfo = document.createElement('p');
+      rulesetInfo.className = 'zen-pomodoro-blocker-ruleset';
+      rulesetInfo.textContent = `Ruleset: ${rulesetName}`;
+
+      // Timer status
+      const timerStatus = document.createElement('div');
+      timerStatus.id = 'zen-pomodoro-website-blocker-timer';
+      this._updateTimerStatus(timerStatus);
+
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-website-blocker-buttons';
+
+      // Go Back button
+      const goBackButton = document.createElement('button');
+      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
+      goBackButton.textContent = 'Go Back';
+      goBackButton.addEventListener('click', () => this._handleGoBack());
+
+      // Stop Timer button
+      const stopTimerButton = document.createElement('button');
+      stopTimerButton.className = 'zen-pomodoro-dialog-button';
+      stopTimerButton.textContent = 'Stop Timer';
+      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
+
+      buttons.appendChild(goBackButton);
+      buttons.appendChild(stopTimerButton);
+
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(rulesetInfo);
+      content.appendChild(timerStatus);
+      content.appendChild(buttons);
+
+      this.blockerOverlay.appendChild(content);
+
+      // Set up timer status updates
+      this._startTimerStatusUpdates(timerStatus);
+    }
+
+    /**
+     * Update the timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _updateTimerStatus(statusElement) {
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer) {
+        statusElement.textContent = '';
+        return;
+      }
+
+      const status = timer.getStatus();
+      if (!status) {
+        statusElement.textContent = '';
+        return;
+      }
+
+      const timeStr = formatTime(status.remainingTime);
+      const phaseLabel = getShortPhaseLabel(status.currentPhase);
+
+      // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
+      if (status.mode === 'simple') {
+        statusElement.textContent = `${phaseLabel}: ${timeStr}`;
+      } else {
+        statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+      }
+    }
+
+    /**
+     * Start interval to update timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _startTimerStatusUpdates(statusElement) {
+      // Update immediately
+      this._updateTimerStatus(statusElement);
+
+      // Update every second
+      this._timerStatusInterval = setInterval(() => {
+        if (this.isBlocking && statusElement) {
+          this._updateTimerStatus(statusElement);
+
+          // Also check if timer is still active
+          if (!window.zenPomodoroApp?.timer?.isActive) {
+            this._hideBlocker();
+          }
+        }
+      }, 1000);
+    }
+
+    /**
+     * Handle the "Go Back" button click.
+     * Navigates the user away from the blocked website.
+     * Uses shared utility for common navigation logic.
+     * @private
+     */
+    _handleGoBack() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on website blocker');
+      handleBlockerGoBack(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
+    }
+
+    /**
+     * Handle the "Stop Timer" button click.
+     * Uses the same security lockout as stopping the timer normally.
+     * @private
+     */
+    _handleStopTimer() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Stop Timer on website blocker');
+
+      // Use the existing handleStopTimerWithLockout utility function
+      // which shows the security lock screen before allowing timer stop
+      handleStopTimerWithLockout(() => {
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.stopTimer();
+          // Hide the blocker after timer is stopped
+          this._hideBlocker();
+        }
+      });
+    }
+
+    /**
+     * Hide the blocker overlay.
+     * @private
+     */
+    _hideBlocker() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Hiding website blocker overlay');
+      this.isBlocking = false;
+      this.currentlyBlockedReason = null;
+
+      // Clear timer status update interval
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+
+      // Disconnect content observer
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+
+    /**
+     * Called when the timer starts.
+     * Re-checks if we need to show the blocker.
+     */
+    onTimerStart() {
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Called when the timer stops.
+     * Hides the blocker if it's showing.
+     */
+    onTimerStop() {
+      if (this.isBlocking) {
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Clean up and destroy the blocker.
+     */
+    destroy() {
+      this._removeGBrowserListeners();
+      this._clearIntervals();
+      this._disconnectContentObserver();
+      this._removeBlockerOverlay();
+      this.isBlocking = false;
+    }
+
+    /**
+     * Disconnect the content observer if active.
+     * @private
+     */
+    _disconnectContentObserver() {
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+    }
+
+    /**
+     * Remove gBrowser event listeners.
+     * @private
+     */
+    _removeGBrowserListeners() {
+      removeBrowserListeners(this);
     }
 
     /**
@@ -4192,6 +5726,7 @@
       this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
       this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
+      this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -4244,6 +5779,10 @@
       // Initialize Sine Mod Blocker
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
       this.sineModBlocker.init();
+      
+      // Initialize Website Blocker
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Website Blocker');
+      this.websiteBlocker.init();
       
       // Setup timer callbacks
       this.timer.onTick = (time, phase, cycle, total) => {
@@ -4319,6 +5858,9 @@
       // Notify Sine Mod Blocker that timer started
       this.sineModBlocker.onTimerStart();
       
+      // Notify Website Blocker that timer started
+      this.websiteBlocker.onTimerStart();
+      
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -4338,6 +5880,9 @@
       
       // Notify Sine Mod Blocker that timer stopped
       this.sineModBlocker.onTimerStop();
+      
+      // Notify Website Blocker that timer stopped
+      this.websiteBlocker.onTimerStop();
     }
 
     /**
@@ -4546,6 +6091,10 @@
       // Clean up all modules that have destroy methods
       if (this.sineModBlocker) {
         this.sineModBlocker.destroy();
+      }
+      
+      if (this.websiteBlocker) {
+        this.websiteBlocker.destroy();
       }
       
       if (this.keyboardShortcut) {
