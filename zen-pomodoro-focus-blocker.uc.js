@@ -82,7 +82,22 @@
     enableNotifications: true,
     enableAudioAlerts: false,
     phase: 'focus',
-    keyboardShortcut: 'Alt+Shift+P'
+    keyboardShortcut: 'Alt+Shift+P',
+    /** Website blocking rulesets (LeechBlock-style) */
+    rulesets: [
+      {
+        id: 'default',
+        name: 'Default Blocklist',
+        enabled: true,
+        sites: [], // URL patterns: "youtube.com", "*.reddit.com", "+allowed.site.com"
+        // NOTE: Keyword blocking fields reserved for future implementation
+        blockKeywords: [], // Future: Keywords to block: "minecraft", "gaming"
+        allowKeywords: [], // Future: Keywords to allow even if site matches: "tutorial", "work"
+        checkTitleOnly: false // Future: If true, only check page title, not full content
+      }
+    ],
+    /** Rulesets to enable when timer starts */
+    activeRulesets: ['default']
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -4190,6 +4205,701 @@
   }
 
   // ============================================
+  // Website Blocker Module (LeechBlock-Style)
+  // ============================================
+
+  /**
+   * Delay (in ms) after page navigation before checking for blocked websites.
+   * This allows the URL to be fully updated before checking.
+   * @constant {number}
+   */
+  const WEBSITE_BLOCKER_CHECK_DELAY_MS = 100;
+
+  /**
+   * Delay (in ms) before hiding the blocker overlay after navigation.
+   * This ensures the navigation has completed before removing the overlay.
+   * @constant {number}
+   */
+  const WEBSITE_BLOCKER_HIDE_DELAY_MS = 100;
+
+  /**
+   * WebsiteBlocker class implements LeechBlock-style website blocking
+   * during Pomodoro focus sessions. Supports URL pattern matching with wildcards,
+   * exceptions, and keyword-based blocking.
+   * 
+   * Features:
+   * - Domain blocking: "youtube.com" - blocks entire domain
+   * - Wildcard subdomains: "*.youtube.com" - blocks all subdomains
+   * - Path-specific blocking: "youtube.com/watch" - blocks specific paths
+   * - Exceptions with + prefix: "+docs.google.com" - allows specific sites
+   * - Multiple named rulesets with independent configurations
+   */
+  class WebsiteBlocker {
+    constructor() {
+      this.config = getConfig();
+      this.blockerOverlay = null;
+      this.isBlocking = false;
+      this.currentlyBlockedReason = null;
+      this.tabSelectHandler = null;
+      this.pageShowHandler = null;
+      this.progressListener = null;
+      this._timerStatusInterval = null;
+    }
+
+    /**
+     * Initialize the website blocker.
+     * Sets up listeners for tab changes and URL navigation.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Website Blocker');
+      this._setupListeners();
+      // Check immediately in case we're already on a blocked page
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Set up all event listeners for detecting navigation to blocked websites.
+     * @private
+     */
+    _setupListeners() {
+      // Tab select listener - fires when user switches tabs
+      this.tabSelectHandler = () => this._checkCurrentPage();
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
+      }
+
+      // Page show listener - fires when page is loaded/shown
+      this.pageShowHandler = () => {
+        // Small delay to ensure URL is updated
+        setTimeout(() => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
+      };
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        gBrowser.addEventListener('pageshow', this.pageShowHandler);
+      }
+
+      // Progress listener for URL changes within tabs
+      this._setupProgressListener();
+    }
+
+    /**
+     * Set up a web progress listener to detect URL changes.
+     * This catches navigation within the same tab more reliably.
+     * @private
+     */
+    _setupProgressListener() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined') return;
+
+      try {
+        this.progressListener = {
+          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
+
+          // eslint-disable-next-line no-unused-vars
+          onLocationChange: (webProgress, request, location) => {
+            // Check if this is a top-level navigation
+            if (webProgress.isTopLevel) {
+              setTimeout(() => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
+            }
+          },
+
+          onStateChange: () => {},
+          onProgressChange: () => {},
+          onStatusChange: () => {},
+          onSecurityChange: () => {},
+          onContentBlockingEvent: () => {}
+        };
+
+        // eslint-disable-next-line no-undef
+        gBrowser.addProgressListener(this.progressListener);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.INIT, 'Failed to add website blocker progress listener', { error: e.message });
+      }
+    }
+
+    /**
+     * Check if the blocker should be shown based on timer state.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _shouldShowBlocker() {
+      return window.zenPomodoroApp?.timer?.isActive || false;
+    }
+
+    /**
+     * Get the current page URL from gBrowser.
+     * @returns {string|null} Current URL or null if unavailable
+     * @private
+     */
+    _getCurrentUrl() {
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.currentURI) {
+          // eslint-disable-next-line no-undef
+          return gBrowser.currentURI.spec;
+        }
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error getting current URL', { error: e.message });
+      }
+      return null;
+    }
+
+    /**
+     * Check if a URL is an internal browser page that should be skipped.
+     * @param {string} url - URL to check
+     * @returns {boolean} True if URL is an internal browser page
+     * @private
+     */
+    _isInternalBrowserPage(url) {
+      const internalPrefixes = ['about:', 'chrome:', 'moz-extension:'];
+      return internalPrefixes.some(prefix => url.startsWith(prefix));
+    }
+
+    /**
+     * Hide blocker if currently showing.
+     * @private
+     */
+    _hideBlockerIfShowing() {
+      if (this.isBlocking) this._hideBlocker();
+    }
+
+    /**
+     * Check if current page should be blocked.
+     * Shows or hides the blocker overlay based on timer state and current URL.
+     * @private
+     */
+    _checkCurrentPage() {
+      // If timer is not active, hide any existing blocker
+      if (!this._shouldShowBlocker()) {
+        this._hideBlockerIfShowing();
+        return;
+      }
+
+      const currentUrl = this._getCurrentUrl();
+      if (!currentUrl) return;
+
+      // Skip internal browser pages
+      if (this._isInternalBrowserPage(currentUrl)) {
+        this._hideBlockerIfShowing();
+        return;
+      }
+
+      // Reload config and check against active rulesets
+      this.config = getConfig();
+      const blockResult = this._checkUrlAgainstActiveRulesets(
+        currentUrl,
+        this.config.activeRulesets || ['default'],
+        this.config.rulesets || []
+      );
+
+      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker page check', {
+        url: currentUrl,
+        blocked: blockResult.blocked,
+        isBlocking: this.isBlocking
+      });
+
+      if (blockResult.blocked) {
+        this._showBlocker(blockResult.reason, blockResult.rulesetName);
+      } else {
+        this._hideBlockerIfShowing();
+      }
+    }
+
+    /**
+     * Check URL against all active rulesets.
+     * @param {string} url - URL to check
+     * @param {string[]} activeRulesets - List of active ruleset IDs
+     * @param {Object[]} rulesets - All available rulesets
+     * @returns {{blocked: boolean, reason: string|null, rulesetName: string|null}} Block result
+     * @private
+     */
+    _checkUrlAgainstActiveRulesets(url, activeRulesets, rulesets) {
+      for (const rulesetId of activeRulesets) {
+        const ruleset = rulesets.find(r => r.id === rulesetId);
+        if (!ruleset || !ruleset.enabled) continue;
+
+        const blockResult = this._checkUrlAgainstRuleset(url, ruleset);
+        if (blockResult.blocked) {
+          return { blocked: true, reason: blockResult.reason, rulesetName: ruleset.name };
+        }
+      }
+      return { blocked: false, reason: null, rulesetName: null };
+    }
+
+    /**
+     * Check if a pattern is an exception pattern (starts with +).
+     * @param {string} pattern - Pattern to check
+     * @returns {boolean} True if pattern is an exception
+     * @private
+     */
+    _isExceptionPattern(pattern) {
+      return pattern.startsWith('+');
+    }
+
+    /**
+     * Check if a pattern is a block pattern (not + or ~ prefix).
+     * @param {string} pattern - Pattern to check
+     * @returns {boolean} True if pattern is a block pattern
+     * @private
+     */
+    _isBlockPattern(pattern) {
+      return !pattern.startsWith('+') && !pattern.startsWith('~');
+    }
+
+    /**
+     * Check if URL matches any exception pattern in the sites list.
+     * @param {string} url - URL to check
+     * @param {string[]} sites - List of site patterns
+     * @returns {boolean} True if URL matches an exception pattern
+     * @private
+     */
+    _urlMatchesException(url, sites) {
+      for (const pattern of sites) {
+        if (!this._isExceptionPattern(pattern)) continue;
+        
+        const exceptionPattern = pattern.substring(1);
+        if (this._matchesUrlPattern(url, exceptionPattern)) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'URL matches exception pattern', {
+            url: url,
+            pattern: exceptionPattern
+          });
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Find a blocking pattern that matches the URL.
+     * @param {string} url - URL to check
+     * @param {string[]} sites - List of site patterns
+     * @returns {string|null} Matching block pattern or null
+     * @private
+     */
+    _findBlockingPattern(url, sites) {
+      for (const pattern of sites) {
+        if (this._isBlockPattern(pattern) && this._matchesUrlPattern(url, pattern)) {
+          return pattern;
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Check URL against a ruleset.
+     * @param {string} url - URL to check
+     * @param {Object} ruleset - Ruleset configuration
+     * @returns {{blocked: boolean, reason: string|null}} Block result
+     * @private
+     */
+    _checkUrlAgainstRuleset(url, ruleset) {
+      const sites = ruleset.sites || [];
+
+      // First check for exceptions (+ prefix) - these override blocks
+      if (this._urlMatchesException(url, sites)) {
+        return { blocked: false, reason: null };
+      }
+
+      // Then check for blocks (patterns without + or ~ prefix)
+      const blockingPattern = this._findBlockingPattern(url, sites);
+      if (blockingPattern) {
+        return { blocked: true, reason: `URL matches pattern: ${blockingPattern}` };
+      }
+
+      return { blocked: false, reason: null };
+    }
+
+    /**
+     * Normalize a URL pattern by removing protocol and www prefix.
+     * @param {string} pattern - Pattern to normalize
+     * @returns {string} Normalized pattern
+     * @private
+     */
+    _normalizePattern(pattern) {
+      return pattern.toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '');
+    }
+
+    /**
+     * Check if URL matches a wildcard pattern.
+     * @param {string} hostname - URL hostname
+     * @param {string} fullUrl - Full URL (hostname + pathname)
+     * @param {string} normalizedPattern - Normalized pattern with wildcards
+     * @returns {boolean} True if URL matches wildcard pattern
+     * @private
+     */
+    _matchesWildcardPattern(hostname, fullUrl, normalizedPattern) {
+      const regexPattern = normalizedPattern
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*');
+      const regex = new RegExp('^' + regexPattern, 'i');
+      return regex.test(hostname) || regex.test(fullUrl);
+    }
+
+    /**
+     * Check if URL matches a simple (non-wildcard) pattern.
+     * @param {string} hostname - URL hostname (without www)
+     * @param {string} pathname - URL pathname
+     * @param {string} normalizedPattern - Normalized pattern
+     * @returns {boolean} True if URL matches simple pattern
+     * @private
+     */
+    _matchesSimplePattern(hostname, pathname, normalizedPattern) {
+      const normalizedHostname = hostname.replace(/^www\./, '');
+      const fullPath = normalizedHostname + pathname;
+      
+      return normalizedHostname === normalizedPattern ||
+             normalizedHostname.endsWith('.' + normalizedPattern) ||
+             fullPath.startsWith(normalizedPattern);
+    }
+
+    /**
+     * Match URL against pattern (supports wildcards).
+     * @param {string} url - URL to check
+     * @param {string} pattern - Pattern to match (supports * wildcard)
+     * @returns {boolean} True if URL matches pattern
+     * @private
+     */
+    _matchesUrlPattern(url, pattern) {
+      try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.toLowerCase();
+        const pathname = urlObj.pathname.toLowerCase();
+        const fullUrl = hostname + pathname;
+        const normalizedPattern = this._normalizePattern(pattern);
+
+        // Handle wildcard patterns
+        if (normalizedPattern.includes('*')) {
+          return this._matchesWildcardPattern(hostname, fullUrl, normalizedPattern);
+        }
+
+        // Simple domain/path matching
+        return this._matchesSimplePattern(hostname, pathname, normalizedPattern);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error matching URL pattern', {
+          url: url,
+          pattern: pattern,
+          error: e.message
+        });
+        return false;
+      }
+    }
+
+    /**
+     * Show the blocker overlay.
+     * @param {string} reason - Reason for blocking
+     * @param {string} rulesetName - Name of the ruleset that triggered the block
+     * @private
+     */
+    _showBlocker(reason, rulesetName) {
+      if (this.blockerOverlay) return;
+
+      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker triggered', {
+        reason: reason,
+        rulesetName: rulesetName
+      });
+      this.isBlocking = true;
+      this.currentlyBlockedReason = reason;
+
+      this._createBlockerOverlay(reason, rulesetName);
+      document.documentElement.appendChild(this.blockerOverlay);
+    }
+
+    /**
+     * Create the blocker overlay element with all its content.
+     * @param {string} reason - Reason for blocking
+     * @param {string} rulesetName - Name of the ruleset that triggered the block
+     * @private
+     */
+    _createBlockerOverlay(reason, rulesetName) {
+      this.blockerOverlay = document.createElement('div');
+      this.blockerOverlay.id = 'zen-pomodoro-website-blocker';
+      this.blockerOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-website-blocker-content';
+
+      // Icon (block symbol)
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-website-blocker-icon';
+      icon.textContent = '🚫';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Website Blocked';
+
+      // Message
+      const message = document.createElement('p');
+      message.textContent = 'This website is blocked during your focus session.';
+
+      // Ruleset info
+      const rulesetInfo = document.createElement('p');
+      rulesetInfo.className = 'zen-pomodoro-blocker-ruleset';
+      rulesetInfo.textContent = `Ruleset: ${rulesetName}`;
+
+      // Timer status
+      const timerStatus = document.createElement('div');
+      timerStatus.id = 'zen-pomodoro-website-blocker-timer';
+      this._updateTimerStatus(timerStatus);
+
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-website-blocker-buttons';
+
+      // Go Back button
+      const goBackButton = document.createElement('button');
+      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
+      goBackButton.textContent = 'Go Back';
+      goBackButton.addEventListener('click', () => this._handleGoBack());
+
+      // Stop Timer button
+      const stopTimerButton = document.createElement('button');
+      stopTimerButton.className = 'zen-pomodoro-dialog-button';
+      stopTimerButton.textContent = 'Stop Timer';
+      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
+
+      buttons.appendChild(goBackButton);
+      buttons.appendChild(stopTimerButton);
+
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(rulesetInfo);
+      content.appendChild(timerStatus);
+      content.appendChild(buttons);
+
+      this.blockerOverlay.appendChild(content);
+
+      // Set up timer status updates
+      this._startTimerStatusUpdates(timerStatus);
+    }
+
+    /**
+     * Update the timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _updateTimerStatus(statusElement) {
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer) {
+        statusElement.textContent = '';
+        return;
+      }
+
+      const status = timer.getStatus();
+      if (!status) {
+        statusElement.textContent = '';
+        return;
+      }
+
+      const timeStr = formatTime(status.remainingTime);
+      const phaseLabel = getShortPhaseLabel(status.currentPhase);
+
+      // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
+      if (status.mode === 'simple') {
+        statusElement.textContent = `${phaseLabel}: ${timeStr}`;
+      } else {
+        statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+      }
+    }
+
+    /**
+     * Start interval to update timer status display.
+     * @param {HTMLElement} statusElement - Element to update
+     * @private
+     */
+    _startTimerStatusUpdates(statusElement) {
+      // Update immediately
+      this._updateTimerStatus(statusElement);
+
+      // Update every second
+      this._timerStatusInterval = setInterval(() => {
+        if (this.isBlocking && statusElement) {
+          this._updateTimerStatus(statusElement);
+
+          // Also check if timer is still active
+          if (!window.zenPomodoroApp?.timer?.isActive) {
+            this._hideBlocker();
+          }
+        }
+      }, 1000);
+    }
+
+    /**
+     * Handle the "Go Back" button click.
+     * Navigates the user away from the blocked website.
+     * @private
+     */
+    _handleGoBack() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on website blocker');
+
+      try {
+        // Try to go back in history
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const webNav = gBrowser.selectedBrowser.webNavigation;
+          if (webNav && webNav.canGoBack) {
+            webNav.goBack();
+            // Hide blocker after navigation
+            setTimeout(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
+            return;
+          }
+        }
+
+        // Fallback: Navigate to about:blank
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined') {
+          // eslint-disable-next-line no-undef
+          gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:blank'), {
+            triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
+          });
+          setTimeout(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
+          return;
+        }
+
+        // Last resort: Just hide the blocker
+        this._hideBlocker();
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back from blocked site', { error: e.message });
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Handle the "Stop Timer" button click.
+     * Uses the same security lockout as stopping the timer normally.
+     * @private
+     */
+    _handleStopTimer() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Stop Timer on website blocker');
+
+      // Use the existing handleStopTimerWithLockout utility function
+      // which shows the security lock screen before allowing timer stop
+      handleStopTimerWithLockout(() => {
+        if (window.zenPomodoroApp) {
+          window.zenPomodoroApp.stopTimer();
+          // Hide the blocker after timer is stopped
+          this._hideBlocker();
+        }
+      });
+    }
+
+    /**
+     * Hide the blocker overlay.
+     * @private
+     */
+    _hideBlocker() {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Hiding website blocker overlay');
+      this.isBlocking = false;
+      this.currentlyBlockedReason = null;
+
+      // Clear timer status update interval
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+
+    /**
+     * Called when the timer starts.
+     * Re-checks if we need to show the blocker.
+     */
+    onTimerStart() {
+      this._checkCurrentPage();
+    }
+
+    /**
+     * Called when the timer stops.
+     * Hides the blocker if it's showing.
+     */
+    onTimerStop() {
+      if (this.isBlocking) {
+        this._hideBlocker();
+      }
+    }
+
+    /**
+     * Clean up and destroy the blocker.
+     */
+    destroy() {
+      this._removeGBrowserListeners();
+      this._clearIntervals();
+      this._removeBlockerOverlay();
+      this.isBlocking = false;
+    }
+
+    /**
+     * Remove gBrowser event listeners.
+     * @private
+     */
+    _removeGBrowserListeners() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined') return;
+
+      // eslint-disable-next-line no-undef
+      if (this.tabSelectHandler && gBrowser.tabContainer) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
+      }
+
+      if (this.pageShowHandler) {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
+      }
+
+      this._removeProgressListener();
+    }
+
+    /**
+     * Remove web progress listener.
+     * @private
+     */
+    _removeProgressListener() {
+      if (!this.progressListener) return;
+
+      try {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeProgressListener(this.progressListener);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+
+    /**
+     * Clear any active intervals.
+     * @private
+     */
+    _clearIntervals() {
+      if (this._timerStatusInterval) {
+        clearInterval(this._timerStatusInterval);
+        this._timerStatusInterval = null;
+      }
+    }
+
+    /**
+     * Remove the blocker overlay from the DOM.
+     * @private
+     */
+    _removeBlockerOverlay() {
+      if (this.blockerOverlay) {
+        this.blockerOverlay.remove();
+        this.blockerOverlay = null;
+      }
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
   
@@ -4201,6 +4911,7 @@
       this.keyboardShortcut = new KeyboardShortcutHandler();
       this.security = new SecurityManager();
       this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
+      this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -4253,6 +4964,10 @@
       // Initialize Sine Mod Blocker
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Sine Mod Blocker');
       this.sineModBlocker.init();
+      
+      // Initialize Website Blocker
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Website Blocker');
+      this.websiteBlocker.init();
       
       // Setup timer callbacks
       this.timer.onTick = (time, phase, cycle, total) => {
@@ -4328,6 +5043,9 @@
       // Notify Sine Mod Blocker that timer started
       this.sineModBlocker.onTimerStart();
       
+      // Notify Website Blocker that timer started
+      this.websiteBlocker.onTimerStart();
+      
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -4347,6 +5065,9 @@
       
       // Notify Sine Mod Blocker that timer stopped
       this.sineModBlocker.onTimerStop();
+      
+      // Notify Website Blocker that timer stopped
+      this.websiteBlocker.onTimerStop();
     }
 
     /**
@@ -4555,6 +5276,10 @@
       // Clean up all modules that have destroy methods
       if (this.sineModBlocker) {
         this.sineModBlocker.destroy();
+      }
+      
+      if (this.websiteBlocker) {
+        this.websiteBlocker.destroy();
       }
       
       if (this.keyboardShortcut) {
