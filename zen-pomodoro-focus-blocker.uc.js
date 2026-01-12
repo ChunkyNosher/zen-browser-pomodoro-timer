@@ -111,6 +111,9 @@
   // Minimum content area dimension for valid overlay bounds (in pixels)
   const MIN_CONTENT_AREA_DIMENSION = 100;
 
+  // Debounce delay for content observer checks (in milliseconds)
+  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
+
   // ============================================
   // LogManager Class
   // ============================================
@@ -826,6 +829,147 @@
       window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
     } else {
       showStopConfirmation();
+    }
+  }
+
+  // ============================================
+  // Shared Blocker Utilities
+  // ============================================
+
+  /**
+   * Create a shared progress listener for monitoring URL changes.
+   * Used by both SineModBlocker and WebsiteBlocker.
+   * @param {function} checkCallback - Callback to call on location change
+   * @param {number} delayMs - Delay before calling callback
+   * @returns {Object|null} Progress listener object or null on failure
+   */
+  function createProgressListener(checkCallback, delayMs) {
+    try {
+      return {
+        QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
+        
+        // eslint-disable-next-line no-unused-vars
+        onLocationChange: (webProgress, _request, _location) => {
+          if (webProgress.isTopLevel) {
+            setTimeout(checkCallback, delayMs);
+          }
+        },
+        
+        onStateChange: () => {},
+        onProgressChange: () => {},
+        onStatusChange: () => {},
+        onSecurityChange: () => {},
+        onContentBlockingEvent: () => {}
+      };
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.INIT, 'Failed to create progress listener', { error: e.message });
+      return null;
+    }
+  }
+
+  /**
+   * Set up common gBrowser event listeners for URL monitoring.
+   * @param {Object} context - The blocker instance (this)
+   * @param {function} checkCallback - Callback to call on events
+   * @param {number} delayMs - Delay for progress listener
+   */
+  function setupBrowserListeners(context, checkCallback, delayMs) {
+    // Tab select listener
+    context.tabSelectHandler = () => checkCallback();
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.addEventListener('TabSelect', context.tabSelectHandler);
+    }
+    
+    // Page show listener
+    context.pageShowHandler = () => {
+      setTimeout(checkCallback, delayMs);
+    };
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined') {
+      // eslint-disable-next-line no-undef
+      gBrowser.addEventListener('pageshow', context.pageShowHandler);
+    }
+    
+    // Progress listener
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined') {
+      context.progressListener = createProgressListener(checkCallback, delayMs);
+      if (context.progressListener) {
+        try {
+          // eslint-disable-next-line no-undef
+          gBrowser.addProgressListener(context.progressListener);
+        } catch (e) {
+          logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove gBrowser event listeners.
+   * @param {Object} context - The blocker instance (this)
+   */
+  function removeBrowserListeners(context) {
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser === 'undefined') return;
+    
+    // eslint-disable-next-line no-undef
+    if (context.tabSelectHandler && gBrowser.tabContainer) {
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.removeEventListener('TabSelect', context.tabSelectHandler);
+    }
+    
+    if (context.pageShowHandler) {
+      // eslint-disable-next-line no-undef
+      gBrowser.removeEventListener('pageshow', context.pageShowHandler);
+    }
+    
+    if (context.progressListener) {
+      try {
+        // eslint-disable-next-line no-undef
+        gBrowser.removeProgressListener(context.progressListener);
+      } catch (e) {
+        // Ignore errors during cleanup
+      }
+    }
+  }
+
+  /**
+   * Handle "Go Back" navigation for blocker overlays.
+   * @param {function} hideBlockerCallback - Callback to hide the blocker
+   * @param {number} delayMs - Delay before hiding blocker
+   */
+  function handleBlockerGoBack(hideBlockerCallback, delayMs) {
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+        // eslint-disable-next-line no-undef
+        const webNav = gBrowser.selectedBrowser.webNavigation;
+        if (webNav && webNav.canGoBack) {
+          webNav.goBack();
+          setTimeout(hideBlockerCallback, delayMs);
+          return;
+        }
+      }
+      
+      // Fallback: Navigate to about:blank
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:blank'), {
+          triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({})
+        });
+        setTimeout(hideBlockerCallback, delayMs);
+        return;
+      }
+      
+      // Last resort: Just hide the blocker
+      hideBlockerCallback();
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back', { error: e.message });
+      hideBlockerCallback();
     }
   }
 
@@ -2891,9 +3035,8 @@
       // ========================================
       // Simple Timer Duration (only visible for simple mode)
       // ========================================
-      const simpleDurationRow = this.createInputRow('Simple Timer Duration (min):', 'simple-duration', 
+      const simpleDurationRow = createLabeledInputRow('Simple Timer Duration (min):', 'simple-duration', 
         { value: config.simpleDuration, min: 1, max: 180 });
-      simpleDurationRow.id = 'simple-duration-row';
       if (config.timerMode !== 'simple') {
         simpleDurationRow.classList.add('hidden');
       }
@@ -2901,30 +3044,26 @@
       // ========================================
       // Pomodoro-specific options
       // ========================================
-      const focusRow = this.createInputRow('Focus Duration (min):', 'focus-duration', 
+      const focusRow = createLabeledInputRow('Focus Duration (min):', 'focus-duration', 
         { value: config.focusDuration, min: 1, max: 120 });
-      focusRow.id = 'focus-duration-row';
       if (config.timerMode === 'simple') {
         focusRow.classList.add('hidden');
       }
       
-      const breakRow = this.createInputRow('Break Duration (min):', 'break-duration', 
+      const breakRow = createLabeledInputRow('Break Duration (min):', 'break-duration', 
         { value: config.breakDuration, min: 1, max: 30 });
-      breakRow.id = 'break-duration-row';
       if (config.timerMode === 'simple') {
         breakRow.classList.add('hidden');
       }
       
-      const longBreakRow = this.createInputRow('Long Break (min):', 'long-break-duration', 
+      const longBreakRow = createLabeledInputRow('Long Break (min):', 'long-break-duration', 
         { value: config.longBreakDuration, min: 5, max: 60 });
-      longBreakRow.id = 'long-break-duration-row';
       if (config.timerMode === 'simple') {
         longBreakRow.classList.add('hidden');
       }
       
-      const cyclesRow = this.createInputRow('Number of Cycles:', 'cycles', 
+      const cyclesRow = createLabeledInputRow('Number of Cycles:', 'cycles', 
         { value: config.cycles, min: 1, max: 20 });
-      cyclesRow.id = 'cycles-row';
       if (config.timerMode === 'simple') {
         cyclesRow.classList.add('hidden');
       }
@@ -3113,15 +3252,15 @@
       activeMethodRow.appendChild(activeMethodSelect);
       
       // Separate hold duration settings for idle and active states
-      const idleHoldDurationRow = this.createInputRow('Idle Hold Time (seconds):', 'idle-hold-duration', 
+      const idleHoldDurationRow = createLabeledInputRow('Idle Hold Time (seconds):', 'idle-hold-duration', 
         { value: config.settingsLockIdleHoldDuration, min: 1, max: 300 });
-      const activeHoldDurationRow = this.createInputRow('Active Hold Time (seconds):', 'active-hold-duration', 
+      const activeHoldDurationRow = createLabeledInputRow('Active Hold Time (seconds):', 'active-hold-duration', 
         { value: config.settingsLockActiveHoldDuration, min: 1, max: 300 });
       
       // Separate code length settings for idle and active states
-      const idleCodeLengthRow = this.createInputRow('Idle Code Length (8-128):', 'idle-code-length', 
+      const idleCodeLengthRow = createLabeledInputRow('Idle Code Length (8-128):', 'idle-code-length', 
         { value: config.settingsLockIdleCodeLength, min: 8, max: 128 });
-      const activeCodeLengthRow = this.createInputRow('Active Code Length (8-128):', 'active-code-length', 
+      const activeCodeLengthRow = createLabeledInputRow('Active Code Length (8-128):', 'active-code-length', 
         { value: config.settingsLockActiveCodeLength, min: 8, max: 128 });
       
       // Show/hide settings based on the selected method for each state
@@ -3365,33 +3504,6 @@
       if (messageEl) {
         messageEl.textContent = sanitizeText(config.motivationalMessage);
       }
-    }
-
-    /**
-     * Helper to create input row.
-     * @param {string} labelText - Label text
-     * @param {string} inputId - Input element ID
-     * @param {Object} options - Input options (value, min, max)
-     * @returns {HTMLElement} The row element
-     */
-    createInputRow(labelText, inputId, options = {}) {
-      const row = document.createElement('div');
-      row.className = 'zen-pomodoro-config-row';
-      
-      const label = document.createElement('label');
-      label.textContent = labelText;
-      
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.id = inputId;
-      if (options.value !== undefined) input.value = options.value;
-      if (options.min !== undefined) input.min = options.min;
-      if (options.max !== undefined) input.max = options.max;
-      
-      row.appendChild(label);
-      row.appendChild(input);
-      
-      return row;
     }
 
     /**
@@ -3671,8 +3783,10 @@
             // Validate and add rulesets
             const importedCount = importData.rulesets.length;
             importData.rulesets.forEach(ruleset => {
-              // Generate new ID to avoid conflicts
-              ruleset.id = 'imported-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+              // Generate new ID to avoid conflicts using crypto.randomUUID if available
+              ruleset.id = typeof crypto !== 'undefined' && crypto.randomUUID 
+                ? 'imported-' + crypto.randomUUID()
+                : 'imported-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
               ruleset.name = ruleset.name || 'Imported Ruleset';
               ruleset.enabled = ruleset.enabled !== false;
               ruleset.sites = Array.isArray(ruleset.sites) ? ruleset.sites : [];
@@ -4146,66 +4260,11 @@
      * @private
      */
     _setupListeners() {
-      // Tab select listener - fires when user switches tabs
-      this.tabSelectHandler = () => this._checkCurrentPage();
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
-      }
+      setupBrowserListeners(this, () => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
       
-      // Page show listener - fires when page is loaded/shown
-      this.pageShowHandler = () => {
-        // Small delay to ensure URL is updated
-        setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
-      };
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined') {
-        // eslint-disable-next-line no-undef
-        gBrowser.addEventListener('pageshow', this.pageShowHandler);
-      }
-      
-      // Hash change listener - for when user navigates within about:preferences
+      // Hash change listener - specific to Sine (for about:preferences navigation)
       this.hashChangeHandler = () => this._checkCurrentPage();
       window.addEventListener('hashchange', this.hashChangeHandler);
-      
-      // Progress listener for URL changes within tabs
-      this._setupProgressListener();
-    }
-
-    /**
-     * Set up a web progress listener to detect URL changes.
-     * This catches navigation within the same tab more reliably.
-     * @private
-     */
-    _setupProgressListener() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-      
-      try {
-        this.progressListener = {
-          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
-          
-          // eslint-disable-next-line no-unused-vars
-          onLocationChange: (webProgress, request, location) => {
-            // Check if this is a top-level navigation
-            if (webProgress.isTopLevel) {
-              setTimeout(() => this._checkCurrentPage(), SINE_PAGE_CHECK_DELAY_MS);
-            }
-          },
-          
-          onStateChange: () => {},
-          onProgressChange: () => {},
-          onStatusChange: () => {},
-          onSecurityChange: () => {},
-          onContentBlockingEvent: () => {}
-        };
-        
-        // eslint-disable-next-line no-undef
-        gBrowser.addProgressListener(this.progressListener);
-      } catch (e) {
-        logger.log(LOG_CATEGORIES.INIT, 'Failed to add progress listener', { error: e.message });
-      }
     }
 
     /**
@@ -4448,6 +4507,7 @@
     /**
      * Handle the "Go Back" button click.
      * Navigates the user away from the Sine Mods page.
+     * Uses shared utility for common navigation logic, but has Sine-specific fallback.
      * @private
      */
     _handleGoBack() {
@@ -4467,7 +4527,7 @@
           }
         }
         
-        // Fallback: Navigate to main preferences page without hash
+        // Sine-specific fallback: Navigate to main preferences page without hash
         // eslint-disable-next-line no-undef
         if (typeof gBrowser !== 'undefined') {
           // eslint-disable-next-line no-undef
@@ -4559,36 +4619,7 @@
      * @private
      */
     _removeGBrowserListeners() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-      
-      // eslint-disable-next-line no-undef
-      if (this.tabSelectHandler && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
-      }
-      
-      if (this.pageShowHandler) {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
-      }
-      
-      this._removeProgressListener();
-    }
-
-    /**
-     * Remove web progress listener.
-     * @private
-     */
-    _removeProgressListener() {
-      if (!this.progressListener) return;
-      
-      try {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeProgressListener(this.progressListener);
-      } catch (e) {
-        // Ignore errors during cleanup
-      }
+      removeBrowserListeners(this);
     }
 
     /**
@@ -4665,6 +4696,7 @@
       this.progressListener = null;
       this._timerStatusInterval = null;
       this.contentObserver = null; // MutationObserver for dynamic page content
+      this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
     }
 
     /**
@@ -4683,62 +4715,7 @@
      * @private
      */
     _setupListeners() {
-      // Tab select listener - fires when user switches tabs
-      this.tabSelectHandler = () => this._checkCurrentPage();
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.addEventListener('TabSelect', this.tabSelectHandler);
-      }
-
-      // Page show listener - fires when page is loaded/shown
-      this.pageShowHandler = () => {
-        // Small delay to ensure URL is updated
-        setTimeout(() => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
-      };
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined') {
-        // eslint-disable-next-line no-undef
-        gBrowser.addEventListener('pageshow', this.pageShowHandler);
-      }
-
-      // Progress listener for URL changes within tabs
-      this._setupProgressListener();
-    }
-
-    /**
-     * Set up a web progress listener to detect URL changes.
-     * This catches navigation within the same tab more reliably.
-     * @private
-     */
-    _setupProgressListener() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-
-      try {
-        this.progressListener = {
-          QueryInterface: ChromeUtils.generateQI(['nsIWebProgressListener', 'nsISupportsWeakReference']),
-
-          // eslint-disable-next-line no-unused-vars
-          onLocationChange: (webProgress, request, location) => {
-            // Check if this is a top-level navigation
-            if (webProgress.isTopLevel) {
-              setTimeout(() => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
-            }
-          },
-
-          onStateChange: () => {},
-          onProgressChange: () => {},
-          onStatusChange: () => {},
-          onSecurityChange: () => {},
-          onContentBlockingEvent: () => {}
-        };
-
-        // eslint-disable-next-line no-undef
-        gBrowser.addProgressListener(this.progressListener);
-      } catch (e) {
-        logger.log(LOG_CATEGORIES.INIT, 'Failed to add website blocker progress listener', { error: e.message });
-      }
+      setupBrowserListeners(this, () => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
     }
 
     /**
@@ -4855,19 +4832,25 @@
         this.contentObserver.disconnect();
         this.contentObserver = null;
       }
+      
+      // Clear any existing debounce timeout
+      if (this._contentObserverDebounceTimeout) {
+        clearTimeout(this._contentObserverDebounceTimeout);
+        this._contentObserverDebounceTimeout = null;
+      }
 
       if (!contentDoc || !contentDoc.body) return;
 
-      let debounceTimeout = null;
-
       this.contentObserver = new MutationObserver(() => {
         // Debounce to avoid excessive checks
-        if (debounceTimeout) clearTimeout(debounceTimeout);
-        debounceTimeout = setTimeout(() => {
+        if (this._contentObserverDebounceTimeout) {
+          clearTimeout(this._contentObserverDebounceTimeout);
+        }
+        this._contentObserverDebounceTimeout = setTimeout(() => {
           if (window.zenPomodoroApp?.timer?.isActive) {
             this._checkCurrentPage();
           }
-        }, 500);
+        }, CONTENT_OBSERVER_DEBOUNCE_DELAY_MS);
       });
 
       this.contentObserver.observe(contentDoc.body, {
@@ -5260,42 +5243,12 @@
     /**
      * Handle the "Go Back" button click.
      * Navigates the user away from the blocked website.
+     * Uses shared utility for common navigation logic.
      * @private
      */
     _handleGoBack() {
       logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on website blocker');
-
-      try {
-        // Try to go back in history
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
-          // eslint-disable-next-line no-undef
-          const webNav = gBrowser.selectedBrowser.webNavigation;
-          if (webNav && webNav.canGoBack) {
-            webNav.goBack();
-            // Hide blocker after navigation
-            setTimeout(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
-            return;
-          }
-        }
-
-        // Fallback: Navigate to about:blank
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined') {
-          // eslint-disable-next-line no-undef
-          gBrowser.selectedBrowser.loadURI(Services.io.newURI('about:blank'), {
-            triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
-          });
-          setTimeout(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
-          return;
-        }
-
-        // Last resort: Just hide the blocker
-        this._hideBlocker();
-      } catch (e) {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back from blocked site', { error: e.message });
-        this._hideBlocker();
-      }
+      handleBlockerGoBack(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
     }
 
     /**
@@ -5389,36 +5342,7 @@
      * @private
      */
     _removeGBrowserListeners() {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser === 'undefined') return;
-
-      // eslint-disable-next-line no-undef
-      if (this.tabSelectHandler && gBrowser.tabContainer) {
-        // eslint-disable-next-line no-undef
-        gBrowser.tabContainer.removeEventListener('TabSelect', this.tabSelectHandler);
-      }
-
-      if (this.pageShowHandler) {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeEventListener('pageshow', this.pageShowHandler);
-      }
-
-      this._removeProgressListener();
-    }
-
-    /**
-     * Remove web progress listener.
-     * @private
-     */
-    _removeProgressListener() {
-      if (!this.progressListener) return;
-
-      try {
-        // eslint-disable-next-line no-undef
-        gBrowser.removeProgressListener(this.progressListener);
-      } catch (e) {
-        // Ignore errors during cleanup
-      }
+      removeBrowserListeners(this);
     }
 
     /**
