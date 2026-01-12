@@ -1,7 +1,7 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
  * Version: 1.1.5
- * License: MPL-2.0
+ * License: MIT
  * 
  * ACCESSIBILITY FIXES:
  * - Added prefers-reduced-motion support for animations
@@ -232,7 +232,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  z-index: 2147483646; /* z-index one less than max to ensure dialogs appear above indicator */
+  z-index: 2147483647 !important; /* Same as max z-index to ensure visibility above lockout screens */
   display: none;
   align-items: center;
   gap: 8px;

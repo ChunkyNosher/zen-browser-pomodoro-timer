@@ -1,7 +1,7 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
  * Version: 1.1.5
- * License: MPL-2.0
+ * License: MIT
  * 
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
  * 
@@ -463,13 +463,22 @@
       startX = coords.x;
       startY = coords.y;
       
-      // If dialog is centered with transform, convert to left/top positioning
+      // Convert from CSS centering (transform + percentage top/left) to absolute pixel positioning
       const computedStyle = window.getComputedStyle(dialog);
+      
+      // Store the actual position from getBoundingClientRect before making changes
+      const actualLeft = rect.left;
+      const actualTop = rect.top;
+      
+      // Clear transform-based centering
       if (computedStyle.transform !== 'none') {
         dialog.style.transform = 'none';
-        dialog.style.left = `${rect.left}px`;
-        dialog.style.top = `${rect.top}px`;
       }
+      
+      // Always set position to fixed and use pixel values to override CSS percentage positioning
+      dialog.style.position = 'fixed';
+      dialog.style.left = `${actualLeft}px`;
+      dialog.style.top = `${actualTop}px`;
       
       startLeft = rect.left;
       startTop = rect.top;
