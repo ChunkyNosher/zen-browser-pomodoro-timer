@@ -90,10 +90,9 @@
         name: 'Default Blocklist',
         enabled: true,
         sites: [], // URL patterns: "youtube.com", "*.reddit.com", "+allowed.site.com"
-        // NOTE: Keyword blocking fields reserved for future implementation
-        blockKeywords: [], // Future: Keywords to block: "minecraft", "gaming"
-        allowKeywords: [], // Future: Keywords to allow even if site matches: "tutorial", "work"
-        checkTitleOnly: false // Future: If true, only check page title, not full content
+        blockKeywords: [], // Keywords to block: "minecraft", "gaming"
+        allowKeywords: [], // Keywords to allow even if site matches: "tutorial", "work"
+        checkTitleOnly: false // If true, only check page title, not full content
       }
     ],
     /** Rulesets to enable when timer starts */
@@ -2532,8 +2531,54 @@
         { value: config.cycles, min: '1', max: '20' });
       cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
       
+      // Ruleset selection for start timer dialog
+      const activeRulesetsRow = document.createElement('div');
+      activeRulesetsRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
+      activeRulesetsRow.id = 'zen-pomodoro-active-rulesets-row';
+      
+      const activeRulesetsLabel = document.createElement('label');
+      activeRulesetsLabel.textContent = 'Active Blocking Rulesets:';
+      
+      const activeRulesetsContainer = document.createElement('div');
+      activeRulesetsContainer.className = 'zen-pomodoro-workspace-list';
+      activeRulesetsContainer.id = 'zen-pomodoro-active-rulesets-container';
+      
+      // Render ruleset checkboxes
+      const rulesets = config.rulesets || [];
+      if (rulesets.length === 0) {
+        const noRulesets = document.createElement('p');
+        noRulesets.style.color = '#888';
+        noRulesets.style.fontSize = '12px';
+        noRulesets.textContent = 'No rulesets configured. Add rulesets in Settings.';
+        activeRulesetsContainer.appendChild(noRulesets);
+      } else {
+        rulesets.forEach(ruleset => {
+          const checkboxRow = document.createElement('div');
+          checkboxRow.className = 'zen-pomodoro-checkbox-row';
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `active-ruleset-${ruleset.id}`;
+          checkbox.value = ruleset.id;
+          checkbox.checked = (config.activeRulesets || ['default']).includes(ruleset.id);
+          checkbox.disabled = !ruleset.enabled;
+          
+          const label = document.createElement('label');
+          label.htmlFor = checkbox.id;
+          label.textContent = ruleset.name + (ruleset.enabled ? '' : ' (disabled)');
+          if (!ruleset.enabled) label.style.color = '#666';
+          
+          checkboxRow.appendChild(checkbox);
+          checkboxRow.appendChild(label);
+          activeRulesetsContainer.appendChild(checkboxRow);
+        });
+      }
+      
+      activeRulesetsRow.appendChild(activeRulesetsLabel);
+      activeRulesetsRow.appendChild(activeRulesetsContainer);
+      
       // Add to config section
-      [modeRow, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow]
+      [modeRow, simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow, activeRulesetsRow]
         .forEach(row => configSection.appendChild(row));
       
       // Buttons
@@ -2651,6 +2696,18 @@
           : config.cycles;
         
         const sessionOverrides = this._buildSessionOverrides(dialog, mode, config);
+        
+        // Save selected active rulesets to config
+        const activeRulesetsContainer = dialog.querySelector('#zen-pomodoro-active-rulesets-container');
+        if (activeRulesetsContainer) {
+          const selectedRulesets = [];
+          activeRulesetsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            selectedRulesets.push(checkbox.value);
+          });
+          config.activeRulesets = selectedRulesets;
+          saveConfig(config);
+          logger.log(LOG_CATEGORIES.SETTINGS, 'Active rulesets saved', { rulesets: selectedRulesets });
+        }
         
         dialog.remove();
         
@@ -2942,6 +2999,64 @@
       workspaceRow.appendChild(workspaceContainer);
       
       // ========================================
+      // Website Blocking Rulesets Section
+      // ========================================
+      const rulesetsSection = document.createElement('div');
+      rulesetsSection.className = 'zen-pomodoro-lockout-section';
+      
+      const rulesetsTitle = document.createElement('div');
+      rulesetsTitle.className = 'zen-pomodoro-lockout-section-title';
+      rulesetsTitle.textContent = '🚫 Website Blocking Rulesets';
+      
+      // Rulesets container
+      const rulesetsContainer = document.createElement('div');
+      rulesetsContainer.className = 'zen-pomodoro-rulesets-container';
+      rulesetsContainer.id = 'zen-pomodoro-rulesets-container';
+      
+      // Render existing rulesets
+      this._renderRulesets(rulesetsContainer, config);
+      
+      // Add New Ruleset button
+      const addRulesetRow = document.createElement('div');
+      addRulesetRow.className = 'zen-pomodoro-config-row';
+      
+      const addRulesetButton = document.createElement('button');
+      addRulesetButton.className = 'zen-pomodoro-dialog-button secondary';
+      addRulesetButton.id = 'zen-pomodoro-add-ruleset';
+      addRulesetButton.textContent = '+ Add Ruleset';
+      addRulesetButton.addEventListener('click', () => {
+        this._addNewRuleset(rulesetsContainer, config);
+      });
+      addRulesetRow.appendChild(addRulesetButton);
+      
+      // Export/Import buttons
+      const exportImportRow = document.createElement('div');
+      exportImportRow.className = 'zen-pomodoro-config-row';
+      exportImportRow.style.gap = '8px';
+      
+      const exportRulesetsButton = document.createElement('button');
+      exportRulesetsButton.className = 'zen-pomodoro-dialog-button secondary small';
+      exportRulesetsButton.textContent = 'Export Rulesets';
+      exportRulesetsButton.addEventListener('click', () => {
+        this._exportRulesets(config);
+      });
+      
+      const importRulesetsButton = document.createElement('button');
+      importRulesetsButton.className = 'zen-pomodoro-dialog-button secondary small';
+      importRulesetsButton.textContent = 'Import Rulesets';
+      importRulesetsButton.addEventListener('click', () => {
+        this._importRulesets(rulesetsContainer, config);
+      });
+      
+      exportImportRow.appendChild(exportRulesetsButton);
+      exportImportRow.appendChild(importRulesetsButton);
+      
+      rulesetsSection.appendChild(rulesetsTitle);
+      rulesetsSection.appendChild(rulesetsContainer);
+      rulesetsSection.appendChild(addRulesetRow);
+      rulesetsSection.appendChild(exportImportRow);
+
+      // ========================================
       // Lockout Methods Section
       // ========================================
       const lockoutSection = document.createElement('div');
@@ -3046,6 +3161,7 @@
       configSection.appendChild(cyclesRow);
       configSection.appendChild(messageRow);
       configSection.appendChild(workspaceRow);
+      configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       
       // Buttons
@@ -3276,6 +3392,310 @@
       row.appendChild(input);
       
       return row;
+    }
+
+    /**
+     * Render rulesets in container
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _renderRulesets(container, config) {
+      container.innerHTML = '';
+      const rulesets = config.rulesets || [];
+      
+      if (rulesets.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'zen-pomodoro-empty-rulesets';
+        emptyMsg.textContent = 'No rulesets configured. Add one to start blocking websites.';
+        container.appendChild(emptyMsg);
+        return;
+      }
+      
+      rulesets.forEach((ruleset, index) => {
+        const rulesetItem = this._createRulesetItem(ruleset, index, container, config);
+        container.appendChild(rulesetItem);
+      });
+    }
+
+    /**
+     * Create a ruleset item element
+     * @param {Object} ruleset - Ruleset data
+     * @param {number} index - Ruleset index
+     * @param {HTMLElement} container - Parent container
+     * @param {Object} config - Configuration object
+     * @returns {HTMLElement}
+     * @private
+     */
+    _createRulesetItem(ruleset, index, container, config) {
+      const item = document.createElement('div');
+      item.className = 'zen-pomodoro-ruleset-item';
+      item.dataset.rulesetId = ruleset.id;
+      
+      // Header row with name and controls
+      const headerRow = document.createElement('div');
+      headerRow.className = 'zen-pomodoro-ruleset-header';
+      
+      // Enable checkbox
+      const enableCheckbox = document.createElement('input');
+      enableCheckbox.type = 'checkbox';
+      enableCheckbox.checked = ruleset.enabled;
+      enableCheckbox.addEventListener('change', () => {
+        config.rulesets[index].enabled = enableCheckbox.checked;
+      });
+      
+      // Name input
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'zen-pomodoro-ruleset-name';
+      nameInput.value = ruleset.name;
+      nameInput.placeholder = 'Ruleset Name';
+      nameInput.addEventListener('change', () => {
+        config.rulesets[index].name = nameInput.value || 'Unnamed Ruleset';
+      });
+      
+      // Expand/collapse toggle
+      const expandBtn = document.createElement('button');
+      expandBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      expandBtn.textContent = '▼';
+      expandBtn.addEventListener('click', () => {
+        const details = item.querySelector('.zen-pomodoro-ruleset-details');
+        if (details.style.display === 'none') {
+          details.style.display = 'block';
+          expandBtn.textContent = '▲';
+        } else {
+          details.style.display = 'none';
+          expandBtn.textContent = '▼';
+        }
+      });
+      
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'zen-pomodoro-dialog-button secondary small';
+      deleteBtn.textContent = '🗑️';
+      deleteBtn.addEventListener('click', () => {
+        if (config.rulesets.length > 1) {
+          config.rulesets.splice(index, 1);
+          // Also remove from active rulesets
+          config.activeRulesets = config.activeRulesets.filter(id => id !== ruleset.id);
+          this._renderRulesets(container, config);
+        } else {
+          window.zenPomodoroApp?.showCustomAlert('Cannot Delete', 'You must have at least one ruleset.');
+        }
+      });
+      
+      headerRow.appendChild(enableCheckbox);
+      headerRow.appendChild(nameInput);
+      headerRow.appendChild(expandBtn);
+      headerRow.appendChild(deleteBtn);
+      
+      // Details section (collapsible)
+      const details = document.createElement('div');
+      details.className = 'zen-pomodoro-ruleset-details';
+      details.style.display = 'none';
+      
+      // Sites textarea
+      const sitesLabel = document.createElement('label');
+      sitesLabel.textContent = 'Blocked Sites (one per line):';
+      sitesLabel.className = 'zen-pomodoro-ruleset-label';
+      
+      const sitesHelp = document.createElement('div');
+      sitesHelp.className = 'zen-pomodoro-ruleset-help';
+      sitesHelp.textContent = 'Use: "site.com", "*.site.com" (wildcard), "+allowed.site.com" (exception)';
+      
+      const sitesTextarea = document.createElement('textarea');
+      sitesTextarea.className = 'zen-pomodoro-ruleset-textarea';
+      sitesTextarea.value = (ruleset.sites || []).join('\n');
+      sitesTextarea.placeholder = 'youtube.com\n*.reddit.com\n+docs.google.com';
+      sitesTextarea.rows = 5;
+      sitesTextarea.addEventListener('change', () => {
+        config.rulesets[index].sites = sitesTextarea.value
+          .split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      });
+      
+      // Block keywords textarea
+      const blockKeywordsLabel = document.createElement('label');
+      blockKeywordsLabel.textContent = 'Block Keywords (page content):';
+      blockKeywordsLabel.className = 'zen-pomodoro-ruleset-label';
+      
+      const blockKeywordsHelp = document.createElement('div');
+      blockKeywordsHelp.className = 'zen-pomodoro-ruleset-help';
+      blockKeywordsHelp.textContent = 'Pages containing these words will be blocked (one per line)';
+      
+      const blockKeywordsTextarea = document.createElement('textarea');
+      blockKeywordsTextarea.className = 'zen-pomodoro-ruleset-textarea';
+      blockKeywordsTextarea.value = (ruleset.blockKeywords || []).join('\n');
+      blockKeywordsTextarea.placeholder = 'gaming\nminecraft\nnetflix';
+      blockKeywordsTextarea.rows = 3;
+      blockKeywordsTextarea.addEventListener('change', () => {
+        config.rulesets[index].blockKeywords = blockKeywordsTextarea.value
+          .split('\n')
+          .map(s => s.trim().toLowerCase())
+          .filter(s => s.length > 0);
+      });
+      
+      // Allow keywords textarea
+      const allowKeywordsLabel = document.createElement('label');
+      allowKeywordsLabel.textContent = 'Allow Keywords (override blocks):';
+      allowKeywordsLabel.className = 'zen-pomodoro-ruleset-label';
+      
+      const allowKeywordsHelp = document.createElement('div');
+      allowKeywordsHelp.className = 'zen-pomodoro-ruleset-help';
+      allowKeywordsHelp.textContent = 'Pages containing these words will NOT be blocked (one per line)';
+      
+      const allowKeywordsTextarea = document.createElement('textarea');
+      allowKeywordsTextarea.className = 'zen-pomodoro-ruleset-textarea';
+      allowKeywordsTextarea.value = (ruleset.allowKeywords || []).join('\n');
+      allowKeywordsTextarea.placeholder = 'tutorial\nwork\neducation';
+      allowKeywordsTextarea.rows = 3;
+      allowKeywordsTextarea.addEventListener('change', () => {
+        config.rulesets[index].allowKeywords = allowKeywordsTextarea.value
+          .split('\n')
+          .map(s => s.trim().toLowerCase())
+          .filter(s => s.length > 0);
+      });
+      
+      // Check title only checkbox
+      const titleOnlyRow = document.createElement('div');
+      titleOnlyRow.className = 'zen-pomodoro-checkbox-row';
+      
+      const titleOnlyCheckbox = document.createElement('input');
+      titleOnlyCheckbox.type = 'checkbox';
+      titleOnlyCheckbox.id = `title-only-${ruleset.id}`;
+      titleOnlyCheckbox.checked = ruleset.checkTitleOnly || false;
+      titleOnlyCheckbox.addEventListener('change', () => {
+        config.rulesets[index].checkTitleOnly = titleOnlyCheckbox.checked;
+      });
+      
+      const titleOnlyLabel = document.createElement('label');
+      titleOnlyLabel.htmlFor = `title-only-${ruleset.id}`;
+      titleOnlyLabel.textContent = 'Check keywords in page title only (faster)';
+      
+      titleOnlyRow.appendChild(titleOnlyCheckbox);
+      titleOnlyRow.appendChild(titleOnlyLabel);
+      
+      // Assemble details
+      details.appendChild(sitesLabel);
+      details.appendChild(sitesHelp);
+      details.appendChild(sitesTextarea);
+      details.appendChild(blockKeywordsLabel);
+      details.appendChild(blockKeywordsHelp);
+      details.appendChild(blockKeywordsTextarea);
+      details.appendChild(allowKeywordsLabel);
+      details.appendChild(allowKeywordsHelp);
+      details.appendChild(allowKeywordsTextarea);
+      details.appendChild(titleOnlyRow);
+      
+      item.appendChild(headerRow);
+      item.appendChild(details);
+      
+      return item;
+    }
+
+    /**
+     * Add a new ruleset
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _addNewRuleset(container, config) {
+      const newId = 'ruleset-' + Date.now();
+      const newRuleset = {
+        id: newId,
+        name: 'New Ruleset',
+        enabled: true,
+        sites: [],
+        blockKeywords: [],
+        allowKeywords: [],
+        checkTitleOnly: false
+      };
+      
+      if (!config.rulesets) config.rulesets = [];
+      config.rulesets.push(newRuleset);
+      
+      this._renderRulesets(container, config);
+      logger.log(LOG_CATEGORIES.SETTINGS, 'New ruleset added', { id: newId });
+    }
+
+    /**
+     * Export rulesets to JSON file
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _exportRulesets(config) {
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        rulesets: config.rulesets || []
+      };
+      
+      const data = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zen-pomodoro-rulesets-${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), URL_REVOKE_DELAY_MS);
+      
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets exported', { count: config.rulesets.length });
+      window.zenPomodoroApp?.showCustomAlert('Export Complete', `Exported ${config.rulesets.length} rulesets.`);
+    }
+
+    /**
+     * Import rulesets from JSON file
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _importRulesets(container, config) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const importData = JSON.parse(event.target.result);
+            
+            if (!importData.rulesets || !Array.isArray(importData.rulesets)) {
+              throw new Error('Invalid rulesets format');
+            }
+            
+            // Validate and add rulesets
+            const importedCount = importData.rulesets.length;
+            importData.rulesets.forEach(ruleset => {
+              // Generate new ID to avoid conflicts
+              ruleset.id = 'imported-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+              ruleset.name = ruleset.name || 'Imported Ruleset';
+              ruleset.enabled = ruleset.enabled !== false;
+              ruleset.sites = Array.isArray(ruleset.sites) ? ruleset.sites : [];
+              ruleset.blockKeywords = Array.isArray(ruleset.blockKeywords) ? ruleset.blockKeywords : [];
+              ruleset.allowKeywords = Array.isArray(ruleset.allowKeywords) ? ruleset.allowKeywords : [];
+              ruleset.checkTitleOnly = !!ruleset.checkTitleOnly;
+            });
+            
+            config.rulesets = [...(config.rulesets || []), ...importData.rulesets];
+            this._renderRulesets(container, config);
+            
+            logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets imported', { count: importedCount });
+            window.zenPomodoroApp?.showCustomAlert('Import Complete', `Imported ${importedCount} rulesets.`);
+          } catch (err) {
+            logger.log(LOG_CATEGORIES.SETTINGS, 'Ruleset import failed', { error: err.message });
+            window.zenPomodoroApp?.showCustomAlert('Import Failed', 'Could not parse the rulesets file. Please ensure it is a valid JSON file.');
+          }
+        };
+        
+        reader.readAsText(file);
+      });
+      
+      input.click();
     }
   }
 
@@ -4244,6 +4664,7 @@
       this.pageShowHandler = null;
       this.progressListener = null;
       this._timerStatusInterval = null;
+      this.contentObserver = null; // MutationObserver for dynamic page content
     }
 
     /**
@@ -4387,6 +4808,20 @@
         return;
       }
 
+      // Setup content observer for dynamic pages (keyword checking)
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const contentDoc = gBrowser.selectedBrowser.contentDocument;
+          if (contentDoc && contentDoc.body) {
+            this._setupContentObserver(contentDoc);
+          }
+        }
+      } catch (e) {
+        // Ignore - content document may not be accessible
+      }
+
       // Reload config and check against active rulesets
       this.config = getConfig();
       const blockResult = this._checkUrlAgainstActiveRulesets(
@@ -4406,6 +4841,40 @@
       } else {
         this._hideBlockerIfShowing();
       }
+    }
+
+    /**
+     * Setup content observer for dynamic pages.
+     * Re-checks keywords when page content changes significantly.
+     * @param {Document} contentDoc - Content document to observe
+     * @private
+     */
+    _setupContentObserver(contentDoc) {
+      // Clean up any existing observer
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+
+      if (!contentDoc || !contentDoc.body) return;
+
+      let debounceTimeout = null;
+
+      this.contentObserver = new MutationObserver(() => {
+        // Debounce to avoid excessive checks
+        if (debounceTimeout) clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(() => {
+          if (window.zenPomodoroApp?.timer?.isActive) {
+            this._checkCurrentPage();
+          }
+        }, 500);
+      });
+
+      this.contentObserver.observe(contentDoc.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
     }
 
     /**
@@ -4489,7 +4958,7 @@
     }
 
     /**
-     * Check URL against a ruleset.
+     * Check URL against a ruleset (includes keyword checking).
      * @param {string} url - URL to check
      * @param {Object} ruleset - Ruleset configuration
      * @returns {{blocked: boolean, reason: string|null}} Block result
@@ -4497,19 +4966,75 @@
      */
     _checkUrlAgainstRuleset(url, ruleset) {
       const sites = ruleset.sites || [];
+      const blockKeywords = ruleset.blockKeywords || [];
+      const allowKeywords = ruleset.allowKeywords || [];
+      const checkTitleOnly = ruleset.checkTitleOnly || false;
 
-      // First check for exceptions (+ prefix) - these override blocks
+      // First check for URL exceptions (+ prefix)
       if (this._urlMatchesException(url, sites)) {
         return { blocked: false, reason: null };
       }
 
-      // Then check for blocks (patterns without + or ~ prefix)
+      // Check allow keywords in page content (override blocks)
+      if (allowKeywords.length > 0) {
+        const pageText = this._getPageText(checkTitleOnly);
+        for (const keyword of allowKeywords) {
+          if (pageText.toLowerCase().includes(keyword.toLowerCase())) {
+            logger.log(LOG_CATEGORIES.SECURITY, 'Page allowed by keyword', { keyword });
+            return { blocked: false, reason: null };
+          }
+        }
+      }
+
+      // Check URL blocks (patterns without + or ~ prefix)
       const blockingPattern = this._findBlockingPattern(url, sites);
       if (blockingPattern) {
         return { blocked: true, reason: `URL matches pattern: ${blockingPattern}` };
       }
 
+      // Check keyword blocks in page content
+      if (blockKeywords.length > 0) {
+        const pageText = this._getPageText(checkTitleOnly);
+        for (const keyword of blockKeywords) {
+          if (pageText.toLowerCase().includes(keyword.toLowerCase())) {
+            return { blocked: true, reason: `Page contains blocked keyword: "${keyword}"` };
+          }
+        }
+      }
+
       return { blocked: false, reason: null };
+    }
+
+    /**
+     * Get page text content for keyword checking.
+     * @param {boolean} titleOnly - If true, only return page title
+     * @returns {string} Page text content
+     * @private
+     */
+    _getPageText(titleOnly = false) {
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser === 'undefined' || !gBrowser.selectedBrowser) {
+          return '';
+        }
+
+        // eslint-disable-next-line no-undef
+        const contentDoc = gBrowser.selectedBrowser.contentDocument;
+        if (!contentDoc) return '';
+
+        if (titleOnly) {
+          return contentDoc.title || '';
+        }
+
+        // Get title + body text
+        const title = contentDoc.title || '';
+        const bodyText = contentDoc.body?.innerText || contentDoc.body?.textContent || '';
+
+        return title + ' ' + bodyText;
+      } catch (e) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Failed to get page text', { error: e.message });
+        return '';
+      }
     }
 
     /**
@@ -4633,9 +5158,11 @@
       const title = document.createElement('h2');
       title.textContent = 'Website Blocked';
 
-      // Message
+      // Message - show keyword info if blocked by keyword
       const message = document.createElement('p');
-      message.textContent = 'This website is blocked during your focus session.';
+      message.textContent = reason && reason.includes('keyword')
+        ? `Blocked: ${reason}`
+        : 'This website is blocked during your focus session.';
 
       // Ruleset info
       const rulesetInfo = document.createElement('p');
@@ -4805,6 +5332,12 @@
         this._timerStatusInterval = null;
       }
 
+      // Disconnect content observer
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+
       if (this.blockerOverlay) {
         this.blockerOverlay.remove();
         this.blockerOverlay = null;
@@ -4835,8 +5368,20 @@
     destroy() {
       this._removeGBrowserListeners();
       this._clearIntervals();
+      this._disconnectContentObserver();
       this._removeBlockerOverlay();
       this.isBlocking = false;
+    }
+
+    /**
+     * Disconnect the content observer if active.
+     * @private
+     */
+    _disconnectContentObserver() {
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
     }
 
     /**
