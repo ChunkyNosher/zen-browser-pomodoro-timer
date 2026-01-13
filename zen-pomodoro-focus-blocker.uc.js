@@ -231,6 +231,31 @@
     '#main-window',
   ];
 
+  // ============================================
+  // Helper Functions
+  // ============================================
+
+  /**
+   * Find rule in config and execute callback if found.
+   * Reduces code duplication in rule event handlers.
+   * @param {Object} config - Configuration object
+   * @param {string} rulesetId - Ruleset ID to find
+   * @param {string} ruleId - Rule ID to find
+   * @param {function} callback - Callback with (rule, ruleIndex, rulesArray) params
+   * @returns {boolean} True if rule was found and callback was executed
+   */
+  function findRuleAndExecute(config, rulesetId, ruleId, callback) {
+    const rulesetIndex = config.rulesets.findIndex((r) => r.id === rulesetId);
+    if (rulesetIndex === -1) return false;
+
+    const rulesArray = config.rulesets[rulesetIndex].rules;
+    const ruleIndex = rulesArray.findIndex((r) => r.id === ruleId);
+    if (ruleIndex === -1) return false;
+
+    callback(rulesArray[ruleIndex], ruleIndex, rulesArray);
+    return true;
+  }
+
   /**
    * LogManager class for comprehensive logging with export functionality.
    * Stores log entries in memory with timestamps and provides export capabilities.
@@ -277,36 +302,26 @@
     }
 
     /**
-     * Sanitize data to remove sensitive information.
-     * @param {*} data - Data to sanitize
-     * @returns {*} Sanitized data
+     * Check if a key is sensitive and should be redacted.
+     * @param {string} key - Key to check
+     * @returns {boolean} True if key is sensitive
      * @private
      */
-    // NOTE: Cyclomatic complexity (cc=9) is acceptable for this recursive sanitization logic
-    // that handles multiple data types (null, primitive, array, object) and sensitive key filtering
-    _sanitizeData(data) {
-      if (data === null || data === undefined) {
-        return data;
-      }
+    _isSensitiveKey(key) {
+      const lowerKey = key.toLowerCase();
+      return SENSITIVE_KEYS.some((sensitive) => lowerKey.includes(sensitive));
+    }
 
-      // Handle primitive types
-      if (typeof data !== 'object') {
-        return data;
-      }
-
-      // Handle arrays
-      if (Array.isArray(data)) {
-        return data.map((item) => this._sanitizeData(item));
-      }
-
-      // Handle objects - filter out sensitive keys using module-level constant
+    /**
+     * Sanitize an object by filtering sensitive keys.
+     * @param {Object} data - Object to sanitize
+     * @returns {Object} Sanitized object
+     * @private
+     */
+    _sanitizeObject(data) {
       const sanitized = {};
-
       for (const [key, value] of Object.entries(data)) {
-        const lowerKey = key.toLowerCase();
-        const isSensitive = SENSITIVE_KEYS.some((sensitive) => lowerKey.includes(sensitive));
-
-        if (isSensitive) {
+        if (this._isSensitiveKey(key)) {
           sanitized[key] = '[REDACTED]';
         } else if (typeof value === 'object' && value !== null) {
           sanitized[key] = this._sanitizeData(value);
@@ -314,8 +329,24 @@
           sanitized[key] = value;
         }
       }
-
       return sanitized;
+    }
+
+    /**
+     * Sanitize data to remove sensitive information.
+     * @param {*} data - Data to sanitize
+     * @returns {*} Sanitized data
+     * @private
+     */
+    _sanitizeData(data) {
+      // Handle null/undefined
+      if (data === null || data === undefined) return data;
+      // Handle primitive types
+      if (typeof data !== 'object') return data;
+      // Handle arrays
+      if (Array.isArray(data)) return data.map((item) => this._sanitizeData(item));
+      // Handle objects
+      return this._sanitizeObject(data);
     }
 
     /**
@@ -476,6 +507,11 @@
    * Issue 8: Setup drag functionality for dialogs
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
+   *
+   * NOTE: Cyclomatic complexity (cc=9) is acceptable for this function since it provides
+   * unified drag handling for both mouse and touch events, coordinate transform conversion,
+   * and viewport boundary clamping. Helper functions (isTouchEventWithTouches, getClientCoords,
+   * cleanupDrag) have already been extracted to reduce complexity where practical.
    *
    * @param {HTMLElement} dialog - The dialog element to make draggable.
    *                               Must contain an h2 element as the drag handle.
@@ -868,6 +904,22 @@
     if (phase === 'focus') return 'Focus';
     if (phase === 'transition') return 'Transition';
     return 'Break';
+  }
+
+  /**
+   * Get detailed phase label for menu display.
+   * Differentiates between 'break' and 'long-break' phases.
+   * @param {string} phase - Phase identifier
+   * @returns {string} Detailed phase label
+   */
+  function getMenuPhaseLabel(phase) {
+    const labels = {
+      focus: 'Focus',
+      break: 'Break',
+      'long-break': 'Long Break',
+      transition: 'Transition',
+    };
+    return labels[phase] || 'Focus';
   }
 
   /**
@@ -3250,25 +3302,8 @@
         // Timer is running - show timer controls
         const status = window.zenPomodoroApp.timer.getStatus();
         const timeStr = formatTime(status.remainingTime);
-        // Map all known phases explicitly, including transition and long-break for backwards compatibility
-        let phaseStr;
-        switch (status.currentPhase) {
-          case 'focus':
-            phaseStr = 'Focus';
-            break;
-          case 'break':
-            phaseStr = 'Break';
-            break;
-          case 'long-break':
-            phaseStr = 'Long Break';
-            break;
-          case 'transition':
-            phaseStr = 'Transition';
-            break;
-          default:
-            phaseStr = 'Focus';
-            break;
-        }
+        // Use helper function to map phase to display label
+        const phaseStr = getMenuPhaseLabel(status.currentPhase);
 
         const statusRow = document.createElement('div');
         statusRow.className = 'zen-pomodoro-config-row';
@@ -4724,13 +4759,9 @@
       patternInput.placeholder =
         rule.type === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
       patternInput.addEventListener('change', () => {
-        const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-        if (rulesetIndex !== -1) {
-          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex((r) => r.id === rule.id);
-          if (ruleIndex !== -1) {
-            config.rulesets[rulesetIndex].rules[ruleIndex].pattern = patternInput.value.trim();
-          }
-        }
+        findRuleAndExecute(config, ruleset.id, rule.id, (ruleObj) => {
+          ruleObj.pattern = patternInput.value.trim();
+        });
       });
 
       // Type dropdown (Website/Keyword)
@@ -4750,16 +4781,12 @@
       typeSelect.appendChild(keywordOption);
 
       typeSelect.addEventListener('change', () => {
-        const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-        if (rulesetIndex !== -1) {
-          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex((r) => r.id === rule.id);
-          if (ruleIndex !== -1) {
-            config.rulesets[rulesetIndex].rules[ruleIndex].type = typeSelect.value;
-            // Update placeholder
-            patternInput.placeholder =
-              typeSelect.value === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
-          }
-        }
+        findRuleAndExecute(config, ruleset.id, rule.id, (ruleObj) => {
+          ruleObj.type = typeSelect.value;
+          // Update placeholder
+          patternInput.placeholder =
+            typeSelect.value === 'keyword' ? 'Enter keyword...' : 'site.com or *.site.com';
+        });
       });
 
       // Condition dropdown (Block/Allow)
@@ -4779,13 +4806,9 @@
       conditionSelect.appendChild(allowOption);
 
       conditionSelect.addEventListener('change', () => {
-        const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-        if (rulesetIndex !== -1) {
-          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex((r) => r.id === rule.id);
-          if (ruleIndex !== -1) {
-            config.rulesets[rulesetIndex].rules[ruleIndex].condition = conditionSelect.value;
-          }
-        }
+        findRuleAndExecute(config, ruleset.id, rule.id, (ruleObj) => {
+          ruleObj.condition = conditionSelect.value;
+        });
       });
 
       // Delete rule button
@@ -4794,14 +4817,10 @@
       deleteBtn.textContent = '×';
       deleteBtn.title = 'Delete rule';
       deleteBtn.addEventListener('click', () => {
-        const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-        if (rulesetIndex !== -1) {
-          const ruleIndex = config.rulesets[rulesetIndex].rules.findIndex((r) => r.id === rule.id);
-          if (ruleIndex !== -1) {
-            config.rulesets[rulesetIndex].rules.splice(ruleIndex, 1);
-            this._renderRules(container, config.rulesets[rulesetIndex], config);
-          }
-        }
+        findRuleAndExecute(config, ruleset.id, rule.id, (ruleObj, ruleIndex, rulesArray) => {
+          rulesArray.splice(ruleIndex, 1);
+          this._renderRules(container, ruleset, config);
+        });
       });
 
       ruleEl.appendChild(patternInput);
@@ -7491,38 +7510,21 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // Clean up all modules that have destroy methods
-      if (this.sineModBlocker) {
-        this.sineModBlocker.destroy();
-      }
+      // Modules with destroy() methods
+      const modulesToDestroy = [
+        this.sineModBlocker,
+        this.websiteBlocker,
+        this.transitionManager,
+        this.keyboardShortcut,
+        this.overlay,
+      ];
 
-      if (this.websiteBlocker) {
-        this.websiteBlocker.destroy();
-      }
+      modulesToDestroy.forEach((module) => module?.destroy?.());
 
-      if (this.transitionManager) {
-        this.transitionManager.destroy();
-      }
-
-      if (this.keyboardShortcut) {
-        this.keyboardShortcut.destroy();
-      }
-
-      if (this.overlay) {
-        this.overlay.destroy();
-      }
-
-      if (this.workspace) {
-        this.workspace.stopMonitoring();
-      }
-
-      if (this.timer) {
-        this.timer.stop();
-      }
-
-      if (this.security) {
-        this.security.cleanupLockScreen();
-      }
+      // Modules with specific cleanup methods
+      this.workspace?.stopMonitoring?.();
+      this.timer?.stop?.();
+      this.security?.cleanupLockScreen?.();
 
       this.initialized = false;
 
