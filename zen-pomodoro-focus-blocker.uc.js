@@ -469,10 +469,13 @@
     let startLeft, startTop;
     let dialogWidth, dialogHeight;
 
+    // Helper to check if event is a valid touch event with touches
+    const isTouchEventWithTouches = (e) =>
+      e.type?.startsWith('touch') && e.touches?.length > 0;
+
     // Helper to get client coordinates from mouse or touch event
     const getClientCoords = (e) => {
-      // Use type checking for more robust touch detection
-      if (e.type && e.type.startsWith('touch') && e.touches && e.touches.length > 0) {
+      if (isTouchEventWithTouches(e)) {
         return { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
       return { x: e.clientX, y: e.clientY };
@@ -824,6 +827,30 @@
   }
 
   /**
+   * Render an empty list message or items from an array.
+   * Shared utility to reduce code duplication between _renderRulesets and _renderRules.
+   * @param {Object} options - Options object
+   * @param {HTMLElement} options.container - Container to populate
+   * @param {Array} options.items - Array of items to check
+   * @param {string} options.emptyClass - CSS class for empty message
+   * @param {string} options.emptyText - Text for empty message
+   * @param {Function} options.renderItem - Function to render each item
+   */
+  function renderListOrEmptyMessage({ container, items, emptyClass, emptyText, renderItem }) {
+    container.innerHTML = '';
+
+    if (!items || items.length === 0) {
+      const emptyMsg = document.createElement('p');
+      emptyMsg.className = emptyClass;
+      emptyMsg.textContent = emptyText;
+      container.appendChild(emptyMsg);
+      return;
+    }
+
+    items.forEach(renderItem);
+  }
+
+  /**
    * Helper to handle stop timer with lockout.
    * Reduces code duplication for stop timer logic.
    *
@@ -1000,6 +1027,90 @@
       logger.log(LOG_CATEGORIES.SECURITY, 'Error navigating back', { error: e.message });
       hideBlockerCallback();
     }
+  }
+
+  /**
+   * Update timer status display element for blocker overlays.
+   * Shared utility to reduce code duplication between SineModBlocker and WebsiteBlocker.
+   * @param {HTMLElement} statusElement - Element to update with timer status
+   */
+  function updateBlockerTimerStatus(statusElement) {
+    const timer = window.zenPomodoroApp?.timer;
+    if (!timer) {
+      statusElement.textContent = '';
+      return;
+    }
+
+    const status = timer.getStatus();
+    if (!status) {
+      statusElement.textContent = '';
+      return;
+    }
+
+    const timeStr = formatTime(status.remainingTime);
+    const phaseLabel = getShortPhaseLabel(status.currentPhase);
+
+    // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
+    statusElement.textContent =
+      status.mode === 'simple'
+        ? `${phaseLabel}: ${timeStr}`
+        : `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+  }
+
+  /**
+   * Start interval to update timer status display for blocker overlays.
+   * Shared utility to reduce code duplication between SineModBlocker and WebsiteBlocker.
+   * @param {Object} context - The blocker instance (this) - must have isBlocking, _timerStatusInterval, _hideBlocker
+   * @param {HTMLElement} statusElement - Element to update
+   */
+  function startBlockerTimerStatusUpdates(context, statusElement) {
+    // Update immediately
+    updateBlockerTimerStatus(statusElement);
+
+    // Update every second
+    context._timerStatusInterval = setInterval(() => {
+      if (context.isBlocking && statusElement) {
+        updateBlockerTimerStatus(statusElement);
+
+        // Also check if timer is still active
+        if (!window.zenPomodoroApp?.timer?.isActive) {
+          context._hideBlocker();
+        }
+      }
+    }, 1000);
+  }
+
+  /**
+   * Create a blocker overlay button element.
+   * @param {string} className - CSS class name
+   * @param {string} text - Button text
+   * @param {Function} onClick - Click handler
+   * @returns {HTMLButtonElement} Button element
+   */
+  function createBlockerButton(className, text, onClick) {
+    const button = document.createElement('button');
+    button.className = `zen-pomodoro-dialog-button ${className}`;
+    button.textContent = text;
+    button.addEventListener('click', onClick);
+    return button;
+  }
+
+  /**
+   * Create the buttons container for blocker overlays.
+   * Shared utility to reduce code duplication.
+   * @param {string} buttonsId - ID for the buttons container
+   * @param {Function} onGoBack - Go Back button click handler
+   * @param {Function} onStopTimer - Stop Timer button click handler
+   * @returns {HTMLElement} Buttons container element
+   */
+  function createBlockerButtons(buttonsId, onGoBack, onStopTimer) {
+    const buttons = document.createElement('div');
+    buttons.id = buttonsId;
+
+    buttons.appendChild(createBlockerButton('secondary', 'Go Back', onGoBack));
+    buttons.appendChild(createBlockerButton('', 'Stop Timer', onStopTimer));
+
+    return buttons;
   }
 
   // ============================================
@@ -2731,90 +2842,16 @@
         ]
       );
 
-      // Duration inputs using helper
-      const simpleDurationRow = createLabeledInputRow(
-        'Duration (min):',
-        'zen-pomodoro-simple-duration-input',
-        { value: config.simpleDuration, min: '1', max: '180' }
-      );
-      simpleDurationRow.style.display = isSimpleMode ? 'flex' : 'none';
+      // Duration inputs
+      const durationRows = this._createDurationInputRows(config, isSimpleMode);
 
-      const focusDurationRow = createLabeledInputRow(
-        'Focus (min):',
-        'zen-pomodoro-focus-duration-input',
-        { value: config.focusDuration, min: '1', max: '120' }
-      );
-      focusDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
-
-      const breakDurationRow = createLabeledInputRow(
-        'Break (min):',
-        'zen-pomodoro-break-duration-input',
-        { value: config.breakDuration, min: '1', max: '30' }
-      );
-      breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
-
-      const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input', {
-        value: config.cycles,
-        min: '1',
-        max: '20',
-      });
-      cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
-
-      // Ruleset selection for start timer dialog
-      const activeRulesetsRow = document.createElement('div');
-      activeRulesetsRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
-      activeRulesetsRow.id = 'zen-pomodoro-active-rulesets-row';
-
-      const activeRulesetsLabel = document.createElement('label');
-      activeRulesetsLabel.textContent = 'Active Blocking Rulesets:';
-
-      const activeRulesetsContainer = document.createElement('div');
-      activeRulesetsContainer.className = 'zen-pomodoro-workspace-list';
-      activeRulesetsContainer.id = 'zen-pomodoro-active-rulesets-container';
-
-      // Render ruleset checkboxes
-      const rulesets = config.rulesets || [];
-      if (rulesets.length === 0) {
-        const noRulesets = document.createElement('p');
-        noRulesets.style.color = '#888';
-        noRulesets.style.fontSize = '12px';
-        noRulesets.textContent = 'No rulesets configured. Add rulesets in Settings.';
-        activeRulesetsContainer.appendChild(noRulesets);
-      } else {
-        rulesets.forEach((ruleset) => {
-          const checkboxRow = document.createElement('div');
-          checkboxRow.className = 'zen-pomodoro-checkbox-row';
-
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.id = `active-ruleset-${ruleset.id}`;
-          checkbox.value = ruleset.id;
-          checkbox.checked = (config.activeRulesets || ['default']).includes(ruleset.id);
-          checkbox.disabled = !ruleset.enabled;
-
-          const label = document.createElement('label');
-          label.htmlFor = checkbox.id;
-          label.textContent = ruleset.name + (ruleset.enabled ? '' : ' (disabled)');
-          if (!ruleset.enabled) label.style.color = '#666';
-
-          checkboxRow.appendChild(checkbox);
-          checkboxRow.appendChild(label);
-          activeRulesetsContainer.appendChild(checkboxRow);
-        });
-      }
-
-      activeRulesetsRow.appendChild(activeRulesetsLabel);
-      activeRulesetsRow.appendChild(activeRulesetsContainer);
+      // Ruleset selection
+      const activeRulesetsRow = this._createActiveRulesetsRow(config);
 
       // Add to config section
-      [
-        modeRow,
-        simpleDurationRow,
-        focusDurationRow,
-        breakDurationRow,
-        cyclesRow,
-        activeRulesetsRow,
-      ].forEach((row) => configSection.appendChild(row));
+      [modeRow, ...durationRows, activeRulesetsRow].forEach((row) =>
+        configSection.appendChild(row)
+      );
 
       // Buttons
       const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
@@ -2825,14 +2862,72 @@
       setupDialogDrag(dialog);
 
       // Event handlers
-      this._setupModeToggleHandler(modeSelect, {
-        simpleDurationRow,
-        focusDurationRow,
-        breakDurationRow,
-        cyclesRow,
-      });
+      this._setupModeToggleHandler(modeSelect, durationRows);
       cancelButton.addEventListener('click', () => dialog.remove());
       this._setupStartHandler(dialog, config, modeSelect, startButton);
+    }
+
+    /**
+     * Create duration input rows for the start timer dialog.
+     * @param {Object} config - Configuration object
+     * @param {boolean} isSimpleMode - Whether simple timer mode is active
+     * @returns {HTMLElement[]} Array of duration row elements
+     * @private
+     */
+    _createDurationInputRows(config, isSimpleMode) {
+      const simpleDurationRow = createLabeledInputRow(
+        'Duration (min):',
+        'zen-pomodoro-simple-duration-input',
+        { value: config.simpleDuration, min: '1', max: '180' }
+      );
+      simpleDurationRow.style.display = isSimpleMode ? 'flex' : 'none';
+      simpleDurationRow.dataset.mode = 'simple';
+
+      const focusDurationRow = createLabeledInputRow(
+        'Focus (min):',
+        'zen-pomodoro-focus-duration-input',
+        { value: config.focusDuration, min: '1', max: '120' }
+      );
+      focusDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      focusDurationRow.dataset.mode = 'pomodoro';
+
+      const breakDurationRow = createLabeledInputRow(
+        'Break (min):',
+        'zen-pomodoro-break-duration-input',
+        { value: config.breakDuration, min: '1', max: '30' }
+      );
+      breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      breakDurationRow.dataset.mode = 'pomodoro';
+
+      const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input', {
+        value: config.cycles,
+        min: '1',
+        max: '20',
+      });
+      cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
+      cyclesRow.dataset.mode = 'pomodoro';
+
+      return [simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow];
+    }
+
+    /**
+     * Create the active rulesets selection row.
+     * @param {Object} config - Configuration object
+     * @returns {HTMLElement} Rulesets row element
+     * @private
+     */
+    _createActiveRulesetsRow(config) {
+      const row = document.createElement('div');
+      row.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
+      row.id = 'zen-pomodoro-active-rulesets-row';
+
+      const label = document.createElement('label');
+      label.textContent = 'Active Blocking Rulesets:';
+
+      row.appendChild(label);
+      row.appendChild(this._createRulesetCheckboxes(config));
+
+      return row;
     }
 
     /**
@@ -2852,6 +2947,51 @@
         this.showPomodoroMenu();
       });
       return backButton;
+    }
+
+    /**
+     * Create ruleset checkboxes for the start timer dialog.
+     * @param {Object} config - Configuration object
+     * @returns {HTMLElement} Container with ruleset checkboxes
+     * @private
+     */
+    _createRulesetCheckboxes(config) {
+      const container = document.createElement('div');
+      container.className = 'zen-pomodoro-workspace-list';
+      container.id = 'zen-pomodoro-active-rulesets-container';
+
+      const rulesets = config.rulesets || [];
+      if (rulesets.length === 0) {
+        const noRulesets = document.createElement('p');
+        noRulesets.style.color = '#888';
+        noRulesets.style.fontSize = '12px';
+        noRulesets.textContent = 'No rulesets configured. Add rulesets in Settings.';
+        container.appendChild(noRulesets);
+        return container;
+      }
+
+      rulesets.forEach((ruleset) => {
+        const checkboxRow = document.createElement('div');
+        checkboxRow.className = 'zen-pomodoro-checkbox-row';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `active-ruleset-${ruleset.id}`;
+        checkbox.value = ruleset.id;
+        checkbox.checked = (config.activeRulesets || ['default']).includes(ruleset.id);
+        checkbox.disabled = !ruleset.enabled;
+
+        const label = document.createElement('label');
+        label.htmlFor = checkbox.id;
+        label.textContent = ruleset.name + (ruleset.enabled ? '' : ' (disabled)');
+        if (!ruleset.enabled) label.style.color = '#666';
+
+        checkboxRow.appendChild(checkbox);
+        checkboxRow.appendChild(label);
+        container.appendChild(checkboxRow);
+      });
+
+      return container;
     }
 
     /**
@@ -2897,19 +3037,20 @@
      * Setup mode toggle handler for showing/hiding duration rows.
      * @param {HTMLSelectElement} modeSelect - Mode select element
      * @param {Object} rows - Object containing row elements
-     * @param {HTMLElement} rows.simpleDurationRow - Simple duration row
-     * @param {HTMLElement} rows.focusDurationRow - Focus duration row
-     * @param {HTMLElement} rows.breakDurationRow - Break duration row
-     * @param {HTMLElement} rows.cyclesRow - Cycles row
+     * @param {HTMLElement[]} rows - Array of duration row elements with dataset.mode attributes
      * @private
      */
     _setupModeToggleHandler(modeSelect, rows) {
       modeSelect.addEventListener('change', () => {
         const isSimple = modeSelect.value === 'simple';
-        rows.simpleDurationRow.style.display = isSimple ? 'flex' : 'none';
-        rows.focusDurationRow.style.display = isSimple ? 'none' : 'flex';
-        rows.breakDurationRow.style.display = isSimple ? 'none' : 'flex';
-        rows.cyclesRow.style.display = isSimple ? 'none' : 'flex';
+        rows.forEach((row) => {
+          const mode = row.dataset.mode;
+          if (mode === 'simple') {
+            row.style.display = isSimple ? 'flex' : 'none';
+          } else if (mode === 'pomodoro') {
+            row.style.display = isSimple ? 'none' : 'flex';
+          }
+        });
       });
     }
 
@@ -3785,20 +3926,16 @@
      * @private
      */
     _renderRulesets(container, config) {
-      container.innerHTML = '';
       const rulesets = config.rulesets || [];
-
-      if (rulesets.length === 0) {
-        const emptyMsg = document.createElement('p');
-        emptyMsg.className = 'zen-pomodoro-empty-rulesets';
-        emptyMsg.textContent = 'No rulesets configured. Add one to start blocking websites.';
-        container.appendChild(emptyMsg);
-        return;
-      }
-
-      rulesets.forEach((ruleset, index) => {
-        const rulesetItem = this._createRulesetItem(ruleset, index, container, config);
-        container.appendChild(rulesetItem);
+      renderListOrEmptyMessage({
+        container,
+        items: rulesets,
+        emptyClass: 'zen-pomodoro-empty-rulesets',
+        emptyText: 'No rulesets configured. Add one to start blocking websites.',
+        renderItem: (ruleset, index) => {
+          const rulesetItem = this._createRulesetItem(ruleset, index, container, config);
+          container.appendChild(rulesetItem);
+        },
       });
     }
 
@@ -3940,26 +4077,23 @@
 
     /**
      * Render individual rules in a container
+     * Uses shared utility to reduce code duplication.
      * @param {HTMLElement} container - Rules container
      * @param {Object} ruleset - Parent ruleset
      * @param {Object} config - Configuration object
      * @private
      */
     _renderRules(container, ruleset, config) {
-      container.innerHTML = '';
       const rules = ruleset.rules || [];
-
-      if (rules.length === 0) {
-        const emptyMsg = document.createElement('p');
-        emptyMsg.className = 'zen-pomodoro-empty-rules';
-        emptyMsg.textContent = 'No rules configured. Click "Add Rule/Condition" to add one.';
-        container.appendChild(emptyMsg);
-        return;
-      }
-
-      rules.forEach((rule) => {
-        const ruleEl = this._createRuleElement(rule, ruleset, config, container);
-        container.appendChild(ruleEl);
+      renderListOrEmptyMessage({
+        container,
+        items: rules,
+        emptyClass: 'zen-pomodoro-empty-rules',
+        emptyText: 'No rules configured. Click "Add Rule/Condition" to add one.',
+        renderItem: (rule) => {
+          const ruleEl = this._createRuleElement(rule, ruleset, config, container);
+          container.appendChild(ruleEl);
+        },
       });
     }
 
@@ -4179,7 +4313,95 @@
     }
 
     /**
-     * Import rulesets from JSON file
+     * Validate and normalize a single imported ruleset.
+     * @param {Object} ruleset - Raw imported ruleset
+     * @returns {Object} Normalized ruleset
+     * @private
+     */
+    _normalizeImportedRuleset(ruleset) {
+      ruleset.id = 'imported-' + this._generateRulesetId().replace('ruleset-', '');
+      ruleset.name = ruleset.name || 'Imported Ruleset';
+      ruleset.enabled = ruleset.enabled !== false;
+      ruleset.checkTitleOnly = !!ruleset.checkTitleOnly;
+
+      // Convert old format to new format if needed
+      if (this._hasOldFormatProperties(ruleset)) {
+        ruleset.rules = this._convertOldFormatToRules(ruleset);
+        delete ruleset.sites;
+        delete ruleset.blockKeywords;
+        delete ruleset.allowKeywords;
+      }
+
+      // Ensure rules array exists
+      if (!Array.isArray(ruleset.rules)) {
+        ruleset.rules = [];
+      }
+
+      // Validate and normalize each rule
+      ruleset.rules = ruleset.rules.filter((rule) => this._normalizeImportedRule(rule));
+
+      return ruleset;
+    }
+
+    /**
+     * Check if ruleset has old format properties.
+     * @param {Object} ruleset - Ruleset to check
+     * @returns {boolean} True if has old format
+     * @private
+     */
+    _hasOldFormatProperties(ruleset) {
+      return (
+        Array.isArray(ruleset.sites) ||
+        Array.isArray(ruleset.blockKeywords) ||
+        Array.isArray(ruleset.allowKeywords)
+      );
+    }
+
+    /**
+     * Normalize and validate an imported rule.
+     * @param {Object} rule - Raw imported rule
+     * @returns {boolean} True if rule is valid
+     * @private
+     */
+    _normalizeImportedRule(rule) {
+      if (!rule || typeof rule !== 'object') return false;
+
+      rule.id = rule.id || this._generateRuleId();
+      rule.pattern = typeof rule.pattern === 'string' ? rule.pattern : '';
+      rule.type = ['website', 'keyword'].includes(rule.type) ? rule.type : 'website';
+      rule.condition = ['block', 'allow'].includes(rule.condition) ? rule.condition : 'block';
+
+      return true;
+    }
+
+    /**
+     * Process imported rulesets JSON data.
+     * @param {string} jsonText - Raw JSON text
+     * @param {Object} config - Current config
+     * @param {HTMLElement} container - Container for re-rendering
+     * @throws {Error} If invalid format
+     * @private
+     */
+    _processImportedRulesets(jsonText, config, container) {
+      const importData = JSON.parse(jsonText);
+
+      if (!importData.rulesets || !Array.isArray(importData.rulesets)) {
+        throw new Error('Invalid rulesets format');
+      }
+
+      const importedCount = importData.rulesets.length;
+      importData.rulesets.forEach((ruleset) => this._normalizeImportedRuleset(ruleset));
+
+      config.rulesets = [...(config.rulesets || []), ...importData.rulesets];
+      this._renderRulesets(container, config);
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets imported', { count: importedCount });
+      return importedCount;
+    }
+
+    /**
+     * Import rulesets from JSON file.
+     * Refactored to reduce cyclomatic complexity.
      * @param {HTMLElement} container - Container element
      * @param {Object} config - Configuration object
      * @private
@@ -4208,57 +4430,11 @@
 
         reader.onload = (event) => {
           try {
-            const importData = JSON.parse(event.target.result);
-
-            if (!importData.rulesets || !Array.isArray(importData.rulesets)) {
-              throw new Error('Invalid rulesets format');
-            }
-
-            // Validate and add rulesets
-            const importedCount = importData.rulesets.length;
-            importData.rulesets.forEach((ruleset) => {
-              // Generate new ID to avoid conflicts
-              ruleset.id = 'imported-' + this._generateRulesetId().replace('ruleset-', '');
-              ruleset.name = ruleset.name || 'Imported Ruleset';
-              ruleset.enabled = ruleset.enabled !== false;
-              ruleset.checkTitleOnly = !!ruleset.checkTitleOnly;
-
-              // Convert old format (sites/blockKeywords/allowKeywords) to new format (rules array)
-              if (
-                Array.isArray(ruleset.sites) ||
-                Array.isArray(ruleset.blockKeywords) ||
-                Array.isArray(ruleset.allowKeywords)
-              ) {
-                ruleset.rules = this._convertOldFormatToRules(ruleset);
-                // Clean up old format properties
-                delete ruleset.sites;
-                delete ruleset.blockKeywords;
-                delete ruleset.allowKeywords;
-              }
-
-              // Ensure rules array exists and is valid
-              if (!Array.isArray(ruleset.rules)) {
-                ruleset.rules = [];
-              }
-
-              // Validate each rule in the rules array
-              ruleset.rules = ruleset.rules.filter((rule) => {
-                if (!rule || typeof rule !== 'object') return false;
-                // Ensure required properties exist
-                rule.id = rule.id || this._generateRuleId();
-                rule.pattern = typeof rule.pattern === 'string' ? rule.pattern : '';
-                rule.type = ['website', 'keyword'].includes(rule.type) ? rule.type : 'website';
-                rule.condition = ['block', 'allow'].includes(rule.condition)
-                  ? rule.condition
-                  : 'block';
-                return true;
-              });
-            });
-
-            config.rulesets = [...(config.rulesets || []), ...importData.rulesets];
-            this._renderRulesets(container, config);
-
-            logger.log(LOG_CATEGORIES.SETTINGS, 'Rulesets imported', { count: importedCount });
+            const importedCount = this._processImportedRulesets(
+              event.target.result,
+              config,
+              container
+            );
             window.zenPomodoroApp?.showCustomAlert(
               'Import Complete',
               `Imported ${importedCount} rulesets.`
@@ -4366,25 +4542,37 @@
 
     /**
      * Check if settings should be locked
+     * Refactored to reduce "Bumpy Road" code smell with extracted helpers.
      */
     shouldLockSettings(timerActive) {
       const config = getConfig();
+      return timerActive
+        ? this._shouldLockActiveTimer(config)
+        : this._shouldLockIdleTimer(config);
+    }
 
-      if (timerActive) {
-        // Check based on active method
-        if (config.settingsLockActiveMethod === LOCKOUT_METHODS.CODE) {
-          return config.settingsLockActiveCodeLength > 0;
-        } else {
-          return config.settingsLockActiveHoldDuration > 0;
-        }
-      } else {
-        // Check based on idle method
-        if (config.settingsLockIdleMethod === LOCKOUT_METHODS.CODE) {
-          return config.settingsLockIdleCodeLength > 0;
-        } else {
-          return config.settingsLockIdleHoldDuration > 0;
-        }
-      }
+    /**
+     * Check lock settings for active timer state.
+     * @param {Object} config - Configuration object
+     * @returns {boolean} True if settings should be locked
+     * @private
+     */
+    _shouldLockActiveTimer(config) {
+      return config.settingsLockActiveMethod === LOCKOUT_METHODS.CODE
+        ? config.settingsLockActiveCodeLength > 0
+        : config.settingsLockActiveHoldDuration > 0;
+    }
+
+    /**
+     * Check lock settings for idle timer state.
+     * @param {Object} config - Configuration object
+     * @returns {boolean} True if settings should be locked
+     * @private
+     */
+    _shouldLockIdleTimer(config) {
+      return config.settingsLockIdleMethod === LOCKOUT_METHODS.CODE
+        ? config.settingsLockIdleCodeLength > 0
+        : config.settingsLockIdleHoldDuration > 0;
     }
 
     /**
@@ -4532,18 +4720,20 @@
       input.id = 'zen-pomodoro-lock-code';
       input.placeholder = 'Enter code here';
 
-      // Add Enter key support for code entry
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          if (input.value === code) {
-            logger.log(LOG_CATEGORIES.SECURITY, 'Code verification successful');
-            this.cleanupLockScreen();
-            onUnlock();
-          } else if (window.zenPomodoroApp) {
-            logger.log(LOG_CATEGORIES.SECURITY, 'Code verification failed - incorrect code');
-            window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
-          }
+      // Shared verification function
+      const verifyCode = () => {
+        if (input.value === code) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification successful');
+          this.cleanupLockScreen();
+          onUnlock();
+        } else {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification failed - incorrect code');
+          window.zenPomodoroApp?.showCustomAlert('Incorrect Code', 'Please try again.');
         }
+      };
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyCode();
       });
 
       const { buttonDiv } = this._createLockButtonRow();
@@ -4554,16 +4744,7 @@
       unlockButton.textContent = 'Unlock';
       buttonDiv.appendChild(unlockButton);
 
-      unlockButton.addEventListener('click', () => {
-        if (input.value === code) {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification successful');
-          this.cleanupLockScreen();
-          onUnlock();
-        } else if (window.zenPomodoroApp) {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Code verification failed - incorrect code');
-          window.zenPomodoroApp.showCustomAlert('Incorrect Code', 'Please try again.');
-        }
-      });
+      unlockButton.addEventListener('click', verifyCode);
 
       lockContent.appendChild(h2);
       lockContent.appendChild(p);
@@ -4721,35 +4902,50 @@
     }
 
     /**
+     * Clear an interval and nullify its reference.
+     * @param {string} intervalKey - Key of the interval property to clear
+     * @private
+     */
+    _clearIntervalIfExists(intervalKey) {
+      if (this[intervalKey]) {
+        clearInterval(this[intervalKey]);
+        this[intervalKey] = null;
+      }
+    }
+
+    /**
+     * Restore overlay pointer-events if they were disabled.
+     * @private
+     */
+    _restoreOverlayPointerEvents() {
+      if (!this._overlayPointerEventsDisabled) return;
+
+      const overlay =
+        window.zenPomodoroApp?.overlay?.overlay ||
+        document.getElementById('zen-pomodoro-overlay');
+      if (overlay) {
+        overlay.style.setProperty('pointer-events', 'all', 'important');
+      }
+      this._overlayPointerEventsDisabled = false;
+    }
+
+    /**
      * Cleanup lock screen
      * MEMORY LEAK FIX: Clear interval and cached element reference on cleanup
      * Z-INDEX FIX: Restore overlay pointer-events when lock screen is closed
+     * Refactored to reduce cyclomatic complexity.
      */
     cleanupLockScreen() {
-      if (this.lockIntervalId) {
-        clearInterval(this.lockIntervalId);
-        this.lockIntervalId = null;
-      }
-      if (this.holdToUnlockIntervalId) {
-        clearInterval(this.holdToUnlockIntervalId);
-        this.holdToUnlockIntervalId = null;
-      }
+      this._clearIntervalIfExists('lockIntervalId');
+      this._clearIntervalIfExists('holdToUnlockIntervalId');
+
       this.lockTimerElement = null;
       if (this.lockScreen) {
         this.lockScreen.remove();
         this.lockScreen = null;
       }
 
-      // Z-INDEX FIX: Restore overlay pointer-events if they were disabled
-      if (this._overlayPointerEventsDisabled) {
-        const overlay =
-          window.zenPomodoroApp?.overlay?.overlay ||
-          document.getElementById('zen-pomodoro-overlay');
-        if (overlay) {
-          overlay.style.setProperty('pointer-events', 'all', 'important');
-        }
-        this._overlayPointerEventsDisabled = false;
-      }
+      this._restoreOverlayPointerEvents();
     }
   }
 
@@ -4936,6 +5132,7 @@
 
     /**
      * Create the blocker overlay element with all its content.
+     * Uses shared utilities to reduce code duplication.
      * @private
      */
     _createBlockerOverlay() {
@@ -4968,24 +5165,12 @@
       timerStatus.id = 'zen-pomodoro-sine-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons container
-      const buttons = document.createElement('div');
-      buttons.id = 'zen-pomodoro-sine-blocker-buttons';
-
-      // Go Back button
-      const goBackButton = document.createElement('button');
-      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
-      goBackButton.textContent = 'Go Back';
-      goBackButton.addEventListener('click', () => this._handleGoBack());
-
-      // Stop Timer button
-      const stopTimerButton = document.createElement('button');
-      stopTimerButton.className = 'zen-pomodoro-dialog-button';
-      stopTimerButton.textContent = 'Stop Timer';
-      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
-
-      buttons.appendChild(goBackButton);
-      buttons.appendChild(stopTimerButton);
+      // Buttons using shared utility
+      const buttons = createBlockerButtons(
+        'zen-pomodoro-sine-blocker-buttons',
+        () => this._handleGoBack(),
+        () => this._handleStopTimer()
+      );
 
       content.appendChild(icon);
       content.appendChild(title);
@@ -4995,59 +5180,28 @@
 
       this.blockerOverlay.appendChild(content);
 
-      // Set up timer status updates
-      this._startTimerStatusUpdates(timerStatus);
+      // Set up timer status updates using shared utility
+      startBlockerTimerStatusUpdates(this, timerStatus);
     }
 
     /**
      * Update the timer status display.
+     * Delegates to shared utility to reduce code duplication.
      * @param {HTMLElement} statusElement - Element to update
      * @private
      */
     _updateTimerStatus(statusElement) {
-      const timer = window.zenPomodoroApp?.timer;
-      if (!timer) {
-        statusElement.textContent = '';
-        return;
-      }
-
-      const status = timer.getStatus();
-      if (!status) {
-        statusElement.textContent = '';
-        return;
-      }
-
-      const timeStr = formatTime(status.remainingTime);
-      const phaseLabel = getShortPhaseLabel(status.currentPhase);
-
-      // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
-      if (status.mode === 'simple') {
-        statusElement.textContent = `${phaseLabel}: ${timeStr}`;
-      } else {
-        statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
-      }
+      updateBlockerTimerStatus(statusElement);
     }
 
     /**
      * Start interval to update timer status display.
+     * Delegates to shared utility to reduce code duplication.
      * @param {HTMLElement} statusElement - Element to update
      * @private
      */
     _startTimerStatusUpdates(statusElement) {
-      // Update immediately
-      this._updateTimerStatus(statusElement);
-
-      // Update every second
-      this._timerStatusInterval = setInterval(() => {
-        if (this.isBlocking && statusElement) {
-          this._updateTimerStatus(statusElement);
-
-          // Also check if timer is still active
-          if (!window.zenPomodoroApp?.timer?.isActive) {
-            this._hideBlocker();
-          }
-        }
-      }, 1000);
+      startBlockerTimerStatusUpdates(this, statusElement);
     }
 
     /**
@@ -5311,8 +5465,55 @@
     }
 
     /**
+     * Try to setup content observer for the current page.
+     * @private
+     */
+    _trySetupContentObserver() {
+      try {
+        // eslint-disable-next-line no-undef
+        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
+          // eslint-disable-next-line no-undef
+          const contentDoc = gBrowser.selectedBrowser.contentDocument;
+          if (contentDoc?.body) {
+            this._setupContentObserver(contentDoc);
+          }
+        }
+      } catch (e) {
+        // Log content access denied errors for debugging
+        logger.log(LOG_CATEGORIES.SECURITY, 'Content document access denied', { error: e.message });
+      }
+    }
+
+    /**
+     * Evaluate URL against rulesets and update blocker state.
+     * @param {string} url - URL to evaluate
+     * @private
+     */
+    _evaluateUrlAndUpdateBlocker(url) {
+      this.config = getConfig();
+      const blockResult = this._checkUrlAgainstActiveRulesets(
+        url,
+        this.config.activeRulesets || ['default'],
+        this.config.rulesets || []
+      );
+
+      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker page check', {
+        url: url,
+        blocked: blockResult.blocked,
+        isBlocking: this.isBlocking,
+      });
+
+      if (blockResult.blocked) {
+        this._showBlocker(blockResult.reason, blockResult.rulesetName);
+      } else {
+        this._hideBlockerIfShowing();
+      }
+    }
+
+    /**
      * Check if current page should be blocked.
      * Shows or hides the blocker overlay based on timer state and current URL.
+     * Refactored to reduce cyclomatic complexity.
      * @private
      */
     _checkCurrentPage() {
@@ -5332,39 +5533,10 @@
       }
 
       // Setup content observer for dynamic pages (keyword checking)
-      try {
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
-          // eslint-disable-next-line no-undef
-          const contentDoc = gBrowser.selectedBrowser.contentDocument;
-          if (contentDoc && contentDoc.body) {
-            this._setupContentObserver(contentDoc);
-          }
-        }
-      } catch (e) {
-        // Log content access denied errors for debugging
-        logger.log(LOG_CATEGORIES.SECURITY, 'Content document access denied', { error: e.message });
-      }
+      this._trySetupContentObserver();
 
-      // Reload config and check against active rulesets
-      this.config = getConfig();
-      const blockResult = this._checkUrlAgainstActiveRulesets(
-        currentUrl,
-        this.config.activeRulesets || ['default'],
-        this.config.rulesets || []
-      );
-
-      logger.log(LOG_CATEGORIES.SECURITY, 'Website blocker page check', {
-        url: currentUrl,
-        blocked: blockResult.blocked,
-        isBlocking: this.isBlocking,
-      });
-
-      if (blockResult.blocked) {
-        this._showBlocker(blockResult.reason, blockResult.rulesetName);
-      } else {
-        this._hideBlockerIfShowing();
-      }
+      // Evaluate URL against rulesets and update blocker
+      this._evaluateUrlAndUpdateBlocker(currentUrl);
     }
 
     /**
@@ -5376,39 +5548,17 @@
      * is limited to tab titles only (see _getPageText). The observer still triggers
      * re-checks which will verify the tab title against keyword rules.
      *
+     * Refactored to reduce cyclomatic complexity by extracting helper methods.
+     *
      * @param {Document} contentDoc - Content document to observe
      * @private
      */
     _setupContentObserver(contentDoc) {
-      // Clean up any existing observer
-      if (this.contentObserver) {
-        this.contentObserver.disconnect();
-        this.contentObserver = null;
-      }
+      this._cleanupExistingObserver();
 
-      // Clear any existing debounce timeout
-      if (this._contentObserverDebounceTimeout) {
-        clearTimeout(this._contentObserverDebounceTimeout);
-        this._contentObserverDebounceTimeout = null;
-      }
+      if (!contentDoc?.body) return;
 
-      if (!contentDoc || !contentDoc.body) return;
-
-      // Only observe if there are keyword rules configured (performance optimization)
-      const config = getConfig();
-      const activeRulesets = config.activeRulesets || ['default'];
-      const rulesets = config.rulesets || [];
-
-      let hasKeywordRules = false;
-      for (const rulesetId of activeRulesets) {
-        const ruleset = rulesets.find((r) => r.id === rulesetId);
-        if (ruleset && ruleset.rules) {
-          hasKeywordRules = ruleset.rules.some((r) => r.type === 'keyword' && r.pattern);
-          if (hasKeywordRules) break;
-        }
-      }
-
-      if (!hasKeywordRules) {
+      if (!this._hasActiveKeywordRules()) {
         logger.log(
           LOG_CATEGORIES.SECURITY,
           'Skipping content observer - no keyword rules configured'
@@ -5416,6 +5566,50 @@
         return;
       }
 
+      this._createContentObserver(contentDoc);
+    }
+
+    /**
+     * Clean up any existing content observer and debounce timeout.
+     * @private
+     */
+    _cleanupExistingObserver() {
+      if (this.contentObserver) {
+        this.contentObserver.disconnect();
+        this.contentObserver = null;
+      }
+
+      if (this._contentObserverDebounceTimeout) {
+        clearTimeout(this._contentObserverDebounceTimeout);
+        this._contentObserverDebounceTimeout = null;
+      }
+    }
+
+    /**
+     * Check if any active ruleset has keyword rules configured.
+     * @returns {boolean} True if keyword rules exist in active rulesets
+     * @private
+     */
+    _hasActiveKeywordRules() {
+      const config = getConfig();
+      const activeRulesets = config.activeRulesets || ['default'];
+      const rulesets = config.rulesets || [];
+
+      for (const rulesetId of activeRulesets) {
+        const ruleset = rulesets.find((r) => r.id === rulesetId);
+        if (ruleset?.rules?.some((r) => r.type === 'keyword' && r.pattern)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Create and attach a MutationObserver to the content document.
+     * @param {Document} contentDoc - Content document to observe
+     * @private
+     */
+    _createContentObserver(contentDoc) {
       this.contentObserver = new MutationObserver(() => {
         // Debounce to avoid excessive checks
         if (this._contentObserverDebounceTimeout) {
@@ -5621,21 +5815,14 @@
      * @private
      */
     _categorizeRules(rules) {
+      const filterRules = (type, condition) =>
+        rules.filter((r) => r.type === type && r.condition === condition && r.pattern);
+
       return {
-        // Allow rules (checked first - highest priority)
-        websiteAllow: rules.filter(
-          (r) => r.type === 'website' && r.condition === 'allow' && r.pattern
-        ),
-        keywordAllow: rules.filter(
-          (r) => r.type === 'keyword' && r.condition === 'allow' && r.pattern
-        ),
-        // Block rules (checked after allows - lower priority)
-        websiteBlock: rules.filter(
-          (r) => r.type === 'website' && r.condition === 'block' && r.pattern
-        ),
-        keywordBlock: rules.filter(
-          (r) => r.type === 'keyword' && r.condition === 'block' && r.pattern
-        ),
+        websiteAllow: filterRules('website', 'allow'),
+        keywordAllow: filterRules('keyword', 'allow'),
+        websiteBlock: filterRules('website', 'block'),
+        keywordBlock: filterRules('keyword', 'block'),
       };
     }
 
@@ -5857,10 +6044,9 @@
 
       // Message - show keyword info if blocked by keyword
       const message = document.createElement('p');
-      message.textContent =
-        reason && reason.includes('keyword')
-          ? `Blocked: ${reason}`
-          : 'This website is blocked during your focus session.';
+      message.textContent = reason?.includes('keyword')
+        ? `Blocked: ${reason}`
+        : 'This website is blocked during your focus session.';
 
       // Ruleset info
       const rulesetInfo = document.createElement('p');
@@ -5872,24 +6058,12 @@
       timerStatus.id = 'zen-pomodoro-website-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons container
-      const buttons = document.createElement('div');
-      buttons.id = 'zen-pomodoro-website-blocker-buttons';
-
-      // Go Back button
-      const goBackButton = document.createElement('button');
-      goBackButton.className = 'zen-pomodoro-dialog-button secondary';
-      goBackButton.textContent = 'Go Back';
-      goBackButton.addEventListener('click', () => this._handleGoBack());
-
-      // Stop Timer button
-      const stopTimerButton = document.createElement('button');
-      stopTimerButton.className = 'zen-pomodoro-dialog-button';
-      stopTimerButton.textContent = 'Stop Timer';
-      stopTimerButton.addEventListener('click', () => this._handleStopTimer());
-
-      buttons.appendChild(goBackButton);
-      buttons.appendChild(stopTimerButton);
+      // Buttons using shared utility
+      const buttons = createBlockerButtons(
+        'zen-pomodoro-website-blocker-buttons',
+        () => this._handleGoBack(),
+        () => this._handleStopTimer()
+      );
 
       content.appendChild(icon);
       content.appendChild(title);
@@ -5900,59 +6074,28 @@
 
       this.blockerOverlay.appendChild(content);
 
-      // Set up timer status updates
-      this._startTimerStatusUpdates(timerStatus);
+      // Set up timer status updates using shared utility
+      startBlockerTimerStatusUpdates(this, timerStatus);
     }
 
     /**
      * Update the timer status display.
+     * Delegates to shared utility to reduce code duplication.
      * @param {HTMLElement} statusElement - Element to update
      * @private
      */
     _updateTimerStatus(statusElement) {
-      const timer = window.zenPomodoroApp?.timer;
-      if (!timer) {
-        statusElement.textContent = '';
-        return;
-      }
-
-      const status = timer.getStatus();
-      if (!status) {
-        statusElement.textContent = '';
-        return;
-      }
-
-      const timeStr = formatTime(status.remainingTime);
-      const phaseLabel = getShortPhaseLabel(status.currentPhase);
-
-      // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
-      if (status.mode === 'simple') {
-        statusElement.textContent = `${phaseLabel}: ${timeStr}`;
-      } else {
-        statusElement.textContent = `${phaseLabel}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
-      }
+      updateBlockerTimerStatus(statusElement);
     }
 
     /**
      * Start interval to update timer status display.
+     * Delegates to shared utility to reduce code duplication.
      * @param {HTMLElement} statusElement - Element to update
      * @private
      */
     _startTimerStatusUpdates(statusElement) {
-      // Update immediately
-      this._updateTimerStatus(statusElement);
-
-      // Update every second
-      this._timerStatusInterval = setInterval(() => {
-        if (this.isBlocking && statusElement) {
-          this._updateTimerStatus(statusElement);
-
-          // Also check if timer is still active
-          if (!window.zenPomodoroApp?.timer?.isActive) {
-            this._hideBlocker();
-          }
-        }
-      }, 1000);
+      startBlockerTimerStatusUpdates(this, statusElement);
     }
 
     /**
