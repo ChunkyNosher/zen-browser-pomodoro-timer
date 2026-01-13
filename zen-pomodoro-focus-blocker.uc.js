@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.9
+ * Version: 1.2.0
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -64,10 +64,11 @@
   };
 
   /**
-   * Timeout duration for context menu auto-close (safety cleanup).
-   * @constant {number}
+   * Data attribute name used to mark dialogs that should not save their position.
+   * Used by the transition popup to prevent affecting settings menu positioning.
+   * @constant {string}
    */
-  const CONTEXT_MENU_TIMEOUT_MS = 30000;
+  const DATA_NO_POSITION_SAVE = 'data-no-position-save';
 
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
@@ -125,16 +126,6 @@
   // Debounce delay for content observer checks (in milliseconds)
   const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
 
-  // Fallback dialog dimensions for position calculations when actual dimensions are unavailable
-  // These match the CSS min-width of .zen-pomodoro-dialog (400px) and estimated height
-  const DIALOG_FALLBACK_WIDTH = 400;
-  const DIALOG_FALLBACK_HEIGHT = 300;
-
-  // Minimum visible portion of dialog required when positioning (in pixels)
-  // Ensures at least this much of the dialog remains on-screen
-  const DIALOG_MIN_VISIBLE_WIDTH = 100;
-  const DIALOG_MIN_VISIBLE_HEIGHT = 50;
-
   // Transition phase duration in seconds (5 minutes)
   // This is the "break ending soon" warning period before focus resumes
   const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;
@@ -152,27 +143,6 @@
    * @constant {RegExp}
    */
   const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = /[.+?^${}()|[\]\\]/g;
-
-  /**
-   * Dev bypass password for skipping a single Pomodoro cycle.
-   * 
-   * IMPORTANT: This is a DEVELOPMENT/TESTING feature, NOT a security measure.
-   * The password is visible in the source code and is not meant to provide
-   * real security. It exists purely for testing timer functionality during
-   * development. Anyone can view the source to discover the password.
-   * 
-   * SECURITY NOTE: Plain string comparison is used intentionally because:
-   * 1. The password is already public (visible in source code)
-   * 2. Timing attacks are not a threat model for dev-only bypass
-   * 3. Rate limiting is applied to prevent brute-force attempts
-   * 
-   * This ONLY works for Pomodoro timer mode, not simple timer.
-   * When entered correctly, skips to the next phase/cycle rather than stopping the timer.
-   * All bypass attempts are logged for auditing purposes.
-   * 
-   * @constant {string}
-   */
-  const DEV_BYPASS_PASSWORD = 'devskip123';
 
   // ============================================
   // LogManager Class
@@ -663,8 +633,11 @@
       dialog.classList.remove('dragging');
       header.style.cursor = 'move';
 
-      // Save the current dialog position using the shared function
-      saveDialogPosition(dialog);
+      // Only save position for dialogs that don't have the no-save attribute
+      // This prevents the transition popup position from affecting the settings menu position
+      if (!dialog.hasAttribute(DATA_NO_POSITION_SAVE)) {
+        saveDialogPosition(dialog);
+      }
 
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onEnd);
@@ -732,6 +705,41 @@
   }
 
   /**
+   * Ensure a dialog is fully visible within the viewport.
+   * Adjusts position if the dialog extends beyond viewport boundaries.
+   * @param {HTMLElement} dialog - The dialog element to check and adjust
+   */
+  function ensureDialogInViewport(dialog) {
+    if (!dialog) return;
+
+    const rect = dialog.getBoundingClientRect();
+    // Skip if dialog hasn't been rendered yet (dimensions are 0)
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // Safety check for window dimensions (defensive against edge cases)
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    if (viewportWidth === 0 || viewportHeight === 0) return;
+
+    // Calculate the position that keeps the dialog within viewport bounds
+    // The formula clamps position between 0 and (viewport - dialog dimension)
+    const maxLeft = Math.max(0, viewportWidth - rect.width);
+    const maxTop = Math.max(0, viewportHeight - rect.height);
+
+    const currentLeft = parseFloat(dialog.style.left) || rect.left;
+    const currentTop = parseFloat(dialog.style.top) || rect.top;
+
+    const constrainedLeft = Math.max(0, Math.min(currentLeft, maxLeft));
+    const constrainedTop = Math.max(0, Math.min(currentTop, maxTop));
+
+    // Only update if position changed
+    if (constrainedLeft !== currentLeft || constrainedTop !== currentTop) {
+      dialog.style.left = `${constrainedLeft}px`;
+      dialog.style.top = `${constrainedTop}px`;
+    }
+  }
+
+  /**
    * Apply saved position to a dialog if available.
    * This allows submenus to open at the same position as the parent dialog.
    * Call this after appending the dialog to the DOM but before setupDialogDrag.
@@ -742,22 +750,18 @@
 
     const { left, top } = lastDialogPosition;
 
-    // Validate that the position is within viewport bounds
-    const rect = dialog.getBoundingClientRect();
-    const dialogWidth = rect.width || DIALOG_FALLBACK_WIDTH;
-    const dialogHeight = rect.height || DIALOG_FALLBACK_HEIGHT;
-
-    // Ensure at least part of the dialog is visible
-    const maxLeft = window.innerWidth - Math.min(DIALOG_MIN_VISIBLE_WIDTH, dialogWidth);
-    const maxTop = window.innerHeight - Math.min(DIALOG_MIN_VISIBLE_HEIGHT, dialogHeight);
-    const adjustedLeft = Math.max(0, Math.min(left, maxLeft));
-    const adjustedTop = Math.max(0, Math.min(top, maxTop));
-
     // Apply pixel positioning directly (override CSS centering)
     dialog.style.position = 'fixed';
-    dialog.style.left = `${adjustedLeft}px`;
-    dialog.style.top = `${adjustedTop}px`;
+    dialog.style.left = `${left}px`;
+    dialog.style.top = `${top}px`;
     dialog.style.transform = 'none';
+
+    // Use requestAnimationFrame to ensure CSS is applied before checking bounds
+    // This allows the browser to render the dialog with its actual dimensions
+    // before we check if it extends beyond the viewport
+    requestAnimationFrame(() => {
+      ensureDialogInViewport(dialog);
+    });
   }
 
   /**
@@ -1072,33 +1076,6 @@
     );
   }
 
-  /**
-   * Skip to the next phase/cycle in the Pomodoro timer.
-   * This is used by the dev bypass feature to skip a single cycle.
-   * ONLY works for Pomodoro mode, not simple timer.
-   *
-   * @returns {boolean} True if skip was successful, false if not applicable
-   */
-  function skipToNextPhase() {
-    const timer = window.zenPomodoroApp?.timer;
-    if (!timer) {
-      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - no timer available');
-      return false;
-    }
-
-    // Use the timer's encapsulated skipPhase method
-    logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass used - attempting to skip phase');
-    const success = timer.skipPhase();
-
-    if (success) {
-      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful - phase skipped');
-    } else {
-      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - see timer logs for details');
-    }
-
-    return success;
-  }
-
   // ============================================
   // Shared Blocker Utilities
   // ============================================
@@ -1315,125 +1292,16 @@
    * @param {string} buttonsId - ID for the buttons container
    * @param {Function} onGoBack - Go Back button click handler
    * @param {Function} onStopTimer - Stop Timer button click handler
-   * @param {Function} [onBypassSuccess] - Optional callback when dev bypass succeeds
    * @returns {HTMLElement} Buttons container element
    */
-  function createBlockerButtons(buttonsId, onGoBack, onStopTimer, onBypassSuccess = null) {
+  function createBlockerButtons(buttonsId, onGoBack, onStopTimer) {
     const buttons = document.createElement('div');
     buttons.id = buttonsId;
 
     buttons.appendChild(createBlockerButton('secondary', 'Go Back', onGoBack));
     buttons.appendChild(createBlockerButton('', 'Stop Timer', onStopTimer));
 
-    // Add dev bypass input (only visible for Pomodoro mode)
-    const bypassContainer = createDevBypassInput(onBypassSuccess);
-    if (bypassContainer) {
-      buttons.appendChild(bypassContainer);
-    }
-
     return buttons;
-  }
-
-  /**
-   * Create the dev bypass password input for blocker overlays.
-   * This input allows skipping a SINGLE cycle in Pomodoro mode only.
-   * @param {Function} [onBypassSuccess] - Optional callback when bypass succeeds
-   * @returns {HTMLElement|null} The bypass container element or null if not in Pomodoro mode
-   */
-  function createDevBypassInput(onBypassSuccess = null) {
-    // Only show dev bypass for Pomodoro mode
-    const timer = window.zenPomodoroApp?.timer;
-    if (!timer || timer.mode !== 'pomodoro') {
-      return null;
-    }
-
-    const container = document.createElement('div');
-    container.className = 'zen-pomodoro-dev-bypass-container';
-
-    // Small toggle link to show/hide the bypass input
-    const toggleLink = document.createElement('a');
-    toggleLink.className = 'zen-pomodoro-dev-bypass-toggle';
-    toggleLink.textContent = 'Dev bypass';
-    toggleLink.href = '#';
-
-    // Input container (initially hidden)
-    const inputContainer = document.createElement('div');
-    inputContainer.className = 'zen-pomodoro-dev-bypass-input-container';
-    inputContainer.style.display = 'none';
-
-    const input = document.createElement('input');
-    input.type = 'password';
-    input.className = 'zen-pomodoro-dev-bypass-input';
-    input.placeholder = 'Enter bypass password';
-    input.maxLength = 64; // Reasonable max length for password input
-
-    const submitBtn = document.createElement('button');
-    submitBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dev-bypass-submit';
-    submitBtn.textContent = 'Skip Cycle';
-
-    // Rate limiting state - simple cooldown to prevent spam
-    let lastAttemptTime = 0;
-    const COOLDOWN_MS = 2000; // 2 second cooldown between attempts
-
-    // Toggle visibility on click
-    toggleLink.addEventListener('click', (e) => {
-      e.preventDefault();
-      const isHidden = inputContainer.style.display === 'none';
-      inputContainer.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) {
-        input.focus();
-      }
-    });
-
-    // Verify password and skip cycle
-    const verifyAndSkip = () => {
-      // Rate limiting check
-      const now = Date.now();
-      if (now - lastAttemptTime < COOLDOWN_MS) {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass attempt rate limited');
-        return;
-      }
-      lastAttemptTime = now;
-
-      if (input.value === DEV_BYPASS_PASSWORD) {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password accepted');
-        const success = skipToNextPhase();
-        if (success) {
-          input.value = '';
-          inputContainer.style.display = 'none';
-          // Call optional callback
-          if (onBypassSuccess) {
-            onBypassSuccess();
-          }
-          // Update overlays after phase skip
-          window.zenPomodoroApp?.updateOverlayVisibility();
-        } else {
-          window.zenPomodoroApp?.showCustomAlert(
-            'Skip Failed',
-            'Could not skip cycle. Dev bypass only works for Pomodoro timer mode.'
-          );
-        }
-      } else {
-        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password rejected');
-        window.zenPomodoroApp?.showCustomAlert('Invalid Password', 'Incorrect bypass password.');
-        input.value = '';
-      }
-    };
-
-    submitBtn.addEventListener('click', verifyAndSkip);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        verifyAndSkip();
-      }
-    });
-
-    inputContainer.appendChild(input);
-    inputContainer.appendChild(submitBtn);
-
-    container.appendChild(toggleLink);
-    container.appendChild(inputContainer);
-
-    return container;
   }
 
   // ============================================
@@ -1712,39 +1580,6 @@
       if (this.onComplete) {
         this.onComplete();
       }
-    }
-
-    /**
-     * Skip to the next phase/cycle.
-     * Used by the dev bypass feature to skip a single cycle.
-     * ONLY works for Pomodoro mode, not simple timer.
-     * @returns {boolean} True if skip was successful, false if not applicable
-     */
-    skipPhase() {
-      if (!this.isActive) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Skip phase failed - timer not active');
-        return false;
-      }
-
-      // Only allow skip for Pomodoro mode, not simple timer
-      if (this.mode !== 'pomodoro') {
-        logger.log(LOG_CATEGORIES.TIMER, 'Skip phase failed - not in Pomodoro mode', {
-          mode: this.mode,
-        });
-        return false;
-      }
-
-      logger.log(LOG_CATEGORIES.TIMER, 'Skipping to next phase', {
-        currentPhase: this.currentPhase,
-        currentCycle: this.currentCycle,
-        totalCycles: this.totalCycles,
-      });
-
-      // Trigger phase transition by completing current phase
-      this.remainingTime = 0;
-      this.handlePhaseComplete();
-
-      return true;
     }
 
     /**
@@ -2135,10 +1970,6 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
-      this.indicatorContextMenuHandler = null; // Store for cleanup
-      this.indicatorContextMenu = null; // Context menu element
-      this.contextMenuClickHandler = null; // Context menu click handler
-      this.contextMenuTimeout = null; // Context menu safety timeout
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
@@ -2195,7 +2026,6 @@
 
     /**
      * Create the overlay controls section with buttons
-     * Includes dev bypass input for Pomodoro mode only
      * @returns {HTMLElement} The controls container element
      * @private
      */
@@ -2215,17 +2045,6 @@
 
       controls.appendChild(pauseButton);
       controls.appendChild(stopButton);
-
-      // Add dev bypass input (only for Pomodoro mode)
-      const bypassContainer = createDevBypassInput(() => {
-        // Callback when bypass succeeds - hide overlay if we're now in break phase
-        if (isInBreakPhase()) {
-          this.hide();
-        }
-      });
-      if (bypassContainer) {
-        controls.appendChild(bypassContainer);
-      }
 
       return controls;
     }
@@ -2400,9 +2219,6 @@
 
       // Issue 8: Set up drag functionality for indicator
       this.setupIndicatorDrag();
-
-      // Set up context menu for indicator (dev bypass during break phase)
-      this.setupIndicatorContextMenu();
 
       // Set up button handlers after elements are created
       // RACE CONDITION FIX: Set up handlers immediately after creation
@@ -2601,215 +2417,6 @@
       // Store reference for cleanup
       this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
-    }
-
-    /**
-     * Set up context menu (right-click) for the indicator to provide a dev bypass during Pomodoro mode.
-     * This allows skipping the current phase (focus, break, or transition) to trigger the transition popup.
-     */
-    setupIndicatorContextMenu() {
-      if (!this.indicator) return;
-
-      this.indicatorContextMenuHandler = (e) => {
-        // Only show context menu in Pomodoro mode
-        const timer = window.zenPomodoroApp?.timer;
-        if (!timer || timer.mode !== 'pomodoro') return;
-
-        e.preventDefault();
-
-        // Create context menu
-        this._showIndicatorContextMenu(e.clientX, e.clientY);
-      };
-
-      this.indicator.addEventListener('contextmenu', this.indicatorContextMenuHandler);
-    }
-
-    /**
-     * Show a simple context menu near the indicator for dev bypass.
-     * @param {number} x - X coordinate for menu
-     * @param {number} y - Y coordinate for menu
-     * @private
-     */
-    _showIndicatorContextMenu(x, y) {
-      // Remove any existing context menu
-      this._hideIndicatorContextMenu();
-
-      const menu = document.createElement('div');
-      menu.className = 'zen-pomodoro-context-menu';
-      menu.id = 'zen-pomodoro-indicator-context-menu';
-      menu.style.left = `${x}px`;
-      menu.style.top = `${y}px`;
-
-      // Dev bypass item
-      const devBypassItem = document.createElement('div');
-      devBypassItem.className = 'zen-pomodoro-context-menu-item';
-      devBypassItem.textContent = '🔧 Dev Bypass (Skip Phase)';
-      devBypassItem.addEventListener('click', () => {
-        this._hideIndicatorContextMenu();
-        this._showDevBypassPrompt();
-      });
-
-      menu.appendChild(devBypassItem);
-
-      // Close menu when clicking elsewhere
-      this.contextMenuClickHandler = (e) => {
-        if (!menu.contains(e.target)) {
-          this._hideIndicatorContextMenu();
-        }
-      };
-      document.addEventListener('click', this.contextMenuClickHandler, true);
-
-      // Safety timeout to ensure cleanup
-      this.contextMenuTimeout = setTimeout(() => {
-        this._hideIndicatorContextMenu();
-      }, CONTEXT_MENU_TIMEOUT_MS);
-
-      document.documentElement.appendChild(menu);
-      this.indicatorContextMenu = menu;
-    }
-
-    /**
-     * Hide the indicator context menu.
-     * @private
-     */
-    _hideIndicatorContextMenu() {
-      if (this.contextMenuTimeout) {
-        clearTimeout(this.contextMenuTimeout);
-        this.contextMenuTimeout = null;
-      }
-      if (this.indicatorContextMenu) {
-        this.indicatorContextMenu.remove();
-        this.indicatorContextMenu = null;
-      }
-      if (this.contextMenuClickHandler) {
-        document.removeEventListener('click', this.contextMenuClickHandler, true);
-        this.contextMenuClickHandler = null;
-      }
-    }
-
-    /**
-     * Show a secure password dialog for dev bypass.
-     * Uses a custom modal with masked password input instead of window.prompt().
-     * @private
-     */
-    _showDevBypassPrompt() {
-      // Create modal backdrop
-      const backdrop = document.createElement('div');
-      backdrop.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        z-index: 2147483647;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      `;
-
-      // Create dialog container
-      const dialog = document.createElement('div');
-      dialog.style.cssText = `
-        background: #2b2a33;
-        border-radius: 8px;
-        padding: 20px;
-        min-width: 280px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      `;
-
-      // Title
-      const title = document.createElement('h3');
-      title.textContent = 'Dev Bypass';
-      title.style.cssText = `
-        margin: 0 0 16px 0;
-        color: #fff;
-        font-size: 16px;
-        font-weight: 600;
-      `;
-
-      // Password input (type="password" for masking)
-      const input = document.createElement('input');
-      input.type = 'password';
-      input.placeholder = 'Enter bypass password';
-      input.style.cssText = `
-        width: 100%;
-        padding: 8px 12px;
-        margin-bottom: 16px;
-        border: 1px solid #3a3944;
-        border-radius: 4px;
-        background: #1e1d26;
-        color: #fff;
-        font-size: 14px;
-        box-sizing: border-box;
-      `;
-
-      // Button container
-      const buttonContainer = document.createElement('div');
-      buttonContainer.style.cssText = `
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-      `;
-
-      // Cancel button
-      const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = 'Cancel';
-      cancelBtn.className = 'zen-pomodoro-dialog-button secondary';
-
-      // Submit button
-      const submitBtn = document.createElement('button');
-      submitBtn.textContent = 'Skip Phase';
-      submitBtn.className = 'zen-pomodoro-dialog-button';
-
-      // Cleanup function
-      const cleanup = () => {
-        backdrop.remove();
-      };
-
-      // Handle submit
-      const handleSubmit = () => {
-        if (input.value === DEV_BYPASS_PASSWORD) {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password accepted from indicator');
-          cleanup();
-          const success = skipToNextPhase();
-          if (success) {
-            window.zenPomodoroApp?.updateOverlayVisibility();
-          } else {
-            window.zenPomodoroApp?.showCustomAlert(
-              'Skip Failed',
-              'Could not skip phase. Dev bypass only works for Pomodoro timer mode.'
-            );
-          }
-        } else {
-          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password rejected from indicator');
-          window.zenPomodoroApp?.showCustomAlert('Invalid Password', 'Incorrect bypass password.');
-          input.value = '';
-          input.focus();
-        }
-      };
-
-      // Event handlers
-      cancelBtn.addEventListener('click', cleanup);
-      submitBtn.addEventListener('click', handleSubmit);
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleSubmit();
-        if (e.key === 'Escape') cleanup();
-      });
-      backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) cleanup();
-      });
-
-      // Assemble dialog
-      buttonContainer.appendChild(cancelBtn);
-      buttonContainer.appendChild(submitBtn);
-      dialog.appendChild(title);
-      dialog.appendChild(input);
-      dialog.appendChild(buttonContainer);
-      backdrop.appendChild(dialog);
-
-      document.documentElement.appendChild(backdrop);
-      input.focus();
     }
 
     /**
@@ -3114,13 +2721,6 @@
         this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
         this.indicatorMouseDownHandler = null;
       }
-      // Clean up context menu event listener
-      if (this.indicator && this.indicatorContextMenuHandler) {
-        this.indicator.removeEventListener('contextmenu', this.indicatorContextMenuHandler);
-        this.indicatorContextMenuHandler = null;
-      }
-      // Clean up any open context menu
-      this._hideIndicatorContextMenu();
     }
 
     /**
@@ -5764,8 +5364,8 @@
     /**
      * Create the blocker overlay element with all its content.
      * Uses shared utilities to reduce code duplication.
-     * NOTE: SineModBlocker includes dev bypass but does NOT hide on break phase
-     * because mod settings should remain locked throughout any timer session.
+     * NOTE: SineModBlocker does NOT hide on break phase because mod settings
+     * should remain locked throughout any timer session.
      * @private
      */
     _createBlockerOverlay() {
@@ -5798,13 +5398,12 @@
       timerStatus.id = 'zen-pomodoro-sine-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons using shared utility with bypass callback
+      // Buttons using shared utility
       // NOTE: Sine Mod blocker does NOT hide on break phase (mod settings stay locked)
       const buttons = createBlockerButtons(
         'zen-pomodoro-sine-blocker-buttons',
         () => this._handleGoBack(),
-        () => this._handleStopTimer(),
-        null // No bypass callback - mod settings stay locked even during breaks
+        () => this._handleStopTimer()
       );
 
       content.appendChild(icon);
@@ -6698,17 +6297,11 @@
       timerStatus.id = 'zen-pomodoro-website-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons using shared utility with bypass callback
+      // Buttons using shared utility
       const buttons = createBlockerButtons(
         'zen-pomodoro-website-blocker-buttons',
         () => this._handleGoBack(),
-        () => this._handleStopTimer(),
-        () => {
-          // Callback when bypass succeeds - hide blocker if we're now in break phase
-          if (isInBreakPhase()) {
-            this._hideBlocker();
-          }
-        }
+        () => this._handleStopTimer()
       );
 
       content.appendChild(icon);
@@ -6962,6 +6555,11 @@
       this.popup = document.createElement('div');
       this.popup.id = 'zen-pomodoro-transition-popup';
       this.popup.className = 'zen-pomodoro-transition-popup active';
+
+      // Mark this popup so its position won't be saved to lastDialogPosition
+      // This prevents the settings menu from appearing in the top-right corner
+      // where the transition popup was shown
+      this.popup.setAttribute(DATA_NO_POSITION_SAVE, 'true');
 
       // Title (also serves as drag handle)
       const title = document.createElement('h2');
