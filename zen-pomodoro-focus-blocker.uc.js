@@ -63,6 +63,13 @@
     HOLD: 'hold',
   };
 
+  /**
+   * Data attribute name used to mark dialogs that should not save their position.
+   * Used by the transition popup to prevent affecting settings menu positioning.
+   * @constant {string}
+   */
+  const DATA_NO_POSITION_SAVE = 'data-no-position-save';
+
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
     simpleDuration: 25,
@@ -628,7 +635,7 @@
 
       // Only save position for dialogs that don't have the no-save attribute
       // This prevents the transition popup position from affecting the settings menu position
-      if (!dialog.hasAttribute('data-no-position-save')) {
+      if (!dialog.hasAttribute(DATA_NO_POSITION_SAVE)) {
         saveDialogPosition(dialog);
       }
 
@@ -6552,7 +6559,7 @@
       // Mark this popup so its position won't be saved to lastDialogPosition
       // This prevents the settings menu from appearing in the top-right corner
       // where the transition popup was shown
-      this.popup.setAttribute('data-no-position-save', 'true');
+      this.popup.setAttribute(DATA_NO_POSITION_SAVE, 'true');
 
       // Title (also serves as drag handle)
       const title = document.createElement('h2');
