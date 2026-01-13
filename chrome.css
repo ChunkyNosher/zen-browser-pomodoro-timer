@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.7
+ * Version: 1.1.8
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -180,6 +180,17 @@
   display: flex;
   gap: 12px;
   margin-top: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Ensure dev bypass inside the controls container is always a full-width row
+   below the main buttons, and does not interfere with button wrapping */
+#zen-pomodoro-controls > .zen-pomodoro-dev-bypass-container {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 12px;
+  text-align: center;
 }
 
 .zen-pomodoro-button {
@@ -307,7 +318,6 @@
 }
 
 .zen-pomodoro-dialog h2 {
-  margin: 0 0 16px;
   font-size: 24px;
   font-weight: 700;
 
@@ -320,11 +330,23 @@
   /* Ensure h2 is positioned above other elements for dragging */
   position: relative;
   z-index: 1;
+
+  /* Visual feedback for draggable area */
+  transition: background-color 0.2s ease;
+  padding: 4px 8px;
+  margin: -4px -8px 16px;
+  border-radius: 4px;
+}
+
+/* Hover state to indicate draggable area */
+.zen-pomodoro-dialog h2:hover {
+  background-color: rgb(255 255 255 / 5%);
 }
 
 /* Cursor when actively dragging */
 .zen-pomodoro-dialog.dragging h2 {
   cursor: grabbing !important;
+  background-color: rgb(255 255 255 / 10%);
 }
 
 .zen-pomodoro-dialog p {
@@ -342,6 +364,9 @@
   flex-direction: column;
   gap: 12px;
   max-height: 60vh;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  flex-shrink: 1;
 }
 
 .zen-pomodoro-config-row {
@@ -385,6 +410,7 @@
   gap: 12px;
   margin-top: 16px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .zen-pomodoro-dialog-button {
@@ -1136,4 +1162,208 @@
 
 #zen-pomodoro-ruleset-dialog .zen-pomodoro-rulesets-container {
   max-height: 400px;
+}
+
+/* ============================================
+   Dev Bypass Password Input Styles
+   Allows skipping a single Pomodoro cycle
+   Only visible in Pomodoro mode, not simple timer
+   ============================================ */
+.zen-pomodoro-dev-bypass-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.zen-pomodoro-dev-bypass-toggle {
+  font-size: 10px !important;
+  opacity: 0.4;
+  text-decoration: none !important;
+  color: #888;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.zen-pomodoro-dev-bypass-toggle:hover {
+  opacity: 0.7;
+  color: #aaa;
+}
+
+.zen-pomodoro-dev-bypass-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.zen-pomodoro-dev-bypass-input {
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  width: 150px !important;
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 4px;
+}
+
+.zen-pomodoro-dev-bypass-input:focus {
+  outline: none;
+  border-color: #2180cd;
+}
+
+.zen-pomodoro-dev-bypass-submit {
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  margin-left: 5px;
+}
+
+/* Ensure dev bypass container doesn't break layout on overlay */
+#zen-pomodoro-controls .zen-pomodoro-dev-bypass-container {
+  flex-basis: 100%;
+  margin-top: 16px;
+}
+
+/* Sine blocker and website blocker button containers */
+#zen-pomodoro-sine-blocker-buttons,
+#zen-pomodoro-website-blocker-buttons {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#zen-pomodoro-sine-blocker-buttons .zen-pomodoro-dev-bypass-container,
+#zen-pomodoro-website-blocker-buttons .zen-pomodoro-dev-bypass-container {
+  flex-basis: 100%;
+  margin-top: 16px;
+}
+
+/* ============================================
+   Transition Phase Popup
+   Floating, movable popup that appears when break ends.
+   This popup does NOT block browser interaction:
+   - It is a small floating element (not full-screen)
+   - Browser content around it remains clickable
+   - The popup itself uses pointer-events: auto so its interactive
+     elements (buttons, drag handle) work normally
+   
+   NOTE ON POSITIONING / DRAG BEHAVIOR:
+   - The popup always initially appears at top: 20px; right: 20px
+   - Users can drag/move the popup while it is visible
+   - When a new transition phase starts, the popup resets to
+     this default position (dragged position is not persisted)
+   ============================================ */
+.zen-pomodoro-transition-popup {
+  position: fixed !important;
+  top: 20px;
+  right: 20px;
+  background-color: #2b2a33;
+  color: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+
+  /* Z-INDEX HIERARCHY NOTE:
+     This popup uses z-index 2147483646 (max - 1) so that:
+     - It appears above normal page content
+     - Other dialogs (#zen-pomodoro-*-dialog) at z-index 2147483647 can appear above it
+     - The overlay (#zen-pomodoro-overlay) at z-index 2147483647 can appear above it */
+  z-index: 2147483646 !important;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 50%);
+  border: 2px solid #ff9800;
+
+  /* The popup receives pointer events for its interactive elements (buttons, dragging) */
+  pointer-events: auto !important;
+}
+
+.zen-pomodoro-transition-popup.active {
+  display: flex !important;
+}
+
+.zen-pomodoro-transition-popup h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff9800;
+
+  /* Draggable header styling */
+  cursor: move !important;
+  user-select: none !important;
+  touch-action: none !important;
+  pointer-events: auto !important;
+  padding: 4px 8px;
+  margin: -4px -8px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.zen-pomodoro-transition-popup h2:hover {
+  background-color: rgb(255 255 255 / 5%);
+}
+
+.zen-pomodoro-transition-popup.dragging h2 {
+  cursor: grabbing !important;
+  background-color: rgb(255 255 255 / 10%);
+}
+
+.zen-pomodoro-transition-message {
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.zen-pomodoro-transition-timer {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ff9800;
+  text-align: center;
+  padding: 12px 16px;
+  background-color: rgb(255 152 0 / 15%);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zen-pomodoro-transition-ready-btn {
+  background-color: #ff9800 !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+  padding: 12px 20px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+  text-align: center;
+}
+
+.zen-pomodoro-transition-ready-btn:hover {
+  background-color: #ffa726 !important;
+}
+
+.zen-pomodoro-transition-ready-btn:active {
+  background-color: #f57c00 !important;
+}
+
+/* ACCESSIBILITY: Reduce motion animations */
+@media (prefers-reduced-motion: no-preference) {
+  .zen-pomodoro-transition-popup.active {
+    animation: transition-popup-appear 0.3s ease;
+  }
+}
+
+@keyframes transition-popup-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

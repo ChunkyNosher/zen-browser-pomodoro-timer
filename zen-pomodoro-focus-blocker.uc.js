@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.7
+ * Version: 1.1.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -38,6 +38,14 @@
   const PREF_PREFIX = 'zen-pomodoro';
 
   /**
+   * Stores the last dialog position for maintaining position across dialogs.
+   * When a dialog is closed or a submenu is opened, the position is saved here.
+   * New dialogs will open at this position instead of centering.
+   * @type {{left: number, top: number}|null}
+   */
+  let lastDialogPosition = null;
+
+  /**
    * Modifier keys used by the keyboard shortcut recorder.
    * These are the keys that can be combined with a regular key to form a shortcut.
    * @constant {string[]}
@@ -60,8 +68,6 @@
     simpleDuration: 25,
     focusDuration: 25,
     breakDuration: 5,
-    longBreakDuration: 15,
-    longBreakInterval: 4,
     cycles: 4,
     blockedWorkspaces: [],
     overlayColor: '#808080',
@@ -113,6 +119,20 @@
   // Debounce delay for content observer checks (in milliseconds)
   const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
 
+  // Fallback dialog dimensions for position calculations when actual dimensions are unavailable
+  // These match the CSS min-width of .zen-pomodoro-dialog (400px) and estimated height
+  const DIALOG_FALLBACK_WIDTH = 400;
+  const DIALOG_FALLBACK_HEIGHT = 300;
+
+  // Minimum visible portion of dialog required when positioning (in pixels)
+  // Ensures at least this much of the dialog remains on-screen
+  const DIALOG_MIN_VISIBLE_WIDTH = 100;
+  const DIALOG_MIN_VISIBLE_HEIGHT = 50;
+
+  // Transition phase duration in seconds (5 minutes)
+  // This is the "break ending soon" warning period before focus resumes
+  const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;
+
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
    * Used to safely include literal strings in dynamically constructed regular expressions.
@@ -126,6 +146,22 @@
    * @constant {RegExp}
    */
   const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = /[.+?^${}()|[\]\\]/g;
+
+  /**
+   * Dev bypass password for skipping a single Pomodoro cycle.
+   * 
+   * IMPORTANT: This is a DEVELOPMENT/TESTING feature, NOT a security measure.
+   * The password is visible in the source code and is not meant to provide
+   * real security. It exists purely for testing timer functionality during
+   * development. Anyone can view the source to discover the password.
+   * 
+   * This ONLY works for Pomodoro timer mode, not simple timer.
+   * When entered correctly, skips to the next phase/cycle rather than stopping the timer.
+   * All bypass attempts are logged for auditing purposes.
+   * 
+   * @constant {string}
+   */
+  const DEV_BYPASS_PASSWORD = 'devskip123';
 
   // ============================================
   // LogManager Class
@@ -580,6 +616,9 @@
       dialog.classList.remove('dragging');
       header.style.cursor = 'move';
 
+      // Save the current dialog position using the shared function
+      saveDialogPosition(dialog);
+
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onEnd);
       document.removeEventListener('touchmove', onMove);
@@ -617,6 +656,61 @@
     } else if (dialog.parentNode) {
       observer.observe(dialog.parentNode, { childList: true, subtree: false });
     }
+  }
+
+  /**
+   * Save the current dialog position before it's closed.
+   * Call this before removing a dialog that may have been dragged.
+   * @param {HTMLElement} dialog - The dialog element to save position from
+   */
+  function saveDialogPosition(dialog) {
+    if (!dialog) return;
+
+    const rect = dialog.getBoundingClientRect();
+
+    // Check if dialog has explicit pixel positioning (was dragged)
+    // We check for both inline style values, as drag converts transform to pixel positioning
+    const hasExplicitPosition = dialog.style.left && dialog.style.top;
+
+    if (hasExplicitPosition) {
+      // Dialog was dragged - use explicit position values
+      lastDialogPosition = {
+        left: parseFloat(dialog.style.left) || rect.left,
+        top: parseFloat(dialog.style.top) || rect.top,
+      };
+    } else if (rect.width > 0 && rect.height > 0) {
+      // Dialog hasn't been dragged but exists - save its current visual position
+      lastDialogPosition = { left: rect.left, top: rect.top };
+    }
+  }
+
+  /**
+   * Apply saved position to a dialog if available.
+   * This allows submenus to open at the same position as the parent dialog.
+   * Call this after appending the dialog to the DOM but before setupDialogDrag.
+   * @param {HTMLElement} dialog - The dialog element to position
+   */
+  function applyLastDialogPosition(dialog) {
+    if (!dialog || !lastDialogPosition) return;
+
+    const { left, top } = lastDialogPosition;
+
+    // Validate that the position is within viewport bounds
+    const rect = dialog.getBoundingClientRect();
+    const dialogWidth = rect.width || DIALOG_FALLBACK_WIDTH;
+    const dialogHeight = rect.height || DIALOG_FALLBACK_HEIGHT;
+
+    // Ensure at least part of the dialog is visible
+    const maxLeft = window.innerWidth - Math.min(DIALOG_MIN_VISIBLE_WIDTH, dialogWidth);
+    const maxTop = window.innerHeight - Math.min(DIALOG_MIN_VISIBLE_HEIGHT, dialogHeight);
+    const adjustedLeft = Math.max(0, Math.min(left, maxLeft));
+    const adjustedTop = Math.max(0, Math.min(top, maxTop));
+
+    // Apply pixel positioning directly (override CSS centering)
+    dialog.style.position = 'fixed';
+    dialog.style.left = `${adjustedLeft}px`;
+    dialog.style.top = `${adjustedTop}px`;
+    dialog.style.transform = 'none';
   }
 
   /**
@@ -746,14 +840,15 @@
 
   /**
    * Get phase display label from phase identifier.
-   * @param {string} phase - Phase identifier ('focus', 'break', 'long-break')
+   * @param {string} phase - Phase identifier ('focus', 'break', 'transition')
    * @returns {string} Human-readable phase label
    */
   function getPhaseLabel(phase) {
     const labels = {
       focus: 'Focus Period',
       break: 'Break Time',
-      'long-break': 'Long Break',
+      'long-break': 'Break Time', // Keep for backwards compatibility with saved state
+      transition: 'Transition',
     };
     return labels[phase] || 'Focus Period';
   }
@@ -764,7 +859,9 @@
    * @returns {string} Short phase label
    */
   function getShortPhaseLabel(phase) {
-    return phase === 'focus' ? 'Focus' : 'Break';
+    if (phase === 'focus') return 'Focus';
+    if (phase === 'transition') return 'Transition';
+    return 'Break';
   }
 
   /**
@@ -883,6 +980,60 @@
     } else {
       showStopConfirmation();
     }
+  }
+
+  // ============================================
+  // Break Phase Detection Utility
+  // ============================================
+
+  /**
+   * Check if the Pomodoro timer is currently in a break phase.
+   * During break phases, workspace and website blocking should be disabled
+   * to allow the user to freely browse during their break.
+   * 
+   * The 'transition' phase is also treated as a break phase because during
+   * the transition (break ending soon warning), blocking should remain disabled
+   * to allow users to finish up their break activities.
+   *
+   * @returns {boolean} True if timer is active AND in a break phase (including transition)
+   */
+  function isInBreakPhase() {
+    const timer = window.zenPomodoroApp?.timer;
+    if (!timer || !timer.isActive) return false;
+    // Handle 'long-break' for backwards compatibility with saved state
+    // Include 'transition' because blocking should remain disabled during the break-ending warning
+    return (
+      timer.currentPhase === 'break' ||
+      timer.currentPhase === 'long-break' ||
+      timer.currentPhase === 'transition'
+    );
+  }
+
+  /**
+   * Skip to the next phase/cycle in the Pomodoro timer.
+   * This is used by the dev bypass feature to skip a single cycle.
+   * ONLY works for Pomodoro mode, not simple timer.
+   *
+   * @returns {boolean} True if skip was successful, false if not applicable
+   */
+  function skipToNextPhase() {
+    const timer = window.zenPomodoroApp?.timer;
+    if (!timer) {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - no timer available');
+      return false;
+    }
+
+    // Use the timer's encapsulated skipPhase method
+    logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass used - attempting to skip phase');
+    const success = timer.skipPhase();
+
+    if (success) {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass successful - phase skipped');
+    } else {
+      logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass failed - see timer logs for details');
+    }
+
+    return success;
   }
 
   // ============================================
@@ -1101,16 +1252,125 @@
    * @param {string} buttonsId - ID for the buttons container
    * @param {Function} onGoBack - Go Back button click handler
    * @param {Function} onStopTimer - Stop Timer button click handler
+   * @param {Function} [onBypassSuccess] - Optional callback when dev bypass succeeds
    * @returns {HTMLElement} Buttons container element
    */
-  function createBlockerButtons(buttonsId, onGoBack, onStopTimer) {
+  function createBlockerButtons(buttonsId, onGoBack, onStopTimer, onBypassSuccess = null) {
     const buttons = document.createElement('div');
     buttons.id = buttonsId;
 
     buttons.appendChild(createBlockerButton('secondary', 'Go Back', onGoBack));
     buttons.appendChild(createBlockerButton('', 'Stop Timer', onStopTimer));
 
+    // Add dev bypass input (only visible for Pomodoro mode)
+    const bypassContainer = createDevBypassInput(onBypassSuccess);
+    if (bypassContainer) {
+      buttons.appendChild(bypassContainer);
+    }
+
     return buttons;
+  }
+
+  /**
+   * Create the dev bypass password input for blocker overlays.
+   * This input allows skipping a SINGLE cycle in Pomodoro mode only.
+   * @param {Function} [onBypassSuccess] - Optional callback when bypass succeeds
+   * @returns {HTMLElement|null} The bypass container element or null if not in Pomodoro mode
+   */
+  function createDevBypassInput(onBypassSuccess = null) {
+    // Only show dev bypass for Pomodoro mode
+    const timer = window.zenPomodoroApp?.timer;
+    if (!timer || timer.mode !== 'pomodoro') {
+      return null;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'zen-pomodoro-dev-bypass-container';
+
+    // Small toggle link to show/hide the bypass input
+    const toggleLink = document.createElement('a');
+    toggleLink.className = 'zen-pomodoro-dev-bypass-toggle';
+    toggleLink.textContent = 'Dev bypass';
+    toggleLink.href = '#';
+
+    // Input container (initially hidden)
+    const inputContainer = document.createElement('div');
+    inputContainer.className = 'zen-pomodoro-dev-bypass-input-container';
+    inputContainer.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.className = 'zen-pomodoro-dev-bypass-input';
+    input.placeholder = 'Enter bypass password';
+    input.maxLength = 64; // Reasonable max length for password input
+
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dev-bypass-submit';
+    submitBtn.textContent = 'Skip Cycle';
+
+    // Rate limiting state - simple cooldown to prevent spam
+    let lastAttemptTime = 0;
+    const COOLDOWN_MS = 2000; // 2 second cooldown between attempts
+
+    // Toggle visibility on click
+    toggleLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isHidden = inputContainer.style.display === 'none';
+      inputContainer.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        input.focus();
+      }
+    });
+
+    // Verify password and skip cycle
+    const verifyAndSkip = () => {
+      // Rate limiting check
+      const now = Date.now();
+      if (now - lastAttemptTime < COOLDOWN_MS) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass attempt rate limited');
+        return;
+      }
+      lastAttemptTime = now;
+
+      if (input.value === DEV_BYPASS_PASSWORD) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password accepted');
+        const success = skipToNextPhase();
+        if (success) {
+          input.value = '';
+          inputContainer.style.display = 'none';
+          // Call optional callback
+          if (onBypassSuccess) {
+            onBypassSuccess();
+          }
+          // Update overlays after phase skip
+          window.zenPomodoroApp?.updateOverlayVisibility();
+        } else {
+          window.zenPomodoroApp?.showCustomAlert(
+            'Skip Failed',
+            'Could not skip cycle. Dev bypass only works for Pomodoro timer mode.'
+          );
+        }
+      } else {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password rejected');
+        window.zenPomodoroApp?.showCustomAlert('Invalid Password', 'Incorrect bypass password.');
+        input.value = '';
+      }
+    };
+
+    submitBtn.addEventListener('click', verifyAndSkip);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        verifyAndSkip();
+      }
+    });
+
+    inputContainer.appendChild(input);
+    inputContainer.appendChild(submitBtn);
+
+    container.appendChild(toggleLink);
+    container.appendChild(inputContainer);
+
+    return container;
   }
 
   // ============================================
@@ -1221,6 +1481,12 @@
         return;
       }
 
+      // Handle transition phase completion - starts actual focus phase
+      if (this.currentPhase === 'transition') {
+        this._handleTransitionPhaseComplete();
+        return;
+      }
+
       // Pomodoro mode phase transitions
       const shouldComplete =
         this.currentPhase === 'focus'
@@ -1243,6 +1509,25 @@
     }
 
     /**
+     * Handle completion of the transition phase.
+     * This is called when the transition timer runs out.
+     * Triggers the callback to hide the popup and start focus.
+     * @private
+     */
+    _handleTransitionPhaseComplete() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition phase timer complete');
+
+      // Trigger the transition end callback if set
+      // This will hide the popup and call startFocusFromTransition
+      if (this.onTransitionEnd) {
+        this.onTransitionEnd();
+      } else {
+        // Fallback: directly start focus if no callback set
+        this.startFocusFromTransition();
+      }
+    }
+
+    /**
      * Handle completion of a focus phase.
      * @returns {boolean} True if timer should complete, false to continue
      * @private
@@ -1255,22 +1540,17 @@
         return true;
       }
 
-      // Determine break type
-      const isLongBreakCycle = this.currentCycle % this.config.longBreakInterval === 0;
-
-      if (isLongBreakCycle) {
-        this.currentPhase = 'long-break';
-        this.remainingTime = this.config.longBreakDuration * 60;
-      } else {
-        this.currentPhase = 'break';
-        this.remainingTime = this.config.breakDuration * 60;
-      }
+      // All breaks use the same duration
+      this.currentPhase = 'break';
+      this.remainingTime = this.config.breakDuration * 60;
 
       return false;
     }
 
     /**
      * Handle completion of a break phase.
+     * Instead of immediately starting the focus phase, we enter a "transition" phase
+     * which shows a popup to warn the user that their break is ending.
      * @returns {boolean} True if timer should complete, false to continue
      * @private
      */
@@ -1282,11 +1562,34 @@
         return true;
       }
 
-      // Start next focus period
+      // Enter transition phase instead of immediately starting focus
+      // The transition popup will handle starting the actual focus phase
+      this.currentPhase = 'transition';
+      this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
+
+      // Trigger the transition popup callback if set
+      if (this.onTransitionStart) {
+        this.onTransitionStart();
+      }
+
+      return false;
+    }
+
+    /**
+     * Called when the transition phase ends (either by timer or user action).
+     * Starts the actual focus phase.
+     */
+    startFocusFromTransition() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting focus from transition phase');
+
       this.currentPhase = 'focus';
       this.remainingTime = this.config.focusDuration * 60;
 
-      return false;
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
     }
 
     /**
@@ -1349,6 +1652,39 @@
     }
 
     /**
+     * Skip to the next phase/cycle.
+     * Used by the dev bypass feature to skip a single cycle.
+     * ONLY works for Pomodoro mode, not simple timer.
+     * @returns {boolean} True if skip was successful, false if not applicable
+     */
+    skipPhase() {
+      if (!this.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Skip phase failed - timer not active');
+        return false;
+      }
+
+      // Only allow skip for Pomodoro mode, not simple timer
+      if (this.mode !== 'pomodoro') {
+        logger.log(LOG_CATEGORIES.TIMER, 'Skip phase failed - not in Pomodoro mode', {
+          mode: this.mode,
+        });
+        return false;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Skipping to next phase', {
+        currentPhase: this.currentPhase,
+        currentCycle: this.currentCycle,
+        totalCycles: this.totalCycles,
+      });
+
+      // Trigger phase transition by completing current phase
+      this.remainingTime = 0;
+      this.handlePhaseComplete();
+
+      return true;
+    }
+
+    /**
      * Save timer state to preferences with config
      * LOGIC FIX: Store config with timer state
      */
@@ -1379,7 +1715,8 @@
             this.isActive = state.isActive;
             this.isPaused = state.isPaused;
             this.remainingTime = state.remainingTime;
-            this.currentPhase = state.currentPhase;
+            // Backwards compatibility: treat 'long-break' as 'break'
+            this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
             this.currentCycle = state.currentCycle;
             this.totalCycles = state.totalCycles;
             this.mode = state.mode;
@@ -1488,8 +1825,15 @@
     /**
      * Check if current workspace is blocked
      * PERFORMANCE FIX: Validation only runs on workspace change, not every call
+     * BREAK PHASE FIX: Returns false during break phases to allow free browsing
      */
     isCurrentWorkspaceBlocked() {
+      // During break phases, workspaces are not blocked to allow free browsing
+      if (isInBreakPhase()) {
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace blocking disabled during break phase');
+        return false;
+      }
+
       // Reload config to get latest blocked workspaces
       this.config = getConfig();
 
@@ -1784,6 +2128,7 @@
 
     /**
      * Create the overlay controls section with buttons
+     * Includes dev bypass input for Pomodoro mode only
      * @returns {HTMLElement} The controls container element
      * @private
      */
@@ -1803,6 +2148,17 @@
 
       controls.appendChild(pauseButton);
       controls.appendChild(stopButton);
+
+      // Add dev bypass input (only for Pomodoro mode)
+      const bypassContainer = createDevBypassInput(() => {
+        // Callback when bypass succeeds - hide overlay if we're now in break phase
+        if (isInBreakPhase()) {
+          this.hide();
+        }
+      });
+      if (bypassContainer) {
+        controls.appendChild(bypassContainer);
+      }
 
       return controls;
     }
@@ -2658,12 +3014,25 @@
         // Timer is running - show timer controls
         const status = window.zenPomodoroApp.timer.getStatus();
         const timeStr = formatTime(status.remainingTime);
-        const phaseStr =
-          status.currentPhase === 'focus'
-            ? 'Focus'
-            : status.currentPhase === 'break'
-              ? 'Break'
-              : 'Long Break';
+        // Map all known phases explicitly, including transition and long-break for backwards compatibility
+        let phaseStr;
+        switch (status.currentPhase) {
+          case 'focus':
+            phaseStr = 'Focus';
+            break;
+          case 'break':
+            phaseStr = 'Break';
+            break;
+          case 'long-break':
+            phaseStr = 'Long Break';
+            break;
+          case 'transition':
+            phaseStr = 'Transition';
+            break;
+          default:
+            phaseStr = 'Focus';
+            break;
+        }
 
         const statusRow = document.createElement('div');
         statusRow.className = 'zen-pomodoro-config-row';
@@ -2709,6 +3078,7 @@
         settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
         settingsBtn.textContent = 'Timer Settings';
         settingsBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showSettingsDialog();
@@ -2718,6 +3088,7 @@
         rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
         rulesetBtn.textContent = 'Ruleset Settings';
         rulesetBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showRulesetSettingsDialog();
@@ -2734,6 +3105,7 @@
         startBtn.className = 'zen-pomodoro-dialog-button';
         startBtn.textContent = 'Start Pomodoro Timer';
         startBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showConfigDialog();
@@ -2743,6 +3115,7 @@
         settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
         settingsBtn.textContent = 'Timer Settings';
         settingsBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showSettingsDialog();
@@ -2752,6 +3125,7 @@
         rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
         rulesetBtn.textContent = 'Ruleset Settings';
         rulesetBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showRulesetSettingsDialog();
@@ -2781,6 +3155,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from previous dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
@@ -2859,6 +3236,9 @@
       // Assemble dialog
       [backButton, h2, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
       setupDialogDrag(dialog);
 
       // Event handlers
@@ -2942,6 +3322,7 @@
       backButton.textContent = '← Back';
       backButton.addEventListener('click', () => {
         if (dialog && dialog.parentNode) {
+          saveDialogPosition(dialog);
           dialog.remove();
         }
         this.showPomodoroMenu();
@@ -3173,6 +3554,7 @@
       backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
       backButton.textContent = '← Back';
       backButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
         dialog.remove();
         this.showPomodoroMenu();
       });
@@ -3305,15 +3687,6 @@
         breakRow.classList.add('hidden');
       }
 
-      const longBreakRow = createLabeledInputRow('Long Break (min):', 'long-break-duration', {
-        value: config.longBreakDuration,
-        min: 5,
-        max: 60,
-      });
-      if (config.timerMode === 'simple') {
-        longBreakRow.classList.add('hidden');
-      }
-
       const cyclesRow = createLabeledInputRow('Number of Cycles:', 'cycles', {
         value: config.cycles,
         min: 1,
@@ -3329,7 +3702,6 @@
         simpleDurationRow.classList.toggle('hidden', !isSimple);
         focusRow.classList.toggle('hidden', isSimple);
         breakRow.classList.toggle('hidden', isSimple);
-        longBreakRow.classList.toggle('hidden', isSimple);
         cyclesRow.classList.toggle('hidden', isSimple);
       });
 
@@ -3543,7 +3915,6 @@
       configSection.appendChild(simpleDurationRow);
       configSection.appendChild(focusRow);
       configSection.appendChild(breakRow);
-      configSection.appendChild(longBreakRow);
       configSection.appendChild(cyclesRow);
       configSection.appendChild(messageRow);
       configSection.appendChild(workspaceRow);
@@ -3579,6 +3950,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
@@ -3672,15 +4046,6 @@
           1,
           30,
           config.breakDuration
-        );
-      }
-      const longBreakDurationInput = dialog.querySelector('#long-break-duration');
-      if (longBreakDurationInput) {
-        config.longBreakDuration = validateIntegerInput(
-          longBreakDurationInput.value,
-          5,
-          60,
-          config.longBreakDuration
         );
       }
       const cyclesInput = dialog.querySelector('#cycles');
@@ -3799,6 +4164,7 @@
       backButton.addEventListener('click', () => {
         // Save current rulesets before closing
         saveConfig(config);
+        saveDialogPosition(dialog);
         dialog.remove();
         if (onClose) {
           onClose();
@@ -3894,6 +4260,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Make dialog draggable
       setupDialogDrag(dialog);
@@ -5010,6 +5379,8 @@
 
     /**
      * Check if the blocker should be shown based on timer state.
+     * NOTE: SineModBlocker intentionally does NOT disable during break phases
+     * because users should not be able to modify mod settings during any timer session.
      * @returns {boolean} True if timer is active
      * @private
      */
@@ -5133,6 +5504,8 @@
     /**
      * Create the blocker overlay element with all its content.
      * Uses shared utilities to reduce code duplication.
+     * NOTE: SineModBlocker includes dev bypass but does NOT hide on break phase
+     * because mod settings should remain locked throughout any timer session.
      * @private
      */
     _createBlockerOverlay() {
@@ -5165,11 +5538,13 @@
       timerStatus.id = 'zen-pomodoro-sine-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons using shared utility
+      // Buttons using shared utility with bypass callback
+      // NOTE: Sine Mod blocker does NOT hide on break phase (mod settings stay locked)
       const buttons = createBlockerButtons(
         'zen-pomodoro-sine-blocker-buttons',
         () => this._handleGoBack(),
-        () => this._handleStopTimer()
+        () => this._handleStopTimer(),
+        null // No bypass callback - mod settings stay locked even during breaks
       );
 
       content.appendChild(icon);
@@ -5420,10 +5795,15 @@
 
     /**
      * Check if the blocker should be shown based on timer state.
-     * @returns {boolean} True if timer is active
+     * BREAK PHASE FIX: Returns false during break phases to allow free browsing
+     * @returns {boolean} True if timer is active and NOT in break phase
      * @private
      */
     _shouldShowBlocker() {
+      // During break phases, website blocking is disabled to allow free browsing
+      if (isInBreakPhase()) {
+        return false;
+      }
       return window.zenPomodoroApp?.timer?.isActive || false;
     }
 
@@ -6058,11 +6438,17 @@
       timerStatus.id = 'zen-pomodoro-website-blocker-timer';
       this._updateTimerStatus(timerStatus);
 
-      // Buttons using shared utility
+      // Buttons using shared utility with bypass callback
       const buttons = createBlockerButtons(
         'zen-pomodoro-website-blocker-buttons',
         () => this._handleGoBack(),
-        () => this._handleStopTimer()
+        () => this._handleStopTimer(),
+        () => {
+          // Callback when bypass succeeds - hide blocker if we're now in break phase
+          if (isInBreakPhase()) {
+            this._hideBlocker();
+          }
+        }
       );
 
       content.appendChild(icon);
@@ -6227,6 +6613,177 @@
   }
 
   // ============================================
+  // Transition Phase Manager
+  // ============================================
+
+  /**
+   * TransitionPhaseManager handles the "break ending" transition popup.
+   * When a break phase ends, this popup appears to warn the user
+   * that their break is ending and they should prepare to focus.
+   *
+   * Features:
+   * - Movable floating popup (does NOT block browser interaction)
+   * - 5-minute countdown timer
+   * - "I'm Ready to Focus" button to close early
+   * - No X button or click-outside-to-close
+   * - When closed (timer or button): re-enables blocking and starts focus phase
+   */
+  class TransitionPhaseManager {
+    constructor() {
+      this.popup = null;
+      this.timerInterval = null;
+      this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
+      this.onTransitionComplete = null; // Callback when transition ends
+    }
+
+    /**
+     * Show the transition popup.
+     * Called when break phase ends and before focus phase begins.
+     */
+    showTransitionPopup() {
+      // Don't show if already showing
+      if (this.popup) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Showing transition popup');
+
+      this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
+      this._createPopup();
+      document.documentElement.appendChild(this.popup);
+
+      // Make popup draggable
+      setupDialogDrag(this.popup);
+
+      // Start countdown
+      this._startCountdown();
+    }
+
+    /**
+     * Hide the transition popup and trigger the completion callback.
+     * Called when timer reaches zero or user clicks the "Ready" button.
+     * Includes guard against race conditions where this could be called twice
+     * (e.g., timer reaching zero at the same moment user clicks the button).
+     */
+    hideTransitionPopup() {
+      // Guard against double-execution (race condition between timer and button click)
+      if (!this.popup && !this.timerInterval) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Hiding transition popup');
+
+      // Clear countdown interval
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+
+      // Remove popup
+      if (this.popup) {
+        this.popup.remove();
+        this.popup = null;
+      }
+
+      // Reset remainingTime for next use to ensure clean state
+      this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
+
+      // Trigger completion callback (starts focus phase and re-enables blocking)
+      if (this.onTransitionComplete) {
+        this.onTransitionComplete();
+      }
+    }
+
+    /**
+     * Create the transition popup element.
+     * @private
+     */
+    _createPopup() {
+      this.popup = document.createElement('div');
+      this.popup.id = 'zen-pomodoro-transition-popup';
+      this.popup.className = 'zen-pomodoro-transition-popup active';
+
+      // Title (also serves as drag handle)
+      const title = document.createElement('h2');
+      title.textContent = 'Break Ending Soon';
+
+      // Message
+      const message = document.createElement('p');
+      message.className = 'zen-pomodoro-transition-message';
+      message.textContent = 'Your break is ending. Finish up and prepare to focus.';
+
+      // Countdown timer display
+      const timerDisplay = document.createElement('div');
+      timerDisplay.id = 'zen-pomodoro-transition-timer';
+      timerDisplay.className = 'zen-pomodoro-transition-timer';
+      timerDisplay.textContent = `Focus resumes in: ${formatTime(this.remainingTime)}`;
+
+      // "I'm Ready to Focus" button
+      const readyButton = document.createElement('button');
+      readyButton.id = 'zen-pomodoro-transition-ready-btn';
+      readyButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-transition-ready-btn';
+      readyButton.textContent = "I'm Ready to Focus";
+      readyButton.addEventListener('click', () => {
+        this.hideTransitionPopup();
+      });
+
+      // Assemble popup
+      this.popup.appendChild(title);
+      this.popup.appendChild(message);
+      this.popup.appendChild(timerDisplay);
+      this.popup.appendChild(readyButton);
+    }
+
+    /**
+     * Start the countdown timer.
+     * Updates the display every second and closes popup when timer reaches zero.
+     * Includes DOM detachment check to stop timer if popup is removed externally.
+     * @private
+     */
+    _startCountdown() {
+      this.timerInterval = setInterval(() => {
+        // If the popup has been removed or detached externally, stop the timer
+        if (!this.popup || !document.documentElement.contains(this.popup)) {
+          if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+          }
+          return;
+        }
+
+        this.remainingTime--;
+
+        // Update display
+        const timerDisplay = this.popup.querySelector('#zen-pomodoro-transition-timer');
+        if (timerDisplay) {
+          timerDisplay.textContent = `Focus resumes in: ${formatTime(this.remainingTime)}`;
+        }
+
+        // Timer reached zero - close popup and start focus
+        if (this.remainingTime <= 0) {
+          this.hideTransitionPopup();
+        }
+      }, 1000);
+    }
+
+    /**
+     * Clean up the transition manager.
+     * Called when the application is being destroyed.
+     */
+    destroy() {
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+
+      if (this.popup) {
+        this.popup.remove();
+        this.popup = null;
+      }
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -6239,6 +6796,7 @@
       this.security = new SecurityManager();
       this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
       this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
+      this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -6309,6 +6867,20 @@
         this.onTimerComplete();
       };
 
+      // Setup transition phase callbacks
+      this.timer.onTransitionStart = () => {
+        this.onTransitionStart();
+      };
+
+      this.timer.onTransitionEnd = () => {
+        this.onTransitionEnd();
+      };
+
+      // Setup transition manager callback (called when popup closes)
+      this.transitionManager.onTransitionComplete = () => {
+        this.onTransitionPopupComplete();
+      };
+
       // Setup workspace change callback
       this.workspace.onWorkspaceChange = (workspaceId, isBlocked) => {
         this.onWorkspaceChange(workspaceId, isBlocked);
@@ -6320,6 +6892,11 @@
         logger.log(LOG_CATEGORIES.INIT, 'Timer state restored from previous session');
         console.log('Restored timer state from previous session');
         this.updateOverlayVisibility();
+
+        // If restored into transition phase, show the popup
+        if (this.timer.currentPhase === 'transition') {
+          this.transitionManager.showTransitionPopup();
+        }
       }
 
       // MISSING FEATURE: Request notification permission
@@ -6392,6 +6969,9 @@
       this.overlay.hide();
       this.overlay.hideIndicator();
 
+      // Clean up transition popup if showing
+      this.transitionManager.destroy();
+
       // Notify Sine Mod Blocker that timer stopped
       this.sineModBlocker.onTimerStop();
 
@@ -6437,6 +7017,53 @@
     }
 
     /**
+     * Handle transition phase start (break phase ended, show popup)
+     */
+    onTransitionStart() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition phase starting - showing popup');
+
+      // Show the transition popup
+      this.transitionManager.showTransitionPopup();
+
+      // Update overlay visibility (blocking should remain disabled during transition)
+      this.updateOverlayVisibility();
+
+      // Show notification about break ending
+      const config = getConfig();
+      if (config.enableNotifications) {
+        this.showNotification('transition');
+      }
+    }
+
+    /**
+     * Handle transition phase end (timer hit zero)
+     * Called by the timer when transition countdown completes
+     */
+    onTransitionEnd() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition timer ended - hiding popup');
+
+      // Hide the popup (which triggers onTransitionPopupComplete)
+      this.transitionManager.hideTransitionPopup();
+    }
+
+    /**
+     * Handle transition popup completion (popup closed, start focus)
+     * Called when the transition popup is closed (by timer or button)
+     */
+    onTransitionPopupComplete() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition popup closed - starting focus phase');
+
+      // Start the actual focus phase
+      this.timer.startFocusFromTransition();
+
+      // Update overlay visibility (re-enable blocking)
+      this.updateOverlayVisibility();
+
+      // Notify blockers that focus is starting
+      this.websiteBlocker.onTimerStart();
+    }
+
+    /**
      * Handle workspace change
      */
     onWorkspaceChange(workspaceId, isBlocked) {
@@ -6451,11 +7078,30 @@
     /**
      * Update overlay visibility based on current state
      * Bug Fix: Also hide indicator when timer is not active
+     * BREAK PHASE FIX: Overlay is hidden during break phases to allow free browsing
+     * TRANSITION PHASE FIX: Overlay is hidden during transition phase to allow free browsing
      */
     updateOverlayVisibility() {
       if (!this.timer.isActive) {
         this.overlay.hide();
         this.overlay.hideIndicator();
+        return;
+      }
+
+      // During break phases, hide workspace overlay to allow free browsing
+      // Note: isCurrentWorkspaceBlocked() already checks for break phase,
+      // but we add an explicit check here for clarity and to update display
+      if (isInBreakPhase()) {
+        this.overlay.hide();
+        // Keep the indicator visible during breaks so user knows timer is running
+        return;
+      }
+
+      // During transition phase, hide workspace overlay (blocking stays disabled)
+      // The transition popup is shown separately by the TransitionPhaseManager
+      if (this.timer.currentPhase === 'transition') {
+        this.overlay.hide();
+        // Keep the indicator visible during transition so user knows timer is running
         return;
       }
 
@@ -6483,7 +7129,8 @@
       const messages = {
         focus: 'Time to focus! 💪',
         break: 'Take a break! ☕',
-        'long-break': 'Long break time! 🌟',
+        'long-break': 'Take a break! ☕', // Keep for backwards compatibility
+        transition: 'Break ending soon! ⏰',
         complete: 'Pomodoro session complete! 🎉',
       };
 
@@ -6537,6 +7184,9 @@
 
       document.documentElement.appendChild(dialog);
 
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
+
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
 
@@ -6581,6 +7231,9 @@
 
       document.documentElement.appendChild(dialog);
 
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
+
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
 
@@ -6609,6 +7262,10 @@
 
       if (this.websiteBlocker) {
         this.websiteBlocker.destroy();
+      }
+
+      if (this.transitionManager) {
+        this.transitionManager.destroy();
       }
 
       if (this.keyboardShortcut) {
