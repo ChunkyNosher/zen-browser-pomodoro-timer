@@ -17,11 +17,13 @@ This guide covers all dependencies and tools recommended for developing the Zen 
 Before installing any dependencies, ensure you have the following installed on your system:
 
 **System-Level Tools:**
+
 - **Git**: Version control (required for managing source code and version history)
 - **Node.js 21+**: JavaScript runtime (Zen Browser's official build requirement)
 - **npm** or **pnpm**: Node package manager (pnpm recommended for faster installations and better disk efficiency)
 
 **Recommended Versions:**
+
 - Node.js: 21.0.0 or higher (latest LTS recommended)
 - npm: 10.0.0 or higher
 - pnpm: 9.0.0 or higher (if using pnpm)
@@ -54,6 +56,7 @@ These tools are used during development and testing but not included in the fina
 **Purpose**: Ensure code quality, consistency, and adherence to best practices.
 
 **ESLint** - JavaScript linting
+
 - **Package**: `eslint`
 - **Version**: Latest (^8.50.0)
 - **Why**: Industry-standard JavaScript linter; catches errors and enforces code style
@@ -65,10 +68,12 @@ These tools are used during development and testing but not included in the fina
   - ES6 syntax validation (arrow functions, const/let, template literals)
 
 **Recommended ESLint Plugins**:
+
 - `eslint-plugin-no-unsanitized` - Prevent DOM sanitization issues
 - `eslint-plugin-mozilla` - Mozilla-specific JavaScript patterns (Services, ChromeUtils, etc.)
 
 **Stylelint** - CSS linting
+
 - **Package**: `stylelint`
 - **Version**: Latest (^16.0.0)
 - **Why**: Ensures CSS code quality and consistency
@@ -81,12 +86,14 @@ These tools are used during development and testing but not included in the fina
   - Validate z-index values and layering logic
 
 **Recommended Stylelint Plugins**:
+
 - `stylelint-config-standard` - Base configuration with sensible defaults
 - `stylelint-order` - Enforce property ordering in CSS rules
 
 #### 2. Code Formatting Tools
 
 **Prettier** - Code formatter
+
 - **Package**: `prettier`
 - **Version**: Latest (^3.0.0)
 - **Why**: Automatic code formatting ensures consistent style across entire codebase
@@ -100,6 +107,7 @@ These tools are used during development and testing but not included in the fina
   - Single quotes: true for JavaScript, false for HTML/XML
 
 **Recommended Setup**:
+
 ```json
 {
   "printWidth": 100,
@@ -115,6 +123,7 @@ These tools are used during development and testing but not included in the fina
 #### 3. Testing Frameworks
 
 **Vitest** - Modern JavaScript testing framework
+
 - **Package**: `vitest`
 - **Version**: Latest (^1.0.0)
 - **Why**: Modern, fast testing framework with Jest-compatible API; uses Vite for speed
@@ -132,6 +141,7 @@ These tools are used during development and testing but not included in the fina
   - Settings persistence tests with Services.prefs mock
 
 **Alternative: Jest** (if not using Vite)
+
 - **Package**: `jest`
 - **Version**: Latest (^29.0.0)
 - **Why**: Established testing framework with extensive documentation
@@ -139,12 +149,14 @@ These tools are used during development and testing but not included in the fina
 - **When to Use**: If your project doesn't use Vite for bundling
 
 **Testing Utilities**:
+
 - `@testing-library/dom` - DOM testing utilities (querySelectors, fireEvents)
 - `@testing-library/jest-dom` - Useful DOM assertions
 - `vitest-browser-vue` or similar - Browser-mode testing for UI components
 - `jsdom` or `happy-dom` - DOM implementation for testing
 
 **Mock Libraries**:
+
 - `sinon` - Spying, stubbing, and mocking library
 - `nock` - HTTP mocking for API calls
 - `jest-mock-extended` - Enhanced mocking capabilities
@@ -152,6 +164,7 @@ These tools are used during development and testing but not included in the fina
 #### 4. Bundling and Build Tools
 
 **Vite** - Next-generation frontend build tool
+
 - **Package**: `vite`
 - **Version**: Latest (^5.0.0)
 - **Why**: Extremely fast build tool; Zen Browser-compatible; used by Firefox projects
@@ -164,6 +177,7 @@ These tools are used during development and testing but not included in the fina
   - Plugin system for extensibility
 
 **Rollup** - Bundler for libraries and extensions
+
 - **Package**: `rollup`
 - **Version**: Latest (^4.0.0)
 - **Why**: Powers Vite; specifically good for Firefox extension bundling
@@ -175,6 +189,7 @@ These tools are used during development and testing but not included in the fina
   - `postcss` + `cssnano` - Minify CSS
 
 **esbuild** - JavaScript bundler
+
 - **Package**: `esbuild`
 - **Version**: Latest (^0.19.0)
 - **Why**: Used by Vite under the hood; extremely fast transpilation
@@ -184,6 +199,7 @@ These tools are used during development and testing but not included in the fina
 #### 5. Development Server and Hot Reload
 
 **Vite Dev Server** (included with Vite)
+
 - **Capabilities**:
   - Hot Module Replacement (HMR)
   - Instant feedback on file changes
@@ -191,6 +207,7 @@ These tools are used during development and testing but not included in the fina
   - Built-in CSS hot reload
 
 **Firefox Developer Edition** (runtime)
+
 - **Purpose**: Debugging Zen mod during development
 - **Installation**: Download from mozilla.org
 - **Key Features for Mod Development**:
@@ -202,6 +219,7 @@ These tools are used during development and testing but not included in the fina
 #### 6. Type Checking (Optional but Recommended)
 
 **TypeScript** - Static type checking for JavaScript
+
 - **Package**: `typescript`
 - **Version**: Latest (^5.0.0)
 - **Why**: Catch type errors before runtime; better IDE support; self-documenting code
@@ -216,6 +234,7 @@ These tools are used during development and testing but not included in the fina
   - `types/zen.d.ts` - Type definitions for Zen-specific APIs
 
 **Recommended tsconfig.json Settings**:
+
 ```json
 {
   "compilerOptions": {
@@ -234,6 +253,7 @@ These tools are used during development and testing but not included in the fina
 #### 7. Pre-commit Hooks
 
 **husky** - Git hooks manager
+
 - **Package**: `husky`
 - **Version**: Latest (^8.0.0)
 - **Why**: Run linting and tests before commits; prevent bad code from being committed
@@ -244,6 +264,7 @@ These tools are used during development and testing but not included in the fina
   - `pre-push`: Run tests before pushing
 
 **lint-staged** - Run linters on staged files only
+
 - **Package**: `lint-staged`
 - **Version**: Latest (^15.0.0)
 - **Why**: Only lint files that are about to be committed (faster feedback)
@@ -262,6 +283,7 @@ These tools are used during development and testing but not included in the fina
 #### 8. Documentation Tools
 
 **JSDoc** - JavaScript documentation generator
+
 - **Package**: `jsdoc`
 - **Version**: Latest (^4.0.0)
 - **Why**: Generate API documentation from code comments
@@ -273,6 +295,7 @@ These tools are used during development and testing but not included in the fina
   - Generate HTML documentation
 
 **TypeDoc** (if using TypeScript)
+
 - **Package**: `typedoc`
 - **Version**: Latest (^0.25.0)
 - **Why**: Better documentation for TypeScript code
@@ -281,6 +304,7 @@ These tools are used during development and testing but not included in the fina
 #### 9. Debugging Tools
 
 **Firefox DevTools Remote Debugging** (built-in)
+
 - **Purpose**: Debug mod code running in Firefox
 - **Access**: `about:debugging` → This Firefox → Enable/Manage Extensions
 - **Key Features**:
@@ -290,6 +314,7 @@ These tools are used during development and testing but not included in the fina
   - Network for timing analysis
 
 **Browser Toolbox** (Firefox chrome debugging)
+
 - **Purpose**: Debug browser chrome UI (not web content)
 - **Enable**: Set `devtools.chrome.enabled` to true in `about:config`
 - **Access**: Ctrl+Alt+Shift+I in Firefox
@@ -298,6 +323,7 @@ These tools are used during development and testing but not included in the fina
 #### 10. Build Optimization
 
 **terser** - JavaScript minifier
+
 - **Package**: `terser`
 - **Version**: Latest (^5.20.0)
 - **Why**: Minify JavaScript for production builds
@@ -308,6 +334,7 @@ These tools are used during development and testing but not included in the fina
   - Compress but maintain readability comments
 
 **cssnano** - CSS minifier
+
 - **Package**: `cssnano`
 - **Version**: Latest (^6.0.0)
 - **Why**: Minimize CSS file size
@@ -315,6 +342,7 @@ These tools are used during development and testing but not included in the fina
 - **Integration**: Use with PostCSS
 
 **PostCSS** - CSS transformation tool
+
 - **Package**: `postcss`
 - **Version**: Latest (^8.4.0)
 - **Why**: Enable modern CSS features and vendor prefixing
@@ -333,6 +361,7 @@ These tools are used during development and testing but not included in the fina
 Zen mods should have **minimal or zero** external runtime dependencies because they run in the browser chrome context without access to npm packages.
 
 **Possible Runtime Dependencies** (rarely needed):
+
 - Custom utility libraries (if bundled)
 - Browser polyfills (if targeting older Firefox versions)
 
@@ -409,6 +438,7 @@ Recommended `package.json` organization:
 Location: Root directory
 
 Key configurations:
+
 - ES2020 target (modern JavaScript)
 - Browser and Node.js environments
 - Mozilla extension rules enabled
@@ -419,6 +449,7 @@ Key configurations:
 Location: Root directory
 
 Key configurations:
+
 - Standard CSS rules
 - Property ordering rules
 - No vendor prefix enforcement (handled by Autoprefixer)
@@ -429,6 +460,7 @@ Key configurations:
 Location: Root directory
 
 Key configurations:
+
 - 100-character line width
 - 2-space indentation
 - Semicolons enabled
@@ -439,6 +471,7 @@ Key configurations:
 Location: Root directory
 
 Key settings:
+
 - Entry point: `src/userChrome.uc.mjs`
 - CSS processing with PostCSS
 - Build output directory: `dist/`
@@ -450,6 +483,7 @@ Key settings:
 Location: Root directory
 
 Key settings:
+
 - DOM environment (happy-dom)
 - Coverage reporting enabled
 - Browser UI enabled for debugging
@@ -460,6 +494,7 @@ Key settings:
 Location: Root directory
 
 Key settings:
+
 - ES2020 target
 - Strict type checking
 - DOM and ES2020 libraries
@@ -614,18 +649,23 @@ For optimal development experience:
 ### Common Issues
 
 **Issue**: ESLint complains about Firefox Services API
+
 - **Solution**: Install `eslint-plugin-mozilla` and configure `.eslintrc.cjs` to recognize Services
 
 **Issue**: Tests fail with "document is not defined"
+
 - **Solution**: Ensure Vitest is configured with `environment: 'jsdom'` or `'happy-dom'`
 
 **Issue**: CSS minification breaks custom properties
+
 - **Solution**: Configure cssnano to preserve CSS variables in `postcss.config.js`
 
 **Issue**: TypeScript doesn't recognize Firefox API types
+
 - **Solution**: Create `types/firefox.d.ts` with type definitions
 
 **Issue**: Hot reload not working in Vite dev mode
+
 - **Solution**: Check `vite.config.ts` HMR configuration; may need to disable for extension development
 
 ---
@@ -711,4 +751,3 @@ npm update              # Update dependencies
 **Prefer official tools**: Use Firefox's official APIs and Mozilla-maintained tooling.
 
 This comprehensive setup provides Copilot with all necessary tools to build a professional, well-tested, maintainable Zen Browser mod.
-
