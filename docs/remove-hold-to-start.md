@@ -7,6 +7,7 @@ The "Start Timer" button in the Pomodoro timer configuration dialog still requir
 ## Problem Description
 
 Currently, when a user:
+
 1. Opens the Pomodoro menu (Alt+Shift+P)
 2. Clicks "Start Pomodoro Timer"
 3. Configures timer settings (mode, duration, cycles)
@@ -33,7 +34,7 @@ _setupStartHandler(dialog, config, modeSelect, startButton) {
       window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
     }
   };
-  
+
   // Always use instant start - no hold required
   startButton.addEventListener('click', applyDurationsAndStart);
 }
@@ -77,25 +78,29 @@ Search results show button text like "Start Timer" but comments mention "Hold to
 ### 1. JavaScript Changes (`zen-pomodoro-focus-blocker.uc.js`)
 
 **Remove any hold-to-start logic from `_setupStartHandler()` method** (lines ~2355-2385):
+
 - Ensure the start button uses a simple `click` event listener
 - Remove any `mousedown`/`mouseup` or `touchstart`/`touchend` event listeners from the start button
 - Remove any timer/interval logic related to button holding for start functionality
 - Ensure the callback `applyDurationsAndStart()` is called immediately on click
 
 **Verify no hold logic exists in `_createStartDialogButtons()` method** (lines ~2311-2340):
+
 - The button should have `textContent = 'Start Timer'` (not including "Hold" text)
 - No progress bar element should be appended to this button
 - No hold-related CSS classes should be applied
 
 **Search and remove**:
+
 - Any `.addEventListener('mousedown', ...)` on the start button
-- Any `.addEventListener('touchstart', ...)` on the start button  
+- Any `.addEventListener('touchstart', ...)` on the start button
 - Any `.addEventListener('keydown', ...)` for hold functionality on start button
 - Any `setInterval()` or timer logic tied to start button holding
 
 ### 2. CSS Cleanup (`chrome.css`)
 
 Verify these CSS rules don't apply to the start button:
+
 - `.zen-pomodoro-hold-to-unlock-btn` (line ~636)
 - `.zen-pomodoro-hold-unlock-progress` (line ~642)
 
@@ -106,6 +111,7 @@ These should **only** apply to the lock screen's hold-to-unlock button, NOT to t
 ### 3. Comments/Documentation
 
 Update any comments in the code that reference:
+
 - "Hold to start"
 - "3 second hold"
 - "Hold-to-start functionality"
@@ -146,6 +152,7 @@ After implementing the fix, verify:
 ## Related Comments in Code
 
 The code already contains this comment (line ~2383):
+
 ```javascript
 // Always use instant-click start button (no hold-to-start)
 startButton.id = 'zen-pomodoro-start-button';

@@ -7,12 +7,12 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 
 ## ✨ Features
 
-- ⏱️ **Flexible Timer Modes**: 
+- ⏱️ **Flexible Timer Modes**:
   - Simple one-phase timer for quick focus sessions
   - Traditional Pomodoro cycles with focus/break periods
   - Customizable long breaks every N cycles
 
-- 🚫 **Workspace-Based Blocking**: 
+- 🚫 **Workspace-Based Blocking**:
   - Block specific workspaces during focus periods
   - Full-screen opaque overlay prevents distractions
   - Automatically adapts when switching workspaces
@@ -111,6 +111,7 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
 ### Available Settings
 
 #### Timer Durations
+
 - **Focus Duration**: Time for focus periods (default: 25 minutes)
   - Range: 1-120 minutes
 - **Break Duration**: Time for short breaks (default: 5 minutes)
@@ -120,6 +121,7 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
 - **Long Break Interval**: Cycles between long breaks (default: every 4 cycles)
 
 #### Overlay Customization
+
 - **Overlay Color**: Background color during blocking
   - Default: `#808080` (medium gray)
   - Focus: `#2180cd` (blue)
@@ -129,16 +131,17 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
   - Examples: "Stay focused!", "You got this!", "Focus mode activated"
 
 #### Workspace Selection
+
 - Choose which workspaces should be blocked during timers
 - Unblocked workspaces remain accessible during focus periods
 - Changes take effect on next timer start
 
 #### Security Features
+
 - **Settings Lock (Idle)**: Wait time before accessing settings when no timer is active
   - Default: 20 seconds
   - Range: 5-300 seconds
   - Prevents quick settings changes
-  
 - **Settings Lock (Active)**: Code entry required during active timer
   - Default: 64 character code
   - Range: 8-128 characters
@@ -146,6 +149,7 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
   - Prevents cheating mid-session
 
 #### Notifications
+
 - **Enable Notifications**: Show phase change alerts
 - **Enable Audio Alerts**: Play sound on phase transitions (requires audio file)
 
@@ -187,15 +191,19 @@ zen-pomodoro.timer-state - Current timer state (for crash recovery)
 ## 🎯 Use Cases
 
 ### Focused Work Sessions
+
 Block social media or entertainment workspaces while working on important tasks. Set a 25-minute focus period with 5-minute breaks.
 
 ### Deep Work Marathons
+
 Use extended focus periods (50-90 minutes) with longer breaks (15-20 minutes) for complex projects requiring sustained concentration.
 
 ### Time-Boxed Learning
+
 Block all non-educational workspaces during study sessions. Use Pomodoro cycles to maintain engagement while learning new material.
 
 ### Meeting Preparation
+
 Set a simple timer for 15 minutes to prepare for meetings without getting distracted by other browser tabs.
 
 ## 🐛 Troubleshooting
@@ -205,6 +213,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Timer starts but no overlay appears
 
 **Solutions**:
+
 1. Verify the current workspace is marked as "blocked" in settings
 2. Clear Zen Browser startup cache:
    - Navigate to `about:support`
@@ -218,6 +227,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Timer doesn't count down accurately
 
 **Solutions**:
+
 1. Verify system clock is correct
 2. Check for high CPU usage from other processes
 3. Close unnecessary browser tabs/extensions
@@ -228,6 +238,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Configuration changes don't save after browser restart
 
 **Solutions**:
+
 1. Check Firefox preferences: `about:config` → search for `zen-pomodoro`
 2. Verify write permissions for profile directory
 3. Try manually saving config via browser console:
@@ -241,6 +252,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Pressing Alt+Shift+P doesn't open the Pomodoro menu
 
 **Solutions**:
+
 1. Verify `zen-pomodoro-focus-blocker.uc.js` is loaded (check browser console on startup)
 2. Check if another extension or mod is using the same shortcut
 3. Configure a different shortcut in the mod settings
@@ -252,6 +264,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 **Issue**: Can't access any workspace during timer
 
 **Solutions**:
+
 - This is intended behavior for blocked workspaces during focus periods
 - Switch to a non-blocked workspace to continue other work
 - Stop the timer if you need immediate access (requires confirmation)
@@ -260,16 +273,19 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 ## 🔐 Privacy & Security
 
 ### Data Storage
+
 - All configuration stored locally using Firefox Services.prefs
 - No data transmitted to external servers
 - No tracking or analytics
 - Timer state saved to recover from browser crashes
 
 ### Security Features
+
 - Settings locks prevent unauthorized configuration changes
 - Code generation uses cryptographically secure random values
 
 ### Limitations
+
 - **Browser-Level Only**: Blocking works only within Zen Browser. Users can open other browsers.
 - **Developer Tools Access**: Users with DevTools knowledge could theoretically bypass the overlay.
 - **Single Timer Per Window**: One active timer per browser window (multiple windows can have independent timers).
@@ -289,6 +305,7 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 ### Reporting Issues
 
 When reporting bugs, please include:
+
 - Zen Browser version
 - Operating system
 - Steps to reproduce
@@ -317,6 +334,7 @@ See [LICENSE](LICENSE) file for full details.
 ## 📊 Changelog
 
 ### Version 1.0.0 (Initial Release)
+
 - ✅ Simple and Pomodoro timer modes
 - ✅ Full-screen workspace blocking overlay
 - ✅ Customizable timer durations

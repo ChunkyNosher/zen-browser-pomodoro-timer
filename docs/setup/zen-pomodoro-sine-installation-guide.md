@@ -38,6 +38,7 @@ This guide focuses on enabling both methods.
 ### What is userChrome?
 
 `chrome.css` and `userChrome.uc.mjs` are Firefox/Zen's browser chrome customization files that:
+
 - Modify the browser UI itself (not web content)
 - Run in the privileged browser context
 - Allow access to Firefox Services API
@@ -86,20 +87,20 @@ The `manifest.json` file is **essential** for Sine mod manager compatibility. Th
 
 **Detailed Field Explanations**:
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `manifest_version` | ✅ | Integer | Must be `1` for Sine compatibility |
-| `name` | ✅ | String | Display name in Sine marketplace (20-50 chars recommended) |
-| `version` | ✅ | String | Semantic versioning (e.g., "1.0.0", "2.1.3-beta") |
-| `description` | ✅ | String | Brief description for marketplace (100-200 chars) |
-| `author` | ✅ | String | Your name or GitHub username |
-| `license` | ✅ | String | License type (MPL-2.0, MIT, GPL-3.0, etc.) |
-| `homepage` | ⚠️ | String | URL to project homepage or GitHub repo |
-| `repository` | ⚠️ | Object | Git repository info (used by Sine for updates) |
-| `keywords` | Optional | Array | Search tags (5-10 keywords) |
-| `icon` | Optional | String | Path to 512x512 PNG icon (relative to root) |
-| `screenshot` | Optional | String | Path to screenshot image for marketplace preview |
-| `compatible_with` | Optional | String | Zen version compatibility (e.g., "1.0.0+") |
+| Field              | Required | Type    | Description                                                |
+| ------------------ | -------- | ------- | ---------------------------------------------------------- |
+| `manifest_version` | ✅       | Integer | Must be `1` for Sine compatibility                         |
+| `name`             | ✅       | String  | Display name in Sine marketplace (20-50 chars recommended) |
+| `version`          | ✅       | String  | Semantic versioning (e.g., "1.0.0", "2.1.3-beta")          |
+| `description`      | ✅       | String  | Brief description for marketplace (100-200 chars)          |
+| `author`           | ✅       | String  | Your name or GitHub username                               |
+| `license`          | ✅       | String  | License type (MPL-2.0, MIT, GPL-3.0, etc.)                 |
+| `homepage`         | ⚠️       | String  | URL to project homepage or GitHub repo                     |
+| `repository`       | ⚠️       | Object  | Git repository info (used by Sine for updates)             |
+| `keywords`         | Optional | Array   | Search tags (5-10 keywords)                                |
+| `icon`             | Optional | String  | Path to 512x512 PNG icon (relative to root)                |
+| `screenshot`       | Optional | String  | Path to screenshot image for marketplace preview           |
+| `compatible_with`  | Optional | String  | Zen version compatibility (e.g., "1.0.0+")                 |
 
 **Example Enhanced manifest.json**:
 
@@ -137,6 +138,7 @@ The `manifest.json` file is **essential** for Sine mod manager compatibility. Th
 The CSS file that styles the timer overlay, buttons, and UI modifications.
 
 **Key Requirements**:
+
 - Must work standalone (no external dependencies)
 - CSS variables for theming
 - No imports of external stylesheets
@@ -144,6 +146,7 @@ The CSS file that styles the timer overlay, buttons, and UI modifications.
 - Responsive design for different screen sizes
 
 **File Structure**:
+
 ```css
 /* Root CSS Variables */
 :root {
@@ -180,12 +183,14 @@ The CSS file that styles the timer overlay, buttons, and UI modifications.
 JavaScript file containing the mod's logic. This is where the timer engine, workspace detection, and overlay management live.
 
 **Requirements for Zen Mod Installation**:
+
 - Must use ES module syntax
 - Must be self-contained (all dependencies bundled)
 - Access Firefox Services API via `Services.prefs`
 - No `localStorage` or `sessionStorage` (blocked in chrome context)
 
 **File Structure**:
+
 ```javascript
 /**
  * Zen Pomodoro Focus Blocker Mod
@@ -252,11 +257,13 @@ Brief one-liner description
 ## Installation
 
 ### Via Sine Mod Manager (Recommended)
+
 1. Open Zen Browser Settings → Sine Mods
 2. Paste this URL: https://github.com/[username]/zen-pomodoro-blocker
 3. Click Install
 
 ### Manual Installation
+
 [Instructions for users without Sine]
 
 ## Usage
@@ -283,11 +290,13 @@ Links to issues, discussions, etc.
 #### 5. Optional: icon.png and screenshot.png
 
 **icon.png** (512x512 PNG):
+
 - Displayed in Sine marketplace
 - Should represent mod functionality (timer icon, etc.)
 - Place in `assets/` subdirectory
 
 **screenshot.png** (1200x675 or similar):
+
 - Preview image shown in Sine details
 - Should show the mod in action
 - Place in `assets/` subdirectory
@@ -330,6 +339,7 @@ zen-pomodoro-blocker/
 **Recommended Format**: `zen-[mod-name]`
 
 **Examples**:
+
 - `zen-pomodoro-blocker`
 - `zen-nebula-theme`
 - `zen-keyboard-shortcuts`
@@ -412,6 +422,7 @@ zen-pomodoro-blocker/
 #### Step 4: Key Configuration Files
 
 **.gitignore**:
+
 ```
 # Node.js
 node_modules/
@@ -438,6 +449,7 @@ Thumbs.db
 ```
 
 **LICENSE**:
+
 ```
 Mozilla Public License Version 2.0
 ==================================
@@ -477,6 +489,7 @@ For the full license text, see: [mozilla.org/MPL/2.0](https://www.mozilla.org/en
 Follow semantic versioning format: `MAJOR.MINOR.PATCH`
 
 **Examples**:
+
 - `1.0.0` - Initial release
 - `1.1.0` - Minor feature addition
 - `1.1.1` - Bug fix
@@ -489,6 +502,7 @@ Sine uses GitHub Releases to check for updates. Every new mod version should hav
 #### Manual Release Process
 
 1. **Update version in `manifest.json`**:
+
    ```json
    {
      "version": "1.1.0"
@@ -496,28 +510,34 @@ Sine uses GitHub Releases to check for updates. Every new mod version should hav
    ```
 
 2. **Update `CHANGELOG.md`**:
+
    ```markdown
    ## [1.1.0] - 2025-01-15
 
    ### Added
+
    - Hold-to-start button feature
    - Custom notification sounds
 
    ### Fixed
+
    - Overlay not responding on sidebar collapse
    - Settings not persisting on browser restart
 
    ### Changed
+
    - Increased default timer font size to 100px
    ```
 
 3. **Commit changes**:
+
    ```bash
    git add manifest.json CHANGELOG.md
    git commit -m "Release v1.1.0: Add hold-to-start and custom sounds"
    ```
 
 4. **Create Git tag**:
+
    ```bash
    git tag v1.1.0
    git push origin main
@@ -548,7 +568,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Create Release
         uses: actions/create-release@v1
         env:
@@ -591,7 +611,8 @@ This points to the `manifest.json` file in your main branch. When the version in
 7. Browser restarts automatically
 8. Mod is now active
 
-**For Your Mod to Appear**: 
+**For Your Mod to Appear**:
+
 - Submit to Sine marketplace (contact Sine maintainers)
 - Make sure `manifest.json` is valid
 - Ensure repository is public
@@ -628,33 +649,35 @@ Once installed, users can enable automatic updates in Sine settings:
 
 For your mod to be recognized and installable by Sine:
 
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| `manifest.json` in root directory | ✅ REQUIRED | Must be valid JSON |
-| Valid `manifest_version: 1` | ✅ REQUIRED | Integer value 1 |
-| `name` field | ✅ REQUIRED | String, 20-50 chars |
-| `version` field | ✅ REQUIRED | Semantic version (e.g., "1.0.0") |
-| `description` field | ✅ REQUIRED | String, 100-200 chars |
-| `author` field | ✅ REQUIRED | Your name/username |
-| `license` field | ✅ REQUIRED | Standard license identifier |
-| `chrome.css` file | ✅ REQUIRED | In root directory |
-| `userChrome.uc.mjs` or similar | ⚠️ OPTIONAL | JavaScript logic file |
-| `README.md` file | ⚠️ RECOMMENDED | Displayed in mod manager |
-| `icon.png` file | ⚠️ RECOMMENDED | 512x512 PNG image |
-| Repository is public | ✅ REQUIRED | Mod manager cannot clone private repos |
-| Valid JSON syntax | ✅ REQUIRED | Use JSON validator to check |
+| Requirement                       | Status         | Notes                                  |
+| --------------------------------- | -------------- | -------------------------------------- |
+| `manifest.json` in root directory | ✅ REQUIRED    | Must be valid JSON                     |
+| Valid `manifest_version: 1`       | ✅ REQUIRED    | Integer value 1                        |
+| `name` field                      | ✅ REQUIRED    | String, 20-50 chars                    |
+| `version` field                   | ✅ REQUIRED    | Semantic version (e.g., "1.0.0")       |
+| `description` field               | ✅ REQUIRED    | String, 100-200 chars                  |
+| `author` field                    | ✅ REQUIRED    | Your name/username                     |
+| `license` field                   | ✅ REQUIRED    | Standard license identifier            |
+| `chrome.css` file                 | ✅ REQUIRED    | In root directory                      |
+| `userChrome.uc.mjs` or similar    | ⚠️ OPTIONAL    | JavaScript logic file                  |
+| `README.md` file                  | ⚠️ RECOMMENDED | Displayed in mod manager               |
+| `icon.png` file                   | ⚠️ RECOMMENDED | 512x512 PNG image                      |
+| Repository is public              | ✅ REQUIRED    | Mod manager cannot clone private repos |
+| Valid JSON syntax                 | ✅ REQUIRED    | Use JSON validator to check            |
 
 ### Validate Your theme.json
 
 Use online JSON validator: [jsonlint.com](https://www.jsonlint.com/)
 
 Or use command line:
+
 ```bash
 npm install -g jsonlint
 jsonlint theme.json
 ```
 
 Expected output if valid:
+
 ```
 ✓ theme.json is valid JSON
 ```
@@ -690,6 +713,7 @@ Expected output if valid:
 Before publishing your mod:
 
 ### Mod Files
+
 - [ ] `chrome.css` created and styled
 - [ ] `userChrome.uc.mjs` with all logic implemented
 - [ ] No `console.error()` or debug statements in production code
@@ -698,6 +722,7 @@ Before publishing your mod:
 - [ ] Timer updates accurately to system clock
 
 ### Repository Structure
+
 - [ ] All files in root directory (theme.json, chrome.css, userChrome.uc.mjs)
 - [ ] `theme.json` valid and complete
 - [ ] `README.md` with installation instructions
@@ -706,6 +731,7 @@ Before publishing your mod:
 - [ ] Repository is **public**
 
 ### Documentation
+
 - [ ] README explains features clearly
 - [ ] Installation instructions included (mod manager URL method)
 - [ ] Configuration/settings explained
@@ -713,6 +739,7 @@ Before publishing your mod:
 - [ ] Links to GitHub issues for support
 
 ### Testing
+
 - [ ] Mod installs via mod manager URL method without errors
 - [ ] Browser doesn't crash after installation
 - [ ] CSS applies correctly without visual glitches
@@ -720,6 +747,7 @@ Before publishing your mod:
 - [ ] All user-configurable options function properly
 
 ### Publishing
+
 - [ ] Commit and push to GitHub
 - [ ] Create GitHub Release with v1.0.0 tag
 - [ ] Update URLs in theme.json if needed
@@ -753,6 +781,7 @@ When releasing updates:
 ### Monitoring
 
 Track:
+
 - GitHub stars (popularity)
 - Issues/discussions (user feedback)
 - Download statistics (engagement)
@@ -869,16 +898,19 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
 ## Troubleshooting
 
 ### Overlay Not Showing
+
 - Clear Zen startup cache: `about:support` → Clear Startup Cache
 - Restart Zen Browser
 - Ensure workspace is marked as "blocked" in settings
 
 ### Timer Not Accurate
+
 - Check system clock is correct
 - Ensure no other processes are consuming excessive CPU
 - Report issue on GitHub
 
 ### Settings Lock Not Working
+
 - Verify code entry is enabled in settings
 - Try clearing startup cache and restarting
 
@@ -916,6 +948,7 @@ Built with ❤️ for Zen Browser
 **Symptoms**: Mod manager says "Repository not found" or "Invalid manifest"
 
 **Solutions**:
+
 1. Verify repository is **public** (Settings → Visibility)
 2. Check `theme.json` is valid JSON (use jsonlint.com)
 3. Ensure `theme.json` is in **root directory** (not in subdirectory)
@@ -927,6 +960,7 @@ Built with ❤️ for Zen Browser
 **Symptoms**: Files copied but mod doesn't load in Zen
 
 **Solutions**:
+
 1. Clear Zen startup cache: `about:support` → Clear Startup Cache
 2. Restart Zen Browser completely
 3. Check for syntax errors in `userChrome.uc.mjs` (use Firefox console)
@@ -938,6 +972,7 @@ Built with ❤️ for Zen Browser
 **Symptoms**: "Update failed" in mod manager settings
 
 **Solutions**:
+
 1. Verify URLs in theme.json are correct
 2. Check GitHub repository is still public
 3. Verify version in theme.json has been incremented for new release
@@ -949,6 +984,7 @@ Built with ❤️ for Zen Browser
 **Symptoms**: Updated mod but old features still present
 
 **Solutions**:
+
 1. Clear Zen startup cache
 2. Clear browser cache (Settings → Clear Recent History)
 3. Restart Zen Browser completely
@@ -994,4 +1030,3 @@ Built with ❤️ for Zen Browser
 ---
 
 This comprehensive guide ensures your Zen Pomodoro mod is properly structured for discovery and installation via Sine, with clear instructions for both developers and users.
-

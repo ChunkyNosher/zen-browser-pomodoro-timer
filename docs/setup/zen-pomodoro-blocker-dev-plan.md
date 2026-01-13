@@ -39,6 +39,7 @@ mod-folder/
 **Workspaces**: Zen implements workspaces as distinct browser contexts, each with a unique UUID stored as the `zen-workspace-id` attribute on DOM elements. The currently active workspace has the `active="true"` attribute.
 
 **Mod Context**: Mods run in the privileged browser chrome context (not web content), granting access to:
+
 - Full DOM manipulation of browser UI elements
 - Firefox Services API (Services.prefs for persistent storage)
 - XUL/XHTML elements and events
@@ -51,6 +52,7 @@ mod-folder/
 #### Firefox Services API
 
 The mod will use `Services.prefs` for persistent configuration storage:
+
 - String preferences for serialized JSON configurations
 - Boolean preferences for feature toggles
 - Character preferences for individual settings
@@ -72,6 +74,7 @@ The user should be able to start the timer from multiple right-click context men
 - **Global Context Menu**: Ideally available on any right-click throughout the browser UI
 
 Implementation approach:
+
 - Listen for 'contextmenu' events on relevant DOM elements
 - Create custom menu items using JavaScript (or modify existing menus if using extensions)
 - Store event listeners on elements like `zen-workspace-icons` container and sidebar areas
@@ -81,12 +84,14 @@ Implementation approach:
 When timer is initiated, present user with two mode options:
 
 **Mode 1: Simple Timer**
+
 - Single countdown phase
 - Timer starts immediately and ends after duration expires
 - No automatic restart or break periods
 - User must manually start another timer
 
 **Mode 2: Pomodoro Timer** (Recommended)
+
 - Multiple configurable cycles consisting of:
   - **Focus Period**: Primary work time (default 25 minutes, customizable)
   - **Break Period**: Recovery time (default 5 minutes, customizable)
@@ -98,6 +103,7 @@ When timer is initiated, present user with two mode options:
 #### UI for Timer Configuration
 
 Show a quick-config dialog when timer starts:
+
 - Timer mode selection (Simple vs Pomodoro)
 - For Pomodoro: number of cycles to run
 - Option to use saved settings or customize on-the-fly
@@ -151,6 +157,7 @@ The overlay must adapt dynamically to UI changes:
 #### Block Enforcement
 
 During active blocking:
+
 - Prevent tab opening: Intercept new tab requests
 - Prevent navigation: Intercept address bar input
 - Prevent shortcuts: Disable keyboard shortcuts that would open new pages
@@ -164,6 +171,7 @@ During active blocking:
 #### Persistent Timer Indicator
 
 While timer is active, display persistent indicator:
+
 - In toolbar or corner of screen
 - Shows current phase (if Pomodoro mode): "Focus: 15:23" or "Break: 3:47"
 - Shows cycle progress (if Pomodoro mode): "Cycle 2/4"
@@ -173,6 +181,7 @@ While timer is active, display persistent indicator:
 #### In-Overlay Information
 
 Within the full-screen overlay:
+
 - Large, readable countdown timer (MM:SS format)
 - Current phase label ("Focus Period" vs "Break Time")
 - Cycle progress if Pomodoro ("Cycle 2 of 4")
@@ -182,6 +191,7 @@ Within the full-screen overlay:
 #### Notifications
 
 At phase transitions:
+
 - Visual notification (overlay changes color/styling)
 - Optional audible alert (notification sound)
 - Optional: Desktop notification (if enabled in settings)
@@ -195,6 +205,7 @@ At phase transitions:
 All settings persisted using Firefox Services.prefs in JSON format:
 
 Core settings include:
+
 - `zen-pomodoro.timer-mode` - "simple" or "pomodoro"
 - `zen-pomodoro.simple-duration` - Minutes for simple timer
 - `zen-pomodoro.focus-duration` - Minutes for focus period
@@ -211,12 +222,14 @@ Core settings include:
 Implement dual security systems for accessing settings:
 
 **System 1: Waiting Period (Used when timer NOT running)**
+
 - User configures wait duration (default: 20 seconds, customizable 5-300 seconds)
 - When accessing settings, show countdown timer
 - User must wait full duration before settings unlock
 - Cannot skip or cancel wait
 
 **System 2: Code Entry (Used when timer IS running)**
+
 - User configures code length (default: 64 characters, configurable 8-128 characters)
 - User configures character set: "alphanumeric" or "all-typeable-characters"
 - When accessing settings during active timer, generate random code and display it
@@ -225,6 +238,7 @@ Implement dual security systems for accessing settings:
 - Optional: Rate limit attempts (max 5 per minute)
 
 Settings interface allows separate configuration for:
+
 - `zen-pomodoro.settings-lock-idle` - Lock when timer not running (wait time)
 - `zen-pomodoro.settings-lock-active` - Lock when timer running (code config)
 - `zen-pomodoro.max-code-length` - Maximum characters in unlock code (128)
@@ -256,6 +270,7 @@ Configuration: `zen-pomodoro.hold-to-start-duration` (milliseconds)
 #### Statistics and Logging
 
 Optional tracking of:
+
 - Total focus time completed today
 - Number of cycles completed
 - Interruptions (timer cancelled mid-session)
@@ -272,6 +287,7 @@ Optional tracking of:
 #### Emergency Bypass
 
 Allow user to configure emergency bypass (with warning):
+
 - "Force Stop" function available even during blocking
 - Requires both: (1) Confirming choice, (2) Successfully entering override code
 - Logs emergency stops for accountability
@@ -335,18 +351,21 @@ Allow user to configure emergency bypass (with warning):
 ### Core Modules
 
 **1. Timer Engine Module** (`timerEngine.js` or embedded in userChrome.uc.mjs)
+
 - Manages countdown logic
 - Handles phase transitions
 - Emits events for UI updates
 - Persists timer state to recover from crashes
 
 **2. Workspace Detector Module**
+
 - Queries DOM for active workspace
 - Listens to workspace change events
 - Determines if current workspace should be blocked
 - Notifies timer engine of workspace changes
 
 **3. Overlay Manager Module**
+
 - Creates and manages full-screen overlay element
 - Updates timer display every 1000ms (or more frequently if needed)
 - Handles responsive resizing via ResizeObserver
@@ -354,18 +373,21 @@ Allow user to configure emergency bypass (with warning):
 - Applies CSS styling dynamically
 
 **4. Context Menu Module**
+
 - Injects context menu items on page load
 - Handles right-click event listeners
 - Triggers timer initialization UI
 - Manages settings access dialog
 
 **5. Settings Manager Module**
+
 - Reads/writes to Services.prefs
 - Provides validation for user inputs
 - Handles settings lock mechanisms (wait and code)
 - Exposes settings UI
 
 **6. Security Module**
+
 - Generates random codes for unlock mechanism
 - Validates unlock attempts
 - Manages rate limiting
@@ -406,6 +428,7 @@ Overlay Removed, Timer Engine Reset
 ### CSS Architecture
 
 **chrome.css** structure:
+
 - Root variables for colors, dimensions, timing
 - Overlay element styles (position fixed, fullscreen, pointer-events all)
 - Overlay content styling (centered, large fonts)
@@ -419,18 +442,21 @@ Overlay Removed, Timer Engine Reset
 ## Implementation Sequence and Milestones
 
 ### Phase 1: Core Timer Engine (Priority: Critical)
+
 - Implement countdown logic
 - Support both simple and Pomodoro modes
 - Persist timer state
 - Test countdown accuracy
 
 ### Phase 2: Workspace Detection (Priority: Critical)
+
 - Query active workspace UUID
 - Listen to workspace change events
 - Detect blocked vs non-blocked workspaces
 - Test workspace switching behavior
 
 ### Phase 3: Full-Screen Overlay (Priority: Critical)
+
 - Create overlay DOM element
 - Apply fullscreen CSS
 - Display timer countdown
@@ -438,30 +464,35 @@ Overlay Removed, Timer Engine Reset
 - Test click/scroll blocking
 
 ### Phase 4: Context Menu Integration (Priority: High)
+
 - Inject context menu items
 - Create timer initialization dialog
 - Handle mode selection
 - Test menu availability across different areas
 
 ### Phase 5: Settings System (Priority: High)
+
 - Implement Services.prefs storage
 - Create settings UI
 - Handle workspace selection for blocking
 - Test settings persistence
 
 ### Phase 6: Security Features (Priority: Medium)
+
 - Implement settings lock wait timer
 - Implement unlock code system
 - Add hold-to-start mechanism
 - Test security bypass resistance
 
 ### Phase 7: Responsive UI (Priority: Medium)
+
 - Implement ResizeObserver for layout changes
 - Test with sidebar collapsed/expanded
 - Test with extension sidebars
 - Test on different screen resolutions
 
 ### Phase 8: Polish and Refinement (Priority: Low)
+
 - Add notifications (audio/visual)
 - Implement theme colors
 - Optimize performance
@@ -472,6 +503,7 @@ Overlay Removed, Timer Engine Reset
 ## Testing Considerations
 
 ### Functional Testing
+
 - Timer counts down accurately (compare with system clock)
 - Workspace blocking engages/disengages correctly
 - Overlay blocks all clicks and navigation
@@ -479,12 +511,14 @@ Overlay Removed, Timer Engine Reset
 - Security locks function as designed
 
 ### Integration Testing
+
 - No interference with Zen's core functionality
 - Compatible with other mods
 - Works across multiple windows
 - Handles rapid workspace switching
 
 ### Edge Cases
+
 - Timer running when browser closes (recovery)
 - Settings access while timer active
 - Workspace deletion during active timer
@@ -492,6 +526,7 @@ Overlay Removed, Timer Engine Reset
 - Very large/small overlay sizes
 
 ### Performance Testing
+
 - Memory usage during active timer
 - CPU usage for countdown updates
 - DOM query efficiency for workspace detection
@@ -572,6 +607,7 @@ Logging:
 ## Deliverables and Success Criteria
 
 ### Core Deliverables
+
 - ✅ userChrome.uc.mjs with full functionality
 - ✅ chrome.css with complete styling
 - ✅ manifest.json with proper metadata
@@ -579,6 +615,7 @@ Logging:
 - ✅ Settings documentation
 
 ### Success Criteria
+
 - Timer counts down accurately to within 100ms
 - Overlay successfully blocks 100% of clicks/interactions
 - Settings persist across browser restarts
@@ -587,6 +624,7 @@ Logging:
 - No noticeable performance impact on browser
 
 ### Optional Enhancements
+
 - Statistics dashboard showing daily stats
 - Theme presets (dark, light, custom)
 - Sound file customization
@@ -635,4 +673,3 @@ This plan intentionally avoids specific code blocks to allow for flexible implem
 When in doubt, prioritize user experience and security over feature complexity. A simple, reliable implementation is better than a feature-rich but buggy one.
 
 Good luck with development! This will be a powerful productivity tool for Zen Browser users.
-

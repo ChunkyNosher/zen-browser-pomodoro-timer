@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.6
+ * Version: 1.1.7
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -23,24 +23,24 @@
   --zen-pomodoro-overlay-opacity: 1;
   --zen-pomodoro-text-color: #fff;
   --zen-pomodoro-text-shadow: 0 2px 4px rgb(0 0 0 / 30%);
-  
+
   /* Timer display */
   --zen-pomodoro-timer-font-size: 96px;
   --zen-pomodoro-timer-font-family: 'Segoe UI', -apple-system, blinkmacsystemfont, sans-serif;
-  
+
   /* Phase colors */
   --zen-pomodoro-focus-color: #2180cd;
   --zen-pomodoro-break-color: #2ec491;
   --zen-pomodoro-long-break-color: #9b59b6;
-  
+
   /* UI spacing */
   --zen-pomodoro-padding: 24px;
   --zen-pomodoro-gap: 16px;
-  
+
   /* Z-index hierarchy */
   --zen-pomodoro-z-index: 99999;
   --zen-pomodoro-max-z-index: 2147483647;
-  
+
   /* Button colors */
   --zen-pomodoro-button-bg: rgb(255 255 255 / 10%);
   --zen-pomodoro-button-hover-bg: rgb(255 255 255 / 20%);
@@ -56,31 +56,31 @@
 #zen-pomodoro-overlay {
   /* Fixed positioning with explicit bounds set by JavaScript */
   position: fixed !important;
-  
+
   /* Ultra-high z-index to appear above all web content */
   z-index: var(--zen-pomodoro-max-z-index) !important;
-  
+
   /* Background styling */
   background-color: var(--zen-pomodoro-overlay-bg, #808080) !important;
   opacity: var(--zen-pomodoro-overlay-opacity, 1) !important;
-  
+
   /* Capture all pointer events to block interaction */
   pointer-events: all !important;
-  
+
   /* Initially hidden */
   display: none !important;
   visibility: hidden !important;
-  
+
   /* Layout */
   align-items: center !important;
   justify-content: center !important;
   flex-direction: column !important;
   overflow: hidden !important;
   box-sizing: border-box !important;
-  
+
   /* Typography */
   font-family: var(--zen-pomodoro-timer-font-family) !important;
-  
+
   /* Ensure overlay is painted */
   isolation: isolate !important;
   contain: layout style !important;
@@ -93,15 +93,15 @@
 }
 
 /* Phase-specific overlay colors */
-#zen-pomodoro-overlay[data-phase="focus"] {
+#zen-pomodoro-overlay[data-phase='focus'] {
   background-color: var(--zen-pomodoro-focus-color);
 }
 
-#zen-pomodoro-overlay[data-phase="break"] {
+#zen-pomodoro-overlay[data-phase='break'] {
   background-color: var(--zen-pomodoro-break-color);
 }
 
-#zen-pomodoro-overlay[data-phase="long-break"] {
+#zen-pomodoro-overlay[data-phase='long-break'] {
   background-color: var(--zen-pomodoro-long-break-color);
 }
 
@@ -260,16 +260,17 @@
   }
 }
 
-#zen-pomodoro-indicator[data-phase="focus"] #zen-pomodoro-indicator-dot {
+#zen-pomodoro-indicator[data-phase='focus'] #zen-pomodoro-indicator-dot {
   background-color: #2180cd;
 }
 
-#zen-pomodoro-indicator[data-phase="break"] #zen-pomodoro-indicator-dot {
+#zen-pomodoro-indicator[data-phase='break'] #zen-pomodoro-indicator-dot {
   background-color: #2ec491;
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
 
@@ -313,12 +314,22 @@
   /* Issue 8: Make dialog header draggable */
   cursor: move !important;
   user-select: none !important;
-  touch-action: none;
+  touch-action: none !important;
+  pointer-events: auto !important;
+
+  /* Ensure h2 is positioned above other elements for dragging */
+  position: relative;
+  z-index: 1;
 }
 
-/* Explicit drag handle styling */
-.zen-pomodoro-dialog h2[data-drag-handle="true"] {
-  cursor: move !important;
+/* Explicit drag handle attribute styling - for accessibility tools */
+.zen-pomodoro-dialog h2[data-drag-handle='true'] {
+  /* Attribute indicates element is a drag handle */
+}
+
+/* Cursor when actively dragging */
+.zen-pomodoro-dialog.dragging h2 {
+  cursor: grabbing !important;
 }
 
 .zen-pomodoro-dialog p {
@@ -440,7 +451,7 @@
   padding: 4px;
 }
 
-.zen-pomodoro-checkbox-row input[type="checkbox"] {
+.zen-pomodoro-checkbox-row input[type='checkbox'] {
   width: auto;
   cursor: pointer;
 }
@@ -579,19 +590,19 @@
   #zen-pomodoro-timer-display {
     font-size: 64px;
   }
-  
+
   #zen-pomodoro-phase-label {
     font-size: 24px;
   }
-  
+
   #zen-pomodoro-cycle-progress {
     font-size: 18px;
   }
-  
+
   #zen-pomodoro-message {
     font-size: 16px;
   }
-  
+
   #zen-pomodoro-config-dialog {
     min-width: 90%;
     max-width: 90%;
@@ -602,11 +613,11 @@
   #zen-pomodoro-timer-display {
     font-size: 48px;
   }
-  
+
   #zen-pomodoro-phase-label {
     font-size: 18px;
   }
-  
+
   .zen-pomodoro-button {
     padding: 10px 16px;
     font-size: 14px;
@@ -634,7 +645,7 @@
   }
 
   /* Phase transition animation */
-  #zen-pomodoro-overlay[data-transitioning="true"] {
+  #zen-pomodoro-overlay[data-transitioning='true'] {
     animation: phase-transition 0.5s ease;
   }
 }
@@ -662,7 +673,7 @@
     animation: none;
   }
 
-  #zen-pomodoro-overlay[data-transitioning="true"] {
+  #zen-pomodoro-overlay[data-transitioning='true'] {
     animation: none;
   }
 }
@@ -705,7 +716,9 @@
   width: 180px;
   cursor: pointer;
   text-align: center;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .zen-pomodoro-shortcut-recorder:hover {
@@ -765,7 +778,8 @@
    ============================================ */
 #zen-pomodoro-menu-dialog,
 #zen-pomodoro-settings-dialog,
-#zen-pomodoro-start-dialog {
+#zen-pomodoro-start-dialog,
+#zen-pomodoro-ruleset-dialog {
   z-index: 2147483647 !important;
   position: fixed !important;
 }
@@ -817,10 +831,6 @@
    ============================================ */
 .zen-pomodoro-dialog.dragging {
   user-select: none !important;
-}
-
-.zen-pomodoro-dialog.dragging h2 {
-  cursor: grabbing !important;
 }
 
 /* ============================================
@@ -1119,4 +1129,16 @@
 .zen-pomodoro-rule-select:focus {
   outline: none;
   border-color: #2180cd;
+}
+
+/* ============================================
+   Ruleset Dialog Specific Styling
+   ============================================ */
+#zen-pomodoro-ruleset-dialog {
+  max-width: 550px;
+  min-width: 450px;
+}
+
+#zen-pomodoro-ruleset-dialog .zen-pomodoro-rulesets-container {
+  max-height: 400px;
 }
