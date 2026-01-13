@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.8
+ * Version: 1.1.9
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -62,6 +62,12 @@
     CODE: 'code',
     HOLD: 'hold',
   };
+
+  /**
+   * Timeout duration for context menu auto-close (safety cleanup).
+   * @constant {number}
+   */
+  const CONTEXT_MENU_TIMEOUT_MS = 30000;
 
   const DEFAULT_CONFIG = {
     timerMode: 'pomodoro',
@@ -2072,6 +2078,10 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.indicatorContextMenuHandler = null; // Store for cleanup
+      this.indicatorContextMenu = null; // Context menu element
+      this.contextMenuClickHandler = null; // Context menu click handler
+      this.contextMenuTimeout = null; // Context menu safety timeout
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
@@ -2334,6 +2344,9 @@
       // Issue 8: Set up drag functionality for indicator
       this.setupIndicatorDrag();
 
+      // Set up context menu for indicator (dev bypass during break phase)
+      this.setupIndicatorContextMenu();
+
       // Set up button handlers after elements are created
       // RACE CONDITION FIX: Set up handlers immediately after creation
       this.setupOverlayHandlers();
@@ -2478,7 +2491,10 @@
         this.indicatorWidth = rect.width;
         this.indicatorHeight = rect.height;
 
-        this.indicator.style.cursor = 'grabbing';
+        // Add dragging class to disable CSS transitions during drag
+        if (this.indicator?.classList) {
+          this.indicator.classList.add('dragging');
+        }
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
@@ -2510,7 +2526,11 @@
         if (!isDragging) return;
 
         isDragging = false;
-        this.indicator.style.cursor = '';
+        
+        // Remove dragging class to re-enable CSS transitions
+        if (this.indicator?.classList) {
+          this.indicator.classList.remove('dragging');
+        }
 
         // Save position to preferences
         const rect = this.indicator.getBoundingClientRect();
@@ -2524,6 +2544,215 @@
       // Store reference for cleanup
       this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
+    }
+
+    /**
+     * Set up context menu (right-click) for indicator to provide dev bypass during break phase.
+     * This allows skipping the break phase to trigger the transition popup.
+     */
+    setupIndicatorContextMenu() {
+      if (!this.indicator) return;
+
+      this.indicatorContextMenuHandler = (e) => {
+        // Only show context menu in Pomodoro mode
+        const timer = window.zenPomodoroApp?.timer;
+        if (!timer || timer.mode !== 'pomodoro') return;
+
+        e.preventDefault();
+
+        // Create context menu
+        this._showIndicatorContextMenu(e.clientX, e.clientY);
+      };
+
+      this.indicator.addEventListener('contextmenu', this.indicatorContextMenuHandler);
+    }
+
+    /**
+     * Show a simple context menu near the indicator for dev bypass.
+     * @param {number} x - X coordinate for menu
+     * @param {number} y - Y coordinate for menu
+     * @private
+     */
+    _showIndicatorContextMenu(x, y) {
+      // Remove any existing context menu
+      this._hideIndicatorContextMenu();
+
+      const menu = document.createElement('div');
+      menu.className = 'zen-pomodoro-context-menu';
+      menu.id = 'zen-pomodoro-indicator-context-menu';
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+
+      // Dev bypass item
+      const devBypassItem = document.createElement('div');
+      devBypassItem.className = 'zen-pomodoro-context-menu-item';
+      devBypassItem.textContent = '🔧 Dev Bypass (Skip Phase)';
+      devBypassItem.addEventListener('click', () => {
+        this._hideIndicatorContextMenu();
+        this._showDevBypassPrompt();
+      });
+
+      menu.appendChild(devBypassItem);
+
+      // Close menu when clicking elsewhere
+      this.contextMenuClickHandler = (e) => {
+        if (!menu.contains(e.target)) {
+          this._hideIndicatorContextMenu();
+        }
+      };
+      document.addEventListener('click', this.contextMenuClickHandler, true);
+
+      // Safety timeout to ensure cleanup
+      this.contextMenuTimeout = setTimeout(() => {
+        this._hideIndicatorContextMenu();
+      }, CONTEXT_MENU_TIMEOUT_MS);
+
+      document.documentElement.appendChild(menu);
+      this.indicatorContextMenu = menu;
+    }
+
+    /**
+     * Hide the indicator context menu.
+     * @private
+     */
+    _hideIndicatorContextMenu() {
+      if (this.contextMenuTimeout) {
+        clearTimeout(this.contextMenuTimeout);
+        this.contextMenuTimeout = null;
+      }
+      if (this.indicatorContextMenu) {
+        this.indicatorContextMenu.remove();
+        this.indicatorContextMenu = null;
+      }
+      if (this.contextMenuClickHandler) {
+        document.removeEventListener('click', this.contextMenuClickHandler, true);
+        this.contextMenuClickHandler = null;
+      }
+    }
+
+    /**
+     * Show a secure password dialog for dev bypass.
+     * Uses a custom modal with masked password input instead of window.prompt().
+     * @private
+     */
+    _showDevBypassPrompt() {
+      // Create modal backdrop
+      const backdrop = document.createElement('div');
+      backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 2147483647;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      `;
+
+      // Create dialog container
+      const dialog = document.createElement('div');
+      dialog.style.cssText = `
+        background: #2b2a33;
+        border-radius: 8px;
+        padding: 20px;
+        min-width: 280px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      `;
+
+      // Title
+      const title = document.createElement('h3');
+      title.textContent = 'Dev Bypass';
+      title.style.cssText = `
+        margin: 0 0 16px 0;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 600;
+      `;
+
+      // Password input (type="password" for masking)
+      const input = document.createElement('input');
+      input.type = 'password';
+      input.placeholder = 'Enter bypass password';
+      input.style.cssText = `
+        width: 100%;
+        padding: 8px 12px;
+        margin-bottom: 16px;
+        border: 1px solid #3a3944;
+        border-radius: 4px;
+        background: #1e1d26;
+        color: #fff;
+        font-size: 14px;
+        box-sizing: border-box;
+      `;
+
+      // Button container
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = `
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      `;
+
+      // Cancel button
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.className = 'zen-pomodoro-dialog-button secondary';
+
+      // Submit button
+      const submitBtn = document.createElement('button');
+      submitBtn.textContent = 'Skip Phase';
+      submitBtn.className = 'zen-pomodoro-dialog-button';
+
+      // Cleanup function
+      const cleanup = () => {
+        backdrop.remove();
+      };
+
+      // Handle submit
+      const handleSubmit = () => {
+        if (input.value === DEV_BYPASS_PASSWORD) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password accepted from indicator');
+          cleanup();
+          const success = skipToNextPhase();
+          if (success) {
+            window.zenPomodoroApp?.updateOverlayVisibility();
+          } else {
+            window.zenPomodoroApp?.showCustomAlert(
+              'Skip Failed',
+              'Could not skip phase. Dev bypass only works for Pomodoro timer mode.'
+            );
+          }
+        } else {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password rejected from indicator');
+          window.zenPomodoroApp?.showCustomAlert('Invalid Password', 'Incorrect bypass password.');
+          input.value = '';
+          input.focus();
+        }
+      };
+
+      // Event handlers
+      cancelBtn.addEventListener('click', cleanup);
+      submitBtn.addEventListener('click', handleSubmit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Escape') cleanup();
+      });
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) cleanup();
+      });
+
+      // Assemble dialog
+      buttonContainer.appendChild(cancelBtn);
+      buttonContainer.appendChild(submitBtn);
+      dialog.appendChild(title);
+      dialog.appendChild(input);
+      dialog.appendChild(buttonContainer);
+      backdrop.appendChild(dialog);
+
+      document.documentElement.appendChild(backdrop);
+      input.focus();
     }
 
     /**
@@ -2828,6 +3057,13 @@
         this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
         this.indicatorMouseDownHandler = null;
       }
+      // Clean up context menu event listener
+      if (this.indicator && this.indicatorContextMenuHandler) {
+        this.indicator.removeEventListener('contextmenu', this.indicatorContextMenuHandler);
+        this.indicatorContextMenuHandler = null;
+      }
+      // Clean up any open context menu
+      this._hideIndicatorContextMenu();
     }
 
     /**
@@ -3274,7 +3510,7 @@
       const breakDurationRow = createLabeledInputRow(
         'Break (min):',
         'zen-pomodoro-break-duration-input',
-        { value: config.breakDuration, min: '1', max: '30' }
+        { value: config.breakDuration, min: '1', max: '60' }
       );
       breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
       breakDurationRow.dataset.mode = 'pomodoro';
@@ -3506,7 +3742,7 @@
           ? validateIntegerInput(focusDurationInput.value, 1, 120, config.focusDuration)
           : config.focusDuration;
         sessionOverrides.breakDuration = breakDurationInput
-          ? validateIntegerInput(breakDurationInput.value, 1, 30, config.breakDuration)
+          ? validateIntegerInput(breakDurationInput.value, 1, 60, config.breakDuration)
           : config.breakDuration;
       }
 
@@ -3681,7 +3917,7 @@
       const breakRow = createLabeledInputRow('Break Duration (min):', 'break-duration', {
         value: config.breakDuration,
         min: 1,
-        max: 30,
+        max: 60,
       });
       if (config.timerMode === 'simple') {
         breakRow.classList.add('hidden');
@@ -4044,7 +4280,7 @@
         config.breakDuration = validateIntegerInput(
           breakDurationInput.value,
           1,
-          30,
+          60,
           config.breakDuration
         );
       }
