@@ -322,11 +322,6 @@
   z-index: 1;
 }
 
-/* Explicit drag handle attribute styling - for accessibility tools */
-.zen-pomodoro-dialog h2[data-drag-handle='true'] {
-  /* Attribute indicates element is a drag handle */
-}
-
 /* Cursor when actively dragging */
 .zen-pomodoro-dialog.dragging h2 {
   cursor: grabbing !important;

@@ -3916,14 +3916,12 @@
       // Always checked and disabled - keywords can only check tab titles due to browser security
       titleOnlyCheckbox.checked = true;
       titleOnlyCheckbox.disabled = true;
-      titleOnlyCheckbox.title =
-        'Browser security restrictions prevent access to page content. Keywords can only match tab titles.';
+      titleOnlyCheckbox.title = 'Keywords match tab titles only due to browser security restrictions.';
 
       const titleOnlyLabel = document.createElement('label');
       titleOnlyLabel.htmlFor = `title-only-${ruleset.id}`;
       titleOnlyLabel.textContent = 'Keywords match tab title only (browser security limitation)';
-      titleOnlyLabel.title =
-        'Due to cross-origin security restrictions, Zen Browser mods cannot access webpage body content. Keywords are matched against tab titles only.';
+      titleOnlyLabel.title = 'Keywords match tab titles only due to browser security restrictions.';
       titleOnlyLabel.style.cursor = 'help';
 
       titleOnlyRow.appendChild(titleOnlyCheckbox);
@@ -5706,6 +5704,7 @@
      * @returns {string} Page title text
      * @private
      */
+    // eslint-disable-next-line no-unused-vars
     _getPageText(_titleOnly = true) {
       try {
         // eslint-disable-next-line no-undef
