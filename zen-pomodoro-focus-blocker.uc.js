@@ -161,6 +161,11 @@
    * real security. It exists purely for testing timer functionality during
    * development. Anyone can view the source to discover the password.
    * 
+   * SECURITY NOTE: Plain string comparison is used intentionally because:
+   * 1. The password is already public (visible in source code)
+   * 2. Timing attacks are not a threat model for dev-only bypass
+   * 3. Rate limiting is applied to prevent brute-force attempts
+   * 
    * This ONLY works for Pomodoro timer mode, not simple timer.
    * When entered correctly, skips to the next phase/cycle rather than stopping the timer.
    * All bypass attempts are logged for auditing purposes.
