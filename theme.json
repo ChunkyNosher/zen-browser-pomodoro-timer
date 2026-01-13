@@ -7,7 +7,7 @@
   "version": "1.1.8",
   "tags": ["productivity", "pomodoro", "timer", "focus", "sine", "fx-autoconfig", "JavaScript"],
   "createdAt": "2024-01-01",
-  "updatedAt": "2026-01-12",
+  "updatedAt": "2026-01-13",
   "style": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/chrome.css",
   "js": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/zen-pomodoro-focus-blocker.uc.js",
   "preferences": "https://raw.githubusercontent.com/ChunkyNosher/zen-browser-pomodoro-timer/main/preferences.json",
