@@ -700,7 +700,6 @@
   /**
    * Ensure a dialog is fully visible within the viewport.
    * Adjusts position if the dialog extends beyond viewport boundaries.
-   * This function should be called after the dialog is rendered and CSS is applied.
    * @param {HTMLElement} dialog - The dialog element to check and adjust
    */
   function ensureDialogInViewport(dialog) {
@@ -710,37 +709,26 @@
     // Skip if dialog hasn't been rendered yet (dimensions are 0)
     if (rect.width === 0 || rect.height === 0) return;
 
-    let newLeft = parseFloat(dialog.style.left) || rect.left;
-    let newTop = parseFloat(dialog.style.top) || rect.top;
-    let needsUpdate = false;
+    // Safety check for window dimensions (defensive against edge cases)
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    if (viewportWidth === 0 || viewportHeight === 0) return;
 
-    // Check right edge
-    if (rect.right > window.innerWidth) {
-      newLeft = Math.max(0, window.innerWidth - rect.width);
-      needsUpdate = true;
-    }
+    // Calculate the position that keeps the dialog within viewport bounds
+    // The formula clamps position between 0 and (viewport - dialog dimension)
+    const maxLeft = Math.max(0, viewportWidth - rect.width);
+    const maxTop = Math.max(0, viewportHeight - rect.height);
 
-    // Check bottom edge - this is the main issue for tall dialogs like settings
-    if (rect.bottom > window.innerHeight) {
-      newTop = Math.max(0, window.innerHeight - rect.height);
-      needsUpdate = true;
-    }
+    const currentLeft = parseFloat(dialog.style.left) || rect.left;
+    const currentTop = parseFloat(dialog.style.top) || rect.top;
 
-    // Check left edge
-    if (rect.left < 0) {
-      newLeft = 0;
-      needsUpdate = true;
-    }
+    const constrainedLeft = Math.max(0, Math.min(currentLeft, maxLeft));
+    const constrainedTop = Math.max(0, Math.min(currentTop, maxTop));
 
-    // Check top edge
-    if (rect.top < 0) {
-      newTop = 0;
-      needsUpdate = true;
-    }
-
-    if (needsUpdate) {
-      dialog.style.left = `${newLeft}px`;
-      dialog.style.top = `${newTop}px`;
+    // Only update if position changed
+    if (constrainedLeft !== currentLeft || constrainedTop !== currentTop) {
+      dialog.style.left = `${constrainedLeft}px`;
+      dialog.style.top = `${constrainedTop}px`;
     }
   }
 
