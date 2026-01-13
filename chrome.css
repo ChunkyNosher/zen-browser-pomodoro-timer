@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.1.8
+ * Version: 1.1.9
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -249,8 +249,14 @@
   gap: 8px;
   cursor: move;
   user-select: none;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+}
+
+/* Disable transitions during drag to prevent offset issues */
+#zen-pomodoro-indicator.dragging {
+  transition: none !important;
+  cursor: grabbing !important;
 }
 
 #zen-pomodoro-indicator.active {
