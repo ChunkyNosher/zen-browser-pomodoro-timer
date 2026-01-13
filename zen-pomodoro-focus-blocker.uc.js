@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.1.7
+ * Version: 1.1.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -149,8 +149,16 @@
 
   /**
    * Dev bypass password for skipping a single Pomodoro cycle.
+   * 
+   * IMPORTANT: This is a DEVELOPMENT/TESTING feature, NOT a security measure.
+   * The password is visible in the source code and is not meant to provide
+   * real security. It exists purely for testing timer functionality during
+   * development. Anyone can view the source to discover the password.
+   * 
    * This ONLY works for Pomodoro timer mode, not simple timer.
    * When entered correctly, skips to the next phase/cycle rather than stopping the timer.
+   * All bypass attempts are logged for auditing purposes.
+   * 
    * @constant {string}
    */
   const DEV_BYPASS_PASSWORD = 'devskip123';
@@ -982,14 +990,23 @@
    * Check if the Pomodoro timer is currently in a break phase.
    * During break phases, workspace and website blocking should be disabled
    * to allow the user to freely browse during their break.
+   * 
+   * The 'transition' phase is also treated as a break phase because during
+   * the transition (break ending soon warning), blocking should remain disabled
+   * to allow users to finish up their break activities.
    *
-   * @returns {boolean} True if timer is active AND in a break phase
+   * @returns {boolean} True if timer is active AND in a break phase (including transition)
    */
   function isInBreakPhase() {
     const timer = window.zenPomodoroApp?.timer;
     if (!timer || !timer.isActive) return false;
     // Handle 'long-break' for backwards compatibility with saved state
-    return timer.currentPhase === 'break' || timer.currentPhase === 'long-break';
+    // Include 'transition' because blocking should remain disabled during the break-ending warning
+    return (
+      timer.currentPhase === 'break' ||
+      timer.currentPhase === 'long-break' ||
+      timer.currentPhase === 'transition'
+    );
   }
 
   /**
@@ -1285,10 +1302,15 @@
     input.type = 'password';
     input.className = 'zen-pomodoro-dev-bypass-input';
     input.placeholder = 'Enter bypass password';
+    input.maxLength = 64; // Reasonable max length for password input
 
     const submitBtn = document.createElement('button');
     submitBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dev-bypass-submit';
     submitBtn.textContent = 'Skip Cycle';
+
+    // Rate limiting state - simple cooldown to prevent spam
+    let lastAttemptTime = 0;
+    const COOLDOWN_MS = 2000; // 2 second cooldown between attempts
 
     // Toggle visibility on click
     toggleLink.addEventListener('click', (e) => {
@@ -1302,6 +1324,14 @@
 
     // Verify password and skip cycle
     const verifyAndSkip = () => {
+      // Rate limiting check
+      const now = Date.now();
+      if (now - lastAttemptTime < COOLDOWN_MS) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass attempt rate limited');
+        return;
+      }
+      lastAttemptTime = now;
+
       if (input.value === DEV_BYPASS_PASSWORD) {
         logger.log(LOG_CATEGORIES.SECURITY, 'Dev bypass password accepted');
         const success = skipToNextPhase();
@@ -2984,8 +3014,25 @@
         // Timer is running - show timer controls
         const status = window.zenPomodoroApp.timer.getStatus();
         const timeStr = formatTime(status.remainingTime);
-        // Simplified: only 'Focus' or 'Break' (no long break)
-        const phaseStr = status.currentPhase === 'focus' ? 'Focus' : 'Break';
+        // Map all known phases explicitly, including transition and long-break for backwards compatibility
+        let phaseStr;
+        switch (status.currentPhase) {
+          case 'focus':
+            phaseStr = 'Focus';
+            break;
+          case 'break':
+            phaseStr = 'Break';
+            break;
+          case 'long-break':
+            phaseStr = 'Long Break';
+            break;
+          case 'transition':
+            phaseStr = 'Transition';
+            break;
+          default:
+            phaseStr = 'Focus';
+            break;
+        }
 
         const statusRow = document.createElement('div');
         statusRow.className = 'zen-pomodoro-config-row';
@@ -6615,8 +6662,15 @@
     /**
      * Hide the transition popup and trigger the completion callback.
      * Called when timer reaches zero or user clicks the "Ready" button.
+     * Includes guard against race conditions where this could be called twice
+     * (e.g., timer reaching zero at the same moment user clicks the button).
      */
     hideTransitionPopup() {
+      // Guard against double-execution (race condition between timer and button click)
+      if (!this.popup && !this.timerInterval) {
+        return;
+      }
+
       logger.log(LOG_CATEGORIES.TIMER, 'Hiding transition popup');
 
       // Clear countdown interval
@@ -6630,6 +6684,9 @@
         this.popup.remove();
         this.popup = null;
       }
+
+      // Reset remainingTime for next use to ensure clean state
+      this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
 
       // Trigger completion callback (starts focus phase and re-enables blocking)
       if (this.onTransitionComplete) {
@@ -6659,7 +6716,7 @@
       const timerDisplay = document.createElement('div');
       timerDisplay.id = 'zen-pomodoro-transition-timer';
       timerDisplay.className = 'zen-pomodoro-transition-timer';
-      timerDisplay.textContent = `Transition ends in: ${formatTime(this.remainingTime)}`;
+      timerDisplay.textContent = `Focus resumes in: ${formatTime(this.remainingTime)}`;
 
       // "I'm Ready to Focus" button
       const readyButton = document.createElement('button');
@@ -6680,16 +6737,26 @@
     /**
      * Start the countdown timer.
      * Updates the display every second and closes popup when timer reaches zero.
+     * Includes DOM detachment check to stop timer if popup is removed externally.
      * @private
      */
     _startCountdown() {
       this.timerInterval = setInterval(() => {
+        // If the popup has been removed or detached externally, stop the timer
+        if (!this.popup || !document.documentElement.contains(this.popup)) {
+          if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+          }
+          return;
+        }
+
         this.remainingTime--;
 
         // Update display
-        const timerDisplay = this.popup?.querySelector('#zen-pomodoro-transition-timer');
+        const timerDisplay = this.popup.querySelector('#zen-pomodoro-transition-timer');
         if (timerDisplay) {
-          timerDisplay.textContent = `Transition ends in: ${formatTime(this.remainingTime)}`;
+          timerDisplay.textContent = `Focus resumes in: ${formatTime(this.remainingTime)}`;
         }
 
         // Timer reached zero - close popup and start focus
