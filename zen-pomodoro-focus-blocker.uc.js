@@ -38,6 +38,14 @@
   const PREF_PREFIX = 'zen-pomodoro';
 
   /**
+   * Stores the last dialog position for maintaining position across dialogs.
+   * When a dialog is closed or a submenu is opened, the position is saved here.
+   * New dialogs will open at this position instead of centering.
+   * @type {{left: number, top: number}|null}
+   */
+  let lastDialogPosition = null;
+
+  /**
    * Modifier keys used by the keyboard shortcut recorder.
    * These are the keys that can be combined with a regular key to form a shortcut.
    * @constant {string[]}
@@ -112,6 +120,16 @@
 
   // Debounce delay for content observer checks (in milliseconds)
   const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
+
+  // Fallback dialog dimensions for position calculations when actual dimensions are unavailable
+  // These match the CSS min-width of .zen-pomodoro-dialog (400px) and estimated height
+  const DIALOG_FALLBACK_WIDTH = 400;
+  const DIALOG_FALLBACK_HEIGHT = 300;
+
+  // Minimum visible portion of dialog required when positioning (in pixels)
+  // Ensures at least this much of the dialog remains on-screen
+  const DIALOG_MIN_VISIBLE_WIDTH = 100;
+  const DIALOG_MIN_VISIBLE_HEIGHT = 50;
 
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
@@ -580,6 +598,9 @@
       dialog.classList.remove('dragging');
       header.style.cursor = 'move';
 
+      // Save the current dialog position using the shared function
+      saveDialogPosition(dialog);
+
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onEnd);
       document.removeEventListener('touchmove', onMove);
@@ -617,6 +638,61 @@
     } else if (dialog.parentNode) {
       observer.observe(dialog.parentNode, { childList: true, subtree: false });
     }
+  }
+
+  /**
+   * Save the current dialog position before it's closed.
+   * Call this before removing a dialog that may have been dragged.
+   * @param {HTMLElement} dialog - The dialog element to save position from
+   */
+  function saveDialogPosition(dialog) {
+    if (!dialog) return;
+
+    const rect = dialog.getBoundingClientRect();
+
+    // Check if dialog has explicit pixel positioning (was dragged)
+    // We check for both inline style values, as drag converts transform to pixel positioning
+    const hasExplicitPosition = dialog.style.left && dialog.style.top;
+
+    if (hasExplicitPosition) {
+      // Dialog was dragged - use explicit position values
+      lastDialogPosition = {
+        left: parseFloat(dialog.style.left) || rect.left,
+        top: parseFloat(dialog.style.top) || rect.top,
+      };
+    } else if (rect.width > 0 && rect.height > 0) {
+      // Dialog hasn't been dragged but exists - save its current visual position
+      lastDialogPosition = { left: rect.left, top: rect.top };
+    }
+  }
+
+  /**
+   * Apply saved position to a dialog if available.
+   * This allows submenus to open at the same position as the parent dialog.
+   * Call this after appending the dialog to the DOM but before setupDialogDrag.
+   * @param {HTMLElement} dialog - The dialog element to position
+   */
+  function applyLastDialogPosition(dialog) {
+    if (!dialog || !lastDialogPosition) return;
+
+    const { left, top } = lastDialogPosition;
+
+    // Validate that the position is within viewport bounds
+    const rect = dialog.getBoundingClientRect();
+    const dialogWidth = rect.width || DIALOG_FALLBACK_WIDTH;
+    const dialogHeight = rect.height || DIALOG_FALLBACK_HEIGHT;
+
+    // Ensure at least part of the dialog is visible
+    const maxLeft = window.innerWidth - Math.min(DIALOG_MIN_VISIBLE_WIDTH, dialogWidth);
+    const maxTop = window.innerHeight - Math.min(DIALOG_MIN_VISIBLE_HEIGHT, dialogHeight);
+    const adjustedLeft = Math.max(0, Math.min(left, maxLeft));
+    const adjustedTop = Math.max(0, Math.min(top, maxTop));
+
+    // Apply pixel positioning directly (override CSS centering)
+    dialog.style.position = 'fixed';
+    dialog.style.left = `${adjustedLeft}px`;
+    dialog.style.top = `${adjustedTop}px`;
+    dialog.style.transform = 'none';
   }
 
   /**
@@ -2709,6 +2785,7 @@
         settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
         settingsBtn.textContent = 'Timer Settings';
         settingsBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showSettingsDialog();
@@ -2718,6 +2795,7 @@
         rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
         rulesetBtn.textContent = 'Ruleset Settings';
         rulesetBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showRulesetSettingsDialog();
@@ -2734,6 +2812,7 @@
         startBtn.className = 'zen-pomodoro-dialog-button';
         startBtn.textContent = 'Start Pomodoro Timer';
         startBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showConfigDialog();
@@ -2743,6 +2822,7 @@
         settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
         settingsBtn.textContent = 'Timer Settings';
         settingsBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showSettingsDialog();
@@ -2752,6 +2832,7 @@
         rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
         rulesetBtn.textContent = 'Ruleset Settings';
         rulesetBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
           this.showRulesetSettingsDialog();
@@ -2781,6 +2862,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from previous dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
@@ -2859,6 +2943,9 @@
       // Assemble dialog
       [backButton, h2, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
       setupDialogDrag(dialog);
 
       // Event handlers
@@ -2942,6 +3029,7 @@
       backButton.textContent = '← Back';
       backButton.addEventListener('click', () => {
         if (dialog && dialog.parentNode) {
+          saveDialogPosition(dialog);
           dialog.remove();
         }
         this.showPomodoroMenu();
@@ -3173,6 +3261,7 @@
       backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
       backButton.textContent = '← Back';
       backButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
         dialog.remove();
         this.showPomodoroMenu();
       });
@@ -3580,6 +3669,9 @@
 
       document.documentElement.appendChild(dialog);
 
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
+
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
 
@@ -3799,6 +3891,7 @@
       backButton.addEventListener('click', () => {
         // Save current rulesets before closing
         saveConfig(config);
+        saveDialogPosition(dialog);
         dialog.remove();
         if (onClose) {
           onClose();
@@ -3894,6 +3987,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Make dialog draggable
       setupDialogDrag(dialog);
@@ -6537,6 +6633,9 @@
 
       document.documentElement.appendChild(dialog);
 
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
+
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
 
@@ -6580,6 +6679,9 @@
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Apply saved position from parent dialog before setting up drag
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
       setupDialogDrag(dialog);
