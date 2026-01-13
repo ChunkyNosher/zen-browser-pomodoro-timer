@@ -2604,8 +2604,8 @@
     }
 
     /**
-     * Set up context menu (right-click) for indicator to provide dev bypass during break phase.
-     * This allows skipping the break phase to trigger the transition popup.
+     * Set up context menu (right-click) for the indicator to provide a dev bypass during Pomodoro mode.
+     * This allows skipping the current phase (focus, break, or transition) to trigger the transition popup.
      */
     setupIndicatorContextMenu() {
       if (!this.indicator) return;
