@@ -2079,8 +2079,9 @@
     /**
      * Check if current workspace is in the blocked list.
      * Unlike isCurrentWorkspaceBlocked(), this does NOT check for break phase.
-     * Used specifically for paused state logic where break/transition phases
-     * are already handled separately in updateOverlayVisibility().
+     * Originally designed for paused state logic where break/transition phases
+     * are already handled separately, but safe for general use when you need
+     * to check raw workspace membership without phase filtering.
      * @returns {boolean} True if current workspace is in the blocked list
      */
     isWorkspaceInBlockedList() {
@@ -3163,9 +3164,10 @@
       this._stopMenuTimerUpdates();
 
       this.menuTimerUpdateInterval = setInterval(() => {
-        // Check if timer is still active (use optional chaining for cleaner code)
+        // Check if timer is still active and element is still in DOM
+        // (prevents errors if menu is closed during interval execution)
         const isTimerActive = window.zenPomodoroApp?.timer?.isActive;
-        if (!isTimerActive) {
+        if (!isTimerActive || !statusText.isConnected) {
           this._stopMenuTimerUpdates();
           return;
         }
@@ -6353,9 +6355,10 @@
    * Cooldown duration (in ms) after "Go Back" button is clicked.
    * During this period, _checkCurrentPage() is skipped to prevent the blocker
    * from re-appearing before navigation completes.
+   * Uses 800ms to handle slower page loads and network conditions.
    * @constant {number}
    */
-  const WEBSITE_BLOCKER_GO_BACK_COOLDOWN_MS = 500;
+  const WEBSITE_BLOCKER_GO_BACK_COOLDOWN_MS = 800;
 
   /**
    * WebsiteBlocker class implements LeechBlock-style website blocking
@@ -6510,6 +6513,7 @@
     _checkCurrentPage() {
       // Skip check if go-back cooldown is active to prevent re-blocking during navigation
       if (this._goBackCooldownActive) {
+        logger.log(LOG_CATEGORIES.SECURITY, 'Page check skipped - go-back cooldown active');
         return;
       }
 
