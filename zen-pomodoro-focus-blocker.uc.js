@@ -7128,6 +7128,7 @@
       this.isShowing = false;
       this.onStartTimer = null; // Callback when user clicks "Start Timer" button
       this._timeDisplayInterval = null; // Interval for updating time display
+      this.checkIntervalId = null; // Interval for periodic reminder check
     }
 
     /**
@@ -7137,6 +7138,7 @@
     init() {
       logger.log(LOG_CATEGORIES.INIT, 'Initializing First-Time Reminder Manager');
       this._checkAndShowReminder();
+      this._startPeriodicCheck();
     }
 
     /**
@@ -7280,6 +7282,45 @@
     }
 
     /**
+     * Start the periodic check for showing the reminder.
+     * Checks every minute if conditions are met to show the reminder.
+     * @private
+     */
+    _startPeriodicCheck() {
+      // Clear any existing interval
+      this._stopPeriodicCheck();
+
+      // Check every minute (60000 ms)
+      this.checkIntervalId = setInterval(() => {
+        // Stop checking if reminder is already showing
+        if (this.isShowing) {
+          return;
+        }
+
+        // Stop checking if timer was started today
+        const config = getConfig();
+        const today = this._getTodayDateString();
+        if (config.lastTimerStartDate === today) {
+          this._stopPeriodicCheck();
+          return;
+        }
+
+        this._checkAndShowReminder();
+      }, 60000);
+    }
+
+    /**
+     * Stop the periodic reminder check.
+     * @private
+     */
+    _stopPeriodicCheck() {
+      if (this.checkIntervalId) {
+        clearInterval(this.checkIntervalId);
+        this.checkIntervalId = null;
+      }
+    }
+
+    /**
      * Record that a timer was started today.
      * This prevents the reminder from showing again until tomorrow.
      */
@@ -7400,6 +7441,9 @@
      * Clean up the reminder manager.
      */
     destroy() {
+      // Clear periodic check interval
+      this._stopPeriodicCheck();
+
       // Clear time display interval
       this._clearTimeDisplayInterval();
 
