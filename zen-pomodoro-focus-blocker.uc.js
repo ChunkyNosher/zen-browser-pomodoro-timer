@@ -1184,7 +1184,11 @@
    * @returns {void}
    */
   function handlePauseResumeTimer() {
-    if (!window.zenPomodoroApp || !window.zenPomodoroApp.timer) return;
+    // Null safety checks for all required objects
+    if (!window.zenPomodoroApp) return;
+    if (!window.zenPomodoroApp.timer) return;
+    if (!window.zenPomodoroApp.workspace) return;
+    if (!window.zenPomodoroApp.overlay) return;
 
     const timer = window.zenPomodoroApp.timer;
     
@@ -3106,12 +3110,9 @@
     updateIndicatorPausedState(isPaused) {
       if (!this.indicator) return;
       
-      // Validate input - ensure boolean type for consistency
-      const pausedState = Boolean(isPaused);
-      
-      this.indicator.setAttribute('data-paused', pausedState ? 'true' : 'false');
+      this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
       logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', { 
-        isPaused: pausedState 
+        isPaused: isPaused 
       });
     }
 
