@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.0
+ * Version: 1.2.1
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -36,6 +36,13 @@
   // ============================================
 
   const PREF_PREFIX = 'zen-pomodoro';
+
+  /**
+   * Version number for the mod.
+   * Used for display in the main menu.
+   * @constant {string}
+   */
+  const MOD_VERSION = '1.2.1';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -109,6 +116,34 @@
     ],
     /** Rulesets to enable when timer starts */
     activeRulesets: ['default'],
+    /** First-time reminder settings */
+    firstTimeReminderEnabled: false,
+    /** Time to show the first-time reminder in 24-hour HH:MM format */
+    firstTimeReminderTime: '10:00',
+    /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
+    lastTimerStartDate: '',
+    /** Post-session reminder settings - shows reminder after timer completes */
+    postSessionReminderEnabled: true,
+    /** Minutes after timer completion before first reminder (default: 45) */
+    postSessionIdleTime: 45,
+    /** Minutes before another reminder after skip (default: 30) */
+    postSessionSkipCooldown: 30,
+    /** @type {'hold'|'code'} Method to use for skip button requirement */
+    postSessionSkipMethod: LOCKOUT_METHODS.HOLD,
+    /** Initial hold duration in seconds for skip (default: 20) */
+    postSessionSkipHoldDuration: 20,
+    /** Initial code length for skip (default: 48) */
+    postSessionSkipCodeLength: 48,
+    /** Minutes of focus time required before post-session reminders stop (default: 150 = 2h 30min) */
+    postSessionFocusTimeGoal: 150,
+    /** Total focus time accumulated today in minutes (persisted) */
+    totalFocusTimeToday: 0,
+    /** Last date the focus time was reset (YYYY-MM-DD format, used to reset at daily reminder time) */
+    lastFocusTimeResetDate: '',
+    /** Persisted skip count for post-session reminder */
+    postSessionSkipCount: 0,
+    /** Timestamp when last skip occurred (persisted) */
+    postSessionLastSkipTime: null,
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -129,6 +164,12 @@
   // Transition phase duration in seconds (5 minutes)
   // This is the "break ending soon" warning period before focus resumes
   const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;
+
+  // Post-session reminder escalation factor (50% increase per skip)
+  const POST_SESSION_ESCALATION_FACTOR = 1.5;
+
+  // Post-session reminder check interval (1 minute in milliseconds)
+  const POST_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
 
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
@@ -415,6 +456,36 @@
   }
 
   /**
+   * Load a boolean preference and set it in config if present.
+   * Handles both true boolean values and 'true' string values.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadBooleanPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null) {
+      config[configKey] = value === true || value === 'true';
+    }
+  }
+
+  /**
+   * Load a positive integer preference and set it in config if present and valid.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadPositiveIntPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null) {
+      const intValue = typeof value === 'number' ? value : parseInt(value, 10);
+      if (!isNaN(intValue) && intValue > 0) {
+        config[configKey] = intValue;
+      }
+    }
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
@@ -433,21 +504,48 @@
     }
 
     // Override with individual preferences if set
-    // Only keyboardShortcut and enableNotifications are in preferences.json now
-    const enableNotifications = getPref('enableNotifications', null);
-    if (enableNotifications !== null) {
-      // Sine checkbox preferences normally return a boolean. The string check ('true')
-      // is kept for robustness/legacy cases where values may have been stored as strings.
-      config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
-    }
+    // Boolean preferences (handles both true and 'true' for legacy support)
+    loadBooleanPref('enableNotifications', config, 'enableNotifications');
+    loadBooleanPref('firstTimeReminderEnabled', config, 'firstTimeReminderEnabled');
+    loadBooleanPref('postSessionReminderEnabled', config, 'postSessionReminderEnabled');
 
-    // Keyboard shortcut
+    // Positive integer preferences
+    loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
+    loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
+    loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
+
+    // Keyboard shortcut (requires non-empty string validation)
     const keyboardShortcut = getPref('keyboardShortcut', null);
     if (keyboardShortcut !== null && keyboardShortcut !== '') {
       config.keyboardShortcut = keyboardShortcut;
     }
 
+    // First-time reminder time (requires HH:MM format validation)
+    const firstTimeReminderTime = getPref('firstTimeReminderTime', null);
+    if (firstTimeReminderTime !== null && firstTimeReminderTime !== '') {
+      if (isValidTimeFormat(firstTimeReminderTime)) {
+        config.firstTimeReminderTime = firstTimeReminderTime;
+      }
+    }
+
     return config;
+  }
+
+  /**
+   * Validate time format (HH:MM, 24-hour) with range checking.
+   * @param {string} timeStr - Time string to validate
+   * @returns {boolean} True if valid time format
+   */
+  function isValidTimeFormat(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return false;
+
+    const match = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (!match) return false;
+
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
   }
 
   /**
@@ -523,8 +621,7 @@
     let dialogWidth, dialogHeight;
 
     // Helper to check if event is a valid touch event with touches
-    const isTouchEventWithTouches = (e) =>
-      e.type?.startsWith('touch') && e.touches?.length > 0;
+    const isTouchEventWithTouches = (e) => e.type?.startsWith('touch') && e.touches?.length > 0;
 
     // Helper to get client coordinates from mouse or touch event
     const getClientCoords = (e) => {
@@ -705,6 +802,36 @@
   }
 
   /**
+   * Check if dialog can be positioned (has valid dimensions and viewport is available).
+   * @param {Element} dialog - The dialog element
+   * @param {DOMRect} rect - Dialog's bounding rect
+   * @returns {{valid: boolean, viewportWidth: number, viewportHeight: number}}
+   */
+  function getViewportDimensions(dialog, rect) {
+    // Validate dialog exists
+    if (!dialog) {
+      return { valid: false, viewportWidth: 0, viewportHeight: 0 };
+    }
+
+    // Check dialog has been rendered
+    const hasValidDimensions = rect.width > 0 && rect.height > 0;
+    if (!hasValidDimensions) {
+      return { valid: false, viewportWidth: 0, viewportHeight: 0 };
+    }
+
+    // Get and validate viewport dimensions
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    const hasValidViewport = viewportWidth > 0 && viewportHeight > 0;
+
+    return {
+      valid: hasValidViewport,
+      viewportWidth,
+      viewportHeight,
+    };
+  }
+
+  /**
    * Ensure a dialog is fully visible within the viewport.
    * Adjusts position if the dialog extends beyond viewport boundaries.
    * @param {HTMLElement} dialog - The dialog element to check and adjust
@@ -713,18 +840,12 @@
     if (!dialog) return;
 
     const rect = dialog.getBoundingClientRect();
-    // Skip if dialog hasn't been rendered yet (dimensions are 0)
-    if (rect.width === 0 || rect.height === 0) return;
-
-    // Safety check for window dimensions (defensive against edge cases)
-    const viewportWidth = window.innerWidth || 0;
-    const viewportHeight = window.innerHeight || 0;
-    if (viewportWidth === 0 || viewportHeight === 0) return;
+    const viewport = getViewportDimensions(dialog, rect);
+    if (!viewport.valid) return;
 
     // Calculate the position that keeps the dialog within viewport bounds
-    // The formula clamps position between 0 and (viewport - dialog dimension)
-    const maxLeft = Math.max(0, viewportWidth - rect.width);
-    const maxTop = Math.max(0, viewportHeight - rect.height);
+    const maxLeft = Math.max(0, viewport.viewportWidth - rect.width);
+    const maxTop = Math.max(0, viewport.viewportHeight - rect.height);
 
     const currentLeft = parseFloat(dialog.style.left) || rect.left;
     const currentTop = parseFloat(dialog.style.top) || rect.top;
@@ -1057,7 +1178,7 @@
    * Check if the Pomodoro timer is currently in a break phase.
    * During break phases, workspace and website blocking should be disabled
    * to allow the user to freely browse during their break.
-   * 
+   *
    * The 'transition' phase is also treated as a break phase because during
    * the transition (break ending soon warning), blocking should remain disabled
    * to allow users to finish up their break activities.
@@ -1304,6 +1425,110 @@
     return buttons;
   }
 
+  /**
+   * Setup hold-to-unlock event handlers for buttons.
+   * Shared utility to reduce code duplication between SecurityManager and PostSessionReminderManager.
+   * @param {Object} options - Options object
+   * @param {HTMLElement} options.holdButton - The hold button element
+   * @param {HTMLElement} options.holdProgress - The progress bar element
+   * @param {number} options.waitTime - Total wait time in seconds
+   * @param {HTMLElement} options.timerElement - Element to display countdown
+   * @param {Function} options.onComplete - Callback when hold completes
+   * @param {Function} options.getIntervalId - Function to get current interval ID
+   * @param {Function} options.setIntervalId - Function to set interval ID
+   * @param {Function} options.clearInterval - Function to clear interval
+   * @param {string} [options.logCategory] - Log category for logging (default: SECURITY)
+   * @param {string} [options.logMessage] - Log message on completion (default: 'Hold-to-unlock completed')
+   */
+  function setupHoldToUnlockHandlers(options) {
+    const {
+      holdButton,
+      holdProgress,
+      waitTime,
+      timerElement,
+      onComplete,
+      clearInterval: clearIntervalFn,
+      setIntervalId,
+      logCategory = LOG_CATEGORIES.SECURITY,
+      logMessage = 'Hold-to-unlock completed',
+    } = options;
+
+    let currentWaitTime = waitTime;
+
+    const startHold = (e) => {
+      if (e.type === 'touchstart') e.preventDefault();
+
+      clearIntervalFn();
+
+      const intervalId = setInterval(() => {
+        currentWaitTime--;
+        if (timerElement) {
+          timerElement.textContent = currentWaitTime.toString();
+        }
+
+        const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
+        if (holdProgress?.style) {
+          holdProgress.style.width = `${percent}%`;
+        }
+
+        if (currentWaitTime <= 0) {
+          logger.log(logCategory, logMessage);
+          clearIntervalFn();
+          onComplete();
+        }
+      }, 1000);
+
+      setIntervalId(intervalId);
+    };
+
+    const stopHold = () => {
+      clearIntervalFn();
+      currentWaitTime = waitTime;
+      if (timerElement) {
+        timerElement.textContent = waitTime.toString();
+      }
+      if (holdProgress) {
+        holdProgress.style.width = '0%';
+      }
+    };
+
+    // Mouse events
+    holdButton.addEventListener('mousedown', startHold);
+    holdButton.addEventListener('mouseup', stopHold);
+    holdButton.addEventListener('mouseleave', stopHold);
+
+    // Touch events (passive: false to allow preventDefault)
+    holdButton.addEventListener('touchstart', startHold, { passive: false });
+    holdButton.addEventListener('touchend', stopHold);
+    holdButton.addEventListener('touchcancel', stopHold);
+
+    // Keyboard accessibility - named functions for cleanup
+    const keydownHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        startHold(e);
+      }
+    };
+    const keyupHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Enter') stopHold();
+    };
+
+    holdButton.addEventListener('keydown', keydownHandler);
+    holdButton.addEventListener('keyup', keyupHandler);
+
+    // Return cleanup function to prevent memory leaks
+    return function cleanup() {
+      holdButton.removeEventListener('mousedown', startHold);
+      holdButton.removeEventListener('mouseup', stopHold);
+      holdButton.removeEventListener('mouseleave', stopHold);
+      holdButton.removeEventListener('touchstart', startHold);
+      holdButton.removeEventListener('touchend', stopHold);
+      holdButton.removeEventListener('touchcancel', stopHold);
+      holdButton.removeEventListener('keydown', keydownHandler);
+      holdButton.removeEventListener('keyup', keyupHandler);
+    };
+  }
+
   // ============================================
   // Timer Engine Module
   // ============================================
@@ -1312,6 +1537,7 @@
     constructor() {
       this.isActive = false;
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Track if paused while on blocked workspace
       this.remainingTime = 0;
       this.currentPhase = 'focus';
       this.currentCycle = 1;
@@ -1379,6 +1605,11 @@
         if (!this.isPaused && this.isActive) {
           this.remainingTime--;
 
+          // Track focus time for post-session reminder goal
+          if (this.currentPhase === 'focus') {
+            this._trackFocusTime();
+          }
+
           if (this.onTick) {
             this.onTick(this.remainingTime, this.currentPhase, this.currentCycle, this.totalCycles);
           }
@@ -1395,6 +1626,103 @@
           }
         }
       }, 1000);
+    }
+
+    /**
+     * Track focus time for post-session reminder feature.
+     * Adds 1 second of focus time and checks if daily reset is needed.
+     * Focus time resets at the configured firstTimeReminderTime, not midnight.
+     * @private
+     */
+    _trackFocusTime() {
+      const config = getConfig();
+
+      // Check if we need to reset focus time based on daily reminder time
+      if (this._shouldResetFocusTime(config)) {
+        this._resetFocusTime(config);
+      }
+
+      // Add 1 second to focus time (tracked in seconds for precision, converted to minutes when needed)
+      // We track in the config as minutes for readability, so add 1/60 minute per tick
+      config.totalFocusTimeToday = (config.totalFocusTimeToday || 0) + 1 / 60;
+
+      // Only save periodically to avoid excessive writes (already handled by saveState interval)
+      // But we need to save the config since totalFocusTimeToday is in config, not timer state
+      // To minimize writes, we'll piggyback on the saveState interval check
+      if (this.tickCounter === 0) {
+        saveConfig(config);
+      }
+    }
+
+    /**
+     * Check if focus time should be reset based on the daily reminder time.
+     * Resets when:
+     * - It's a new calendar day compared to lastFocusTimeResetDate
+     * - AND the current time is at or after the configured firstTimeReminderTime
+     * @param {Object} config - Configuration object
+     * @returns {boolean} True if focus time should be reset
+     * @private
+     */
+    _shouldResetFocusTime(config) {
+      const now = new Date();
+      const today = this._getDateString(now);
+
+      // If no reset date stored, we should reset
+      if (!config.lastFocusTimeResetDate) {
+        return true;
+      }
+
+      // If same day, no reset needed
+      if (config.lastFocusTimeResetDate === today) {
+        return false;
+      }
+
+      // Different day - check if we're past the reminder time
+      const reminderTime = config.firstTimeReminderTime || '10:00';
+
+      // Use shared validation function
+      if (!isValidTimeFormat(reminderTime)) {
+        // Invalid format, default to immediate reset on new day
+        return true;
+      }
+
+      const [hours, minutes] = reminderTime.split(':').map(Number);
+      const reminderDate = new Date();
+      reminderDate.setHours(hours, minutes, 0, 0);
+
+      return now >= reminderDate;
+    }
+
+    /**
+     * Reset the daily focus time tracker.
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _resetFocusTime(config) {
+      const today = this._getDateString(new Date());
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Resetting daily focus time', {
+        previousTotal: config.totalFocusTimeToday,
+        previousResetDate: config.lastFocusTimeResetDate,
+        newResetDate: today,
+      });
+
+      config.totalFocusTimeToday = 0;
+      config.lastFocusTimeResetDate = today;
+      saveConfig(config);
+    }
+
+    /**
+     * Get date string in YYYY-MM-DD format.
+     * @param {Date} date - Date object
+     * @returns {string} Date string
+     * @private
+     */
+    _getDateString(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     /**
@@ -1525,12 +1853,15 @@
 
     /**
      * Pause the timer
+     * @param {boolean} isOnBlockedWorkspace - Whether the timer is being paused on a blocked workspace
      */
-    pause() {
+    pause(isOnBlockedWorkspace = false) {
       this.isPaused = true;
+      this.pausedOnBlockedWorkspace = isOnBlockedWorkspace;
       logger.log(LOG_CATEGORIES.TIMER, 'Timer paused', {
         remainingTime: this.remainingTime,
         phase: this.currentPhase,
+        pausedOnBlockedWorkspace: isOnBlockedWorkspace,
       });
       this.saveState();
     }
@@ -1540,6 +1871,7 @@
      */
     resume() {
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Reset paused workspace tracking
       logger.log(LOG_CATEGORIES.TIMER, 'Timer resumed', {
         remainingTime: this.remainingTime,
         phase: this.currentPhase,
@@ -1559,6 +1891,7 @@
       });
       this.isActive = false;
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Reset paused workspace tracking
       if (this.intervalId) {
         clearInterval(this.intervalId);
         this.intervalId = null;
@@ -1590,6 +1923,7 @@
       const state = {
         isActive: this.isActive,
         isPaused: this.isPaused,
+        pausedOnBlockedWorkspace: this.pausedOnBlockedWorkspace, // Track pause workspace state
         remainingTime: this.remainingTime,
         currentPhase: this.currentPhase,
         currentCycle: this.currentCycle,
@@ -1612,6 +1946,7 @@
           if (state.isActive) {
             this.isActive = state.isActive;
             this.isPaused = state.isPaused;
+            this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
             this.remainingTime = state.remainingTime;
             // Backwards compatibility: treat 'long-break' as 'break'
             this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
@@ -2399,7 +2734,7 @@
         if (!isDragging) return;
 
         isDragging = false;
-        
+
         // Remove dragging class to re-enable CSS transitions
         if (this.indicator?.classList) {
           this.indicator.classList.remove('dragging');
@@ -2434,9 +2769,14 @@
               window.zenPomodoroApp.timer.resume();
               pauseButton.textContent = 'Pause';
             } else {
-              window.zenPomodoroApp.timer.pause();
+              // Track whether we're pausing on a blocked workspace
+              const isOnBlockedWorkspace =
+                window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+              window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
               pauseButton.textContent = 'Resume';
             }
+            // Update overlay visibility after pause/resume state change
+            window.zenPomodoroApp.updateOverlayVisibility();
           }
         });
       }
@@ -2932,8 +3272,13 @@
           if (window.zenPomodoroApp.timer.isPaused) {
             window.zenPomodoroApp.timer.resume();
           } else {
-            window.zenPomodoroApp.timer.pause();
+            // Track whether we're pausing on a blocked workspace
+            const isOnBlockedWorkspace =
+              window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+            window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
           }
+          // Update overlay visibility after pause/resume state change
+          window.zenPomodoroApp.updateOverlayVisibility();
           dialog.remove();
           this.menuDialog = null;
         });
@@ -3026,9 +3371,15 @@
 
       buttonDiv.appendChild(cancelButton);
 
+      // Version indicator at bottom of menu
+      const versionIndicator = document.createElement('div');
+      versionIndicator.className = 'zen-pomodoro-version-indicator';
+      versionIndicator.textContent = `v${MOD_VERSION}`;
+
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
       dialog.appendChild(buttonDiv);
+      dialog.appendChild(versionIndicator);
 
       document.documentElement.appendChild(dialog);
 
@@ -3784,6 +4135,217 @@
       lockoutSection.appendChild(activeCodeLengthRow);
 
       // ========================================
+      // First-Time Reminder Section
+      // ========================================
+      const reminderSection = document.createElement('div');
+      reminderSection.className = 'zen-pomodoro-lockout-section';
+
+      const reminderTitle = document.createElement('div');
+      reminderTitle.className = 'zen-pomodoro-lockout-section-title';
+      reminderTitle.textContent = '⏰ Daily Focus Reminder';
+
+      const reminderDescription = document.createElement('p');
+      reminderDescription.style.fontSize = '13px';
+      reminderDescription.style.color = '#888';
+      reminderDescription.style.margin = '0 0 12px 0';
+      reminderDescription.textContent =
+        'Show a blocking reminder at a specific time each day if no timer has been started.';
+
+      // Enable/disable checkbox
+      const reminderEnabledRow = document.createElement('div');
+      reminderEnabledRow.className = 'zen-pomodoro-checkbox-row';
+
+      const reminderEnabledCheckbox = document.createElement('input');
+      reminderEnabledCheckbox.type = 'checkbox';
+      reminderEnabledCheckbox.id = 'first-time-reminder-enabled';
+      reminderEnabledCheckbox.checked = config.firstTimeReminderEnabled;
+
+      const reminderEnabledLabel = document.createElement('label');
+      reminderEnabledLabel.setAttribute('for', 'first-time-reminder-enabled');
+      reminderEnabledLabel.textContent = 'Enable daily reminder';
+
+      reminderEnabledRow.appendChild(reminderEnabledCheckbox);
+      reminderEnabledRow.appendChild(reminderEnabledLabel);
+
+      // Reminder time input
+      const reminderTimeRow = document.createElement('div');
+      reminderTimeRow.className = 'zen-pomodoro-config-row';
+      reminderTimeRow.id = 'first-time-reminder-time-row';
+
+      const reminderTimeLabel = document.createElement('label');
+      reminderTimeLabel.textContent = 'Reminder Time (24h):';
+
+      const reminderTimeInput = document.createElement('input');
+      reminderTimeInput.type = 'time';
+      reminderTimeInput.id = 'first-time-reminder-time';
+      reminderTimeInput.value = config.firstTimeReminderTime;
+
+      reminderTimeRow.appendChild(reminderTimeLabel);
+      reminderTimeRow.appendChild(reminderTimeInput);
+
+      // Show/hide time row based on enabled state
+      const updateReminderTimeVisibility = () => {
+        reminderTimeRow.style.display = reminderEnabledCheckbox.checked ? '' : 'none';
+      };
+      reminderEnabledCheckbox.addEventListener('change', updateReminderTimeVisibility);
+      updateReminderTimeVisibility();
+
+      // Development: Trigger reminder button
+      const triggerReminderButton = document.createElement('button');
+      triggerReminderButton.className = 'zen-pomodoro-dialog-button secondary';
+      triggerReminderButton.id = 'zen-pomodoro-trigger-reminder';
+      triggerReminderButton.textContent = '🧪 Test Reminder';
+      triggerReminderButton.title =
+        'Trigger the first-time reminder for testing (ignores time/date)';
+      triggerReminderButton.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.firstTimeReminder) {
+          dialog.style.display = 'none';
+          window.zenPomodoroApp.firstTimeReminder.triggerReminderForTesting();
+        }
+      });
+
+      reminderSection.appendChild(reminderTitle);
+      reminderSection.appendChild(reminderDescription);
+      reminderSection.appendChild(reminderEnabledRow);
+      reminderSection.appendChild(reminderTimeRow);
+      reminderSection.appendChild(triggerReminderButton);
+
+      // ========================================
+      // Post-Session Reminder Section
+      // ========================================
+      const postSessionSection = document.createElement('div');
+      postSessionSection.className = 'zen-pomodoro-lockout-section';
+
+      const postSessionTitle = document.createElement('div');
+      postSessionTitle.className = 'zen-pomodoro-lockout-section-title';
+      postSessionTitle.textContent = '⏱️ Post-Session Reminder';
+
+      const postSessionDescription = document.createElement('p');
+      postSessionDescription.style.fontSize = '13px';
+      postSessionDescription.style.color = '#888';
+      postSessionDescription.style.margin = '0 0 12px 0';
+      postSessionDescription.textContent =
+        'Remind to start a new timer after idle time following completion.';
+
+      // Enable/disable checkbox
+      const postSessionEnabledRow = document.createElement('div');
+      postSessionEnabledRow.className = 'zen-pomodoro-checkbox-row';
+
+      const postSessionEnabledCheckbox = document.createElement('input');
+      postSessionEnabledCheckbox.type = 'checkbox';
+      postSessionEnabledCheckbox.id = 'post-session-reminder-enabled';
+      postSessionEnabledCheckbox.checked = config.postSessionReminderEnabled;
+
+      const postSessionEnabledLabel = document.createElement('label');
+      postSessionEnabledLabel.setAttribute('for', 'post-session-reminder-enabled');
+      postSessionEnabledLabel.textContent = 'Enable post-session reminder';
+
+      postSessionEnabledRow.appendChild(postSessionEnabledCheckbox);
+      postSessionEnabledRow.appendChild(postSessionEnabledLabel);
+
+      // Idle time input
+      const postSessionIdleTimeRow = createLabeledInputRow(
+        'Idle time before reminder (min):',
+        'post-session-idle-time',
+        { value: config.postSessionIdleTime, min: 1, max: 240 }
+      );
+
+      // Skip cooldown input
+      const postSessionCooldownRow = createLabeledInputRow(
+        'Skip cooldown (min):',
+        'post-session-skip-cooldown',
+        { value: config.postSessionSkipCooldown, min: 1, max: 120 }
+      );
+
+      // Skip method select
+      const postSessionMethodRow = document.createElement('div');
+      postSessionMethodRow.className = 'zen-pomodoro-config-row';
+      const postSessionMethodLabel = document.createElement('label');
+      postSessionMethodLabel.textContent = 'Skip method:';
+      const postSessionMethodSelect = document.createElement('select');
+      postSessionMethodSelect.id = 'post-session-skip-method';
+
+      const postSessionHoldOption = document.createElement('option');
+      postSessionHoldOption.value = LOCKOUT_METHODS.HOLD;
+      postSessionHoldOption.textContent = 'Hold to Skip';
+      postSessionHoldOption.selected = config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD;
+
+      const postSessionCodeOption = document.createElement('option');
+      postSessionCodeOption.value = LOCKOUT_METHODS.CODE;
+      postSessionCodeOption.textContent = 'Code Entry';
+      postSessionCodeOption.selected = config.postSessionSkipMethod === LOCKOUT_METHODS.CODE;
+
+      postSessionMethodSelect.appendChild(postSessionHoldOption);
+      postSessionMethodSelect.appendChild(postSessionCodeOption);
+      postSessionMethodRow.appendChild(postSessionMethodLabel);
+      postSessionMethodRow.appendChild(postSessionMethodSelect);
+
+      // Hold duration input
+      const postSessionHoldDurationRow = createLabeledInputRow(
+        'Initial hold time (sec):',
+        'post-session-hold-duration',
+        { value: config.postSessionSkipHoldDuration, min: 5, max: 120 }
+      );
+
+      // Code length input
+      const postSessionCodeLengthRow = createLabeledInputRow(
+        'Initial code length:',
+        'post-session-code-length',
+        { value: config.postSessionSkipCodeLength, min: 16, max: 128 }
+      );
+
+      // Escalation info
+      const escalationInfo = document.createElement('p');
+      escalationInfo.style.fontSize = '12px';
+      escalationInfo.style.color = '#666';
+      escalationInfo.style.margin = '8px 0 0 0';
+      escalationInfo.style.fontStyle = 'italic';
+      escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
+
+      // Show/hide settings based on enabled and method
+      const updatePostSessionVisibility = () => {
+        const isEnabled = postSessionEnabledCheckbox.checked;
+        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
+
+        postSessionIdleTimeRow.style.display = isEnabled ? '' : 'none';
+        postSessionCooldownRow.style.display = isEnabled ? '' : 'none';
+        postSessionMethodRow.style.display = isEnabled ? '' : 'none';
+        postSessionHoldDurationRow.style.display = isEnabled && usesHold ? '' : 'none';
+        postSessionCodeLengthRow.style.display = isEnabled && !usesHold ? '' : 'none';
+        escalationInfo.style.display = isEnabled ? '' : 'none';
+        triggerPostSessionButton.style.display = isEnabled ? '' : 'none';
+      };
+
+      // Development: Trigger post-session reminder button
+      const triggerPostSessionButton = document.createElement('button');
+      triggerPostSessionButton.className = 'zen-pomodoro-dialog-button secondary';
+      triggerPostSessionButton.id = 'zen-pomodoro-trigger-post-session';
+      triggerPostSessionButton.textContent = '🧪 Test Post-Session Reminder';
+      triggerPostSessionButton.title =
+        'Trigger the post-session reminder for testing (ignores idle time)';
+      triggerPostSessionButton.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.postSessionReminder) {
+          dialog.style.display = 'none';
+          window.zenPomodoroApp.postSessionReminder.triggerReminderForTesting();
+        }
+      });
+
+      postSessionEnabledCheckbox.addEventListener('change', updatePostSessionVisibility);
+      postSessionMethodSelect.addEventListener('change', updatePostSessionVisibility);
+      updatePostSessionVisibility();
+
+      postSessionSection.appendChild(postSessionTitle);
+      postSessionSection.appendChild(postSessionDescription);
+      postSessionSection.appendChild(postSessionEnabledRow);
+      postSessionSection.appendChild(postSessionIdleTimeRow);
+      postSessionSection.appendChild(postSessionCooldownRow);
+      postSessionSection.appendChild(postSessionMethodRow);
+      postSessionSection.appendChild(postSessionHoldDurationRow);
+      postSessionSection.appendChild(postSessionCodeLengthRow);
+      postSessionSection.appendChild(escalationInfo);
+      postSessionSection.appendChild(triggerPostSessionButton);
+
+      // ========================================
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
@@ -3796,6 +4358,8 @@
       configSection.appendChild(workspaceRow);
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
+      configSection.appendChild(reminderSection);
+      configSection.appendChild(postSessionSection);
 
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -3811,14 +4375,39 @@
       exportLogsButton.id = 'zen-pomodoro-export-logs';
       exportLogsButton.textContent = 'Export Logs';
 
+      // Helper function to save all settings
+      const saveAllSettings = () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
+        this._saveKeyboardShortcut(shortcutInput, config);
+        this._saveTimerSettings(dialog, config, timerModeSelect);
+        this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
+        this._saveBlockedWorkspaces(workspaceContainer, config);
+        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimeInput, config);
+        this._savePostSessionSettings(
+          dialog,
+          config,
+          postSessionEnabledCheckbox,
+          postSessionMethodSelect
+        );
+
+        saveConfig(config);
+        this._updateOverlayMessage(config);
+      };
+
       const saveButton = document.createElement('button');
-      saveButton.className = 'zen-pomodoro-dialog-button';
+      saveButton.className = 'zen-pomodoro-dialog-button secondary';
       saveButton.id = 'zen-pomodoro-settings-save';
       saveButton.textContent = 'Save';
+
+      const saveCloseButton = document.createElement('button');
+      saveCloseButton.className = 'zen-pomodoro-dialog-button';
+      saveCloseButton.id = 'zen-pomodoro-settings-save-close';
+      saveCloseButton.textContent = 'Save & Close';
 
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(exportLogsButton);
       buttonDiv.appendChild(saveButton);
+      buttonDiv.appendChild(saveCloseButton);
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
@@ -3849,17 +4438,16 @@
         }
       });
 
+      // Save button - saves settings but keeps dialog open
       saveButton.addEventListener('click', () => {
-        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
-        this._saveKeyboardShortcut(shortcutInput, config);
-        this._saveTimerSettings(dialog, config, timerModeSelect);
-        this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
-        this._saveBlockedWorkspaces(workspaceContainer, config);
+        saveAllSettings();
+        window.zenPomodoroApp?.showCustomAlert('Saved', 'Settings have been saved.');
+      });
 
-        saveConfig(config);
+      // Save & Close button - saves settings and closes dialog
+      saveCloseButton.addEventListener('click', () => {
+        saveAllSettings();
         dialog.remove();
-
-        this._updateOverlayMessage(config);
       });
     }
 
@@ -4006,6 +4594,92 @@
     }
 
     /**
+     * Save first-time reminder settings from settings dialog.
+     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
+     * @param {HTMLInputElement} timeInput - Time input element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveReminderSettings(enabledCheckbox, timeInput, config) {
+      config.firstTimeReminderEnabled = enabledCheckbox.checked;
+
+      // Validate and save time with proper range checking using shared utility function
+      const timeValue = timeInput.value;
+      if (timeValue && isValidTimeFormat(timeValue)) {
+        config.firstTimeReminderTime = timeValue;
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved reminder settings', {
+        enabled: config.firstTimeReminderEnabled,
+        time: config.firstTimeReminderTime,
+      });
+    }
+
+    /**
+     * Save post-session reminder settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
+     * @param {HTMLSelectElement} methodSelect - Skip method select element
+     * @private
+     */
+    _savePostSessionSettings(dialog, config, enabledCheckbox, methodSelect) {
+      config.postSessionReminderEnabled = enabledCheckbox.checked;
+      config.postSessionSkipMethod = methodSelect.value;
+
+      // Save idle time
+      const idleTimeInput = dialog.querySelector('#post-session-idle-time');
+      if (idleTimeInput) {
+        config.postSessionIdleTime = validateIntegerInput(
+          idleTimeInput.value,
+          1,
+          240,
+          config.postSessionIdleTime
+        );
+      }
+
+      // Save cooldown
+      const cooldownInput = dialog.querySelector('#post-session-skip-cooldown');
+      if (cooldownInput) {
+        config.postSessionSkipCooldown = validateIntegerInput(
+          cooldownInput.value,
+          1,
+          120,
+          config.postSessionSkipCooldown
+        );
+      }
+
+      // Save hold duration
+      const holdDurationInput = dialog.querySelector('#post-session-hold-duration');
+      if (holdDurationInput) {
+        config.postSessionSkipHoldDuration = validateIntegerInput(
+          holdDurationInput.value,
+          5,
+          120,
+          config.postSessionSkipHoldDuration
+        );
+      }
+
+      // Save code length
+      const codeLengthInput = dialog.querySelector('#post-session-code-length');
+      if (codeLengthInput) {
+        config.postSessionSkipCodeLength = validateIntegerInput(
+          codeLengthInput.value,
+          16,
+          128,
+          config.postSessionSkipCodeLength
+        );
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
+        enabled: config.postSessionReminderEnabled,
+        idleTime: config.postSessionIdleTime,
+        skipCooldown: config.postSessionSkipCooldown,
+        skipMethod: config.postSessionSkipMethod,
+      });
+    }
+
+    /**
      * Update overlay message if it exists.
      * @param {Object} config - Configuration object with message
      * @private
@@ -4123,12 +4797,18 @@
       cancelButton.textContent = 'Cancel';
 
       const saveButton = document.createElement('button');
-      saveButton.className = 'zen-pomodoro-dialog-button';
+      saveButton.className = 'zen-pomodoro-dialog-button secondary';
       saveButton.id = 'zen-pomodoro-ruleset-save';
       saveButton.textContent = 'Save';
 
+      const saveCloseButton = document.createElement('button');
+      saveCloseButton.className = 'zen-pomodoro-dialog-button';
+      saveCloseButton.id = 'zen-pomodoro-ruleset-save-close';
+      saveCloseButton.textContent = 'Save & Close';
+
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(saveButton);
+      buttonDiv.appendChild(saveCloseButton);
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
@@ -4151,15 +4831,21 @@
         }
       });
 
+      // Save button - saves settings but keeps dialog open
       saveButton.addEventListener('click', () => {
         logger.log(LOG_CATEGORIES.SETTINGS, 'Saving ruleset settings');
+        saveConfig(config);
+        window.zenPomodoroApp?.showCustomAlert('Saved', 'Ruleset settings have been saved.');
+      });
+
+      // Save & Close button - saves settings and closes dialog
+      saveCloseButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving ruleset settings and closing');
         saveConfig(config);
         dialog.remove();
 
         if (onClose) {
           onClose();
-        } else {
-          window.zenPomodoroApp?.showCustomAlert('Saved', 'Ruleset settings have been saved.');
         }
       });
     }
@@ -4298,7 +4984,8 @@
       // Always checked and disabled - keywords can only check tab titles due to browser security
       titleOnlyCheckbox.checked = true;
       titleOnlyCheckbox.disabled = true;
-      titleOnlyCheckbox.title = 'Keywords match tab titles only due to browser security restrictions.';
+      titleOnlyCheckbox.title =
+        'Keywords match tab titles only due to browser security restrictions.';
 
       const titleOnlyLabel = document.createElement('label');
       titleOnlyLabel.htmlFor = `title-only-${ruleset.id}`;
@@ -4775,9 +5462,7 @@
      */
     shouldLockSettings(timerActive) {
       const config = getConfig();
-      return timerActive
-        ? this._shouldLockActiveTimer(config)
-        : this._shouldLockIdleTimer(config);
+      return timerActive ? this._shouldLockActiveTimer(config) : this._shouldLockIdleTimer(config);
     }
 
     /**
@@ -5052,6 +5737,7 @@
 
     /**
      * Setup hold-to-unlock event handlers.
+     * Uses shared setupHoldToUnlockHandlers utility to reduce code duplication.
      * @param {HTMLElement} holdButton - The hold button element
      * @param {HTMLElement} holdProgress - The progress bar element
      * @param {number} waitTime - Total wait time in seconds
@@ -5059,63 +5745,22 @@
      * @private
      */
     _setupHoldHandlers(holdButton, holdProgress, waitTime, onUnlock) {
-      let currentWaitTime = waitTime;
-
-      const startHold = (e) => {
-        if (e.type === 'touchstart') e.preventDefault();
-
-        this._clearHoldInterval();
-
-        this.holdToUnlockIntervalId = setInterval(() => {
-          currentWaitTime--;
-          if (this.lockTimerElement) {
-            this.lockTimerElement.textContent = currentWaitTime.toString();
-          }
-
-          const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
-          if (holdProgress?.style) {
-            holdProgress.style.width = `${percent}%`;
-          }
-
-          if (currentWaitTime <= 0) {
-            logger.log(LOG_CATEGORIES.SECURITY, 'Hold-to-unlock completed successfully');
-            this._clearHoldInterval();
-            this.cleanupLockScreen();
-            onUnlock();
-          }
-        }, 1000);
-      };
-
-      const stopHold = () => {
-        this._clearHoldInterval();
-        currentWaitTime = waitTime;
-        if (this.lockTimerElement) {
-          this.lockTimerElement.textContent = waitTime.toString();
-        }
-        if (holdProgress) {
-          holdProgress.style.width = '0%';
-        }
-      };
-
-      // Mouse events
-      holdButton.addEventListener('mousedown', startHold);
-      holdButton.addEventListener('mouseup', stopHold);
-      holdButton.addEventListener('mouseleave', stopHold);
-
-      // Touch events (passive: false to allow preventDefault)
-      holdButton.addEventListener('touchstart', startHold, { passive: false });
-      holdButton.addEventListener('touchend', stopHold);
-      holdButton.addEventListener('touchcancel', stopHold);
-
-      // Keyboard accessibility
-      holdButton.addEventListener('keydown', (e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          startHold(e);
-        }
-      });
-      holdButton.addEventListener('keyup', (e) => {
-        if (e.key === ' ' || e.key === 'Enter') stopHold();
+      // Store cleanup function to prevent memory leaks
+      this._holdHandlersCleanup = setupHoldToUnlockHandlers({
+        holdButton,
+        holdProgress,
+        waitTime,
+        timerElement: this.lockTimerElement,
+        onComplete: () => {
+          this.cleanupLockScreen();
+          onUnlock();
+        },
+        clearInterval: () => this._clearHoldInterval(),
+        setIntervalId: (id) => {
+          this.holdToUnlockIntervalId = id;
+        },
+        logCategory: LOG_CATEGORIES.SECURITY,
+        logMessage: 'Hold-to-unlock completed successfully',
       });
     }
 
@@ -5150,8 +5795,7 @@
       if (!this._overlayPointerEventsDisabled) return;
 
       const overlay =
-        window.zenPomodoroApp?.overlay?.overlay ||
-        document.getElementById('zen-pomodoro-overlay');
+        window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
       if (overlay) {
         overlay.style.setProperty('pointer-events', 'all', 'important');
       }
@@ -5167,6 +5811,12 @@
     cleanupLockScreen() {
       this._clearIntervalIfExists('lockIntervalId');
       this._clearIntervalIfExists('holdToUnlockIntervalId');
+
+      // Call cleanup function to remove event listeners
+      if (this._holdHandlersCleanup) {
+        this._holdHandlersCleanup();
+        this._holdHandlersCleanup = null;
+      }
 
       this.lockTimerElement = null;
       if (this.lockScreen) {
@@ -6642,6 +7292,982 @@
   }
 
   // ============================================
+  // First-Time Reminder Manager
+  // ============================================
+
+  /**
+   * FirstTimeReminderManager handles the daily "first-time" reminder.
+   * When enabled, it shows a blocking overlay if:
+   * - The current time is at or after the configured reminder time
+   * - No timer has been started today yet
+   * - No timer is currently active
+   *
+   * The reminder BLOCKS browser interaction (like a lockscreen)
+   * and can ONLY be dismissed by starting a timer.
+   */
+  class FirstTimeReminderManager {
+    constructor() {
+      this.reminderOverlay = null;
+      this.isShowing = false;
+      this.onStartTimer = null; // Callback when user clicks "Start Timer" button
+      this._timeDisplayInterval = null; // Interval for updating time display
+      this.checkIntervalId = null; // Interval for periodic reminder check
+    }
+
+    /**
+     * Initialize the first-time reminder manager.
+     * Checks if reminder should be shown on startup.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing First-Time Reminder Manager');
+      this._checkAndShowReminder();
+      this._startPeriodicCheck();
+    }
+
+    /**
+     * Check if the reminder should be shown and show it if conditions are met.
+     * Conditions:
+     * 1. Feature is enabled
+     * 2. Current time >= configured reminder time
+     * 3. No timer has been started today
+     * 4. No timer is currently active
+     * @private
+     */
+    _checkAndShowReminder() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.firstTimeReminderEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Feature disabled');
+        return;
+      }
+
+      // Check if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Timer already active');
+        return;
+      }
+
+      // Check if timer was already started today
+      const today = this._getTodayDateString();
+      if (config.lastTimerStartDate === today) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Timer already started today', {
+          lastStartDate: config.lastTimerStartDate,
+          today: today,
+        });
+        return;
+      }
+
+      // Check if current time is past the reminder time
+      if (!this._isAfterReminderTime(config.firstTimeReminderTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Not yet reminder time', {
+          reminderTime: config.firstTimeReminderTime,
+          currentTime: new Date().toLocaleTimeString(),
+        });
+        return;
+      }
+
+      // All conditions met - show reminder
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Showing reminder');
+      this.showReminder();
+    }
+
+    /**
+     * Get today's date in YYYY-MM-DD format.
+     * @returns {string} Today's date
+     * @private
+     */
+    _getTodayDateString() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * Check if current time is at or after the reminder time.
+     * @param {string} reminderTime - Time in HH:MM format
+     * @returns {boolean} True if current time >= reminder time
+     * @private
+     */
+    _isAfterReminderTime(reminderTime) {
+      // Use shared validation function first
+      if (!isValidTimeFormat(reminderTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Invalid reminder time format', {
+          reminderTime: reminderTime,
+        });
+        return false;
+      }
+
+      // Parse the validated time
+      const [hours, minutes] = reminderTime.split(':').map(Number);
+
+      const now = new Date();
+      const reminderDate = new Date();
+      reminderDate.setHours(hours, minutes, 0, 0);
+
+      return now >= reminderDate;
+    }
+
+    /**
+     * Show the first-time reminder overlay.
+     * This blocks browser interaction until user starts a timer.
+     */
+    showReminder() {
+      // Don't show if already showing
+      if (this.reminderOverlay || this.isShowing) {
+        return;
+      }
+
+      // Don't show if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Showing first-time reminder overlay');
+      this.isShowing = true;
+
+      this._createOverlay();
+      document.documentElement.appendChild(this.reminderOverlay);
+    }
+
+    /**
+     * Hide the first-time reminder overlay.
+     * Called when user starts a timer.
+     */
+    hideReminder() {
+      if (!this.reminderOverlay && !this.isShowing) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Hiding first-time reminder overlay');
+      this.isShowing = false;
+
+      // Clear time display interval
+      this._clearTimeDisplayInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+    }
+
+    /**
+     * Clear the time display interval if it exists.
+     * @private
+     */
+    _clearTimeDisplayInterval() {
+      if (this._timeDisplayInterval) {
+        clearInterval(this._timeDisplayInterval);
+        this._timeDisplayInterval = null;
+      }
+    }
+
+    /**
+     * Start the periodic check for showing the reminder.
+     * Checks every minute if conditions are met to show the reminder.
+     * @private
+     */
+    _startPeriodicCheck() {
+      // Clear any existing interval
+      this._stopPeriodicCheck();
+
+      // Check every minute (60000 ms)
+      this.checkIntervalId = setInterval(() => {
+        // Stop checking if reminder is already showing
+        if (this.isShowing) {
+          return;
+        }
+
+        // Stop checking if timer was started today
+        const config = getConfig();
+        const today = this._getTodayDateString();
+        if (config.lastTimerStartDate === today) {
+          this._stopPeriodicCheck();
+          return;
+        }
+
+        this._checkAndShowReminder();
+      }, 60000);
+    }
+
+    /**
+     * Stop the periodic reminder check.
+     * @private
+     */
+    _stopPeriodicCheck() {
+      if (this.checkIntervalId) {
+        clearInterval(this.checkIntervalId);
+        this.checkIntervalId = null;
+      }
+    }
+
+    /**
+     * Record that a timer was started today.
+     * This prevents the reminder from showing again until tomorrow.
+     */
+    recordTimerStarted() {
+      const config = getConfig();
+      config.lastTimerStartDate = this._getTodayDateString();
+      saveConfig(config);
+      logger.log(LOG_CATEGORIES.TIMER, 'Recorded timer start date', {
+        date: config.lastTimerStartDate,
+      });
+    }
+
+    /**
+     * Create the blocking reminder overlay.
+     * @private
+     */
+    _createOverlay() {
+      this.reminderOverlay = document.createElement('div');
+      this.reminderOverlay.id = 'zen-pomodoro-first-time-reminder';
+      this.reminderOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-first-time-reminder-content';
+
+      // Icon
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-first-time-reminder-icon';
+      icon.textContent = '⏰';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Time to Start Your Focus Session!';
+
+      // Message
+      const message = document.createElement('p');
+      message.textContent =
+        "It's time to begin your daily focus session. Start a timer to begin working productively.";
+
+      // Current time display
+      const timeDisplay = document.createElement('div');
+      timeDisplay.id = 'zen-pomodoro-first-time-reminder-time';
+      timeDisplay.textContent = new Date().toLocaleTimeString();
+
+      // Update time every second - store interval for cleanup
+      this._timeDisplayInterval = setInterval(() => {
+        if (!this.reminderOverlay || !document.documentElement.contains(this.reminderOverlay)) {
+          this._clearTimeDisplayInterval();
+          return;
+        }
+        const display = this.reminderOverlay.querySelector(
+          '#zen-pomodoro-first-time-reminder-time'
+        );
+        if (display) {
+          display.textContent = new Date().toLocaleTimeString();
+        }
+      }, 1000);
+
+      // Start Timer button
+      const startButton = document.createElement('button');
+      startButton.id = 'zen-pomodoro-first-time-reminder-start-btn';
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Timer';
+      startButton.addEventListener('click', () => {
+        this._handleStartTimerClick();
+      });
+
+      // Info text (no dismiss option)
+      const infoText = document.createElement('p');
+      infoText.className = 'zen-pomodoro-first-time-reminder-info';
+      infoText.textContent = 'This reminder can only be dismissed by starting a timer.';
+
+      // Assemble content
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(timeDisplay);
+      content.appendChild(startButton);
+      content.appendChild(infoText);
+
+      this.reminderOverlay.appendChild(content);
+    }
+
+    /**
+     * Handle the "Start Timer" button click.
+     * Opens the start timer dialog and hides the reminder when timer starts.
+     * @private
+     */
+    _handleStartTimerClick() {
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Start Timer button clicked');
+
+      // Use callback if set, otherwise try to show start dialog directly
+      if (this.onStartTimer) {
+        this.onStartTimer();
+      } else if (window.zenPomodoroApp?.keyboardShortcut) {
+        // Fallback: use keyboard shortcut handler to show start dialog
+        // This is a fallback - normally the callback is set in ZenPomodoroApp
+        window.zenPomodoroApp.keyboardShortcut.showConfigDialog();
+      }
+    }
+
+    /**
+     * Manually trigger the reminder for testing purposes.
+     * Ignores time and date checks.
+     */
+    triggerReminderForTesting() {
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Manually triggered for testing');
+
+      // Force show even if conditions aren't met
+      if (this.reminderOverlay) {
+        this.hideReminder();
+      }
+
+      this.showReminder();
+    }
+
+    /**
+     * Clean up the reminder manager.
+     */
+    destroy() {
+      // Clear periodic check interval
+      this._stopPeriodicCheck();
+
+      // Clear time display interval
+      this._clearTimeDisplayInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+      this.isShowing = false;
+    }
+  }
+
+  // ============================================
+  // Post-Session Reminder Manager
+  // ============================================
+
+  /**
+   * PostSessionReminderManager handles reminders to start a new timer
+   * after a configurable idle time following timer completion.
+   *
+   * Features:
+   * - Tracks idle time after timer/pomodoro cycle COMPLETES
+   * - Shows blocking overlay after configured idle time
+   * - User can start a new timer or skip the reminder
+   * - Skip requires hold/code completion with escalating difficulty
+   * - Skip count resets when a new timer is started
+   * - Skip count persists across browser restarts
+   * - Reminders stop after focus time goal is reached
+   */
+  class PostSessionReminderManager {
+    constructor() {
+      this.reminderOverlay = null;
+      this.isShowing = false;
+      this.idleStartTime = null; // When the last timer completed
+      this.skipCount = 0; // Number of times user has skipped
+      this.lastSkipTime = null; // When the last skip occurred
+      this.checkIntervalId = null; // Interval for checking if reminder should show
+      this.onStartTimer = null; // Callback when user clicks "Start Timer"
+      this._holdIntervalId = null; // Hold-to-unlock interval
+      this._holdTimerElement = null; // Timer display element for hold mode
+    }
+
+    /**
+     * Initialize the post-session reminder manager.
+     * Loads persisted state from config.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Post-Session Reminder Manager');
+      this._loadState();
+      this._startIdleCheck();
+    }
+
+    /**
+     * Load persisted state from config.
+     * Restores skipCount and lastSkipTime across browser restarts.
+     * @private
+     */
+    _loadState() {
+      const config = getConfig();
+
+      this.skipCount = config.postSessionSkipCount || 0;
+      this.lastSkipTime = config.postSessionLastSkipTime || null;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Loaded persisted state', {
+        skipCount: this.skipCount,
+        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      });
+    }
+
+    /**
+     * Save current state to config for persistence across browser restarts.
+     * @private
+     */
+    _saveState() {
+      const config = getConfig();
+
+      config.postSessionSkipCount = this.skipCount;
+      config.postSessionLastSkipTime = this.lastSkipTime;
+
+      saveConfig(config);
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Saved state', {
+        skipCount: this.skipCount,
+        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      });
+    }
+
+    /**
+     * Check if the focus time goal has been reached for today.
+     * When the goal is reached, post-session reminders should stop.
+     * @returns {boolean} True if focus time goal is reached
+     * @private
+     */
+    _checkFocusTimeGoalReached() {
+      const config = getConfig();
+
+      const focusTimeGoal = config.postSessionFocusTimeGoal || 150; // Default 2h 30min
+      const totalFocusTimeToday = config.totalFocusTimeToday || 0;
+
+      const goalReached = totalFocusTimeToday >= focusTimeGoal;
+
+      if (goalReached) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Focus time goal reached', {
+          totalFocusTimeToday: Math.round(totalFocusTimeToday),
+          focusTimeGoal: focusTimeGoal,
+        });
+      }
+
+      return goalReached;
+    }
+
+    /**
+     * Called when a timer completes naturally (not stopped manually).
+     * Starts tracking idle time for post-session reminder.
+     */
+    onTimerComplete() {
+      const config = getConfig();
+      if (!config.postSessionReminderEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Feature disabled');
+        return;
+      }
+
+      logger.log(
+        LOG_CATEGORIES.TIMER,
+        'Post-session reminder: Timer completed, starting idle tracking'
+      );
+      this.idleStartTime = Date.now();
+      // Don't reset skip count here - it resets when a NEW timer starts
+    }
+
+    /**
+     * Called when a new timer is started.
+     * Resets idle tracking and skip count.
+     */
+    onTimerStart() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state');
+      this.idleStartTime = null;
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+      this._saveState(); // Persist the reset state
+      this.hideReminder();
+    }
+
+    /**
+     * Start the periodic check for showing the reminder.
+     * @private
+     */
+    _startIdleCheck() {
+      // Clear any existing interval
+      this._stopIdleCheck();
+
+      // Check every minute
+      this.checkIntervalId = setInterval(() => {
+        this._checkAndShowReminder();
+      }, POST_SESSION_CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * Stop the periodic idle check.
+     * @private
+     */
+    _stopIdleCheck() {
+      if (this.checkIntervalId) {
+        clearInterval(this.checkIntervalId);
+        this.checkIntervalId = null;
+      }
+    }
+
+    /**
+     * Check if we're still in the cooldown period after a skip.
+     * @param {number} cooldownMinutes - The cooldown period in minutes
+     * @returns {boolean} True if still in cooldown
+     * @private
+     */
+    _isInCooldownPeriod(cooldownMinutes) {
+      if (!this.lastSkipTime) return false;
+
+      const timeSinceSkipMs = Date.now() - this.lastSkipTime;
+      const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
+      return timeSinceSkipMinutes < cooldownMinutes;
+    }
+
+    /**
+     * Check if conditions are met to potentially show the reminder.
+     * @returns {boolean} True if basic conditions for showing are met
+     * @private
+     */
+    _canPotentiallyShowReminder() {
+      const config = getConfig();
+
+      // Feature must be enabled
+      if (!config.postSessionReminderEnabled) return false;
+
+      // Must not already be showing
+      if (this.isShowing) return false;
+
+      // Timer must not be active
+      if (window.zenPomodoroApp?.timer?.isActive) return false;
+
+      // Must have an idle start time (timer has completed)
+      if (!this.idleStartTime) return false;
+
+      // Focus time goal must not have been reached
+      if (this._checkFocusTimeGoalReached()) return false;
+
+      return true;
+    }
+
+    /**
+     * Check if the reminder should be shown based on current state.
+     * @private
+     */
+    _checkAndShowReminder() {
+      // Check basic preconditions
+      if (!this._canPotentiallyShowReminder()) return;
+
+      const config = getConfig();
+      const now = Date.now();
+      const idleTimeMs = now - this.idleStartTime;
+      const idleTimeMinutes = idleTimeMs / (60 * 1000);
+
+      // If user has skipped before, check against cooldown
+      if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
+        return;
+      }
+
+      // Check if enough idle time has passed
+      if (idleTimeMinutes >= config.postSessionIdleTime) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Showing reminder', {
+          idleTimeMinutes: Math.round(idleTimeMinutes),
+          skipCount: this.skipCount,
+        });
+        this.showReminder();
+      }
+    }
+
+    /**
+     * Calculate the escalated skip requirement based on skip count.
+     * @param {number} baseValue - Base value for the requirement
+     * @returns {number} Escalated value
+     * @private
+     */
+    _calculateEscalatedValue(baseValue) {
+      return Math.ceil(baseValue * Math.pow(POST_SESSION_ESCALATION_FACTOR, this.skipCount));
+    }
+
+    /**
+     * Show the post-session reminder overlay.
+     */
+    showReminder() {
+      if (this.reminderOverlay || this.isShowing) return;
+
+      // Don't show if timer is active
+      if (window.zenPomodoroApp?.timer?.isActive) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Showing post-session reminder overlay', {
+        skipCount: this.skipCount,
+      });
+
+      this.isShowing = true;
+      this._createOverlay();
+      document.documentElement.appendChild(this.reminderOverlay);
+    }
+
+    /**
+     * Hide the post-session reminder overlay.
+     */
+    hideReminder() {
+      if (!this.reminderOverlay && !this.isShowing) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Hiding post-session reminder overlay');
+      this.isShowing = false;
+
+      // Clear hold interval if active
+      this._clearHoldInterval();
+
+      // Call cleanup function to remove event listeners
+      if (this._holdHandlersCleanup) {
+        this._holdHandlersCleanup();
+        this._holdHandlersCleanup = null;
+      }
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+    }
+
+    /**
+     * Handle skip action - dismisses reminder for cooldown period.
+     * Persists the skip state across browser restarts.
+     * @private
+     */
+    _handleSkip() {
+      this.skipCount++;
+      this.lastSkipTime = Date.now();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder skipped', {
+        skipCount: this.skipCount,
+        cooldownMinutes: getConfig().postSessionSkipCooldown,
+      });
+
+      // Save state to persist across browser restarts
+      this._saveState();
+
+      this.hideReminder();
+    }
+
+    /**
+     * Create the blocking reminder overlay.
+     * @private
+     */
+    _createOverlay() {
+      const config = getConfig();
+
+      this.reminderOverlay = document.createElement('div');
+      this.reminderOverlay.id = 'zen-pomodoro-post-session-reminder';
+      this.reminderOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-post-session-reminder-content';
+
+      // Icon
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-post-session-reminder-icon';
+      icon.textContent = '⏱️';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Time to Get Back to Work!';
+
+      // Message
+      const message = document.createElement('p');
+      message.textContent =
+        "It's been a while since your last focus session. Start a new timer to stay productive!";
+
+      // Skip info (shows skip count and current requirement)
+      const skipInfo = document.createElement('div');
+      skipInfo.id = 'zen-pomodoro-post-session-skip-info';
+      if (this.skipCount > 0) {
+        const escalatedHold = this._calculateEscalatedValue(config.postSessionSkipHoldDuration);
+        const escalatedCode = this._calculateEscalatedValue(config.postSessionSkipCodeLength);
+        const requirementText =
+          config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD
+            ? `Hold for ${escalatedHold} seconds`
+            : `Enter ${escalatedCode} characters`;
+        skipInfo.textContent = `Skip #${this.skipCount + 1} - ${requirementText}`;
+      } else {
+        const requirementText =
+          config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD
+            ? `Hold for ${config.postSessionSkipHoldDuration} seconds`
+            : `Enter ${config.postSessionSkipCodeLength} characters`;
+        skipInfo.textContent = requirementText;
+      }
+
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-post-session-buttons';
+
+      // Start Timer button
+      const startButton = document.createElement('button');
+      startButton.id = 'zen-pomodoro-post-session-start-btn';
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Timer';
+      startButton.addEventListener('click', () => {
+        this._handleStartTimerClick();
+      });
+
+      // Skip button (with hold/code requirement)
+      const skipButton = document.createElement('button');
+      skipButton.id = 'zen-pomodoro-post-session-skip-btn';
+      skipButton.className = 'zen-pomodoro-dialog-button secondary';
+      skipButton.textContent = 'Skip for Now';
+      skipButton.addEventListener('click', () => {
+        this._showSkipChallenge(config);
+      });
+
+      buttons.appendChild(startButton);
+      buttons.appendChild(skipButton);
+
+      // Assemble content
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(skipInfo);
+      content.appendChild(buttons);
+
+      this.reminderOverlay.appendChild(content);
+    }
+
+    /**
+     * Show the skip challenge (hold or code entry).
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _showSkipChallenge(config) {
+      // Remove the buttons and replace with challenge UI
+      const content = this.reminderOverlay.querySelector(
+        '#zen-pomodoro-post-session-reminder-content'
+      );
+      const buttons = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-buttons');
+      const skipInfo = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-skip-info');
+
+      if (!content || !buttons) return;
+
+      // Remove current buttons
+      buttons.remove();
+      if (skipInfo) skipInfo.remove();
+
+      // Create challenge container
+      const challengeContainer = document.createElement('div');
+      challengeContainer.id = 'zen-pomodoro-post-session-challenge';
+
+      if (config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD) {
+        this._createHoldChallenge(challengeContainer, config);
+      } else {
+        this._createCodeChallenge(challengeContainer, config);
+      }
+
+      content.appendChild(challengeContainer);
+    }
+
+    /**
+     * Create hold-to-unlock challenge UI.
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _createHoldChallenge(container, config) {
+      const escalatedDuration = this._calculateEscalatedValue(config.postSessionSkipHoldDuration);
+
+      // Timer display
+      const timerDiv = document.createElement('div');
+      timerDiv.id = 'zen-pomodoro-post-session-hold-timer';
+      timerDiv.className = 'zen-pomodoro-post-session-hold-timer';
+      timerDiv.textContent = escalatedDuration.toString();
+      this._holdTimerElement = timerDiv;
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.className = 'zen-pomodoro-post-session-instructions';
+      instructions.textContent = 'seconds remaining - hold button to skip';
+
+      // Hold button with progress bar
+      const holdButton = document.createElement('button');
+      holdButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-hold-to-unlock-btn';
+      holdButton.id = 'zen-pomodoro-post-session-hold-btn';
+      holdButton.textContent = 'Hold to Skip';
+
+      const holdProgress = document.createElement('div');
+      holdProgress.className = 'zen-pomodoro-hold-unlock-progress';
+      holdProgress.id = 'zen-pomodoro-post-session-hold-progress';
+      holdButton.appendChild(holdProgress);
+
+      // Button row
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'zen-pomodoro-dialog-buttons';
+
+      // Cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        this._clearHoldInterval();
+        this.hideReminder();
+        // Immediately re-show to reset the UI
+        setTimeout(() => this.showReminder(), 100);
+      });
+
+      buttonRow.appendChild(cancelButton);
+      buttonRow.appendChild(holdButton);
+
+      container.appendChild(timerDiv);
+      container.appendChild(instructions);
+      container.appendChild(buttonRow);
+
+      // Setup hold handlers
+      this._setupHoldHandlers(holdButton, holdProgress, escalatedDuration);
+    }
+
+    /**
+     * Setup hold-to-unlock event handlers.
+     * Uses shared setupHoldToUnlockHandlers utility to reduce code duplication.
+     * @param {HTMLElement} holdButton - The hold button element
+     * @param {HTMLElement} holdProgress - The progress bar element
+     * @param {number} waitTime - Total wait time in seconds
+     * @private
+     */
+    _setupHoldHandlers(holdButton, holdProgress, waitTime) {
+      // Store cleanup function to prevent memory leaks
+      this._holdHandlersCleanup = setupHoldToUnlockHandlers({
+        holdButton,
+        holdProgress,
+        waitTime,
+        timerElement: this._holdTimerElement,
+        onComplete: () => this._handleSkip(),
+        clearInterval: () => this._clearHoldInterval(),
+        setIntervalId: (id) => {
+          this._holdIntervalId = id;
+        },
+        logCategory: LOG_CATEGORIES.TIMER,
+        logMessage: 'Post-session hold-to-skip completed',
+      });
+    }
+
+    /**
+     * Clear the hold interval if active.
+     * @private
+     */
+    _clearHoldInterval() {
+      if (this._holdIntervalId) {
+        clearInterval(this._holdIntervalId);
+        this._holdIntervalId = null;
+      }
+    }
+
+    /**
+     * Create code entry challenge UI.
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _createCodeChallenge(container, config) {
+      const escalatedLength = this._calculateEscalatedValue(config.postSessionSkipCodeLength);
+      const code = generateRandomCode(escalatedLength, 'alphanumeric');
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.className = 'zen-pomodoro-post-session-instructions';
+      instructions.textContent = `Enter the ${escalatedLength}-character code below to skip:`;
+
+      // Code display
+      const codeDiv = document.createElement('div');
+      codeDiv.className = 'zen-pomodoro-lock-code-display';
+      codeDiv.textContent = code;
+
+      // Input field
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'zen-pomodoro-post-session-code-input';
+      input.className = 'zen-pomodoro-post-session-code-input';
+      input.placeholder = 'Enter code here';
+
+      // Button row
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'zen-pomodoro-dialog-buttons';
+
+      // Cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        this.hideReminder();
+        // Immediately re-show to reset the UI
+        setTimeout(() => this.showReminder(), 100);
+      });
+
+      // Verify button
+      const verifyButton = document.createElement('button');
+      verifyButton.className = 'zen-pomodoro-dialog-button';
+      verifyButton.textContent = 'Skip';
+
+      const verifyCode = () => {
+        if (input.value === code) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Post-session code verification successful');
+          this._handleSkip();
+        } else {
+          logger.log(LOG_CATEGORIES.TIMER, 'Post-session code verification failed');
+          window.zenPomodoroApp?.showCustomAlert('Incorrect Code', 'Please try again.');
+        }
+      };
+
+      verifyButton.addEventListener('click', verifyCode);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyCode();
+      });
+
+      buttonRow.appendChild(cancelButton);
+      buttonRow.appendChild(verifyButton);
+
+      container.appendChild(instructions);
+      container.appendChild(codeDiv);
+      container.appendChild(input);
+      container.appendChild(buttonRow);
+
+      // Focus input
+      setTimeout(() => input?.focus(), 0);
+    }
+
+    /**
+     * Handle the "Start Timer" button click.
+     * @private
+     */
+    _handleStartTimerClick() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Start Timer button clicked');
+
+      // Hide reminder first
+      this.hideReminder();
+
+      // Use callback if set, otherwise try to show start dialog directly
+      if (this.onStartTimer) {
+        this.onStartTimer();
+      } else if (window.zenPomodoroApp?.keyboardShortcut) {
+        window.zenPomodoroApp.keyboardShortcut.showConfigDialog();
+      }
+    }
+
+    /**
+     * Manually trigger the reminder for testing purposes.
+     * Ignores idle time checks.
+     */
+    triggerReminderForTesting() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Manually triggered for testing');
+
+      // Force show even if conditions aren't met
+      if (this.reminderOverlay) {
+        this.hideReminder();
+      }
+
+      this.showReminder();
+    }
+
+    /**
+     * Clean up the reminder manager.
+     */
+    destroy() {
+      this._stopIdleCheck();
+      this._clearHoldInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+      this.isShowing = false;
+      this.idleStartTime = null;
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -6655,6 +8281,8 @@
       this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
       this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
       this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
+      this.firstTimeReminder = new FirstTimeReminderManager(); // First-time daily reminder
+      this.postSessionReminder = new PostSessionReminderManager(); // Post-session idle reminder
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -6763,6 +8391,24 @@
       // Expose app globally for debugging and keyboard shortcut
       window.zenPomodoroApp = this;
 
+      // Initialize First-Time Reminder Manager (after app is globally exposed)
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing First-Time Reminder Manager');
+      this.firstTimeReminder.onStartTimer = () => {
+        // Hide reminder first, then show start timer dialog
+        this.firstTimeReminder.hideReminder();
+        this.keyboardShortcut.showConfigDialog();
+      };
+      this.firstTimeReminder.init();
+
+      // Initialize Post-Session Reminder Manager
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Post-Session Reminder Manager');
+      this.postSessionReminder.onStartTimer = () => {
+        // Hide reminder first, then show start timer dialog
+        this.postSessionReminder.hideReminder();
+        this.keyboardShortcut.showConfigDialog();
+      };
+      this.postSessionReminder.init();
+
       logger.log(LOG_CATEGORIES.INIT, 'Application initialization complete');
     }
 
@@ -6809,6 +8455,15 @@
 
       // Notify Website Blocker that timer started
       this.websiteBlocker.onTimerStart();
+
+      // Record timer start date for first-time reminder tracking
+      this.firstTimeReminder.recordTimerStarted();
+
+      // Hide first-time reminder if showing (timer has been started)
+      this.firstTimeReminder.hideReminder();
+
+      // Notify Post-Session Reminder that timer started (resets idle tracking)
+      this.postSessionReminder.onTimerStart();
 
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
@@ -6872,6 +8527,9 @@
 
       // Show completion notification
       this.showNotification('complete');
+
+      // Notify Post-Session Reminder that timer completed (starts idle tracking)
+      this.postSessionReminder.onTimerComplete();
     }
 
     /**
@@ -6938,6 +8596,9 @@
      * Bug Fix: Also hide indicator when timer is not active
      * BREAK PHASE FIX: Overlay is hidden during break phases to allow free browsing
      * TRANSITION PHASE FIX: Overlay is hidden during transition phase to allow free browsing
+     * PAUSE FIX: When paused, show overlay based on pause context:
+     *   - If paused on blocked workspace → show overlay on ALL workspaces
+     *   - If paused on unblocked workspace → show overlay only on blocked workspaces
      */
     updateOverlayVisibility() {
       if (!this.timer.isActive) {
@@ -6963,20 +8624,49 @@
         return;
       }
 
+      // PAUSE FIX: Handle paused state blocking logic
+      if (this.timer.isPaused) {
+        // If paused on a blocked workspace, show overlay on ALL workspaces
+        // This prevents user from forgetting to unpause when leaving temporarily
+        if (this.timer.pausedOnBlockedWorkspace) {
+          this._showOverlayWithStatus();
+          return;
+        }
+
+        // If paused on unblocked workspace, still show overlay on blocked workspaces
+        const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
+        if (isBlocked) {
+          this._showOverlayWithStatus();
+        } else {
+          this.overlay.hide();
+        }
+        return;
+      }
+
+      // Normal (non-paused) state: show overlay only on blocked workspaces
       const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
 
       if (isBlocked) {
-        const status = this.timer.getStatus();
-        this.overlay.show(status.currentPhase);
-        this.overlay.updateDisplay(
-          status.remainingTime,
-          status.currentPhase,
-          status.currentCycle,
-          status.totalCycles
-        );
+        this._showOverlayWithStatus();
       } else {
         this.overlay.hide();
       }
+    }
+
+    /**
+     * Helper method to show overlay with current timer status.
+     * Reduces code duplication in updateOverlayVisibility().
+     * @private
+     */
+    _showOverlayWithStatus() {
+      const status = this.timer.getStatus();
+      this.overlay.show(status.currentPhase);
+      this.overlay.updateDisplay(
+        status.remainingTime,
+        status.currentPhase,
+        status.currentCycle,
+        status.totalCycles
+      );
     }
 
     /**
@@ -7118,6 +8808,8 @@
         this.sineModBlocker,
         this.websiteBlocker,
         this.transitionManager,
+        this.firstTimeReminder,
+        this.postSessionReminder,
         this.keyboardShortcut,
         this.overlay,
       ];

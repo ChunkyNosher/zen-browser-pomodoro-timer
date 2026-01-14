@@ -11,5 +11,42 @@
     "label": "Enable Notifications",
     "type": "checkbox",
     "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.firstTimeReminderEnabled",
+    "label": "Enable Daily Focus Reminder",
+    "type": "checkbox",
+    "defaultValue": false
+  },
+  {
+    "property": "zen-pomodoro.firstTimeReminderTime",
+    "label": "Daily Reminder Time (24h format)",
+    "type": "string",
+    "defaultValue": "10:00",
+    "placeholder": "10:00"
+  },
+  {
+    "property": "zen-pomodoro.postSessionReminderEnabled",
+    "label": "Enable Post-Session Reminder",
+    "type": "checkbox",
+    "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.postSessionIdleTime",
+    "label": "Post-Session Idle Time (minutes)",
+    "type": "number",
+    "defaultValue": 45
+  },
+  {
+    "property": "zen-pomodoro.postSessionSkipCooldown",
+    "label": "Post-Session Skip Cooldown (minutes)",
+    "type": "number",
+    "defaultValue": 30
+  },
+  {
+    "property": "zen-pomodoro.postSessionFocusTimeGoal",
+    "label": "Daily Focus Time Goal (minutes) - reminders stop after goal",
+    "type": "number",
+    "defaultValue": 150
   }
 ]
