@@ -456,6 +456,36 @@
   }
 
   /**
+   * Load a boolean preference and set it in config if present.
+   * Handles both true boolean values and 'true' string values.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadBooleanPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null) {
+      config[configKey] = value === true || value === 'true';
+    }
+  }
+
+  /**
+   * Load a positive integer preference and set it in config if present and valid.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadPositiveIntPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null) {
+      const intValue = typeof value === 'number' ? value : parseInt(value, 10);
+      if (!isNaN(intValue) && intValue > 0) {
+        config[configKey] = intValue;
+      }
+    }
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
@@ -474,72 +504,27 @@
     }
 
     // Override with individual preferences if set
-    // Only keyboardShortcut and enableNotifications are in preferences.json now
-    const enableNotifications = getPref('enableNotifications', null);
-    if (enableNotifications !== null) {
-      // Sine checkbox preferences normally return a boolean. The string check ('true')
-      // is kept for robustness/legacy cases where values may have been stored as strings.
-      config.enableNotifications = enableNotifications === true || enableNotifications === 'true';
-    }
+    // Boolean preferences (handles both true and 'true' for legacy support)
+    loadBooleanPref('enableNotifications', config, 'enableNotifications');
+    loadBooleanPref('firstTimeReminderEnabled', config, 'firstTimeReminderEnabled');
+    loadBooleanPref('postSessionReminderEnabled', config, 'postSessionReminderEnabled');
 
-    // Keyboard shortcut
+    // Positive integer preferences
+    loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
+    loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
+    loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
+
+    // Keyboard shortcut (requires non-empty string validation)
     const keyboardShortcut = getPref('keyboardShortcut', null);
     if (keyboardShortcut !== null && keyboardShortcut !== '') {
       config.keyboardShortcut = keyboardShortcut;
     }
 
-    // First-time reminder settings
-    const firstTimeReminderEnabled = getPref('firstTimeReminderEnabled', null);
-    if (firstTimeReminderEnabled !== null) {
-      config.firstTimeReminderEnabled =
-        firstTimeReminderEnabled === true || firstTimeReminderEnabled === 'true';
-    }
-
+    // First-time reminder time (requires HH:MM format validation)
     const firstTimeReminderTime = getPref('firstTimeReminderTime', null);
     if (firstTimeReminderTime !== null && firstTimeReminderTime !== '') {
-      // Validate time format (HH:MM, 24-hour format with range check)
       if (isValidTimeFormat(firstTimeReminderTime)) {
         config.firstTimeReminderTime = firstTimeReminderTime;
-      }
-    }
-
-    // Post-session reminder settings (from preferences.json)
-    const postSessionReminderEnabled = getPref('postSessionReminderEnabled', null);
-    if (postSessionReminderEnabled !== null) {
-      config.postSessionReminderEnabled =
-        postSessionReminderEnabled === true || postSessionReminderEnabled === 'true';
-    }
-
-    const postSessionIdleTime = getPref('postSessionIdleTime', null);
-    if (postSessionIdleTime !== null) {
-      const idleTime =
-        typeof postSessionIdleTime === 'number'
-          ? postSessionIdleTime
-          : parseInt(postSessionIdleTime, 10);
-      if (!isNaN(idleTime) && idleTime > 0) {
-        config.postSessionIdleTime = idleTime;
-      }
-    }
-
-    const postSessionSkipCooldown = getPref('postSessionSkipCooldown', null);
-    if (postSessionSkipCooldown !== null) {
-      const cooldown =
-        typeof postSessionSkipCooldown === 'number'
-          ? postSessionSkipCooldown
-          : parseInt(postSessionSkipCooldown, 10);
-      if (!isNaN(cooldown) && cooldown > 0) {
-        config.postSessionSkipCooldown = cooldown;
-      }
-    }
-
-    const postSessionFocusTimeGoal = getPref('postSessionFocusTimeGoal', null);
-    if (postSessionFocusTimeGoal !== null) {
-      const goal =
-        typeof postSessionFocusTimeGoal === 'number'
-          ? postSessionFocusTimeGoal
-          : parseInt(postSessionFocusTimeGoal, 10);
-      if (!isNaN(goal) && goal > 0) {
-        config.postSessionFocusTimeGoal = goal;
       }
     }
 
@@ -817,6 +802,36 @@
   }
 
   /**
+   * Check if dialog can be positioned (has valid dimensions and viewport is available).
+   * @param {Element} dialog - The dialog element
+   * @param {DOMRect} rect - Dialog's bounding rect
+   * @returns {{valid: boolean, viewportWidth: number, viewportHeight: number}}
+   */
+  function getViewportDimensions(dialog, rect) {
+    // Validate dialog exists
+    if (!dialog) {
+      return { valid: false, viewportWidth: 0, viewportHeight: 0 };
+    }
+
+    // Check dialog has been rendered
+    const hasValidDimensions = rect.width > 0 && rect.height > 0;
+    if (!hasValidDimensions) {
+      return { valid: false, viewportWidth: 0, viewportHeight: 0 };
+    }
+
+    // Get and validate viewport dimensions
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    const hasValidViewport = viewportWidth > 0 && viewportHeight > 0;
+
+    return {
+      valid: hasValidViewport,
+      viewportWidth,
+      viewportHeight,
+    };
+  }
+
+  /**
    * Ensure a dialog is fully visible within the viewport.
    * Adjusts position if the dialog extends beyond viewport boundaries.
    * @param {HTMLElement} dialog - The dialog element to check and adjust
@@ -825,18 +840,12 @@
     if (!dialog) return;
 
     const rect = dialog.getBoundingClientRect();
-    // Skip if dialog hasn't been rendered yet (dimensions are 0)
-    if (rect.width === 0 || rect.height === 0) return;
-
-    // Safety check for window dimensions (defensive against edge cases)
-    const viewportWidth = window.innerWidth || 0;
-    const viewportHeight = window.innerHeight || 0;
-    if (viewportWidth === 0 || viewportHeight === 0) return;
+    const viewport = getViewportDimensions(dialog, rect);
+    if (!viewport.valid) return;
 
     // Calculate the position that keeps the dialog within viewport bounds
-    // The formula clamps position between 0 and (viewport - dialog dimension)
-    const maxLeft = Math.max(0, viewportWidth - rect.width);
-    const maxTop = Math.max(0, viewportHeight - rect.height);
+    const maxLeft = Math.max(0, viewport.viewportWidth - rect.width);
+    const maxTop = Math.max(0, viewport.viewportHeight - rect.height);
 
     const currentLeft = parseFloat(dialog.style.left) || rect.left;
     const currentTop = parseFloat(dialog.style.top) || rect.top;
@@ -7786,42 +7795,61 @@
     }
 
     /**
+     * Check if we're still in the cooldown period after a skip.
+     * @param {number} cooldownMinutes - The cooldown period in minutes
+     * @returns {boolean} True if still in cooldown
+     * @private
+     */
+    _isInCooldownPeriod(cooldownMinutes) {
+      if (!this.lastSkipTime) return false;
+
+      const timeSinceSkipMs = Date.now() - this.lastSkipTime;
+      const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
+      return timeSinceSkipMinutes < cooldownMinutes;
+    }
+
+    /**
+     * Check if conditions are met to potentially show the reminder.
+     * @returns {boolean} True if basic conditions for showing are met
+     * @private
+     */
+    _canPotentiallyShowReminder() {
+      const config = getConfig();
+
+      // Feature must be enabled
+      if (!config.postSessionReminderEnabled) return false;
+
+      // Must not already be showing
+      if (this.isShowing) return false;
+
+      // Timer must not be active
+      if (window.zenPomodoroApp?.timer?.isActive) return false;
+
+      // Must have an idle start time (timer has completed)
+      if (!this.idleStartTime) return false;
+
+      // Focus time goal must not have been reached
+      if (this._checkFocusTimeGoalReached()) return false;
+
+      return true;
+    }
+
+    /**
      * Check if the reminder should be shown based on current state.
      * @private
      */
     _checkAndShowReminder() {
+      // Check basic preconditions
+      if (!this._canPotentiallyShowReminder()) return;
+
       const config = getConfig();
-
-      // Check if feature is enabled
-      if (!config.postSessionReminderEnabled) return;
-
-      // Check if already showing
-      if (this.isShowing) return;
-
-      // Check if timer is currently active
-      if (window.zenPomodoroApp?.timer?.isActive) return;
-
-      // Check if we have an idle start time (timer has completed)
-      if (!this.idleStartTime) return;
-
-      // Check if focus time goal has been reached - skip showing if so
-      if (this._checkFocusTimeGoalReached()) {
-        return;
-      }
-
       const now = Date.now();
       const idleTimeMs = now - this.idleStartTime;
       const idleTimeMinutes = idleTimeMs / (60 * 1000);
 
       // If user has skipped before, check against cooldown
-      if (this.lastSkipTime) {
-        const timeSinceSkipMs = now - this.lastSkipTime;
-        const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
-
-        if (timeSinceSkipMinutes < config.postSessionSkipCooldown) {
-          // Still in cooldown period
-          return;
-        }
+      if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
+        return;
       }
 
       // Check if enough idle time has passed
