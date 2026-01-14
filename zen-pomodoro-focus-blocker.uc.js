@@ -2799,14 +2799,22 @@
               window.zenPomodoroApp.timer.resume();
               pauseButton.textContent = 'Pause';
             } else {
-              // Track whether we're pausing on a blocked workspace
+              // PAUSE FIX: Track whether we're pausing on a blocked workspace
+              // Use isWorkspaceInBlockedList() to check raw workspace membership
+              // without break phase interference (break phase already handled separately)
               const isOnBlockedWorkspace =
-                window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+                window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
               window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
               pauseButton.textContent = 'Resume';
             }
             // Update overlay visibility after pause/resume state change
             window.zenPomodoroApp.updateOverlayVisibility();
+            
+            // PAUSE FIX: Update indicator paused state for visual feedback
+            // This ensures the indicator shows orange color when paused
+            window.zenPomodoroApp.overlay.updateIndicatorPausedState(
+              window.zenPomodoroApp.timer.isPaused
+            );
           }
         });
       }
@@ -3002,9 +3010,10 @@
         this.indicator.setAttribute('data-phase', phase);
         
         // PAUSED INDICATOR FIX: Set paused state for visual feedback
+        // Use the centralized method to avoid code duplication
         const timer = window.zenPomodoroApp?.timer;
         if (timer) {
-          this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+          this.updateIndicatorPausedState(timer.isPaused);
         }
       }
     }
@@ -3059,7 +3068,8 @@
       this.indicator.setAttribute('data-phase', phase);
       
       // PAUSED INDICATOR FIX: Set paused state for visual feedback
-      this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+      // Use the centralized method to avoid code duplication
+      this.updateIndicatorPausedState(timer.isPaused);
     }
 
     /**
@@ -3069,6 +3079,24 @@
       if (this.indicator) {
         this.indicator.classList.remove('active');
       }
+    }
+
+    /**
+     * Update the indicator's paused state attribute for visual feedback.
+     * This method should be called when the timer is paused or resumed
+     * to ensure the indicator shows orange color when paused and normal color when not paused.
+     * @param {boolean} isPaused - Whether the timer is currently paused
+     */
+    updateIndicatorPausedState(isPaused) {
+      if (!this.indicator) return;
+      
+      // Validate input - ensure boolean type for consistency
+      const pausedState = Boolean(isPaused);
+      
+      this.indicator.setAttribute('data-paused', pausedState ? 'true' : 'false');
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', { 
+        isPaused: pausedState 
+      });
     }
 
     /**
@@ -3358,13 +3386,22 @@
           if (window.zenPomodoroApp.timer.isPaused) {
             window.zenPomodoroApp.timer.resume();
           } else {
-            // Track whether we're pausing on a blocked workspace
+            // PAUSE FIX: Track whether we're pausing on a blocked workspace
+            // Use isWorkspaceInBlockedList() to check raw workspace membership
+            // without break phase interference (break phase already handled separately)
             const isOnBlockedWorkspace =
-              window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+              window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
             window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
           }
           // Update overlay visibility after pause/resume state change
           window.zenPomodoroApp.updateOverlayVisibility();
+          
+          // PAUSE FIX: Update indicator paused state for visual feedback
+          // This ensures the indicator shows orange color when paused
+          window.zenPomodoroApp.overlay.updateIndicatorPausedState(
+            window.zenPomodoroApp.timer.isPaused
+          );
+          
           dialog.remove();
           this.menuDialog = null;
         });
