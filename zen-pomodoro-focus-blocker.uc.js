@@ -1937,6 +1937,7 @@
     /**
      * Load timer state from preferences
      * LOGIC FIX: Restore config from saved state
+     * AUTO-PAUSE FIX: Timer is paused on browser restart
      */
     loadState() {
       const stateStr = getPref('timer-state', null);
@@ -1945,7 +1946,8 @@
           const state = JSON.parse(stateStr);
           if (state.isActive) {
             this.isActive = state.isActive;
-            this.isPaused = state.isPaused;
+            // AUTO-PAUSE FIX: Always pause timer on restoration
+            this.isPaused = true;
             this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
             this.remainingTime = state.remainingTime;
             // Backwards compatibility: treat 'long-break' as 'break'
@@ -1960,9 +1962,9 @@
               this.config = state.savedConfig;
             }
 
-            if (!this.isPaused) {
-              this.startInterval();
-            }
+            // AUTO-PAUSE FIX: Don't start interval, timer is paused
+            // Set flag to indicate this was restored from restart
+            this.restoredFromRestart = true;
 
             return true;
           }
@@ -2993,6 +2995,12 @@
       }
       if (this.indicator) {
         this.indicator.setAttribute('data-phase', phase);
+        
+        // PAUSED INDICATOR FIX: Set paused state for visual feedback
+        const timer = window.zenPomodoroApp?.timer;
+        if (timer) {
+          this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+        }
       }
     }
 
@@ -3044,6 +3052,9 @@
 
       indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
       this.indicator.setAttribute('data-phase', phase);
+      
+      // PAUSED INDICATOR FIX: Set paused state for visual feedback
+      this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
     }
 
     /**
@@ -8501,11 +8512,22 @@
       if (restored) {
         logger.log(LOG_CATEGORIES.INIT, 'Timer state restored from previous session');
         console.log('Restored timer state from previous session');
+        
+        // INDICATOR FIX: Show indicator after state restoration
+        this.overlay.showIndicator();
         this.updateOverlayVisibility();
 
         // If restored into transition phase, show the popup
         if (this.timer.currentPhase === 'transition') {
           this.transitionManager.showTransitionPopup();
+        }
+
+        // AUTO-PAUSE FIX: Show notification that timer was paused
+        if (this.timer.restoredFromRestart) {
+          // Show a non-blocking notification after a short delay to ensure DOM is ready
+          setTimeout(() => {
+            this.showRestorationNotification();
+          }, 500);
         }
       }
 
@@ -8824,6 +8846,33 @@
         }
       } catch (e) {
         console.log('Notification:', message);
+      }
+    }
+
+    /**
+     * Show notification when timer is restored from browser restart.
+     * Informs user that timer was paused and prompts them to continue.
+     * AUTO-PAUSE FIX: Non-blocking notification on timer restoration
+     */
+    showRestorationNotification() {
+      const status = this.timer.getStatus();
+      const timeStr = formatTime(status.remainingTime);
+      const phaseLabel = getPhaseLabel(status.currentPhase);
+      
+      const message = `Your ${phaseLabel} timer (${timeStr} remaining) has been paused. Click the indicator to resume.`;
+
+      // Browser notification with permission check
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          new Notification('Timer Restored', {
+            body: message,
+            icon: 'chrome://branding/content/about-logo.png',
+          });
+        } else {
+          console.log('Timer Restored:', message);
+        }
+      } catch (e) {
+        console.log('Timer Restored:', message);
       }
     }
 

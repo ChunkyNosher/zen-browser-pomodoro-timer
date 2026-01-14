@@ -278,6 +278,34 @@
   background-color: #2ec491;
 }
 
+/* PAUSED INDICATOR FIX: Visual feedback when timer is paused */
+#zen-pomodoro-indicator[data-paused='true'] {
+  opacity: 0.7;
+  background-color: rgb(80 80 80 / 70%);
+}
+
+#zen-pomodoro-indicator[data-paused='true'] #zen-pomodoro-indicator-dot {
+  background-color: #ffa500; /* Orange color for paused state */
+}
+
+/* ACCESSIBILITY FIX: Wrap slow pulse animation for paused state in prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  #zen-pomodoro-indicator[data-paused='true'] #zen-pomodoro-indicator-dot {
+    animation: slow-pulse 3s ease-in-out infinite;
+  }
+}
+
+@keyframes slow-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
