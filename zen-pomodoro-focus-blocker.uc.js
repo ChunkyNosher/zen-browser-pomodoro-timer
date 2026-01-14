@@ -3010,9 +3010,10 @@
         this.indicator.setAttribute('data-phase', phase);
         
         // PAUSED INDICATOR FIX: Set paused state for visual feedback
+        // Use the centralized method to avoid code duplication
         const timer = window.zenPomodoroApp?.timer;
         if (timer) {
-          this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+          this.updateIndicatorPausedState(timer.isPaused);
         }
       }
     }
@@ -3067,7 +3068,8 @@
       this.indicator.setAttribute('data-phase', phase);
       
       // PAUSED INDICATOR FIX: Set paused state for visual feedback
-      this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+      // Use the centralized method to avoid code duplication
+      this.updateIndicatorPausedState(timer.isPaused);
     }
 
     /**
