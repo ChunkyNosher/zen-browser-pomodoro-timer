@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.0
+ * Version: 1.2.1
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -36,6 +36,13 @@
   // ============================================
 
   const PREF_PREFIX = 'zen-pomodoro';
+
+  /**
+   * Version number for the mod.
+   * Used for display in the main menu.
+   * @constant {string}
+   */
+  const MOD_VERSION = '1.2.1';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -3188,9 +3195,15 @@
 
       buttonDiv.appendChild(cancelButton);
 
+      // Version indicator at bottom of menu
+      const versionIndicator = document.createElement('div');
+      versionIndicator.className = 'zen-pomodoro-version-indicator';
+      versionIndicator.textContent = `v${MOD_VERSION}`;
+
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
       dialog.appendChild(buttonDiv);
+      dialog.appendChild(versionIndicator);
 
       document.documentElement.appendChild(dialog);
 

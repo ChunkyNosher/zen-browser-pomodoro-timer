@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.0
+ * Version: 1.2.1
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -1574,4 +1574,17 @@
   #zen-pomodoro-post-session-reminder.active {
     animation: fade-in 0.3s ease;
   }
+}
+
+/* ============================================
+   Version Indicator
+   Subtle version display at bottom of main menu
+   ============================================ */
+.zen-pomodoro-version-indicator {
+  font-size: 11px;
+  color: #888;
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / 10%);
 }
