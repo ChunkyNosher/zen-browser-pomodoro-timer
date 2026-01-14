@@ -115,6 +115,18 @@
     firstTimeReminderTime: '10:00',
     /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
     lastTimerStartDate: '',
+    /** Post-session reminder settings - shows reminder after timer completes */
+    postSessionReminderEnabled: true,
+    /** Minutes after timer completion before first reminder (default: 45) */
+    postSessionIdleTime: 45,
+    /** Minutes before another reminder after skip (default: 30) */
+    postSessionSkipCooldown: 30,
+    /** @type {'hold'|'code'} Method to use for skip button requirement */
+    postSessionSkipMethod: LOCKOUT_METHODS.HOLD,
+    /** Initial hold duration in seconds for skip (default: 20) */
+    postSessionSkipHoldDuration: 20,
+    /** Initial code length for skip (default: 48) */
+    postSessionSkipCodeLength: 48,
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -135,6 +147,12 @@
   // Transition phase duration in seconds (5 minutes)
   // This is the "break ending soon" warning period before focus resumes
   const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;
+
+  // Post-session reminder escalation factor (50% increase per skip)
+  const POST_SESSION_ESCALATION_FACTOR = 1.5;
+
+  // Post-session reminder check interval (1 minute in milliseconds)
+  const POST_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
 
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
@@ -1339,6 +1357,95 @@
     buttons.appendChild(createBlockerButton('', 'Stop Timer', onStopTimer));
 
     return buttons;
+  }
+
+  /**
+   * Setup hold-to-unlock event handlers for buttons.
+   * Shared utility to reduce code duplication between SecurityManager and PostSessionReminderManager.
+   * @param {Object} options - Options object
+   * @param {HTMLElement} options.holdButton - The hold button element
+   * @param {HTMLElement} options.holdProgress - The progress bar element
+   * @param {number} options.waitTime - Total wait time in seconds
+   * @param {HTMLElement} options.timerElement - Element to display countdown
+   * @param {Function} options.onComplete - Callback when hold completes
+   * @param {Function} options.getIntervalId - Function to get current interval ID
+   * @param {Function} options.setIntervalId - Function to set interval ID
+   * @param {Function} options.clearInterval - Function to clear interval
+   * @param {string} [options.logCategory] - Log category for logging (default: SECURITY)
+   * @param {string} [options.logMessage] - Log message on completion (default: 'Hold-to-unlock completed')
+   */
+  function setupHoldToUnlockHandlers(options) {
+    const {
+      holdButton,
+      holdProgress,
+      waitTime,
+      timerElement,
+      onComplete,
+      clearInterval: clearIntervalFn,
+      setIntervalId,
+      logCategory = LOG_CATEGORIES.SECURITY,
+      logMessage = 'Hold-to-unlock completed',
+    } = options;
+
+    let currentWaitTime = waitTime;
+
+    const startHold = (e) => {
+      if (e.type === 'touchstart') e.preventDefault();
+
+      clearIntervalFn();
+
+      const intervalId = setInterval(() => {
+        currentWaitTime--;
+        if (timerElement) {
+          timerElement.textContent = currentWaitTime.toString();
+        }
+
+        const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
+        if (holdProgress?.style) {
+          holdProgress.style.width = `${percent}%`;
+        }
+
+        if (currentWaitTime <= 0) {
+          logger.log(logCategory, logMessage);
+          clearIntervalFn();
+          onComplete();
+        }
+      }, 1000);
+
+      setIntervalId(intervalId);
+    };
+
+    const stopHold = () => {
+      clearIntervalFn();
+      currentWaitTime = waitTime;
+      if (timerElement) {
+        timerElement.textContent = waitTime.toString();
+      }
+      if (holdProgress) {
+        holdProgress.style.width = '0%';
+      }
+    };
+
+    // Mouse events
+    holdButton.addEventListener('mousedown', startHold);
+    holdButton.addEventListener('mouseup', stopHold);
+    holdButton.addEventListener('mouseleave', stopHold);
+
+    // Touch events (passive: false to allow preventDefault)
+    holdButton.addEventListener('touchstart', startHold, { passive: false });
+    holdButton.addEventListener('touchend', stopHold);
+    holdButton.addEventListener('touchcancel', stopHold);
+
+    // Keyboard accessibility
+    holdButton.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        startHold(e);
+      }
+    });
+    holdButton.addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') stopHold();
+    });
   }
 
   // ============================================
@@ -3915,6 +4022,141 @@
       reminderSection.appendChild(triggerReminderButton);
 
       // ========================================
+      // Post-Session Reminder Section
+      // ========================================
+      const postSessionSection = document.createElement('div');
+      postSessionSection.className = 'zen-pomodoro-lockout-section';
+
+      const postSessionTitle = document.createElement('div');
+      postSessionTitle.className = 'zen-pomodoro-lockout-section-title';
+      postSessionTitle.textContent = '⏱️ Post-Session Reminder';
+
+      const postSessionDescription = document.createElement('p');
+      postSessionDescription.style.fontSize = '13px';
+      postSessionDescription.style.color = '#888';
+      postSessionDescription.style.margin = '0 0 12px 0';
+      postSessionDescription.textContent =
+        'Remind to start a new timer after idle time following completion.';
+
+      // Enable/disable checkbox
+      const postSessionEnabledRow = document.createElement('div');
+      postSessionEnabledRow.className = 'zen-pomodoro-checkbox-row';
+
+      const postSessionEnabledCheckbox = document.createElement('input');
+      postSessionEnabledCheckbox.type = 'checkbox';
+      postSessionEnabledCheckbox.id = 'post-session-reminder-enabled';
+      postSessionEnabledCheckbox.checked = config.postSessionReminderEnabled;
+
+      const postSessionEnabledLabel = document.createElement('label');
+      postSessionEnabledLabel.setAttribute('for', 'post-session-reminder-enabled');
+      postSessionEnabledLabel.textContent = 'Enable post-session reminder';
+
+      postSessionEnabledRow.appendChild(postSessionEnabledCheckbox);
+      postSessionEnabledRow.appendChild(postSessionEnabledLabel);
+
+      // Idle time input
+      const postSessionIdleTimeRow = createLabeledInputRow(
+        'Idle time before reminder (min):',
+        'post-session-idle-time',
+        { value: config.postSessionIdleTime, min: 1, max: 240 }
+      );
+
+      // Skip cooldown input
+      const postSessionCooldownRow = createLabeledInputRow(
+        'Skip cooldown (min):',
+        'post-session-skip-cooldown',
+        { value: config.postSessionSkipCooldown, min: 1, max: 120 }
+      );
+
+      // Skip method select
+      const postSessionMethodRow = document.createElement('div');
+      postSessionMethodRow.className = 'zen-pomodoro-config-row';
+      const postSessionMethodLabel = document.createElement('label');
+      postSessionMethodLabel.textContent = 'Skip method:';
+      const postSessionMethodSelect = document.createElement('select');
+      postSessionMethodSelect.id = 'post-session-skip-method';
+
+      const postSessionHoldOption = document.createElement('option');
+      postSessionHoldOption.value = LOCKOUT_METHODS.HOLD;
+      postSessionHoldOption.textContent = 'Hold to Skip';
+      postSessionHoldOption.selected = config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD;
+
+      const postSessionCodeOption = document.createElement('option');
+      postSessionCodeOption.value = LOCKOUT_METHODS.CODE;
+      postSessionCodeOption.textContent = 'Code Entry';
+      postSessionCodeOption.selected = config.postSessionSkipMethod === LOCKOUT_METHODS.CODE;
+
+      postSessionMethodSelect.appendChild(postSessionHoldOption);
+      postSessionMethodSelect.appendChild(postSessionCodeOption);
+      postSessionMethodRow.appendChild(postSessionMethodLabel);
+      postSessionMethodRow.appendChild(postSessionMethodSelect);
+
+      // Hold duration input
+      const postSessionHoldDurationRow = createLabeledInputRow(
+        'Initial hold time (sec):',
+        'post-session-hold-duration',
+        { value: config.postSessionSkipHoldDuration, min: 5, max: 120 }
+      );
+
+      // Code length input
+      const postSessionCodeLengthRow = createLabeledInputRow(
+        'Initial code length:',
+        'post-session-code-length',
+        { value: config.postSessionSkipCodeLength, min: 16, max: 128 }
+      );
+
+      // Escalation info
+      const escalationInfo = document.createElement('p');
+      escalationInfo.style.fontSize = '12px';
+      escalationInfo.style.color = '#666';
+      escalationInfo.style.margin = '8px 0 0 0';
+      escalationInfo.style.fontStyle = 'italic';
+      escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
+
+      // Show/hide settings based on enabled and method
+      const updatePostSessionVisibility = () => {
+        const isEnabled = postSessionEnabledCheckbox.checked;
+        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
+
+        postSessionIdleTimeRow.style.display = isEnabled ? '' : 'none';
+        postSessionCooldownRow.style.display = isEnabled ? '' : 'none';
+        postSessionMethodRow.style.display = isEnabled ? '' : 'none';
+        postSessionHoldDurationRow.style.display = isEnabled && usesHold ? '' : 'none';
+        postSessionCodeLengthRow.style.display = isEnabled && !usesHold ? '' : 'none';
+        escalationInfo.style.display = isEnabled ? '' : 'none';
+        triggerPostSessionButton.style.display = isEnabled ? '' : 'none';
+      };
+
+      // Development: Trigger post-session reminder button
+      const triggerPostSessionButton = document.createElement('button');
+      triggerPostSessionButton.className = 'zen-pomodoro-dialog-button secondary';
+      triggerPostSessionButton.id = 'zen-pomodoro-trigger-post-session';
+      triggerPostSessionButton.textContent = '🧪 Test Post-Session Reminder';
+      triggerPostSessionButton.title =
+        'Trigger the post-session reminder for testing (ignores idle time)';
+      triggerPostSessionButton.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.postSessionReminder) {
+          dialog.style.display = 'none';
+          window.zenPomodoroApp.postSessionReminder.triggerReminderForTesting();
+        }
+      });
+
+      postSessionEnabledCheckbox.addEventListener('change', updatePostSessionVisibility);
+      postSessionMethodSelect.addEventListener('change', updatePostSessionVisibility);
+      updatePostSessionVisibility();
+
+      postSessionSection.appendChild(postSessionTitle);
+      postSessionSection.appendChild(postSessionDescription);
+      postSessionSection.appendChild(postSessionEnabledRow);
+      postSessionSection.appendChild(postSessionIdleTimeRow);
+      postSessionSection.appendChild(postSessionCooldownRow);
+      postSessionSection.appendChild(postSessionMethodRow);
+      postSessionSection.appendChild(postSessionHoldDurationRow);
+      postSessionSection.appendChild(postSessionCodeLengthRow);
+      postSessionSection.appendChild(escalationInfo);
+      postSessionSection.appendChild(triggerPostSessionButton);
+
+      // ========================================
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
@@ -3928,6 +4170,7 @@
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       configSection.appendChild(reminderSection);
+      configSection.appendChild(postSessionSection);
 
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -3988,6 +4231,12 @@
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveBlockedWorkspaces(workspaceContainer, config);
         this._saveReminderSettings(reminderEnabledCheckbox, reminderTimeInput, config);
+        this._savePostSessionSettings(
+          dialog,
+          config,
+          postSessionEnabledCheckbox,
+          postSessionMethodSelect
+        );
 
         saveConfig(config);
         dialog.remove();
@@ -4157,6 +4406,70 @@
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saved reminder settings', {
         enabled: config.firstTimeReminderEnabled,
         time: config.firstTimeReminderTime,
+      });
+    }
+
+    /**
+     * Save post-session reminder settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
+     * @param {HTMLSelectElement} methodSelect - Skip method select element
+     * @private
+     */
+    _savePostSessionSettings(dialog, config, enabledCheckbox, methodSelect) {
+      config.postSessionReminderEnabled = enabledCheckbox.checked;
+      config.postSessionSkipMethod = methodSelect.value;
+
+      // Save idle time
+      const idleTimeInput = dialog.querySelector('#post-session-idle-time');
+      if (idleTimeInput) {
+        config.postSessionIdleTime = validateIntegerInput(
+          idleTimeInput.value,
+          1,
+          240,
+          config.postSessionIdleTime
+        );
+      }
+
+      // Save cooldown
+      const cooldownInput = dialog.querySelector('#post-session-skip-cooldown');
+      if (cooldownInput) {
+        config.postSessionSkipCooldown = validateIntegerInput(
+          cooldownInput.value,
+          1,
+          120,
+          config.postSessionSkipCooldown
+        );
+      }
+
+      // Save hold duration
+      const holdDurationInput = dialog.querySelector('#post-session-hold-duration');
+      if (holdDurationInput) {
+        config.postSessionSkipHoldDuration = validateIntegerInput(
+          holdDurationInput.value,
+          5,
+          120,
+          config.postSessionSkipHoldDuration
+        );
+      }
+
+      // Save code length
+      const codeLengthInput = dialog.querySelector('#post-session-code-length');
+      if (codeLengthInput) {
+        config.postSessionSkipCodeLength = validateIntegerInput(
+          codeLengthInput.value,
+          16,
+          128,
+          config.postSessionSkipCodeLength
+        );
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
+        enabled: config.postSessionReminderEnabled,
+        idleTime: config.postSessionIdleTime,
+        skipCooldown: config.postSessionSkipCooldown,
+        skipMethod: config.postSessionSkipMethod,
       });
     }
 
@@ -5206,6 +5519,7 @@
 
     /**
      * Setup hold-to-unlock event handlers.
+     * Uses shared setupHoldToUnlockHandlers utility to reduce code duplication.
      * @param {HTMLElement} holdButton - The hold button element
      * @param {HTMLElement} holdProgress - The progress bar element
      * @param {number} waitTime - Total wait time in seconds
@@ -5213,63 +5527,21 @@
      * @private
      */
     _setupHoldHandlers(holdButton, holdProgress, waitTime, onUnlock) {
-      let currentWaitTime = waitTime;
-
-      const startHold = (e) => {
-        if (e.type === 'touchstart') e.preventDefault();
-
-        this._clearHoldInterval();
-
-        this.holdToUnlockIntervalId = setInterval(() => {
-          currentWaitTime--;
-          if (this.lockTimerElement) {
-            this.lockTimerElement.textContent = currentWaitTime.toString();
-          }
-
-          const percent = ((waitTime - currentWaitTime) / waitTime) * 100;
-          if (holdProgress?.style) {
-            holdProgress.style.width = `${percent}%`;
-          }
-
-          if (currentWaitTime <= 0) {
-            logger.log(LOG_CATEGORIES.SECURITY, 'Hold-to-unlock completed successfully');
-            this._clearHoldInterval();
-            this.cleanupLockScreen();
-            onUnlock();
-          }
-        }, 1000);
-      };
-
-      const stopHold = () => {
-        this._clearHoldInterval();
-        currentWaitTime = waitTime;
-        if (this.lockTimerElement) {
-          this.lockTimerElement.textContent = waitTime.toString();
-        }
-        if (holdProgress) {
-          holdProgress.style.width = '0%';
-        }
-      };
-
-      // Mouse events
-      holdButton.addEventListener('mousedown', startHold);
-      holdButton.addEventListener('mouseup', stopHold);
-      holdButton.addEventListener('mouseleave', stopHold);
-
-      // Touch events (passive: false to allow preventDefault)
-      holdButton.addEventListener('touchstart', startHold, { passive: false });
-      holdButton.addEventListener('touchend', stopHold);
-      holdButton.addEventListener('touchcancel', stopHold);
-
-      // Keyboard accessibility
-      holdButton.addEventListener('keydown', (e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          startHold(e);
-        }
-      });
-      holdButton.addEventListener('keyup', (e) => {
-        if (e.key === ' ' || e.key === 'Enter') stopHold();
+      setupHoldToUnlockHandlers({
+        holdButton,
+        holdProgress,
+        waitTime,
+        timerElement: this.lockTimerElement,
+        onComplete: () => {
+          this.cleanupLockScreen();
+          onUnlock();
+        },
+        clearInterval: () => this._clearHoldInterval(),
+        setIntervalId: (id) => {
+          this.holdToUnlockIntervalId = id;
+        },
+        logCategory: LOG_CATEGORIES.SECURITY,
+        logMessage: 'Hold-to-unlock completed successfully',
       });
     }
 
@@ -7098,6 +7370,538 @@
   }
 
   // ============================================
+  // Post-Session Reminder Manager
+  // ============================================
+
+  /**
+   * PostSessionReminderManager handles reminders to start a new timer
+   * after a configurable idle time following timer completion.
+   *
+   * Features:
+   * - Tracks idle time after timer/pomodoro cycle COMPLETES
+   * - Shows blocking overlay after configured idle time
+   * - User can start a new timer or skip the reminder
+   * - Skip requires hold/code completion with escalating difficulty
+   * - Skip count resets when a new timer is started
+   */
+  class PostSessionReminderManager {
+    constructor() {
+      this.reminderOverlay = null;
+      this.isShowing = false;
+      this.idleStartTime = null; // When the last timer completed
+      this.skipCount = 0; // Number of times user has skipped
+      this.lastSkipTime = null; // When the last skip occurred
+      this.checkIntervalId = null; // Interval for checking if reminder should show
+      this.onStartTimer = null; // Callback when user clicks "Start Timer"
+      this._holdIntervalId = null; // Hold-to-unlock interval
+      this._holdTimerElement = null; // Timer display element for hold mode
+    }
+
+    /**
+     * Initialize the post-session reminder manager.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Post-Session Reminder Manager');
+      this._startIdleCheck();
+    }
+
+    /**
+     * Called when a timer completes naturally (not stopped manually).
+     * Starts tracking idle time for post-session reminder.
+     */
+    onTimerComplete() {
+      const config = getConfig();
+      if (!config.postSessionReminderEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Feature disabled');
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer completed, starting idle tracking');
+      this.idleStartTime = Date.now();
+      // Don't reset skip count here - it resets when a NEW timer starts
+    }
+
+    /**
+     * Called when a new timer is started.
+     * Resets idle tracking and skip count.
+     */
+    onTimerStart() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state');
+      this.idleStartTime = null;
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+      this.hideReminder();
+    }
+
+    /**
+     * Start the periodic check for showing the reminder.
+     * @private
+     */
+    _startIdleCheck() {
+      // Clear any existing interval
+      this._stopIdleCheck();
+
+      // Check every minute
+      this.checkIntervalId = setInterval(() => {
+        this._checkAndShowReminder();
+      }, POST_SESSION_CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * Stop the periodic idle check.
+     * @private
+     */
+    _stopIdleCheck() {
+      if (this.checkIntervalId) {
+        clearInterval(this.checkIntervalId);
+        this.checkIntervalId = null;
+      }
+    }
+
+    /**
+     * Check if the reminder should be shown based on current state.
+     * @private
+     */
+    _checkAndShowReminder() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.postSessionReminderEnabled) return;
+
+      // Check if already showing
+      if (this.isShowing) return;
+
+      // Check if timer is currently active
+      if (window.zenPomodoroApp?.timer?.isActive) return;
+
+      // Check if we have an idle start time (timer has completed)
+      if (!this.idleStartTime) return;
+
+      const now = Date.now();
+      const idleTimeMs = now - this.idleStartTime;
+      const idleTimeMinutes = idleTimeMs / (60 * 1000);
+
+      // If user has skipped before, check against cooldown
+      if (this.lastSkipTime) {
+        const timeSinceSkipMs = now - this.lastSkipTime;
+        const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
+
+        if (timeSinceSkipMinutes < config.postSessionSkipCooldown) {
+          // Still in cooldown period
+          return;
+        }
+      }
+
+      // Check if enough idle time has passed
+      if (idleTimeMinutes >= config.postSessionIdleTime) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Showing reminder', {
+          idleTimeMinutes: Math.round(idleTimeMinutes),
+          skipCount: this.skipCount,
+        });
+        this.showReminder();
+      }
+    }
+
+    /**
+     * Calculate the escalated skip requirement based on skip count.
+     * @param {number} baseValue - Base value for the requirement
+     * @returns {number} Escalated value
+     * @private
+     */
+    _calculateEscalatedValue(baseValue) {
+      return Math.ceil(baseValue * Math.pow(POST_SESSION_ESCALATION_FACTOR, this.skipCount));
+    }
+
+    /**
+     * Show the post-session reminder overlay.
+     */
+    showReminder() {
+      if (this.reminderOverlay || this.isShowing) return;
+
+      // Don't show if timer is active
+      if (window.zenPomodoroApp?.timer?.isActive) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Showing post-session reminder overlay', {
+        skipCount: this.skipCount,
+      });
+
+      this.isShowing = true;
+      this._createOverlay();
+      document.documentElement.appendChild(this.reminderOverlay);
+    }
+
+    /**
+     * Hide the post-session reminder overlay.
+     */
+    hideReminder() {
+      if (!this.reminderOverlay && !this.isShowing) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Hiding post-session reminder overlay');
+      this.isShowing = false;
+
+      // Clear hold interval if active
+      this._clearHoldInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+    }
+
+    /**
+     * Handle skip action - dismisses reminder for cooldown period.
+     * @private
+     */
+    _handleSkip() {
+      this.skipCount++;
+      this.lastSkipTime = Date.now();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder skipped', {
+        skipCount: this.skipCount,
+        cooldownMinutes: getConfig().postSessionSkipCooldown,
+      });
+
+      this.hideReminder();
+    }
+
+    /**
+     * Create the blocking reminder overlay.
+     * @private
+     */
+    _createOverlay() {
+      const config = getConfig();
+
+      this.reminderOverlay = document.createElement('div');
+      this.reminderOverlay.id = 'zen-pomodoro-post-session-reminder';
+      this.reminderOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-post-session-reminder-content';
+
+      // Icon
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-post-session-reminder-icon';
+      icon.textContent = '⏱️';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Time to Get Back to Work!';
+
+      // Message
+      const message = document.createElement('p');
+      message.textContent =
+        "It's been a while since your last focus session. Start a new timer to stay productive!";
+
+      // Skip info (shows skip count and current requirement)
+      const skipInfo = document.createElement('div');
+      skipInfo.id = 'zen-pomodoro-post-session-skip-info';
+      if (this.skipCount > 0) {
+        const escalatedHold = this._calculateEscalatedValue(config.postSessionSkipHoldDuration);
+        const escalatedCode = this._calculateEscalatedValue(config.postSessionSkipCodeLength);
+        const requirementText =
+          config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD
+            ? `Hold for ${escalatedHold} seconds`
+            : `Enter ${escalatedCode} characters`;
+        skipInfo.textContent = `Skip #${this.skipCount + 1} - ${requirementText}`;
+      } else {
+        const requirementText =
+          config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD
+            ? `Hold for ${config.postSessionSkipHoldDuration} seconds`
+            : `Enter ${config.postSessionSkipCodeLength} characters`;
+        skipInfo.textContent = requirementText;
+      }
+
+      // Buttons container
+      const buttons = document.createElement('div');
+      buttons.id = 'zen-pomodoro-post-session-buttons';
+
+      // Start Timer button
+      const startButton = document.createElement('button');
+      startButton.id = 'zen-pomodoro-post-session-start-btn';
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Timer';
+      startButton.addEventListener('click', () => {
+        this._handleStartTimerClick();
+      });
+
+      // Skip button (with hold/code requirement)
+      const skipButton = document.createElement('button');
+      skipButton.id = 'zen-pomodoro-post-session-skip-btn';
+      skipButton.className = 'zen-pomodoro-dialog-button secondary';
+      skipButton.textContent = 'Skip for Now';
+      skipButton.addEventListener('click', () => {
+        this._showSkipChallenge(config);
+      });
+
+      buttons.appendChild(startButton);
+      buttons.appendChild(skipButton);
+
+      // Assemble content
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(skipInfo);
+      content.appendChild(buttons);
+
+      this.reminderOverlay.appendChild(content);
+    }
+
+    /**
+     * Show the skip challenge (hold or code entry).
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _showSkipChallenge(config) {
+      // Remove the buttons and replace with challenge UI
+      const content = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-reminder-content');
+      const buttons = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-buttons');
+      const skipInfo = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-skip-info');
+
+      if (!content || !buttons) return;
+
+      // Remove current buttons
+      buttons.remove();
+      if (skipInfo) skipInfo.remove();
+
+      // Create challenge container
+      const challengeContainer = document.createElement('div');
+      challengeContainer.id = 'zen-pomodoro-post-session-challenge';
+
+      if (config.postSessionSkipMethod === LOCKOUT_METHODS.HOLD) {
+        this._createHoldChallenge(challengeContainer, config);
+      } else {
+        this._createCodeChallenge(challengeContainer, config);
+      }
+
+      content.appendChild(challengeContainer);
+    }
+
+    /**
+     * Create hold-to-unlock challenge UI.
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _createHoldChallenge(container, config) {
+      const escalatedDuration = this._calculateEscalatedValue(config.postSessionSkipHoldDuration);
+
+      // Timer display
+      const timerDiv = document.createElement('div');
+      timerDiv.id = 'zen-pomodoro-post-session-hold-timer';
+      timerDiv.className = 'zen-pomodoro-post-session-hold-timer';
+      timerDiv.textContent = escalatedDuration.toString();
+      this._holdTimerElement = timerDiv;
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.className = 'zen-pomodoro-post-session-instructions';
+      instructions.textContent = 'seconds remaining - hold button to skip';
+
+      // Hold button with progress bar
+      const holdButton = document.createElement('button');
+      holdButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-hold-to-unlock-btn';
+      holdButton.id = 'zen-pomodoro-post-session-hold-btn';
+      holdButton.textContent = 'Hold to Skip';
+
+      const holdProgress = document.createElement('div');
+      holdProgress.className = 'zen-pomodoro-hold-unlock-progress';
+      holdProgress.id = 'zen-pomodoro-post-session-hold-progress';
+      holdButton.appendChild(holdProgress);
+
+      // Button row
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'zen-pomodoro-dialog-buttons';
+
+      // Cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        this._clearHoldInterval();
+        this.hideReminder();
+        // Immediately re-show to reset the UI
+        setTimeout(() => this.showReminder(), 100);
+      });
+
+      buttonRow.appendChild(cancelButton);
+      buttonRow.appendChild(holdButton);
+
+      container.appendChild(timerDiv);
+      container.appendChild(instructions);
+      container.appendChild(buttonRow);
+
+      // Setup hold handlers
+      this._setupHoldHandlers(holdButton, holdProgress, escalatedDuration);
+    }
+
+    /**
+     * Setup hold-to-unlock event handlers.
+     * @param {HTMLElement} holdButton - The hold button element
+     * @param {HTMLElement} holdProgress - The progress bar element
+     * @param {number} waitTime - Total wait time in seconds
+     * @private
+     */
+    /**
+     * Setup hold-to-unlock event handlers.
+     * Uses shared setupHoldToUnlockHandlers utility to reduce code duplication.
+     * @param {HTMLElement} holdButton - The hold button element
+     * @param {HTMLElement} holdProgress - The progress bar element
+     * @param {number} waitTime - Total wait time in seconds
+     * @private
+     */
+    _setupHoldHandlers(holdButton, holdProgress, waitTime) {
+      setupHoldToUnlockHandlers({
+        holdButton,
+        holdProgress,
+        waitTime,
+        timerElement: this._holdTimerElement,
+        onComplete: () => this._handleSkip(),
+        clearInterval: () => this._clearHoldInterval(),
+        setIntervalId: (id) => {
+          this._holdIntervalId = id;
+        },
+        logCategory: LOG_CATEGORIES.TIMER,
+        logMessage: 'Post-session hold-to-skip completed',
+      });
+    }
+
+    /**
+     * Clear the hold interval if active.
+     * @private
+     */
+    _clearHoldInterval() {
+      if (this._holdIntervalId) {
+        clearInterval(this._holdIntervalId);
+        this._holdIntervalId = null;
+      }
+    }
+
+    /**
+     * Create code entry challenge UI.
+     * @param {HTMLElement} container - Container element
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _createCodeChallenge(container, config) {
+      const escalatedLength = this._calculateEscalatedValue(config.postSessionSkipCodeLength);
+      const code = generateRandomCode(escalatedLength, 'alphanumeric');
+
+      // Instructions
+      const instructions = document.createElement('p');
+      instructions.className = 'zen-pomodoro-post-session-instructions';
+      instructions.textContent = `Enter the ${escalatedLength}-character code below to skip:`;
+
+      // Code display
+      const codeDiv = document.createElement('div');
+      codeDiv.className = 'zen-pomodoro-lock-code-display';
+      codeDiv.textContent = code;
+
+      // Input field
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'zen-pomodoro-post-session-code-input';
+      input.className = 'zen-pomodoro-post-session-code-input';
+      input.placeholder = 'Enter code here';
+
+      // Button row
+      const buttonRow = document.createElement('div');
+      buttonRow.className = 'zen-pomodoro-dialog-buttons';
+
+      // Cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        this.hideReminder();
+        // Immediately re-show to reset the UI
+        setTimeout(() => this.showReminder(), 100);
+      });
+
+      // Verify button
+      const verifyButton = document.createElement('button');
+      verifyButton.className = 'zen-pomodoro-dialog-button';
+      verifyButton.textContent = 'Skip';
+
+      const verifyCode = () => {
+        if (input.value === code) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Post-session code verification successful');
+          this._handleSkip();
+        } else {
+          logger.log(LOG_CATEGORIES.TIMER, 'Post-session code verification failed');
+          window.zenPomodoroApp?.showCustomAlert('Incorrect Code', 'Please try again.');
+        }
+      };
+
+      verifyButton.addEventListener('click', verifyCode);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyCode();
+      });
+
+      buttonRow.appendChild(cancelButton);
+      buttonRow.appendChild(verifyButton);
+
+      container.appendChild(instructions);
+      container.appendChild(codeDiv);
+      container.appendChild(input);
+      container.appendChild(buttonRow);
+
+      // Focus input
+      setTimeout(() => input?.focus(), 0);
+    }
+
+    /**
+     * Handle the "Start Timer" button click.
+     * @private
+     */
+    _handleStartTimerClick() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Start Timer button clicked');
+
+      // Hide reminder first
+      this.hideReminder();
+
+      // Use callback if set, otherwise try to show start dialog directly
+      if (this.onStartTimer) {
+        this.onStartTimer();
+      } else if (window.zenPomodoroApp?.keyboardShortcut) {
+        window.zenPomodoroApp.keyboardShortcut.showConfigDialog();
+      }
+    }
+
+    /**
+     * Manually trigger the reminder for testing purposes.
+     * Ignores idle time checks.
+     */
+    triggerReminderForTesting() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Manually triggered for testing');
+
+      // Force show even if conditions aren't met
+      if (this.reminderOverlay) {
+        this.hideReminder();
+      }
+
+      this.showReminder();
+    }
+
+    /**
+     * Clean up the reminder manager.
+     */
+    destroy() {
+      this._stopIdleCheck();
+      this._clearHoldInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+      this.isShowing = false;
+      this.idleStartTime = null;
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -7112,6 +7916,7 @@
       this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
       this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
       this.firstTimeReminder = new FirstTimeReminderManager(); // First-time daily reminder
+      this.postSessionReminder = new PostSessionReminderManager(); // Post-session idle reminder
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -7229,6 +8034,15 @@
       };
       this.firstTimeReminder.init();
 
+      // Initialize Post-Session Reminder Manager
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing Post-Session Reminder Manager');
+      this.postSessionReminder.onStartTimer = () => {
+        // Hide reminder first, then show start timer dialog
+        this.postSessionReminder.hideReminder();
+        this.keyboardShortcut.showConfigDialog();
+      };
+      this.postSessionReminder.init();
+
       logger.log(LOG_CATEGORIES.INIT, 'Application initialization complete');
     }
 
@@ -7281,6 +8095,9 @@
 
       // Hide first-time reminder if showing (timer has been started)
       this.firstTimeReminder.hideReminder();
+
+      // Notify Post-Session Reminder that timer started (resets idle tracking)
+      this.postSessionReminder.onTimerStart();
 
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
@@ -7344,6 +8161,9 @@
 
       // Show completion notification
       this.showNotification('complete');
+
+      // Notify Post-Session Reminder that timer completed (starts idle tracking)
+      this.postSessionReminder.onTimerComplete();
     }
 
     /**
@@ -7623,6 +8443,7 @@
         this.websiteBlocker,
         this.transitionManager,
         this.firstTimeReminder,
+        this.postSessionReminder,
         this.keyboardShortcut,
         this.overlay,
       ];
