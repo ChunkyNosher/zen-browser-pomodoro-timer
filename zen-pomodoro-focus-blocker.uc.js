@@ -1949,7 +1949,8 @@
           const state = JSON.parse(stateStr);
           if (state.isActive) {
             this.isActive = state.isActive;
-            // AUTO-PAUSE FIX: Always pause timer on restoration
+            // AUTO-PAUSE FIX: Always pause timer on restoration (user requirement)
+            // This overrides the saved pause state to prevent timer from auto-continuing on restart
             this.isPaused = true;
             this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
             this.remainingTime = state.remainingTime;
