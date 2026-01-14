@@ -24,5 +24,23 @@
     "type": "string",
     "defaultValue": "10:00",
     "placeholder": "10:00"
+  },
+  {
+    "property": "zen-pomodoro.postSessionReminderEnabled",
+    "label": "Enable Post-Session Reminder",
+    "type": "checkbox",
+    "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.postSessionIdleTime",
+    "label": "Post-Session Idle Time (minutes)",
+    "type": "number",
+    "defaultValue": 45
+  },
+  {
+    "property": "zen-pomodoro.postSessionSkipCooldown",
+    "label": "Post-Session Skip Cooldown (minutes)",
+    "type": "number",
+    "defaultValue": 30
   }
 ]
