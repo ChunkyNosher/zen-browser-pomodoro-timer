@@ -3084,7 +3084,7 @@
     /**
      * Update the indicator's paused state attribute for visual feedback.
      * This method should be called when the timer is paused or resumed
-     * to ensure the indicator reflects the correct state (orange when paused).
+     * to ensure the indicator shows orange color when paused and normal color when not paused.
      * @param {boolean} isPaused - Whether the timer is currently paused
      */
     updateIndicatorPausedState(isPaused) {
