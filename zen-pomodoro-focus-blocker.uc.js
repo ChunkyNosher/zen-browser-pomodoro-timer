@@ -2799,14 +2799,22 @@
               window.zenPomodoroApp.timer.resume();
               pauseButton.textContent = 'Pause';
             } else {
-              // Track whether we're pausing on a blocked workspace
+              // PAUSE FIX: Track whether we're pausing on a blocked workspace
+              // Use isWorkspaceInBlockedList() to check raw workspace membership
+              // without break phase interference (break phase already handled separately)
               const isOnBlockedWorkspace =
-                window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+                window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
               window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
               pauseButton.textContent = 'Resume';
             }
             // Update overlay visibility after pause/resume state change
             window.zenPomodoroApp.updateOverlayVisibility();
+            
+            // PAUSE FIX: Update indicator paused state for visual feedback
+            // This ensures the indicator shows orange color when paused
+            window.zenPomodoroApp.overlay.updateIndicatorPausedState(
+              window.zenPomodoroApp.timer.isPaused
+            );
           }
         });
       }
@@ -3068,6 +3076,19 @@
     hideIndicator() {
       if (this.indicator) {
         this.indicator.classList.remove('active');
+      }
+    }
+
+    /**
+     * Update the indicator's paused state attribute for visual feedback.
+     * This method should be called when the timer is paused or resumed
+     * to ensure the indicator reflects the correct state (orange when paused).
+     * @param {boolean} isPaused - Whether the timer is currently paused
+     */
+    updateIndicatorPausedState(isPaused) {
+      if (this.indicator) {
+        this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state updated', { isPaused });
       }
     }
 
@@ -3358,13 +3379,22 @@
           if (window.zenPomodoroApp.timer.isPaused) {
             window.zenPomodoroApp.timer.resume();
           } else {
-            // Track whether we're pausing on a blocked workspace
+            // PAUSE FIX: Track whether we're pausing on a blocked workspace
+            // Use isWorkspaceInBlockedList() to check raw workspace membership
+            // without break phase interference (break phase already handled separately)
             const isOnBlockedWorkspace =
-              window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+              window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
             window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
           }
           // Update overlay visibility after pause/resume state change
           window.zenPomodoroApp.updateOverlayVisibility();
+          
+          // PAUSE FIX: Update indicator paused state for visual feedback
+          // This ensures the indicator shows orange color when paused
+          window.zenPomodoroApp.overlay.updateIndicatorPausedState(
+            window.zenPomodoroApp.timer.isPaused
+          );
+          
           dialog.remove();
           this.menuDialog = null;
         });
