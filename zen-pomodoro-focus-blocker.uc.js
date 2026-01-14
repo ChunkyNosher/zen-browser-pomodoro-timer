@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.1
+ * Version: 1.2.2
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.1';
+  const MOD_VERSION = '1.2.2';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -2067,6 +2067,29 @@
         return false;
       }
 
+      return this._checkWorkspaceBlocked('Workspace blocked check');
+    }
+
+    /**
+     * Check if current workspace is in the blocked list.
+     * Unlike isCurrentWorkspaceBlocked(), this does NOT check for break phase.
+     * Used specifically for paused state logic where break/transition phases
+     * are already handled separately in updateOverlayVisibility().
+     * @returns {boolean} True if current workspace is in the blocked list
+     */
+    isWorkspaceInBlockedList() {
+      return this._checkWorkspaceBlocked('Workspace in blocked list check (no phase check)');
+    }
+
+    /**
+     * Private helper to check if current workspace is in the blocked list.
+     * Reloads config to get latest blocked workspaces on each call.
+     * Returns false if no active workspace can be detected.
+     * @param {string} logMessage - Description for logging purposes
+     * @returns {boolean} True if current workspace is in the blocked list, false otherwise
+     * @private
+     */
+    _checkWorkspaceBlocked(logMessage) {
       // Reload config to get latest blocked workspaces
       this.config = getConfig();
 
@@ -2076,7 +2099,7 @@
       }
 
       const isBlocked = this.config.blockedWorkspaces.includes(activeWorkspace);
-      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace blocked check', {
+      logger.log(LOG_CATEGORIES.WORKSPACE, logMessage, {
         workspaceId: activeWorkspace,
         isBlocked: isBlocked,
         blockedCount: this.config.blockedWorkspaces.length,
@@ -3113,6 +3136,48 @@
     constructor() {
       this.keydownHandler = null;
       this.menuDialog = null;
+      this.menuTimerUpdateInterval = null;
+    }
+
+    /**
+     * Start real-time timer updates in the menu dialog
+     * @param {HTMLElement} statusText - The element to update with timer status
+     */
+    _startMenuTimerUpdates(statusText) {
+      // Clear any existing interval first
+      this._stopMenuTimerUpdates();
+
+      this.menuTimerUpdateInterval = setInterval(() => {
+        // Check if timer is still active
+        if (
+          !window.zenPomodoroApp ||
+          !window.zenPomodoroApp.timer ||
+          !window.zenPomodoroApp.timer.isActive
+        ) {
+          this._stopMenuTimerUpdates();
+          return;
+        }
+
+        const status = window.zenPomodoroApp.timer.getStatus();
+        const timeStr = formatTime(status.remainingTime);
+        const phaseStr = getMenuPhaseLabel(status.currentPhase);
+
+        if (status.mode === 'simple') {
+          statusText.textContent = `${phaseStr}: ${timeStr}`;
+        } else {
+          statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+        }
+      }, 1000);
+    }
+
+    /**
+     * Stop the real-time timer updates in the menu dialog
+     */
+    _stopMenuTimerUpdates() {
+      if (this.menuTimerUpdateInterval) {
+        clearInterval(this.menuTimerUpdateInterval);
+        this.menuTimerUpdateInterval = null;
+      }
     }
 
     /**
@@ -3120,6 +3185,9 @@
      * MEMORY LEAK FIX: Clean up associated resources for dialogs that manage state
      */
     closeAllDialogs() {
+      // Stop any running timer updates in the menu
+      this._stopMenuTimerUpdates();
+
       // Clean up lock screen resources if the security manager exists
       if (window.zenPomodoroApp?.security) {
         window.zenPomodoroApp.security.cleanupLockScreen();
@@ -3265,10 +3333,14 @@
         }
         statusRow.appendChild(statusText);
 
+        // Start real-time timer updates while menu is open
+        this._startMenuTimerUpdates(statusText);
+
         const pauseResumeBtn = document.createElement('button');
         pauseResumeBtn.className = 'zen-pomodoro-dialog-button';
         pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
         pauseResumeBtn.addEventListener('click', () => {
+          this._stopMenuTimerUpdates();
           if (window.zenPomodoroApp.timer.isPaused) {
             window.zenPomodoroApp.timer.resume();
           } else {
@@ -3287,6 +3359,7 @@
         stopBtn.className = 'zen-pomodoro-dialog-button secondary';
         stopBtn.textContent = 'Stop Timer';
         stopBtn.addEventListener('click', () => {
+          this._stopMenuTimerUpdates();
           dialog.remove();
           this.menuDialog = null;
           // Issue 6: Require lockout before stopping timer using helper function
@@ -3299,6 +3372,7 @@
         settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
         settingsBtn.textContent = 'Timer Settings';
         settingsBtn.addEventListener('click', () => {
+          this._stopMenuTimerUpdates();
           saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
@@ -3309,6 +3383,7 @@
         rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
         rulesetBtn.textContent = 'Ruleset Settings';
         rulesetBtn.addEventListener('click', () => {
+          this._stopMenuTimerUpdates();
           saveDialogPosition(dialog);
           dialog.remove();
           this.menuDialog = null;
@@ -3365,6 +3440,7 @@
       cancelButton.className = 'zen-pomodoro-dialog-button secondary';
       cancelButton.textContent = 'Close';
       cancelButton.addEventListener('click', () => {
+        this._stopMenuTimerUpdates();
         dialog.remove();
         this.menuDialog = null;
       });
@@ -3395,6 +3471,7 @@
       // Close on Escape key
       const escHandler = (e) => {
         if (e.key === 'Escape') {
+          this._stopMenuTimerUpdates();
           dialog.remove();
           this.menuDialog = null;
           document.removeEventListener('keydown', escHandler);
@@ -3407,6 +3484,9 @@
      * Destroy and cleanup
      */
     destroy() {
+      // Stop any running timer updates in the menu
+      this._stopMenuTimerUpdates();
+
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
         this.keydownHandler = null;
@@ -6258,6 +6338,14 @@
   const WEBSITE_BLOCKER_HIDE_DELAY_MS = 100;
 
   /**
+   * Cooldown duration (in ms) after "Go Back" button is clicked.
+   * During this period, _checkCurrentPage() is skipped to prevent the blocker
+   * from re-appearing before navigation completes.
+   * @constant {number}
+   */
+  const WEBSITE_BLOCKER_GO_BACK_COOLDOWN_MS = 500;
+
+  /**
    * WebsiteBlocker class implements LeechBlock-style website blocking
    * during Pomodoro focus sessions. Supports URL pattern matching with wildcards,
    * exceptions, and keyword-based blocking.
@@ -6281,6 +6369,8 @@
       this._timerStatusInterval = null;
       this.contentObserver = null; // MutationObserver for dynamic page content
       this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
+      this._goBackCooldownActive = false; // Cooldown flag to prevent re-blocking after "Go Back"
+      this._goBackCooldownTimeout = null; // Timeout ID for cooldown cleanup
     }
 
     /**
@@ -6406,6 +6496,11 @@
      * @private
      */
     _checkCurrentPage() {
+      // Skip check if go-back cooldown is active to prevent re-blocking during navigation
+      if (this._goBackCooldownActive) {
+        return;
+      }
+
       // If timer is not active, hide any existing blocker
       if (!this._shouldShowBlocker()) {
         this._hideBlockerIfShowing();
@@ -6991,11 +7086,30 @@
      * Handle the "Go Back" button click.
      * Navigates the user away from the blocked website.
      * Uses shared utility for common navigation logic.
+     * Sets a cooldown flag to prevent the blocker from re-appearing
+     * before navigation completes.
      * @private
      */
     _handleGoBack() {
       logger.log(LOG_CATEGORIES.SECURITY, 'User clicked Go Back on website blocker');
+
+      // Clear any existing cooldown timeout to handle rapid successive clicks
+      if (this._goBackCooldownTimeout) {
+        clearTimeout(this._goBackCooldownTimeout);
+      }
+
+      // Set cooldown flag to prevent _checkCurrentPage() from re-triggering
+      // the blocker while navigation is in progress
+      this._goBackCooldownActive = true;
+
       handleBlockerGoBack(() => this._hideBlocker(), WEBSITE_BLOCKER_HIDE_DELAY_MS);
+
+      // Clear the cooldown flag after navigation should be complete
+      this._goBackCooldownTimeout = setTimeout(() => {
+        this._goBackCooldownActive = false;
+        this._goBackCooldownTimeout = null;
+        logger.log(LOG_CATEGORIES.SECURITY, 'Go-back cooldown cleared');
+      }, WEBSITE_BLOCKER_GO_BACK_COOLDOWN_MS);
     }
 
     /**
@@ -7069,8 +7183,21 @@
       this._removeGBrowserListeners();
       this._clearIntervals();
       this._disconnectContentObserver();
+      this._clearGoBackCooldown();
       this._removeBlockerOverlay();
       this.isBlocking = false;
+    }
+
+    /**
+     * Clear the go-back cooldown timeout if active.
+     * @private
+     */
+    _clearGoBackCooldown() {
+      if (this._goBackCooldownTimeout) {
+        clearTimeout(this._goBackCooldownTimeout);
+        this._goBackCooldownTimeout = null;
+      }
+      this._goBackCooldownActive = false;
     }
 
     /**
@@ -8634,7 +8761,9 @@
         }
 
         // If paused on unblocked workspace, still show overlay on blocked workspaces
-        const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
+        // Use isWorkspaceInBlockedList() to check workspace membership directly,
+        // since we already handled break/transition phases above
+        const isBlocked = this.workspace.isWorkspaceInBlockedList();
         if (isBlocked) {
           this._showOverlayWithStatus();
         } else {

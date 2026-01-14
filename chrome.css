@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.1
+ * Version: 1.2.2
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -595,7 +595,7 @@
   font-size: 14px;
   width: 100%;
   margin-top: 16px;
-  font-family: monospace;
+  font-family: monospace !important;
   line-height: 1.5;
 }
 
@@ -1559,7 +1559,7 @@
   padding: 12px;
   font-size: 14px;
   width: 100%;
-  font-family: monospace;
+  font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
 }
