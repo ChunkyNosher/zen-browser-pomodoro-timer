@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.2
+ * Version: 1.2.3
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.2';
+  const MOD_VERSION = '1.2.3';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
