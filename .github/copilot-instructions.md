@@ -95,6 +95,52 @@ Configuration is stored via Firefox `Services.prefs` with the `zen-pomodoro.` pr
 
 ---
 
+## Reminder Systems
+
+### First-Time Reminder (FirstTimeReminderManager)
+Shows a blocking reminder if no timer has been started today after a configurable time.
+- Uses periodic check (every 60 seconds) not just on init
+- Triggers based on user's local time (configurable HH:MM format)
+- State persisted via `Services.prefs`
+
+### Post-Session Reminder (PostSessionReminderManager)
+Shows reminder after configurable idle time following timer completion.
+- Escalating skip requirements (50% longer each skip)
+- Skip count persisted across browser restarts
+- Focus time tracking - reminders stop after configurable focus time goal (default 2h 30min)
+- Focus time resets on daily reminder time, not midnight
+
+---
+
+## New Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `firstTimeReminderEnabled` | boolean | false | Enable daily startup reminder |
+| `firstTimeReminderTime` | string | '10:00' | Time in HH:MM format for daily reminder |
+| `postSessionReminderEnabled` | boolean | true | Enable post-session idle reminder |
+| `postSessionIdleTime` | number | 45 | Minutes before first reminder after timer completion |
+| `postSessionSkipCooldown` | number | 30 | Minutes between reminders after skip |
+| `postSessionFocusTimeGoal` | number | 150 | Minutes of focus time goal (2.5 hours) |
+| `postSessionSkipMethod` | string | 'hold' | Skip method: 'hold' or 'code' |
+| `postSessionSkipHoldDuration` | number | 20 | Seconds to hold for skip |
+| `postSessionSkipCodeLength` | number | 48 | Characters to type for skip |
+| `postSessionSkipCount` | number | 0 | Current skip count (runtime state) |
+| `postSessionLastSkipTime` | number | null | Last skip timestamp (runtime state) |
+
+---
+
+## Helper Functions
+
+| Function | Purpose |
+|----------|---------|
+| `loadBooleanPref(prefName, config, configKey)` | Load a boolean preference with validation |
+| `loadPositiveIntPref(prefName, config, configKey)` | Load a positive integer preference with validation |
+| `isValidTimeFormat(timeStr)` | Validate HH:MM time format |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input |
+
+---
+
 ## Documentation Update Reminder
 
 **⚠️ IMPORTANT:** When making changes to this mod, remember to update these documentation files (`copilot-instructions.md` and `subagent.agent.md`) with any new classes, constants, features, or significant changes. This ensures Copilot and the subagent have accurate context for future tasks.

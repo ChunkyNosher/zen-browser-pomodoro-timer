@@ -36,8 +36,22 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 - `SecurityManager` - Settings lockout screens
 - `WebsiteBlocker` - Website/keyword blocking
 - `SineModBlocker` - Blocks mod settings access
-- `FirstTimeReminderManager` - Daily startup reminder
-- `PostSessionReminderManager` - Idle time reminder
+- `FirstTimeReminderManager` - Daily startup reminder (periodic check every 60s)
+- `PostSessionReminderManager` - Idle time reminder with escalating skips
+
+## Reminder Systems
+
+### First-Time Reminder
+- Shows blocking reminder if no timer started today after configured time
+- Uses periodic check (every 60 seconds) not just on init
+- Triggers based on user's local time
+
+### Post-Session Reminder
+- Shows reminder after configurable idle time following timer completion
+- Escalating skip requirements (50% longer each skip)
+- Skip count persisted across browser restarts
+- Focus time tracking - stops after focus time goal (default 2.5h)
+- Focus time resets on daily reminder time, not midnight
 
 ## Important Constants
 
@@ -45,6 +59,26 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 - `MOD_VERSION = '1.2.1'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
+
+## Key Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `firstTimeReminderEnabled` | boolean | false | Enable daily startup reminder |
+| `firstTimeReminderTime` | string | '10:00' | Time in HH:MM format for daily reminder |
+| `postSessionReminderEnabled` | boolean | true | Enable post-session idle reminder |
+| `postSessionIdleTime` | number | 45 | Minutes before first reminder |
+| `postSessionSkipCooldown` | number | 30 | Minutes between reminders after skip |
+| `postSessionFocusTimeGoal` | number | 150 | Focus time goal in minutes (2.5 hours) |
+
+## Helper Functions
+
+| Function | Purpose |
+|----------|---------|
+| `loadBooleanPref(prefName, config, configKey)` | Load boolean preference with validation |
+| `loadPositiveIntPref(prefName, config, configKey)` | Load positive integer preference |
+| `isValidTimeFormat(timeStr)` | Validate HH:MM time format |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input |
 
 ## Development Guidelines
 
@@ -55,6 +89,7 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 5. **Use `Services.prefs`** for preference storage, not localStorage
 6. **Use `textContent`** instead of `innerHTML` for security
 7. **Use `crypto.getRandomValues()`** for random code generation
+8. **Memory leak prevention** - always clean up event listeners in hold-to-unlock handlers
 
 ## Documentation Reminder
 
