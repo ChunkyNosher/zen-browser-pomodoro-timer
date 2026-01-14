@@ -3198,6 +3198,7 @@
       this.keydownHandler = null;
       this.menuDialog = null;
       this.menuTimerUpdateInterval = null;
+      this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
     }
 
     /**
@@ -3240,12 +3241,68 @@
     }
 
     /**
+     * Start real-time reminder countdown updates in the menu dialog
+     * @param {HTMLElement} countdownElement - The element to update with countdown
+     */
+    _startReminderCountdownUpdates(countdownElement) {
+      this._stopReminderCountdownUpdates();
+      this._updateReminderCountdown(countdownElement);
+
+      this.reminderCountdownUpdateInterval = setInterval(() => {
+        if (!countdownElement.isConnected) {
+          this._stopReminderCountdownUpdates();
+          return;
+        }
+        this._updateReminderCountdown(countdownElement);
+      }, 1000);
+    }
+
+    /**
+     * Update the reminder countdown display
+     * @param {HTMLElement} countdownElement - The element to update
+     * @private
+     */
+    _updateReminderCountdown(countdownElement) {
+      if (!window.zenPomodoroApp?.postSessionReminder) return;
+
+      const secondsUntil =
+        window.zenPomodoroApp.postSessionReminder.getTimeUntilNextReminder();
+
+      if (secondsUntil === null) {
+        countdownElement.style.display = 'none';
+        return;
+      }
+
+      countdownElement.style.display = 'block';
+
+      if (secondsUntil === 0) {
+        countdownElement.textContent = 'Reminder ready to show';
+      } else {
+        const timeStr = formatTime(secondsUntil);
+        countdownElement.textContent = `Next reminder in: ${timeStr}`;
+      }
+    }
+
+    /**
+     * Stop the reminder countdown updates
+     */
+    _stopReminderCountdownUpdates() {
+      if (this.reminderCountdownUpdateInterval) {
+        clearInterval(this.reminderCountdownUpdateInterval);
+        this.reminderCountdownUpdateInterval = null;
+      }
+    }
+
+    /**
      * Issue 3: Close all existing dialogs to prevent duplicates
      * MEMORY LEAK FIX: Clean up associated resources for dialogs that manage state
      */
     closeAllDialogs() {
       // Stop any running timer updates in the menu
       this._stopMenuTimerUpdates();
+
+      // Stop any running reminder countdown updates
+      this._stopReminderCountdownUpdates();
 
       // Clean up lock screen resources if the security manager exists
       if (window.zenPomodoroApp?.security) {
@@ -3491,6 +3548,7 @@
       cancelButton.textContent = 'Close';
       cancelButton.addEventListener('click', () => {
         this._stopMenuTimerUpdates();
+        this._stopReminderCountdownUpdates();
         dialog.remove();
         this.menuDialog = null;
       });
@@ -3502,10 +3560,19 @@
       versionIndicator.className = 'zen-pomodoro-version-indicator';
       versionIndicator.textContent = `v${MOD_VERSION}`;
 
+      // Post-session reminder countdown indicator
+      const reminderCountdown = document.createElement('div');
+      reminderCountdown.className = 'zen-pomodoro-reminder-countdown';
+      reminderCountdown.style.display = 'none';
+
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
       dialog.appendChild(buttonDiv);
       dialog.appendChild(versionIndicator);
+      dialog.appendChild(reminderCountdown);
+
+      // Start reminder countdown updates (will auto-hide if not applicable)
+      this._startReminderCountdownUpdates(reminderCountdown);
 
       document.documentElement.appendChild(dialog);
 
@@ -3522,6 +3589,7 @@
       const escHandler = (e) => {
         if (e.key === 'Escape') {
           this._stopMenuTimerUpdates();
+          this._stopReminderCountdownUpdates();
           dialog.remove();
           this.menuDialog = null;
           document.removeEventListener('keydown', escHandler);
@@ -3536,6 +3604,9 @@
     destroy() {
       // Stop any running timer updates in the menu
       this._stopMenuTimerUpdates();
+
+      // Stop any running reminder countdown updates
+      this._stopReminderCountdownUpdates();
 
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
@@ -8050,6 +8121,46 @@
         });
         this.showReminder();
       }
+    }
+
+    /**
+     * Get time remaining until next reminder (in seconds).
+     * Returns null if reminder shouldn't show or conditions aren't met.
+     * @returns {number|null} Seconds until reminder, or null if not applicable
+     */
+    getTimeUntilNextReminder() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.postSessionReminderEnabled) return null;
+
+      // Must have idle start time
+      if (!this.idleStartTime) return null;
+
+      // Timer must not be active
+      if (window.zenPomodoroApp?.timer?.isActive) return null;
+
+      // Focus time goal must not be reached
+      if (this._checkFocusTimeGoalReached()) return null;
+
+      const now = Date.now();
+
+      // If in cooldown, calculate time until cooldown ends
+      if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
+        const cooldownEndMs = this.lastSkipTime + config.postSessionSkipCooldown * 60 * 1000;
+        const remainingMs = cooldownEndMs - now;
+        return Math.max(0, Math.ceil(remainingMs / 1000));
+      }
+
+      // Calculate time until first/next reminder
+      const idleTimeMs = now - this.idleStartTime;
+      const requiredIdleMs = config.postSessionIdleTime * 60 * 1000;
+      const remainingMs = requiredIdleMs - idleTimeMs;
+
+      // If reminder should already be shown, return 0
+      if (remainingMs <= 0) return 0;
+
+      return Math.ceil(remainingMs / 1000);
     }
 
     /**
