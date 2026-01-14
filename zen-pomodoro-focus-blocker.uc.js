@@ -8536,6 +8536,8 @@
           setTimeout(() => {
             this.showRestorationNotification();
           }, RESTORATION_NOTIFICATION_DELAY_MS);
+          // Clear flag after scheduling notification to prevent duplicate notifications
+          this.timer.restoredFromRestart = false;
         }
       }
 
