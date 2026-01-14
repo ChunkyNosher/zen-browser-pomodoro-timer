@@ -5,6 +5,7 @@
 The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based on Firefox/fx-autoconfig) that implements a customizable Pomodoro timer with workspace blocking capabilities. It helps users maintain focus by blocking access to specified workspaces and websites during focus sessions while allowing breaks between sessions.
 
 **Key Features:**
+
 - Customizable Pomodoro and simple timer modes
 - Workspace-based blocking (blocks entire workspaces during focus)
 - Website/keyword blocking (LeechBlock-style rulesets)
@@ -19,32 +20,32 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ## File Structure
 
-| File | Purpose |
-|------|---------|
-| `zen-pomodoro-focus-blocker.uc.js` | Main JavaScript file containing all logic, classes, and UI components |
-| `chrome.css` | All styling for overlays, dialogs, indicators, and blockers |
-| `theme.json` | Mod metadata (id, name, version, author, URLs) for Zen Browser mod system |
-| `preferences.json` | Zen Browser preferences UI definitions (keyboard shortcut, notifications, reminders) |
-| `README.md` | User-facing documentation |
-| `docs/` | Additional documentation |
+| File                               | Purpose                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------ |
+| `zen-pomodoro-focus-blocker.uc.js` | Main JavaScript file containing all logic, classes, and UI components                |
+| `chrome.css`                       | All styling for overlays, dialogs, indicators, and blockers                          |
+| `theme.json`                       | Mod metadata (id, name, version, author, URLs) for Zen Browser mod system            |
+| `preferences.json`                 | Zen Browser preferences UI definitions (keyboard shortcut, notifications, reminders) |
+| `README.md`                        | User-facing documentation                                                            |
+| `docs/`                            | Additional documentation                                                             |
 
 ---
 
 ## Key Classes
 
-| Class | Purpose |
-|-------|---------|
-| `PomodoroTimer` | Core timer logic - handles countdown, phases (focus/break/transition), cycles, state persistence |
-| `WorkspaceDetector` | Detects current Zen workspace, monitors workspace changes via MutationObserver |
-| `OverlayManager` | Manages the workspace blocking overlay that covers content during focus |
-| `SecurityManager` | Handles settings access lockouts (hold-to-unlock, code entry) |
-| `WebsiteBlocker` | LeechBlock-style website/keyword blocking with configurable rulesets |
-| `SineModBlocker` | Blocks access to `about:preferences#sineMods` during active timer |
-| `FirstTimeReminderManager` | Shows blocking reminder if no timer started today after configured time |
-| `PostSessionReminderManager` | Shows reminder after idle time following timer completion |
-| `TransitionPhaseManager` | Manages the "break ending soon" popup before focus resumes |
-| `KeyboardShortcutHandler` | Global keyboard shortcut handling and configuration |
-| `LogManager` | Comprehensive logging with export functionality |
+| Class                        | Purpose                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `PomodoroTimer`              | Core timer logic - handles countdown, phases (focus/break/transition), cycles, state persistence |
+| `WorkspaceDetector`          | Detects current Zen workspace, monitors workspace changes via MutationObserver                   |
+| `OverlayManager`             | Manages the workspace blocking overlay that covers content during focus                          |
+| `SecurityManager`            | Handles settings access lockouts (hold-to-unlock, code entry)                                    |
+| `WebsiteBlocker`             | LeechBlock-style website/keyword blocking with configurable rulesets                             |
+| `SineModBlocker`             | Blocks access to `about:preferences#sineMods` during active timer                                |
+| `FirstTimeReminderManager`   | Shows blocking reminder if no timer started today after configured time                          |
+| `PostSessionReminderManager` | Shows reminder after idle time following timer completion                                        |
+| `TransitionPhaseManager`     | Manages the "break ending soon" popup before focus resumes                                       |
+| `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                              |
+| `LogManager`                 | Comprehensive logging with export functionality                                                  |
 
 ---
 
@@ -98,13 +99,17 @@ Configuration is stored via Firefox `Services.prefs` with the `zen-pomodoro.` pr
 ## Reminder Systems
 
 ### First-Time Reminder (FirstTimeReminderManager)
+
 Shows a blocking reminder if no timer has been started today after a configurable time.
+
 - Uses periodic check (every 60 seconds) not just on init
 - Triggers based on user's local time (configurable HH:MM format)
 - State persisted via `Services.prefs`
 
 ### Post-Session Reminder (PostSessionReminderManager)
+
 Shows reminder after configurable idle time following timer completion.
+
 - Escalating skip requirements (50% longer each skip)
 - Skip count persisted across browser restarts
 - Focus time tracking - reminders stop after configurable focus time goal (default 2h 30min)
@@ -114,30 +119,30 @@ Shows reminder after configurable idle time following timer completion.
 
 ## New Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `firstTimeReminderEnabled` | boolean | false | Enable daily startup reminder |
-| `firstTimeReminderTime` | string | '10:00' | Time in HH:MM format for daily reminder |
-| `postSessionReminderEnabled` | boolean | true | Enable post-session idle reminder |
-| `postSessionIdleTime` | number | 45 | Minutes before first reminder after timer completion |
-| `postSessionSkipCooldown` | number | 30 | Minutes between reminders after skip |
-| `postSessionFocusTimeGoal` | number | 150 | Minutes of focus time goal (2.5 hours) |
-| `postSessionSkipMethod` | string | 'hold' | Skip method: 'hold' or 'code' |
-| `postSessionSkipHoldDuration` | number | 20 | Seconds to hold for skip |
-| `postSessionSkipCodeLength` | number | 48 | Characters to type for skip |
-| `postSessionSkipCount` | number | 0 | Current skip count (runtime state) |
-| `postSessionLastSkipTime` | number | null | Last skip timestamp (runtime state) |
+| Option                        | Type    | Default | Description                                          |
+| ----------------------------- | ------- | ------- | ---------------------------------------------------- |
+| `firstTimeReminderEnabled`    | boolean | false   | Enable daily startup reminder                        |
+| `firstTimeReminderTime`       | string  | '10:00' | Time in HH:MM format for daily reminder              |
+| `postSessionReminderEnabled`  | boolean | true    | Enable post-session idle reminder                    |
+| `postSessionIdleTime`         | number  | 45      | Minutes before first reminder after timer completion |
+| `postSessionSkipCooldown`     | number  | 30      | Minutes between reminders after skip                 |
+| `postSessionFocusTimeGoal`    | number  | 150     | Minutes of focus time goal (2.5 hours)               |
+| `postSessionSkipMethod`       | string  | 'hold'  | Skip method: 'hold' or 'code'                        |
+| `postSessionSkipHoldDuration` | number  | 20      | Seconds to hold for skip                             |
+| `postSessionSkipCodeLength`   | number  | 48      | Characters to type for skip                          |
+| `postSessionSkipCount`        | number  | 0       | Current skip count (runtime state)                   |
+| `postSessionLastSkipTime`     | number  | null    | Last skip timestamp (runtime state)                  |
 
 ---
 
 ## Helper Functions
 
-| Function | Purpose |
-|----------|---------|
-| `loadBooleanPref(prefName, config, configKey)` | Load a boolean preference with validation |
-| `loadPositiveIntPref(prefName, config, configKey)` | Load a positive integer preference with validation |
-| `isValidTimeFormat(timeStr)` | Validate HH:MM time format |
-| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input |
+| Function                                              | Purpose                                            |
+| ----------------------------------------------------- | -------------------------------------------------- |
+| `loadBooleanPref(prefName, config, configKey)`        | Load a boolean preference with validation          |
+| `loadPositiveIntPref(prefName, config, configKey)`    | Load a positive integer preference with validation |
+| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                         |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 
 ---
 

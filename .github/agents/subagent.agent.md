@@ -21,12 +21,12 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 ## Main Files to Work With
 
-| File | Description |
-|------|-------------|
+| File                               | Description                        |
+| ---------------------------------- | ---------------------------------- |
 | `zen-pomodoro-focus-blocker.uc.js` | All JavaScript logic (~8500 lines) |
-| `chrome.css` | All CSS styling (~1600 lines) |
-| `theme.json` | Mod metadata for Zen Browser |
-| `preferences.json` | Settings UI definitions |
+| `chrome.css`                       | All CSS styling (~1600 lines)      |
+| `theme.json`                       | Mod metadata for Zen Browser       |
+| `preferences.json`                 | Settings UI definitions            |
 
 ## Key Classes
 
@@ -42,11 +42,13 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 ## Reminder Systems
 
 ### First-Time Reminder
+
 - Shows blocking reminder if no timer started today after configured time
 - Uses periodic check (every 60 seconds) not just on init
 - Triggers based on user's local time
 
 ### Post-Session Reminder
+
 - Shows reminder after configurable idle time following timer completion
 - Escalating skip requirements (50% longer each skip)
 - Skip count persisted across browser restarts
@@ -62,23 +64,23 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 ## Key Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `firstTimeReminderEnabled` | boolean | false | Enable daily startup reminder |
-| `firstTimeReminderTime` | string | '10:00' | Time in HH:MM format for daily reminder |
-| `postSessionReminderEnabled` | boolean | true | Enable post-session idle reminder |
-| `postSessionIdleTime` | number | 45 | Minutes before first reminder |
-| `postSessionSkipCooldown` | number | 30 | Minutes between reminders after skip |
-| `postSessionFocusTimeGoal` | number | 150 | Focus time goal in minutes (2.5 hours) |
+| Option                       | Type    | Default | Description                             |
+| ---------------------------- | ------- | ------- | --------------------------------------- |
+| `firstTimeReminderEnabled`   | boolean | false   | Enable daily startup reminder           |
+| `firstTimeReminderTime`      | string  | '10:00' | Time in HH:MM format for daily reminder |
+| `postSessionReminderEnabled` | boolean | true    | Enable post-session idle reminder       |
+| `postSessionIdleTime`        | number  | 45      | Minutes before first reminder           |
+| `postSessionSkipCooldown`    | number  | 30      | Minutes between reminders after skip    |
+| `postSessionFocusTimeGoal`   | number  | 150     | Focus time goal in minutes (2.5 hours)  |
 
 ## Helper Functions
 
-| Function | Purpose |
-|----------|---------|
-| `loadBooleanPref(prefName, config, configKey)` | Load boolean preference with validation |
-| `loadPositiveIntPref(prefName, config, configKey)` | Load positive integer preference |
-| `isValidTimeFormat(timeStr)` | Validate HH:MM time format |
-| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input |
+| Function                                              | Purpose                                 |
+| ----------------------------------------------------- | --------------------------------------- |
+| `loadBooleanPref(prefName, config, configKey)`        | Load boolean preference with validation |
+| `loadPositiveIntPref(prefName, config, configKey)`    | Load positive integer preference        |
+| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format              |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input        |
 
 ## Development Guidelines
 
