@@ -1443,16 +1443,31 @@
     holdButton.addEventListener('touchend', stopHold);
     holdButton.addEventListener('touchcancel', stopHold);
 
-    // Keyboard accessibility
-    holdButton.addEventListener('keydown', (e) => {
+    // Keyboard accessibility - named functions for cleanup
+    const keydownHandler = (e) => {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         startHold(e);
       }
-    });
-    holdButton.addEventListener('keyup', (e) => {
+    };
+    const keyupHandler = (e) => {
       if (e.key === ' ' || e.key === 'Enter') stopHold();
-    });
+    };
+
+    holdButton.addEventListener('keydown', keydownHandler);
+    holdButton.addEventListener('keyup', keyupHandler);
+
+    // Return cleanup function to prevent memory leaks
+    return function cleanup() {
+      holdButton.removeEventListener('mousedown', startHold);
+      holdButton.removeEventListener('mouseup', stopHold);
+      holdButton.removeEventListener('mouseleave', stopHold);
+      holdButton.removeEventListener('touchstart', startHold);
+      holdButton.removeEventListener('touchend', stopHold);
+      holdButton.removeEventListener('touchcancel', stopHold);
+      holdButton.removeEventListener('keydown', keydownHandler);
+      holdButton.removeEventListener('keyup', keyupHandler);
+    };
   }
 
   // ============================================
@@ -5569,7 +5584,8 @@
      * @private
      */
     _setupHoldHandlers(holdButton, holdProgress, waitTime, onUnlock) {
-      setupHoldToUnlockHandlers({
+      // Store cleanup function to prevent memory leaks
+      this._holdHandlersCleanup = setupHoldToUnlockHandlers({
         holdButton,
         holdProgress,
         waitTime,
@@ -5634,6 +5650,12 @@
     cleanupLockScreen() {
       this._clearIntervalIfExists('lockIntervalId');
       this._clearIntervalIfExists('holdToUnlockIntervalId');
+
+      // Call cleanup function to remove event listeners
+      if (this._holdHandlersCleanup) {
+        this._holdHandlersCleanup();
+        this._holdHandlersCleanup = null;
+      }
 
       this.lockTimerElement = null;
       if (this.lockScreen) {
@@ -7628,6 +7650,12 @@
       // Clear hold interval if active
       this._clearHoldInterval();
 
+      // Call cleanup function to remove event listeners
+      if (this._holdHandlersCleanup) {
+        this._holdHandlersCleanup();
+        this._holdHandlersCleanup = null;
+      }
+
       if (this.reminderOverlay) {
         this.reminderOverlay.remove();
         this.reminderOverlay = null;
@@ -7823,13 +7851,6 @@
 
     /**
      * Setup hold-to-unlock event handlers.
-     * @param {HTMLElement} holdButton - The hold button element
-     * @param {HTMLElement} holdProgress - The progress bar element
-     * @param {number} waitTime - Total wait time in seconds
-     * @private
-     */
-    /**
-     * Setup hold-to-unlock event handlers.
      * Uses shared setupHoldToUnlockHandlers utility to reduce code duplication.
      * @param {HTMLElement} holdButton - The hold button element
      * @param {HTMLElement} holdProgress - The progress bar element
@@ -7837,7 +7858,8 @@
      * @private
      */
     _setupHoldHandlers(holdButton, holdProgress, waitTime) {
-      setupHoldToUnlockHandlers({
+      // Store cleanup function to prevent memory leaks
+      this._holdHandlersCleanup = setupHoldToUnlockHandlers({
         holdButton,
         holdProgress,
         waitTime,
