@@ -11,5 +11,18 @@
     "label": "Enable Notifications",
     "type": "checkbox",
     "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.firstTimeReminderEnabled",
+    "label": "Enable Daily Focus Reminder",
+    "type": "checkbox",
+    "defaultValue": false
+  },
+  {
+    "property": "zen-pomodoro.firstTimeReminderTime",
+    "label": "Daily Reminder Time (24h format)",
+    "type": "string",
+    "defaultValue": "10:00",
+    "placeholder": "10:00"
   }
 ]

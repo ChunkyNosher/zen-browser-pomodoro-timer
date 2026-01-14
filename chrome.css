@@ -240,7 +240,9 @@
   gap: 8px;
   cursor: move;
   user-select: none;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 }
 
@@ -594,6 +596,7 @@
   width: 100%;
   margin-top: 16px;
   font-family: monospace;
+  line-height: 1.5;
 }
 
 #zen-pomodoro-lock-code:focus {
@@ -1258,7 +1261,9 @@
   border: none !important;
   border-radius: 6px !important;
   cursor: pointer !important;
-  transition: background-color 0.2s ease, color 0.2s ease !important;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease !important;
   text-align: center;
 }
 
@@ -1289,4 +1294,127 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ============================================
+   First-Time Reminder Overlay
+   Full-screen blocking overlay that shows when
+   user opens browser at/after reminder time
+   and hasn't started a timer today yet.
+   ============================================ */
+#zen-pomodoro-first-time-reminder {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgb(30 29 38 / 98%) !important;
+  z-index: 2147483647 !important;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  pointer-events: all !important;
+}
+
+#zen-pomodoro-first-time-reminder.active {
+  display: flex !important;
+}
+
+#zen-pomodoro-first-time-reminder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  max-width: 500px;
+  padding: 40px;
+  background-color: #2b2a33;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 40%);
+  border: 2px solid #2180cd;
+}
+
+#zen-pomodoro-first-time-reminder-icon {
+  font-size: 72px;
+  margin-bottom: 16px;
+}
+
+#zen-pomodoro-first-time-reminder-content h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 16px;
+}
+
+#zen-pomodoro-first-time-reminder-content p {
+  font-size: 16px;
+  color: #ccc;
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+
+#zen-pomodoro-first-time-reminder-time {
+  font-size: 24px;
+  font-weight: 600;
+  color: #2180cd;
+  margin-bottom: 24px;
+  padding: 12px 24px;
+  background-color: rgb(33 128 205 / 15%);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+#zen-pomodoro-first-time-reminder-start-btn {
+  background-color: #2180cd !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  padding: 14px 32px !important;
+  font-size: 16px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease !important;
+  margin-bottom: 16px;
+}
+
+#zen-pomodoro-first-time-reminder-start-btn:hover {
+  background-color: #1a6bb3 !important;
+  transform: translateY(-2px);
+}
+
+#zen-pomodoro-first-time-reminder-start-btn:active {
+  transform: translateY(0);
+}
+
+.zen-pomodoro-first-time-reminder-info {
+  font-size: 13px !important;
+  color: #888 !important;
+  font-style: italic;
+  margin: 0 !important;
+}
+
+/* ACCESSIBILITY: Reduce motion animations for reminder */
+@media (prefers-reduced-motion: no-preference) {
+  #zen-pomodoro-first-time-reminder.active {
+    animation: fade-in 0.3s ease;
+  }
+}
+
+/* Time input styling for settings */
+.zen-pomodoro-config-row input[type='time'] {
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid #3a3944;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 180px;
+}
+
+.zen-pomodoro-config-row input[type='time']:focus {
+  outline: none;
+  border-color: #2180cd;
 }

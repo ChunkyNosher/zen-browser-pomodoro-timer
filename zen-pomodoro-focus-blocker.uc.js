@@ -109,6 +109,12 @@
     ],
     /** Rulesets to enable when timer starts */
     activeRulesets: ['default'],
+    /** First-time reminder settings */
+    firstTimeReminderEnabled: false,
+    /** Time to show the first-time reminder in 24-hour HH:MM format */
+    firstTimeReminderTime: '10:00',
+    /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
+    lastTimerStartDate: '',
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -447,7 +453,39 @@
       config.keyboardShortcut = keyboardShortcut;
     }
 
+    // First-time reminder settings
+    const firstTimeReminderEnabled = getPref('firstTimeReminderEnabled', null);
+    if (firstTimeReminderEnabled !== null) {
+      config.firstTimeReminderEnabled =
+        firstTimeReminderEnabled === true || firstTimeReminderEnabled === 'true';
+    }
+
+    const firstTimeReminderTime = getPref('firstTimeReminderTime', null);
+    if (firstTimeReminderTime !== null && firstTimeReminderTime !== '') {
+      // Validate time format (HH:MM, 24-hour format with range check)
+      if (isValidTimeFormat(firstTimeReminderTime)) {
+        config.firstTimeReminderTime = firstTimeReminderTime;
+      }
+    }
+
     return config;
+  }
+
+  /**
+   * Validate time format (HH:MM, 24-hour) with range checking.
+   * @param {string} timeStr - Time string to validate
+   * @returns {boolean} True if valid time format
+   */
+  function isValidTimeFormat(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return false;
+
+    const match = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (!match) return false;
+
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
   }
 
   /**
@@ -523,8 +561,7 @@
     let dialogWidth, dialogHeight;
 
     // Helper to check if event is a valid touch event with touches
-    const isTouchEventWithTouches = (e) =>
-      e.type?.startsWith('touch') && e.touches?.length > 0;
+    const isTouchEventWithTouches = (e) => e.type?.startsWith('touch') && e.touches?.length > 0;
 
     // Helper to get client coordinates from mouse or touch event
     const getClientCoords = (e) => {
@@ -1057,7 +1094,7 @@
    * Check if the Pomodoro timer is currently in a break phase.
    * During break phases, workspace and website blocking should be disabled
    * to allow the user to freely browse during their break.
-   * 
+   *
    * The 'transition' phase is also treated as a break phase because during
    * the transition (break ending soon warning), blocking should remain disabled
    * to allow users to finish up their break activities.
@@ -1312,6 +1349,7 @@
     constructor() {
       this.isActive = false;
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Track if paused while on blocked workspace
       this.remainingTime = 0;
       this.currentPhase = 'focus';
       this.currentCycle = 1;
@@ -1525,12 +1563,15 @@
 
     /**
      * Pause the timer
+     * @param {boolean} isOnBlockedWorkspace - Whether the timer is being paused on a blocked workspace
      */
-    pause() {
+    pause(isOnBlockedWorkspace = false) {
       this.isPaused = true;
+      this.pausedOnBlockedWorkspace = isOnBlockedWorkspace;
       logger.log(LOG_CATEGORIES.TIMER, 'Timer paused', {
         remainingTime: this.remainingTime,
         phase: this.currentPhase,
+        pausedOnBlockedWorkspace: isOnBlockedWorkspace,
       });
       this.saveState();
     }
@@ -1540,6 +1581,7 @@
      */
     resume() {
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Reset paused workspace tracking
       logger.log(LOG_CATEGORIES.TIMER, 'Timer resumed', {
         remainingTime: this.remainingTime,
         phase: this.currentPhase,
@@ -1559,6 +1601,7 @@
       });
       this.isActive = false;
       this.isPaused = false;
+      this.pausedOnBlockedWorkspace = false; // Reset paused workspace tracking
       if (this.intervalId) {
         clearInterval(this.intervalId);
         this.intervalId = null;
@@ -1590,6 +1633,7 @@
       const state = {
         isActive: this.isActive,
         isPaused: this.isPaused,
+        pausedOnBlockedWorkspace: this.pausedOnBlockedWorkspace, // Track pause workspace state
         remainingTime: this.remainingTime,
         currentPhase: this.currentPhase,
         currentCycle: this.currentCycle,
@@ -1612,6 +1656,7 @@
           if (state.isActive) {
             this.isActive = state.isActive;
             this.isPaused = state.isPaused;
+            this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
             this.remainingTime = state.remainingTime;
             // Backwards compatibility: treat 'long-break' as 'break'
             this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
@@ -2399,7 +2444,7 @@
         if (!isDragging) return;
 
         isDragging = false;
-        
+
         // Remove dragging class to re-enable CSS transitions
         if (this.indicator?.classList) {
           this.indicator.classList.remove('dragging');
@@ -2434,9 +2479,14 @@
               window.zenPomodoroApp.timer.resume();
               pauseButton.textContent = 'Pause';
             } else {
-              window.zenPomodoroApp.timer.pause();
+              // Track whether we're pausing on a blocked workspace
+              const isOnBlockedWorkspace =
+                window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+              window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
               pauseButton.textContent = 'Resume';
             }
+            // Update overlay visibility after pause/resume state change
+            window.zenPomodoroApp.updateOverlayVisibility();
           }
         });
       }
@@ -2932,8 +2982,13 @@
           if (window.zenPomodoroApp.timer.isPaused) {
             window.zenPomodoroApp.timer.resume();
           } else {
-            window.zenPomodoroApp.timer.pause();
+            // Track whether we're pausing on a blocked workspace
+            const isOnBlockedWorkspace =
+              window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
+            window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
           }
+          // Update overlay visibility after pause/resume state change
+          window.zenPomodoroApp.updateOverlayVisibility();
           dialog.remove();
           this.menuDialog = null;
         });
@@ -3784,6 +3839,82 @@
       lockoutSection.appendChild(activeCodeLengthRow);
 
       // ========================================
+      // First-Time Reminder Section
+      // ========================================
+      const reminderSection = document.createElement('div');
+      reminderSection.className = 'zen-pomodoro-lockout-section';
+
+      const reminderTitle = document.createElement('div');
+      reminderTitle.className = 'zen-pomodoro-lockout-section-title';
+      reminderTitle.textContent = '⏰ Daily Focus Reminder';
+
+      const reminderDescription = document.createElement('p');
+      reminderDescription.style.fontSize = '13px';
+      reminderDescription.style.color = '#888';
+      reminderDescription.style.margin = '0 0 12px 0';
+      reminderDescription.textContent =
+        'Show a blocking reminder at a specific time each day if no timer has been started.';
+
+      // Enable/disable checkbox
+      const reminderEnabledRow = document.createElement('div');
+      reminderEnabledRow.className = 'zen-pomodoro-checkbox-row';
+
+      const reminderEnabledCheckbox = document.createElement('input');
+      reminderEnabledCheckbox.type = 'checkbox';
+      reminderEnabledCheckbox.id = 'first-time-reminder-enabled';
+      reminderEnabledCheckbox.checked = config.firstTimeReminderEnabled;
+
+      const reminderEnabledLabel = document.createElement('label');
+      reminderEnabledLabel.setAttribute('for', 'first-time-reminder-enabled');
+      reminderEnabledLabel.textContent = 'Enable daily reminder';
+
+      reminderEnabledRow.appendChild(reminderEnabledCheckbox);
+      reminderEnabledRow.appendChild(reminderEnabledLabel);
+
+      // Reminder time input
+      const reminderTimeRow = document.createElement('div');
+      reminderTimeRow.className = 'zen-pomodoro-config-row';
+      reminderTimeRow.id = 'first-time-reminder-time-row';
+
+      const reminderTimeLabel = document.createElement('label');
+      reminderTimeLabel.textContent = 'Reminder Time (24h):';
+
+      const reminderTimeInput = document.createElement('input');
+      reminderTimeInput.type = 'time';
+      reminderTimeInput.id = 'first-time-reminder-time';
+      reminderTimeInput.value = config.firstTimeReminderTime;
+
+      reminderTimeRow.appendChild(reminderTimeLabel);
+      reminderTimeRow.appendChild(reminderTimeInput);
+
+      // Show/hide time row based on enabled state
+      const updateReminderTimeVisibility = () => {
+        reminderTimeRow.style.display = reminderEnabledCheckbox.checked ? '' : 'none';
+      };
+      reminderEnabledCheckbox.addEventListener('change', updateReminderTimeVisibility);
+      updateReminderTimeVisibility();
+
+      // Development: Trigger reminder button
+      const triggerReminderButton = document.createElement('button');
+      triggerReminderButton.className = 'zen-pomodoro-dialog-button secondary';
+      triggerReminderButton.id = 'zen-pomodoro-trigger-reminder';
+      triggerReminderButton.textContent = '🧪 Test Reminder';
+      triggerReminderButton.title =
+        'Trigger the first-time reminder for testing (ignores time/date)';
+      triggerReminderButton.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.firstTimeReminder) {
+          dialog.style.display = 'none';
+          window.zenPomodoroApp.firstTimeReminder.triggerReminderForTesting();
+        }
+      });
+
+      reminderSection.appendChild(reminderTitle);
+      reminderSection.appendChild(reminderDescription);
+      reminderSection.appendChild(reminderEnabledRow);
+      reminderSection.appendChild(reminderTimeRow);
+      reminderSection.appendChild(triggerReminderButton);
+
+      // ========================================
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
@@ -3796,6 +3927,7 @@
       configSection.appendChild(workspaceRow);
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
+      configSection.appendChild(reminderSection);
 
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -3855,6 +3987,7 @@
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveBlockedWorkspaces(workspaceContainer, config);
+        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimeInput, config);
 
         saveConfig(config);
         dialog.remove();
@@ -4003,6 +4136,28 @@
         checkedWorkspaces.push(checkbox.value);
       });
       config.blockedWorkspaces = checkedWorkspaces;
+    }
+
+    /**
+     * Save first-time reminder settings from settings dialog.
+     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
+     * @param {HTMLInputElement} timeInput - Time input element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveReminderSettings(enabledCheckbox, timeInput, config) {
+      config.firstTimeReminderEnabled = enabledCheckbox.checked;
+
+      // Validate and save time with proper range checking using shared utility function
+      const timeValue = timeInput.value;
+      if (timeValue && isValidTimeFormat(timeValue)) {
+        config.firstTimeReminderTime = timeValue;
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved reminder settings', {
+        enabled: config.firstTimeReminderEnabled,
+        time: config.firstTimeReminderTime,
+      });
     }
 
     /**
@@ -4298,7 +4453,8 @@
       // Always checked and disabled - keywords can only check tab titles due to browser security
       titleOnlyCheckbox.checked = true;
       titleOnlyCheckbox.disabled = true;
-      titleOnlyCheckbox.title = 'Keywords match tab titles only due to browser security restrictions.';
+      titleOnlyCheckbox.title =
+        'Keywords match tab titles only due to browser security restrictions.';
 
       const titleOnlyLabel = document.createElement('label');
       titleOnlyLabel.htmlFor = `title-only-${ruleset.id}`;
@@ -4775,9 +4931,7 @@
      */
     shouldLockSettings(timerActive) {
       const config = getConfig();
-      return timerActive
-        ? this._shouldLockActiveTimer(config)
-        : this._shouldLockIdleTimer(config);
+      return timerActive ? this._shouldLockActiveTimer(config) : this._shouldLockIdleTimer(config);
     }
 
     /**
@@ -5150,8 +5304,7 @@
       if (!this._overlayPointerEventsDisabled) return;
 
       const overlay =
-        window.zenPomodoroApp?.overlay?.overlay ||
-        document.getElementById('zen-pomodoro-overlay');
+        window.zenPomodoroApp?.overlay?.overlay || document.getElementById('zen-pomodoro-overlay');
       if (overlay) {
         overlay.style.setProperty('pointer-events', 'all', 'important');
       }
@@ -6642,6 +6795,309 @@
   }
 
   // ============================================
+  // First-Time Reminder Manager
+  // ============================================
+
+  /**
+   * FirstTimeReminderManager handles the daily "first-time" reminder.
+   * When enabled, it shows a blocking overlay if:
+   * - The current time is at or after the configured reminder time
+   * - No timer has been started today yet
+   * - No timer is currently active
+   *
+   * The reminder BLOCKS browser interaction (like a lockscreen)
+   * and can ONLY be dismissed by starting a timer.
+   */
+  class FirstTimeReminderManager {
+    constructor() {
+      this.reminderOverlay = null;
+      this.isShowing = false;
+      this.onStartTimer = null; // Callback when user clicks "Start Timer" button
+      this._timeDisplayInterval = null; // Interval for updating time display
+    }
+
+    /**
+     * Initialize the first-time reminder manager.
+     * Checks if reminder should be shown on startup.
+     */
+    init() {
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing First-Time Reminder Manager');
+      this._checkAndShowReminder();
+    }
+
+    /**
+     * Check if the reminder should be shown and show it if conditions are met.
+     * Conditions:
+     * 1. Feature is enabled
+     * 2. Current time >= configured reminder time
+     * 3. No timer has been started today
+     * 4. No timer is currently active
+     * @private
+     */
+    _checkAndShowReminder() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.firstTimeReminderEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Feature disabled');
+        return;
+      }
+
+      // Check if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Timer already active');
+        return;
+      }
+
+      // Check if timer was already started today
+      const today = this._getTodayDateString();
+      if (config.lastTimerStartDate === today) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Timer already started today', {
+          lastStartDate: config.lastTimerStartDate,
+          today: today,
+        });
+        return;
+      }
+
+      // Check if current time is past the reminder time
+      if (!this._isAfterReminderTime(config.firstTimeReminderTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Not yet reminder time', {
+          reminderTime: config.firstTimeReminderTime,
+          currentTime: new Date().toLocaleTimeString(),
+        });
+        return;
+      }
+
+      // All conditions met - show reminder
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Showing reminder');
+      this.showReminder();
+    }
+
+    /**
+     * Get today's date in YYYY-MM-DD format.
+     * @returns {string} Today's date
+     * @private
+     */
+    _getTodayDateString() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    /**
+     * Check if current time is at or after the reminder time.
+     * @param {string} reminderTime - Time in HH:MM format
+     * @returns {boolean} True if current time >= reminder time
+     * @private
+     */
+    _isAfterReminderTime(reminderTime) {
+      // Use shared validation function first
+      if (!isValidTimeFormat(reminderTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Invalid reminder time format', {
+          reminderTime: reminderTime,
+        });
+        return false;
+      }
+
+      // Parse the validated time
+      const [hours, minutes] = reminderTime.split(':').map(Number);
+
+      const now = new Date();
+      const reminderDate = new Date();
+      reminderDate.setHours(hours, minutes, 0, 0);
+
+      return now >= reminderDate;
+    }
+
+    /**
+     * Show the first-time reminder overlay.
+     * This blocks browser interaction until user starts a timer.
+     */
+    showReminder() {
+      // Don't show if already showing
+      if (this.reminderOverlay || this.isShowing) {
+        return;
+      }
+
+      // Don't show if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Showing first-time reminder overlay');
+      this.isShowing = true;
+
+      this._createOverlay();
+      document.documentElement.appendChild(this.reminderOverlay);
+    }
+
+    /**
+     * Hide the first-time reminder overlay.
+     * Called when user starts a timer.
+     */
+    hideReminder() {
+      if (!this.reminderOverlay && !this.isShowing) {
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Hiding first-time reminder overlay');
+      this.isShowing = false;
+
+      // Clear time display interval
+      this._clearTimeDisplayInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+    }
+
+    /**
+     * Clear the time display interval if it exists.
+     * @private
+     */
+    _clearTimeDisplayInterval() {
+      if (this._timeDisplayInterval) {
+        clearInterval(this._timeDisplayInterval);
+        this._timeDisplayInterval = null;
+      }
+    }
+
+    /**
+     * Record that a timer was started today.
+     * This prevents the reminder from showing again until tomorrow.
+     */
+    recordTimerStarted() {
+      const config = getConfig();
+      config.lastTimerStartDate = this._getTodayDateString();
+      saveConfig(config);
+      logger.log(LOG_CATEGORIES.TIMER, 'Recorded timer start date', {
+        date: config.lastTimerStartDate,
+      });
+    }
+
+    /**
+     * Create the blocking reminder overlay.
+     * @private
+     */
+    _createOverlay() {
+      this.reminderOverlay = document.createElement('div');
+      this.reminderOverlay.id = 'zen-pomodoro-first-time-reminder';
+      this.reminderOverlay.className = 'active';
+
+      // Content container
+      const content = document.createElement('div');
+      content.id = 'zen-pomodoro-first-time-reminder-content';
+
+      // Icon
+      const icon = document.createElement('div');
+      icon.id = 'zen-pomodoro-first-time-reminder-icon';
+      icon.textContent = '⏰';
+
+      // Title
+      const title = document.createElement('h2');
+      title.textContent = 'Time to Start Your Focus Session!';
+
+      // Message
+      const message = document.createElement('p');
+      message.textContent =
+        "It's time to begin your daily focus session. Start a timer to begin working productively.";
+
+      // Current time display
+      const timeDisplay = document.createElement('div');
+      timeDisplay.id = 'zen-pomodoro-first-time-reminder-time';
+      timeDisplay.textContent = new Date().toLocaleTimeString();
+
+      // Update time every second - store interval for cleanup
+      this._timeDisplayInterval = setInterval(() => {
+        if (!this.reminderOverlay || !document.documentElement.contains(this.reminderOverlay)) {
+          this._clearTimeDisplayInterval();
+          return;
+        }
+        const display = this.reminderOverlay.querySelector(
+          '#zen-pomodoro-first-time-reminder-time'
+        );
+        if (display) {
+          display.textContent = new Date().toLocaleTimeString();
+        }
+      }, 1000);
+
+      // Start Timer button
+      const startButton = document.createElement('button');
+      startButton.id = 'zen-pomodoro-first-time-reminder-start-btn';
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Timer';
+      startButton.addEventListener('click', () => {
+        this._handleStartTimerClick();
+      });
+
+      // Info text (no dismiss option)
+      const infoText = document.createElement('p');
+      infoText.className = 'zen-pomodoro-first-time-reminder-info';
+      infoText.textContent = 'This reminder can only be dismissed by starting a timer.';
+
+      // Assemble content
+      content.appendChild(icon);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(timeDisplay);
+      content.appendChild(startButton);
+      content.appendChild(infoText);
+
+      this.reminderOverlay.appendChild(content);
+    }
+
+    /**
+     * Handle the "Start Timer" button click.
+     * Opens the start timer dialog and hides the reminder when timer starts.
+     * @private
+     */
+    _handleStartTimerClick() {
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Start Timer button clicked');
+
+      // Use callback if set, otherwise try to show start dialog directly
+      if (this.onStartTimer) {
+        this.onStartTimer();
+      } else if (window.zenPomodoroApp?.keyboardShortcut) {
+        // Fallback: use keyboard shortcut handler to show start dialog
+        // This is a fallback - normally the callback is set in ZenPomodoroApp
+        window.zenPomodoroApp.keyboardShortcut.showConfigDialog();
+      }
+    }
+
+    /**
+     * Manually trigger the reminder for testing purposes.
+     * Ignores time and date checks.
+     */
+    triggerReminderForTesting() {
+      logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Manually triggered for testing');
+
+      // Force show even if conditions aren't met
+      if (this.reminderOverlay) {
+        this.hideReminder();
+      }
+
+      this.showReminder();
+    }
+
+    /**
+     * Clean up the reminder manager.
+     */
+    destroy() {
+      // Clear time display interval
+      this._clearTimeDisplayInterval();
+
+      if (this.reminderOverlay) {
+        this.reminderOverlay.remove();
+        this.reminderOverlay = null;
+      }
+      this.isShowing = false;
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -6655,6 +7111,7 @@
       this.sineModBlocker = new SineModBlocker(); // NEW: Sine Mod settings blocker
       this.websiteBlocker = new WebsiteBlocker(); // NEW: LeechBlock-style website blocker
       this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
+      this.firstTimeReminder = new FirstTimeReminderManager(); // First-time daily reminder
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -6763,6 +7220,15 @@
       // Expose app globally for debugging and keyboard shortcut
       window.zenPomodoroApp = this;
 
+      // Initialize First-Time Reminder Manager (after app is globally exposed)
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing First-Time Reminder Manager');
+      this.firstTimeReminder.onStartTimer = () => {
+        // Hide reminder first, then show start timer dialog
+        this.firstTimeReminder.hideReminder();
+        this.keyboardShortcut.showConfigDialog();
+      };
+      this.firstTimeReminder.init();
+
       logger.log(LOG_CATEGORIES.INIT, 'Application initialization complete');
     }
 
@@ -6809,6 +7275,12 @@
 
       // Notify Website Blocker that timer started
       this.websiteBlocker.onTimerStart();
+
+      // Record timer start date for first-time reminder tracking
+      this.firstTimeReminder.recordTimerStarted();
+
+      // Hide first-time reminder if showing (timer has been started)
+      this.firstTimeReminder.hideReminder();
 
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
@@ -6938,6 +7410,9 @@
      * Bug Fix: Also hide indicator when timer is not active
      * BREAK PHASE FIX: Overlay is hidden during break phases to allow free browsing
      * TRANSITION PHASE FIX: Overlay is hidden during transition phase to allow free browsing
+     * PAUSE FIX: When paused, show overlay based on pause context:
+     *   - If paused on blocked workspace → show overlay on ALL workspaces
+     *   - If paused on unblocked workspace → show overlay only on blocked workspaces
      */
     updateOverlayVisibility() {
       if (!this.timer.isActive) {
@@ -6963,20 +7438,49 @@
         return;
       }
 
+      // PAUSE FIX: Handle paused state blocking logic
+      if (this.timer.isPaused) {
+        // If paused on a blocked workspace, show overlay on ALL workspaces
+        // This prevents user from forgetting to unpause when leaving temporarily
+        if (this.timer.pausedOnBlockedWorkspace) {
+          this._showOverlayWithStatus();
+          return;
+        }
+
+        // If paused on unblocked workspace, still show overlay on blocked workspaces
+        const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
+        if (isBlocked) {
+          this._showOverlayWithStatus();
+        } else {
+          this.overlay.hide();
+        }
+        return;
+      }
+
+      // Normal (non-paused) state: show overlay only on blocked workspaces
       const isBlocked = this.workspace.isCurrentWorkspaceBlocked();
 
       if (isBlocked) {
-        const status = this.timer.getStatus();
-        this.overlay.show(status.currentPhase);
-        this.overlay.updateDisplay(
-          status.remainingTime,
-          status.currentPhase,
-          status.currentCycle,
-          status.totalCycles
-        );
+        this._showOverlayWithStatus();
       } else {
         this.overlay.hide();
       }
+    }
+
+    /**
+     * Helper method to show overlay with current timer status.
+     * Reduces code duplication in updateOverlayVisibility().
+     * @private
+     */
+    _showOverlayWithStatus() {
+      const status = this.timer.getStatus();
+      this.overlay.show(status.currentPhase);
+      this.overlay.updateDisplay(
+        status.remainingTime,
+        status.currentPhase,
+        status.currentCycle,
+        status.totalCycles
+      );
     }
 
     /**
@@ -7118,6 +7622,7 @@
         this.sineModBlocker,
         this.websiteBlocker,
         this.transitionManager,
+        this.firstTimeReminder,
         this.keyboardShortcut,
         this.overlay,
       ];
