@@ -4186,14 +4186,39 @@
       exportLogsButton.id = 'zen-pomodoro-export-logs';
       exportLogsButton.textContent = 'Export Logs';
 
+      // Helper function to save all settings
+      const saveAllSettings = () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
+        this._saveKeyboardShortcut(shortcutInput, config);
+        this._saveTimerSettings(dialog, config, timerModeSelect);
+        this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
+        this._saveBlockedWorkspaces(workspaceContainer, config);
+        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimeInput, config);
+        this._savePostSessionSettings(
+          dialog,
+          config,
+          postSessionEnabledCheckbox,
+          postSessionMethodSelect
+        );
+
+        saveConfig(config);
+        this._updateOverlayMessage(config);
+      };
+
       const saveButton = document.createElement('button');
-      saveButton.className = 'zen-pomodoro-dialog-button';
+      saveButton.className = 'zen-pomodoro-dialog-button secondary';
       saveButton.id = 'zen-pomodoro-settings-save';
       saveButton.textContent = 'Save';
+
+      const saveCloseButton = document.createElement('button');
+      saveCloseButton.className = 'zen-pomodoro-dialog-button';
+      saveCloseButton.id = 'zen-pomodoro-settings-save-close';
+      saveCloseButton.textContent = 'Save & Close';
 
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(exportLogsButton);
       buttonDiv.appendChild(saveButton);
+      buttonDiv.appendChild(saveCloseButton);
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
@@ -4224,24 +4249,16 @@
         }
       });
 
+      // Save button - saves settings but keeps dialog open
       saveButton.addEventListener('click', () => {
-        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
-        this._saveKeyboardShortcut(shortcutInput, config);
-        this._saveTimerSettings(dialog, config, timerModeSelect);
-        this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
-        this._saveBlockedWorkspaces(workspaceContainer, config);
-        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimeInput, config);
-        this._savePostSessionSettings(
-          dialog,
-          config,
-          postSessionEnabledCheckbox,
-          postSessionMethodSelect
-        );
+        saveAllSettings();
+        window.zenPomodoroApp?.showCustomAlert('Saved', 'Settings have been saved.');
+      });
 
-        saveConfig(config);
+      // Save & Close button - saves settings and closes dialog
+      saveCloseButton.addEventListener('click', () => {
+        saveAllSettings();
         dialog.remove();
-
-        this._updateOverlayMessage(config);
       });
     }
 
@@ -4591,12 +4608,18 @@
       cancelButton.textContent = 'Cancel';
 
       const saveButton = document.createElement('button');
-      saveButton.className = 'zen-pomodoro-dialog-button';
+      saveButton.className = 'zen-pomodoro-dialog-button secondary';
       saveButton.id = 'zen-pomodoro-ruleset-save';
       saveButton.textContent = 'Save';
 
+      const saveCloseButton = document.createElement('button');
+      saveCloseButton.className = 'zen-pomodoro-dialog-button';
+      saveCloseButton.id = 'zen-pomodoro-ruleset-save-close';
+      saveCloseButton.textContent = 'Save & Close';
+
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(saveButton);
+      buttonDiv.appendChild(saveCloseButton);
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
@@ -4619,15 +4642,21 @@
         }
       });
 
+      // Save button - saves settings but keeps dialog open
       saveButton.addEventListener('click', () => {
         logger.log(LOG_CATEGORIES.SETTINGS, 'Saving ruleset settings');
+        saveConfig(config);
+        window.zenPomodoroApp?.showCustomAlert('Saved', 'Ruleset settings have been saved.');
+      });
+
+      // Save & Close button - saves settings and closes dialog
+      saveCloseButton.addEventListener('click', () => {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saving ruleset settings and closing');
         saveConfig(config);
         dialog.remove();
 
         if (onClose) {
           onClose();
-        } else {
-          window.zenPomodoroApp?.showCustomAlert('Saved', 'Ruleset settings have been saved.');
         }
       });
     }
