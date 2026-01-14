@@ -3088,10 +3088,15 @@
      * @param {boolean} isPaused - Whether the timer is currently paused
      */
     updateIndicatorPausedState(isPaused) {
-      if (this.indicator) {
-        this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state updated', { isPaused });
-      }
+      if (!this.indicator) return;
+      
+      // Validate input - ensure boolean type for consistency
+      const pausedState = Boolean(isPaused);
+      
+      this.indicator.setAttribute('data-paused', pausedState ? 'true' : 'false');
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', { 
+        isPaused: pausedState 
+      });
     }
 
     /**
