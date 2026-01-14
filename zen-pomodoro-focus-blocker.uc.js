@@ -3148,12 +3148,9 @@
       this._stopMenuTimerUpdates();
 
       this.menuTimerUpdateInterval = setInterval(() => {
-        // Check if timer is still active
-        if (
-          !window.zenPomodoroApp ||
-          !window.zenPomodoroApp.timer ||
-          !window.zenPomodoroApp.timer.isActive
-        ) {
+        // Check if timer is still active (use optional chaining for cleaner code)
+        const isTimerActive = window.zenPomodoroApp?.timer?.isActive;
+        if (!isTimerActive) {
           this._stopMenuTimerUpdates();
           return;
         }
