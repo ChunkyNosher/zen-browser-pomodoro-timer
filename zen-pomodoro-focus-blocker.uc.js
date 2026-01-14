@@ -134,6 +134,16 @@
     postSessionSkipHoldDuration: 20,
     /** Initial code length for skip (default: 48) */
     postSessionSkipCodeLength: 48,
+    /** Minutes of focus time required before post-session reminders stop (default: 150 = 2h 30min) */
+    postSessionFocusTimeGoal: 150,
+    /** Total focus time accumulated today in minutes (persisted) */
+    totalFocusTimeToday: 0,
+    /** Last date the focus time was reset (YYYY-MM-DD format, used to reset at daily reminder time) */
+    lastFocusTimeResetDate: '',
+    /** Persisted skip count for post-session reminder */
+    postSessionSkipCount: 0,
+    /** Timestamp when last skip occurred (persisted) */
+    postSessionLastSkipTime: null,
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -490,6 +500,46 @@
       // Validate time format (HH:MM, 24-hour format with range check)
       if (isValidTimeFormat(firstTimeReminderTime)) {
         config.firstTimeReminderTime = firstTimeReminderTime;
+      }
+    }
+
+    // Post-session reminder settings (from preferences.json)
+    const postSessionReminderEnabled = getPref('postSessionReminderEnabled', null);
+    if (postSessionReminderEnabled !== null) {
+      config.postSessionReminderEnabled =
+        postSessionReminderEnabled === true || postSessionReminderEnabled === 'true';
+    }
+
+    const postSessionIdleTime = getPref('postSessionIdleTime', null);
+    if (postSessionIdleTime !== null) {
+      const idleTime =
+        typeof postSessionIdleTime === 'number'
+          ? postSessionIdleTime
+          : parseInt(postSessionIdleTime, 10);
+      if (!isNaN(idleTime) && idleTime > 0) {
+        config.postSessionIdleTime = idleTime;
+      }
+    }
+
+    const postSessionSkipCooldown = getPref('postSessionSkipCooldown', null);
+    if (postSessionSkipCooldown !== null) {
+      const cooldown =
+        typeof postSessionSkipCooldown === 'number'
+          ? postSessionSkipCooldown
+          : parseInt(postSessionSkipCooldown, 10);
+      if (!isNaN(cooldown) && cooldown > 0) {
+        config.postSessionSkipCooldown = cooldown;
+      }
+    }
+
+    const postSessionFocusTimeGoal = getPref('postSessionFocusTimeGoal', null);
+    if (postSessionFocusTimeGoal !== null) {
+      const goal =
+        typeof postSessionFocusTimeGoal === 'number'
+          ? postSessionFocusTimeGoal
+          : parseInt(postSessionFocusTimeGoal, 10);
+      if (!isNaN(goal) && goal > 0) {
+        config.postSessionFocusTimeGoal = goal;
       }
     }
 
@@ -1546,6 +1596,11 @@
         if (!this.isPaused && this.isActive) {
           this.remainingTime--;
 
+          // Track focus time for post-session reminder goal
+          if (this.currentPhase === 'focus') {
+            this._trackFocusTime();
+          }
+
           if (this.onTick) {
             this.onTick(this.remainingTime, this.currentPhase, this.currentCycle, this.totalCycles);
           }
@@ -1562,6 +1617,103 @@
           }
         }
       }, 1000);
+    }
+
+    /**
+     * Track focus time for post-session reminder feature.
+     * Adds 1 second of focus time and checks if daily reset is needed.
+     * Focus time resets at the configured firstTimeReminderTime, not midnight.
+     * @private
+     */
+    _trackFocusTime() {
+      const config = getConfig();
+
+      // Check if we need to reset focus time based on daily reminder time
+      if (this._shouldResetFocusTime(config)) {
+        this._resetFocusTime(config);
+      }
+
+      // Add 1 second to focus time (tracked in seconds for precision, converted to minutes when needed)
+      // We track in the config as minutes for readability, so add 1/60 minute per tick
+      config.totalFocusTimeToday = (config.totalFocusTimeToday || 0) + 1 / 60;
+
+      // Only save periodically to avoid excessive writes (already handled by saveState interval)
+      // But we need to save the config since totalFocusTimeToday is in config, not timer state
+      // To minimize writes, we'll piggyback on the saveState interval check
+      if (this.tickCounter === 0) {
+        saveConfig(config);
+      }
+    }
+
+    /**
+     * Check if focus time should be reset based on the daily reminder time.
+     * Resets when:
+     * - It's a new calendar day compared to lastFocusTimeResetDate
+     * - AND the current time is at or after the configured firstTimeReminderTime
+     * @param {Object} config - Configuration object
+     * @returns {boolean} True if focus time should be reset
+     * @private
+     */
+    _shouldResetFocusTime(config) {
+      const now = new Date();
+      const today = this._getDateString(now);
+
+      // If no reset date stored, we should reset
+      if (!config.lastFocusTimeResetDate) {
+        return true;
+      }
+
+      // If same day, no reset needed
+      if (config.lastFocusTimeResetDate === today) {
+        return false;
+      }
+
+      // Different day - check if we're past the reminder time
+      const reminderTime = config.firstTimeReminderTime || '10:00';
+
+      // Use shared validation function
+      if (!isValidTimeFormat(reminderTime)) {
+        // Invalid format, default to immediate reset on new day
+        return true;
+      }
+
+      const [hours, minutes] = reminderTime.split(':').map(Number);
+      const reminderDate = new Date();
+      reminderDate.setHours(hours, minutes, 0, 0);
+
+      return now >= reminderDate;
+    }
+
+    /**
+     * Reset the daily focus time tracker.
+     * @param {Object} config - Configuration object
+     * @private
+     */
+    _resetFocusTime(config) {
+      const today = this._getDateString(new Date());
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Resetting daily focus time', {
+        previousTotal: config.totalFocusTimeToday,
+        previousResetDate: config.lastFocusTimeResetDate,
+        newResetDate: today,
+      });
+
+      config.totalFocusTimeToday = 0;
+      config.lastFocusTimeResetDate = today;
+      saveConfig(config);
+    }
+
+    /**
+     * Get date string in YYYY-MM-DD format.
+     * @param {Date} date - Date object
+     * @returns {string} Date string
+     * @private
+     */
+    _getDateString(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     /**
@@ -7491,6 +7643,8 @@
    * - User can start a new timer or skip the reminder
    * - Skip requires hold/code completion with escalating difficulty
    * - Skip count resets when a new timer is started
+   * - Skip count persists across browser restarts
+   * - Reminders stop after focus time goal is reached
    */
   class PostSessionReminderManager {
     constructor() {
@@ -7507,10 +7661,71 @@
 
     /**
      * Initialize the post-session reminder manager.
+     * Loads persisted state from config.
      */
     init() {
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Post-Session Reminder Manager');
+      this._loadState();
       this._startIdleCheck();
+    }
+
+    /**
+     * Load persisted state from config.
+     * Restores skipCount and lastSkipTime across browser restarts.
+     * @private
+     */
+    _loadState() {
+      const config = getConfig();
+
+      this.skipCount = config.postSessionSkipCount || 0;
+      this.lastSkipTime = config.postSessionLastSkipTime || null;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Loaded persisted state', {
+        skipCount: this.skipCount,
+        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      });
+    }
+
+    /**
+     * Save current state to config for persistence across browser restarts.
+     * @private
+     */
+    _saveState() {
+      const config = getConfig();
+
+      config.postSessionSkipCount = this.skipCount;
+      config.postSessionLastSkipTime = this.lastSkipTime;
+
+      saveConfig(config);
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Saved state', {
+        skipCount: this.skipCount,
+        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      });
+    }
+
+    /**
+     * Check if the focus time goal has been reached for today.
+     * When the goal is reached, post-session reminders should stop.
+     * @returns {boolean} True if focus time goal is reached
+     * @private
+     */
+    _checkFocusTimeGoalReached() {
+      const config = getConfig();
+
+      const focusTimeGoal = config.postSessionFocusTimeGoal || 150; // Default 2h 30min
+      const totalFocusTimeToday = config.totalFocusTimeToday || 0;
+
+      const goalReached = totalFocusTimeToday >= focusTimeGoal;
+
+      if (goalReached) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Focus time goal reached', {
+          totalFocusTimeToday: Math.round(totalFocusTimeToday),
+          focusTimeGoal: focusTimeGoal,
+        });
+      }
+
+      return goalReached;
     }
 
     /**
@@ -7524,7 +7739,10 @@
         return;
       }
 
-      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer completed, starting idle tracking');
+      logger.log(
+        LOG_CATEGORIES.TIMER,
+        'Post-session reminder: Timer completed, starting idle tracking'
+      );
       this.idleStartTime = Date.now();
       // Don't reset skip count here - it resets when a NEW timer starts
     }
@@ -7538,6 +7756,7 @@
       this.idleStartTime = null;
       this.skipCount = 0;
       this.lastSkipTime = null;
+      this._saveState(); // Persist the reset state
       this.hideReminder();
     }
 
@@ -7584,6 +7803,11 @@
 
       // Check if we have an idle start time (timer has completed)
       if (!this.idleStartTime) return;
+
+      // Check if focus time goal has been reached - skip showing if so
+      if (this._checkFocusTimeGoalReached()) {
+        return;
+      }
 
       const now = Date.now();
       const idleTimeMs = now - this.idleStartTime;
@@ -7664,6 +7888,7 @@
 
     /**
      * Handle skip action - dismisses reminder for cooldown period.
+     * Persists the skip state across browser restarts.
      * @private
      */
     _handleSkip() {
@@ -7674,6 +7899,9 @@
         skipCount: this.skipCount,
         cooldownMinutes: getConfig().postSessionSkipCooldown,
       });
+
+      // Save state to persist across browser restarts
+      this._saveState();
 
       this.hideReminder();
     }
@@ -7768,7 +7996,9 @@
      */
     _showSkipChallenge(config) {
       // Remove the buttons and replace with challenge UI
-      const content = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-reminder-content');
+      const content = this.reminderOverlay.querySelector(
+        '#zen-pomodoro-post-session-reminder-content'
+      );
       const buttons = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-buttons');
       const skipInfo = this.reminderOverlay.querySelector('#zen-pomodoro-post-session-skip-info');
 

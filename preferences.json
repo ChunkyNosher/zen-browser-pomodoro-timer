@@ -42,5 +42,11 @@
     "label": "Post-Session Skip Cooldown (minutes)",
     "type": "number",
     "defaultValue": 30
+  },
+  {
+    "property": "zen-pomodoro.postSessionFocusTimeGoal",
+    "label": "Daily Focus Time Goal (minutes) - reminders stop after goal",
+    "type": "number",
+    "defaultValue": 150
   }
 ]
