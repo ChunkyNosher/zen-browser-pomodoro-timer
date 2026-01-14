@@ -1173,6 +1173,39 @@
     }
   }
 
+  /**
+   * Handle timer pause/resume logic with overlay and indicator updates.
+   * This helper function consolidates the pause/resume logic to eliminate code duplication.
+   * 
+   * PAUSE FIX: When pausing, checks if currently on a blocked workspace using
+   * isWorkspaceInBlockedList() which checks raw workspace membership without break
+   * phase interference (break phase handling is separate).
+   * 
+   * @returns {void}
+   */
+  function handlePauseResumeTimer() {
+    if (!window.zenPomodoroApp || !window.zenPomodoroApp.timer) return;
+
+    const timer = window.zenPomodoroApp.timer;
+    
+    if (timer.isPaused) {
+      timer.resume();
+    } else {
+      // PAUSE FIX: Track whether we're pausing on a blocked workspace
+      // Use isWorkspaceInBlockedList() to check raw workspace membership
+      // without break phase interference (break phase already handled separately)
+      const isOnBlockedWorkspace = window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
+      timer.pause(isOnBlockedWorkspace);
+    }
+    
+    // Update overlay visibility after pause/resume state change
+    window.zenPomodoroApp.updateOverlayVisibility();
+    
+    // PAUSE FIX: Update indicator paused state for visual feedback
+    // This ensures the indicator shows orange color when paused
+    window.zenPomodoroApp.overlay.updateIndicatorPausedState(timer.isPaused);
+  }
+
   // ============================================
   // Break Phase Detection Utility
   // ============================================
@@ -2795,26 +2828,9 @@
       if (pauseButton) {
         pauseButton.addEventListener('click', () => {
           if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
-            if (window.zenPomodoroApp.timer.isPaused) {
-              window.zenPomodoroApp.timer.resume();
-              pauseButton.textContent = 'Pause';
-            } else {
-              // PAUSE FIX: Track whether we're pausing on a blocked workspace
-              // Use isWorkspaceInBlockedList() to check raw workspace membership
-              // without break phase interference (break phase already handled separately)
-              const isOnBlockedWorkspace =
-                window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
-              window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
-              pauseButton.textContent = 'Resume';
-            }
-            // Update overlay visibility after pause/resume state change
-            window.zenPomodoroApp.updateOverlayVisibility();
-            
-            // PAUSE FIX: Update indicator paused state for visual feedback
-            // This ensures the indicator shows orange color when paused
-            window.zenPomodoroApp.overlay.updateIndicatorPausedState(
-              window.zenPomodoroApp.timer.isPaused
-            );
+            handlePauseResumeTimer();
+            // Update button text based on new state
+            pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
           }
         });
       }
@@ -3383,25 +3399,7 @@
         pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
         pauseResumeBtn.addEventListener('click', () => {
           this._stopMenuTimerUpdates();
-          if (window.zenPomodoroApp.timer.isPaused) {
-            window.zenPomodoroApp.timer.resume();
-          } else {
-            // PAUSE FIX: Track whether we're pausing on a blocked workspace
-            // Use isWorkspaceInBlockedList() to check raw workspace membership
-            // without break phase interference (break phase already handled separately)
-            const isOnBlockedWorkspace =
-              window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
-            window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
-          }
-          // Update overlay visibility after pause/resume state change
-          window.zenPomodoroApp.updateOverlayVisibility();
-          
-          // PAUSE FIX: Update indicator paused state for visual feedback
-          // This ensures the indicator shows orange color when paused
-          window.zenPomodoroApp.overlay.updateIndicatorPausedState(
-            window.zenPomodoroApp.timer.isPaused
-          );
-          
+          handlePauseResumeTimer();
           dialog.remove();
           this.menuDialog = null;
         });
@@ -4433,20 +4431,6 @@
       escalationInfo.style.fontStyle = 'italic';
       escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
 
-      // Show/hide settings based on enabled and method
-      const updatePostSessionVisibility = () => {
-        const isEnabled = postSessionEnabledCheckbox.checked;
-        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
-
-        postSessionIdleTimeRow.style.display = isEnabled ? '' : 'none';
-        postSessionCooldownRow.style.display = isEnabled ? '' : 'none';
-        postSessionMethodRow.style.display = isEnabled ? '' : 'none';
-        postSessionHoldDurationRow.style.display = isEnabled && usesHold ? '' : 'none';
-        postSessionCodeLengthRow.style.display = isEnabled && !usesHold ? '' : 'none';
-        escalationInfo.style.display = isEnabled ? '' : 'none';
-        triggerPostSessionButton.style.display = isEnabled ? '' : 'none';
-      };
-
       // Development: Trigger post-session reminder button
       const triggerPostSessionButton = document.createElement('button');
       triggerPostSessionButton.className = 'zen-pomodoro-dialog-button secondary';
@@ -4454,6 +4438,31 @@
       triggerPostSessionButton.textContent = '🧪 Test Post-Session Reminder';
       triggerPostSessionButton.title =
         'Trigger the post-session reminder for testing (ignores idle time)';
+
+      // Helper to set element display style
+      const setElementDisplay = (element, visible) => {
+        element.style.display = visible ? '' : 'none';
+      };
+
+      // Show/hide settings based on enabled and method
+      const updatePostSessionVisibility = () => {
+        const isEnabled = postSessionEnabledCheckbox.checked;
+        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
+
+        // Set visibility for elements that depend only on isEnabled
+        [
+          postSessionIdleTimeRow,
+          postSessionCooldownRow,
+          postSessionMethodRow,
+          escalationInfo,
+          triggerPostSessionButton,
+        ].forEach((el) => setElementDisplay(el, isEnabled));
+
+        // Set visibility for method-specific elements
+        setElementDisplay(postSessionHoldDurationRow, isEnabled && usesHold);
+        setElementDisplay(postSessionCodeLengthRow, isEnabled && !usesHold);
+      };
+
       triggerPostSessionButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.postSessionReminder) {
           dialog.style.display = 'none';
