@@ -152,6 +152,9 @@
   // Delay for DOM settling after timer start (in milliseconds)
   const DOM_SETTLE_DELAY_MS = 100;
 
+  // Delay for showing restoration notification after DOM is ready (in milliseconds)
+  const RESTORATION_NOTIFICATION_DELAY_MS = 500;
+
   // Maximum z-index value for overlay (highest possible value for 32-bit signed integer)
   const MAX_OVERLAY_Z_INDEX = '2147483647';
 
@@ -8527,7 +8530,7 @@
           // Show a non-blocking notification after a short delay to ensure DOM is ready
           setTimeout(() => {
             this.showRestorationNotification();
-          }, 500);
+          }, RESTORATION_NOTIFICATION_DELAY_MS);
         }
       }
 
