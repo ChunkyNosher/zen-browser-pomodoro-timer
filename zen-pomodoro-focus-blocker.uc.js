@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.5
+ * Version: 1.2.6
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.5';
+  const MOD_VERSION = '1.2.6';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -8102,17 +8102,6 @@
         return null;
       }
 
-      // Return null if timer is active
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        return null;
-      }
-
-      // Return null if timer was already started today
-      const today = this._getTodayDateString();
-      if (config.lastTimerStartDate === today) {
-        return null;
-      }
-
       // Validate time format
       if (!isValidTimeFormat(config.firstTimeReminderTime)) {
         return null;
@@ -8127,6 +8116,7 @@
       reminderDate.setHours(hours, minutes, 0, 0);
 
       // If reminder time has already passed today, return 0
+      // (This will show "Daily reminder ready to show" in the UI)
       if (now >= reminderDate) {
         return 0;
       }
@@ -8530,10 +8520,33 @@
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
     getTimeUntilNextReminder() {
-      if (!this._canShowReminderCountdown()) return null;
-
       const config = getConfig();
+      
+      // Only return null if feature is disabled
+      if (!config.postSessionReminderEnabled) {
+        return null;
+      }
+
+      // Don't show countdown while reminder is displaying
+      if (this.isShowing) {
+        return null;
+      }
+
+      // Don't show countdown if focus time goal is reached
+      if (this._checkFocusTimeGoalReached()) {
+        return null;
+      }
+
       const now = Date.now();
+
+      // When there's no idle tracking yet (either because timer is still active or hasn't started),
+      // display the configured idle timeout duration as a static indicator.
+      // This shows users how long they need to be idle after timer completion before reminder appears.
+      const shouldShowStaticDuration = window.zenPomodoroApp?.timer?.isActive || !this.idleStartTime;
+      if (shouldShowStaticDuration) {
+        // Return the full idle timeout duration in seconds (e.g., 45 minutes = 2700 seconds)
+        return config.postSessionIdleTime * 60;
+      }
 
       // If in cooldown, calculate time until cooldown ends
       if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
@@ -9292,6 +9305,8 @@
         isBlocked: isBlocked,
         timerActive: this.timer.isActive,
         timerPaused: this.timer.isPaused,
+        // TODO: pausedOnBlockedWorkspace is logged for debugging but no longer affects overlay logic.
+        // Can be removed from this log and PomodoroTimer class in future cleanup.
         pausedOnBlockedWorkspace: this.timer.pausedOnBlockedWorkspace,
       });
 
@@ -9304,9 +9319,10 @@
      * Bug Fix: Also hide indicator when timer is not active
      * BREAK PHASE FIX: Overlay is hidden during break phases to allow free browsing
      * TRANSITION PHASE FIX: Overlay is hidden during transition phase to allow free browsing
-     * PAUSE FIX: When paused, show overlay based on pause context:
-     *   - If paused on blocked workspace → show overlay on ALL workspaces
-     *   - If paused on unblocked workspace → show overlay only on blocked workspaces
+     *
+     * Blocking behavior (applies to both paused and running states):
+     *   - Blocked workspaces → show overlay (determined by this.workspace.isCurrentWorkspaceBlocked())
+     *   - Unblocked workspaces → hide overlay
      *
      * @param {string} workspaceId - Optional workspace ID to check (avoids DOM re-query)
      * @param {boolean} isBlocked - Optional pre-computed blocked status (avoids re-computation)
@@ -9335,74 +9351,30 @@
         return;
       }
 
-      // PAUSE FIX: Handle paused state blocking logic
-      if (this.timer.isPaused) {
-        // If paused on a blocked workspace, show overlay on ALL workspaces
-        // This prevents user from forgetting to unpause when leaving temporarily
-        if (this.timer.pausedOnBlockedWorkspace) {
-          logger.log(
-            LOG_CATEGORIES.OVERLAY,
-            'Paused on blocked workspace - showing overlay on all workspaces',
-            {
-              pausedOnBlockedWorkspace: true,
-            }
-          );
-          this._showOverlayWithStatus();
-          return;
-        }
-
-        // If paused on unblocked workspace, still show overlay on blocked workspaces
-        // WORKSPACE CHANGE FIX: Use provided workspace info if available to avoid race conditions
-        // Otherwise fall back to checking current workspace
-        //
-        // NOTE: We intentionally don't use the `isBlocked` parameter here because it
-        // comes from isCurrentWorkspaceBlocked() which includes break phase logic.
-        // In paused state, we need raw workspace membership check (isWorkspaceIdBlocked)
-        // regardless of what phase the timer thinks it's in.
-        let workspaceIsBlocked;
-        if (workspaceId !== null) {
-          // Use provided workspace ID with cached membership check
-          workspaceIsBlocked = this.workspace.isWorkspaceIdBlocked(workspaceId);
-          logger.log(
-            LOG_CATEGORIES.OVERLAY,
-            'Using provided workspace info for paused state check',
-            {
-              workspaceId: workspaceId,
-              isBlocked: workspaceIsBlocked,
-            }
-          );
-        } else {
-          // Fall back to querying current workspace
-          workspaceIsBlocked = this.workspace.isWorkspaceInBlockedList();
-          logger.log(LOG_CATEGORIES.OVERLAY, 'Querying current workspace for paused state check', {
-            isBlocked: workspaceIsBlocked,
-          });
-        }
-
-        if (workspaceIsBlocked) {
-          logger.log(
-            LOG_CATEGORIES.OVERLAY,
-            'Paused on unblocked workspace - current workspace is blocked, showing overlay'
-          );
-          this._showOverlayWithStatus();
-        } else {
-          logger.log(
-            LOG_CATEGORIES.OVERLAY,
-            'Paused on unblocked workspace - current workspace is unblocked, hiding overlay'
-          );
-          this.overlay.hide();
-        }
-        return;
-      }
-
-      // Normal (non-paused) state: show overlay only on blocked workspaces
+      // Show overlay only on blocked workspaces (same logic for paused and running states)
       // Use provided status if available, otherwise check current workspace
       const workspaceBlocked =
         isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
 
       if (workspaceBlocked) {
+        logger.log(
+          LOG_CATEGORIES.OVERLAY,
+          'Current workspace is blocked - showing overlay',
+          {
+            isPaused: this.timer.isPaused,
+            workspaceBlocked: workspaceBlocked,
+          }
+        );
         this._showOverlayWithStatus();
       } else {
+        logger.log(
+          LOG_CATEGORIES.OVERLAY,
+          'Current workspace is unblocked - hiding overlay',
+          {
+            isPaused: this.timer.isPaused,
+            workspaceBlocked: workspaceBlocked,
+          }
+        );
         this.overlay.hide();
       }
     }
