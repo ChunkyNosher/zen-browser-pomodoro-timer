@@ -3344,12 +3344,13 @@
       this._updateReminderCountdown(postSessionCountdownElement, firstTimeCountdownElement);
 
       this.reminderCountdownUpdateInterval = setInterval(() => {
-        // Stop interval when BOTH elements are disconnected from DOM (menu closed)
-        // Check isConnected only on elements that exist to avoid false positives
-        const postDisconnected = postSessionCountdownElement && !postSessionCountdownElement.isConnected;
-        const firstDisconnected = firstTimeCountdownElement && !firstTimeCountdownElement.isConnected;
+        // Stop interval when BOTH elements are either missing or disconnected from DOM (menu closed)
+        const allPostGoneOrDisconnected =
+          !postSessionCountdownElement || !postSessionCountdownElement.isConnected;
+        const allFirstGoneOrDisconnected =
+          !firstTimeCountdownElement || !firstTimeCountdownElement.isConnected;
 
-        if (postDisconnected && firstDisconnected) {
+        if (allPostGoneOrDisconnected && allFirstGoneOrDisconnected) {
           this._stopReminderCountdownUpdates();
           return;
         }
@@ -3599,9 +3600,29 @@
           this.showRulesetSettingsDialog();
         });
 
+        // Toggle indicator visibility button
+        const toggleIndicatorBtn = document.createElement('button');
+        toggleIndicatorBtn.className = 'zen-pomodoro-dialog-button secondary';
+        toggleIndicatorBtn.textContent = window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
+          ? 'Hide Timer Indicator'
+          : 'Show Timer Indicator';
+        toggleIndicatorBtn.addEventListener('click', () => {
+          if (window.zenPomodoroApp?.overlay) {
+            const indicator = window.zenPomodoroApp.overlay.indicator;
+            if (indicator?.classList.contains('active')) {
+              window.zenPomodoroApp.overlay.hideIndicator();
+              toggleIndicatorBtn.textContent = 'Show Timer Indicator';
+            } else {
+              window.zenPomodoroApp.overlay.showIndicator();
+              toggleIndicatorBtn.textContent = 'Hide Timer Indicator';
+            }
+          }
+        });
+
         menuSection.appendChild(statusRow);
         menuSection.appendChild(pauseResumeBtn);
         menuSection.appendChild(stopBtn);
+        menuSection.appendChild(toggleIndicatorBtn);
         menuSection.appendChild(settingsBtn);
         menuSection.appendChild(rulesetBtn);
       } else {
