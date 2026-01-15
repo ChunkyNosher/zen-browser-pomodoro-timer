@@ -182,6 +182,10 @@
   // Post-session reminders only auto-disable if current time is before this cutoff
   const EARLY_MORNING_CUTOFF_MINUTES = 6 * 60;
 
+  // Delay for workspace mutation handling to allow DOM to settle (in milliseconds)
+  // This prevents race conditions where the active attribute hasn't been set yet
+  const WORKSPACE_MUTATION_DELAY_MS = 50;
+
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
    * Used to safely include literal strings in dynamically constructed regular expressions.
@@ -2170,7 +2174,6 @@
      */
     _handleWorkspaceMutation() {
       // Use a small delay to ensure DOM has fully updated before checking workspace
-      // This prevents race conditions where the active attribute hasn't been set yet
       setTimeout(() => {
         const newWorkspace = this.getActiveWorkspace();
         if (newWorkspace === this.activeWorkspace) return;
@@ -2182,7 +2185,7 @@
         if (this.onWorkspaceChange) {
           this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
         }
-      }, 50); // 50ms delay to allow DOM to settle
+      }, WORKSPACE_MUTATION_DELAY_MS);
     }
 
     /**
@@ -8031,7 +8034,11 @@
     /**
      * Called when a timer completes naturally (not stopped manually).
      * Starts tracking idle time for post-session reminder.
-     * Also re-enables reminders if they were disabled for the day.
+     * 
+     * Also re-enables reminders if they were disabled for the day. This allows
+     * reminders to work again immediately after finishing a session, encouraging
+     * continued productivity. The disabled flag (postSessionReminderDisabledForDay)
+     * is set when the auto-off time is reached, and reset here when a timer completes.
      */
     onTimerComplete() {
       const config = getConfig();
@@ -9116,16 +9123,11 @@
         // since we already handled break/transition phases above
         const isBlocked = this.workspace.isWorkspaceInBlockedList();
         
-        logger.log(LOG_CATEGORIES.OVERLAY, 'Paused on unblocked workspace - checking current workspace', {
-          pausedOnBlockedWorkspace: false,
-          currentWorkspaceBlocked: isBlocked,
-        });
-        
         if (isBlocked) {
-          logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is blocked - showing overlay');
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Paused on unblocked workspace - current workspace is blocked, showing overlay');
           this._showOverlayWithStatus();
         } else {
-          logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is unblocked - hiding overlay');
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Paused on unblocked workspace - current workspace is unblocked, hiding overlay');
           this.overlay.hide();
         }
         return;
