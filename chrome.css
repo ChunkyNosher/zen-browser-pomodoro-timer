@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.2
+ * Version: 1.2.3
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -1615,4 +1615,22 @@
   margin-top: 12px;
   padding-top: 8px;
   border-top: 1px solid rgb(255 255 255 / 10%);
+}
+
+/* ============================================
+   Post-Session Reminder Countdown Indicator
+   Shows countdown in main menu
+   ============================================ */
+
+/* Post-session reminder countdown indicator in main menu */
+.zen-pomodoro-reminder-countdown {
+  font-size: 12px;
+  color: #4a9eff;
+  text-align: center;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgb(74 158 255 / 10%);
+  border-radius: 6px;
+  font-weight: 500;
+  border: 1px solid rgb(74 158 255 / 20%);
 }

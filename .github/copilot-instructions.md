@@ -53,7 +53,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.2.1';                  // Current mod version
+const MOD_VERSION = '1.2.3';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -79,6 +79,30 @@ When the subagent is done, make sure to double-check its work and don't just ass
 Also make sure that you run the Copilot code review multiple times before finishing your work.
 
 Also, after the changes are done, I want you to run the CodeScene MCP and refactor the code if there's any issue detected with CodeScene.
+
+---
+
+## MCP Tools Usage
+
+When working on this mod, make use of these MCP (Model Context Protocol) tools:
+
+### Context7
+Use context7 to look up documentation for libraries and frameworks:
+- First call `context7-resolve-library-id` with the library name to get the library ID
+- Then call `context7-query-docs` with the library ID to query documentation
+- Example: For Firefox WebExtension APIs, look up "mozilla/firefox-api" or similar
+
+### Perplexity
+Use perplexity for web searches and reasoning:
+- `perplexity_search` - For finding up-to-date information, news, or documentation
+- `perplexity_reason` - For complex reasoning tasks that benefit from web context
+
+### CodeScene
+Use CodeScene for code quality analysis:
+- `codescene-code_health_score` - Get the overall code health score (1-10)
+- `codescene-code_health_review` - Get detailed issues affecting code health
+- `codescene-code_health_auto_refactor` - Auto-refactor specific functions
+- Target: Maintain Code Health score of at least 7.5
 
 ---
 
@@ -143,6 +167,7 @@ Shows reminder after configurable idle time following timer completion.
 | `loadPositiveIntPref(prefName, config, configKey)`    | Load a positive integer preference with validation |
 | `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                         |
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
+| `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
 
 ---
 

@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.2
+ * Version: 1.2.3
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.2';
+  const MOD_VERSION = '1.2.3';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -580,6 +580,23 @@
   }
 
   /**
+   * Clamp a position value within viewport bounds.
+   * @param {number} position - Current position value
+   * @param {number} size - Size of the element (width or height)
+   * @param {number} viewportSize - Size of the viewport (innerWidth or innerHeight)
+   * @returns {number} Clamped position value
+   */
+  function clampToViewportBound(position, size, viewportSize) {
+    const maxBound = viewportSize - size;
+    if (maxBound >= 0) {
+      return Math.max(0, Math.min(position, maxBound));
+    }
+    // Element larger than viewport: allow negative positions but keep part visible
+    const overflow = size - viewportSize;
+    return Math.max(-overflow, Math.min(position, 0));
+  }
+
+  /**
    * Issue 8: Setup drag functionality for dialogs
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
@@ -695,32 +712,9 @@
       const deltaX = coords.x - startX;
       const deltaY = coords.y - startY;
 
-      let newLeft = startLeft + deltaX;
-      let newTop = startTop + deltaY;
-
-      // Keep within viewport boundaries
-      const maxX = window.innerWidth - dialogWidth;
-      const maxY = window.innerHeight - dialogHeight;
-
-      if (maxX >= 0) {
-        newLeft = Math.max(0, Math.min(newLeft, maxX));
-      } else {
-        // Dialog wider than viewport: allow negative positions but ensure some part stays visible
-        const overflowX = dialogWidth - window.innerWidth;
-        const minLeft = -overflowX;
-        const maxLeftVal = 0;
-        newLeft = Math.max(minLeft, Math.min(newLeft, maxLeftVal));
-      }
-
-      if (maxY >= 0) {
-        newTop = Math.max(0, Math.min(newTop, maxY));
-      } else {
-        // Dialog taller than viewport
-        const overflowY = dialogHeight - window.innerHeight;
-        const minTop = -overflowY;
-        const maxTopVal = 0;
-        newTop = Math.max(minTop, Math.min(newTop, maxTopVal));
-      }
+      // Clamp positions to viewport boundaries using helper
+      const newLeft = clampToViewportBound(startLeft + deltaX, dialogWidth, window.innerWidth);
+      const newTop = clampToViewportBound(startTop + deltaY, dialogHeight, window.innerHeight);
 
       dialog.style.left = `${newLeft}px`;
       dialog.style.top = `${newTop}px`;
@@ -1171,6 +1165,46 @@
     } else {
       showStopConfirmation();
     }
+  }
+
+  /**
+   * Handle timer pause/resume logic with overlay and indicator updates.
+   * This helper function consolidates the pause/resume logic to eliminate code duplication.
+   * 
+   * PAUSE FIX: When pausing, checks if currently on a blocked workspace using
+   * isWorkspaceInBlockedList() which checks raw workspace membership without break
+   * phase interference (break phase handling is separate).
+   * 
+   * NOTE: This function handles core timer state and visual indicator updates only.
+   * Callers are responsible for updating their own UI elements (e.g., button text).
+   * 
+   * @returns {void}
+   */
+  function handlePauseResumeTimer() {
+    // Null safety checks for all required objects
+    if (!window.zenPomodoroApp) return;
+    if (!window.zenPomodoroApp.timer) return;
+    if (!window.zenPomodoroApp.workspace) return;
+    if (!window.zenPomodoroApp.overlay) return;
+
+    const timer = window.zenPomodoroApp.timer;
+    
+    if (timer.isPaused) {
+      timer.resume();
+    } else {
+      // PAUSE FIX: Track whether we're pausing on a blocked workspace
+      // Use isWorkspaceInBlockedList() to check raw workspace membership
+      // without break phase interference (break phase already handled separately)
+      const isOnBlockedWorkspace = window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
+      timer.pause(isOnBlockedWorkspace);
+    }
+    
+    // Update overlay visibility after pause/resume state change
+    window.zenPomodoroApp.updateOverlayVisibility();
+    
+    // PAUSE FIX: Update indicator paused state for visual feedback
+    // This ensures the indicator shows orange color when paused
+    window.zenPomodoroApp.overlay.updateIndicatorPausedState(timer.isPaused);
   }
 
   // ============================================
@@ -2795,18 +2829,9 @@
       if (pauseButton) {
         pauseButton.addEventListener('click', () => {
           if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
-            if (window.zenPomodoroApp.timer.isPaused) {
-              window.zenPomodoroApp.timer.resume();
-              pauseButton.textContent = 'Pause';
-            } else {
-              // Track whether we're pausing on a blocked workspace
-              const isOnBlockedWorkspace =
-                window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
-              window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
-              pauseButton.textContent = 'Resume';
-            }
-            // Update overlay visibility after pause/resume state change
-            window.zenPomodoroApp.updateOverlayVisibility();
+            handlePauseResumeTimer();
+            // Update button text based on new state
+            pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
           }
         });
       }
@@ -3001,10 +3026,11 @@
       if (this.indicator) {
         this.indicator.setAttribute('data-phase', phase);
         
-        // PAUSED INDICATOR FIX: Set paused state for visual feedback
+        // PAUSED INDICATOR FIX: keep paused state in sync during normal updates,
+        // not just on explicit pause/resume actions, using the centralized handler.
         const timer = window.zenPomodoroApp?.timer;
         if (timer) {
-          this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+          this.updateIndicatorPausedState(timer.isPaused);
         }
       }
     }
@@ -3058,8 +3084,8 @@
       indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
       this.indicator.setAttribute('data-phase', phase);
       
-      // PAUSED INDICATOR FIX: Set paused state for visual feedback
-      this.indicator.setAttribute('data-paused', timer.isPaused ? 'true' : 'false');
+      // Note: Paused state is set by actual pause/resume handlers in handlePauseResumeTimer(),
+      // not here during indicator initialization. This prevents incorrect initial state.
     }
 
     /**
@@ -3069,6 +3095,21 @@
       if (this.indicator) {
         this.indicator.classList.remove('active');
       }
+    }
+
+    /**
+     * Update the indicator's paused state attribute for visual feedback.
+     * This method should be called when the timer is paused or resumed
+     * to ensure the indicator shows orange color when paused and normal color when not paused.
+     * @param {boolean} isPaused - Whether the timer is currently paused
+     */
+    updateIndicatorPausedState(isPaused) {
+      if (!this.indicator) return;
+      
+      this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', { 
+        isPaused: isPaused 
+      });
     }
 
     /**
@@ -3153,6 +3194,7 @@
       this.keydownHandler = null;
       this.menuDialog = null;
       this.menuTimerUpdateInterval = null;
+      this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
     }
 
     /**
@@ -3195,12 +3237,76 @@
     }
 
     /**
+     * Start real-time reminder countdown updates in the menu dialog
+     * @param {HTMLElement} countdownElement - The element to update with countdown
+     */
+    _startReminderCountdownUpdates(countdownElement) {
+      this._stopReminderCountdownUpdates();
+      this._updateReminderCountdown(countdownElement);
+
+      this.reminderCountdownUpdateInterval = setInterval(() => {
+        if (!countdownElement.isConnected) {
+          this._stopReminderCountdownUpdates();
+          return;
+        }
+        this._updateReminderCountdown(countdownElement);
+      }, 1000);
+    }
+
+    /**
+     * Update the reminder countdown display
+     * @param {HTMLElement} countdownElement - The element to update
+     * @private
+     */
+    _updateReminderCountdown(countdownElement) {
+      if (!window.zenPomodoroApp?.postSessionReminder) return;
+
+      const secondsUntil =
+        window.zenPomodoroApp.postSessionReminder.getTimeUntilNextReminder();
+
+      if (secondsUntil === null) {
+        countdownElement.style.display = 'none';
+        return;
+      }
+
+      countdownElement.style.display = 'block';
+
+      if (secondsUntil === 0) {
+        countdownElement.textContent = 'Reminder ready to show';
+      } else {
+        // Use formatTime if available, otherwise fallback to manual formatting
+        let timeStr;
+        if (typeof formatTime === 'function') {
+          timeStr = formatTime(secondsUntil);
+        } else {
+          const minutes = Math.floor(secondsUntil / 60);
+          const seconds = secondsUntil % 60;
+          timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        countdownElement.textContent = `Next reminder in: ${timeStr}`;
+      }
+    }
+
+    /**
+     * Stop the reminder countdown updates
+     */
+    _stopReminderCountdownUpdates() {
+      if (this.reminderCountdownUpdateInterval) {
+        clearInterval(this.reminderCountdownUpdateInterval);
+        this.reminderCountdownUpdateInterval = null;
+      }
+    }
+
+    /**
      * Issue 3: Close all existing dialogs to prevent duplicates
      * MEMORY LEAK FIX: Clean up associated resources for dialogs that manage state
      */
     closeAllDialogs() {
       // Stop any running timer updates in the menu
       this._stopMenuTimerUpdates();
+
+      // Stop any running reminder countdown updates
+      this._stopReminderCountdownUpdates();
 
       // Clean up lock screen resources if the security manager exists
       if (window.zenPomodoroApp?.security) {
@@ -3355,16 +3461,7 @@
         pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
         pauseResumeBtn.addEventListener('click', () => {
           this._stopMenuTimerUpdates();
-          if (window.zenPomodoroApp.timer.isPaused) {
-            window.zenPomodoroApp.timer.resume();
-          } else {
-            // Track whether we're pausing on a blocked workspace
-            const isOnBlockedWorkspace =
-              window.zenPomodoroApp.workspace.isCurrentWorkspaceBlocked();
-            window.zenPomodoroApp.timer.pause(isOnBlockedWorkspace);
-          }
-          // Update overlay visibility after pause/resume state change
-          window.zenPomodoroApp.updateOverlayVisibility();
+          handlePauseResumeTimer();
           dialog.remove();
           this.menuDialog = null;
         });
@@ -3455,6 +3552,7 @@
       cancelButton.textContent = 'Close';
       cancelButton.addEventListener('click', () => {
         this._stopMenuTimerUpdates();
+        this._stopReminderCountdownUpdates();
         dialog.remove();
         this.menuDialog = null;
       });
@@ -3466,10 +3564,19 @@
       versionIndicator.className = 'zen-pomodoro-version-indicator';
       versionIndicator.textContent = `v${MOD_VERSION}`;
 
+      // Post-session reminder countdown indicator
+      const reminderCountdown = document.createElement('div');
+      reminderCountdown.className = 'zen-pomodoro-reminder-countdown';
+      reminderCountdown.style.display = 'none';
+
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
       dialog.appendChild(buttonDiv);
+      dialog.appendChild(reminderCountdown);
       dialog.appendChild(versionIndicator);
+
+      // Start reminder countdown updates (will auto-hide if not applicable)
+      this._startReminderCountdownUpdates(reminderCountdown);
 
       document.documentElement.appendChild(dialog);
 
@@ -3486,6 +3593,7 @@
       const escHandler = (e) => {
         if (e.key === 'Escape') {
           this._stopMenuTimerUpdates();
+          this._stopReminderCountdownUpdates();
           dialog.remove();
           this.menuDialog = null;
           document.removeEventListener('keydown', escHandler);
@@ -3500,6 +3608,9 @@
     destroy() {
       // Stop any running timer updates in the menu
       this._stopMenuTimerUpdates();
+
+      // Stop any running reminder countdown updates
+      this._stopReminderCountdownUpdates();
 
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
@@ -4396,20 +4507,6 @@
       escalationInfo.style.fontStyle = 'italic';
       escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
 
-      // Show/hide settings based on enabled and method
-      const updatePostSessionVisibility = () => {
-        const isEnabled = postSessionEnabledCheckbox.checked;
-        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
-
-        postSessionIdleTimeRow.style.display = isEnabled ? '' : 'none';
-        postSessionCooldownRow.style.display = isEnabled ? '' : 'none';
-        postSessionMethodRow.style.display = isEnabled ? '' : 'none';
-        postSessionHoldDurationRow.style.display = isEnabled && usesHold ? '' : 'none';
-        postSessionCodeLengthRow.style.display = isEnabled && !usesHold ? '' : 'none';
-        escalationInfo.style.display = isEnabled ? '' : 'none';
-        triggerPostSessionButton.style.display = isEnabled ? '' : 'none';
-      };
-
       // Development: Trigger post-session reminder button
       const triggerPostSessionButton = document.createElement('button');
       triggerPostSessionButton.className = 'zen-pomodoro-dialog-button secondary';
@@ -4417,6 +4514,31 @@
       triggerPostSessionButton.textContent = '🧪 Test Post-Session Reminder';
       triggerPostSessionButton.title =
         'Trigger the post-session reminder for testing (ignores idle time)';
+
+      // Helper to set element display style
+      const setElementDisplay = (element, visible) => {
+        element.style.display = visible ? '' : 'none';
+      };
+
+      // Show/hide settings based on enabled and method
+      const updatePostSessionVisibility = () => {
+        const isEnabled = postSessionEnabledCheckbox.checked;
+        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
+
+        // Set visibility for elements that depend only on isEnabled
+        [
+          postSessionIdleTimeRow,
+          postSessionCooldownRow,
+          postSessionMethodRow,
+          escalationInfo,
+          triggerPostSessionButton,
+        ].forEach((el) => setElementDisplay(el, isEnabled));
+
+        // Set visibility for method-specific elements
+        setElementDisplay(postSessionHoldDurationRow, isEnabled && usesHold);
+        setElementDisplay(postSessionCodeLengthRow, isEnabled && !usesHold);
+      };
+
       triggerPostSessionButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.postSessionReminder) {
           dialog.style.display = 'none';
@@ -8006,6 +8128,53 @@
     }
 
     /**
+     * Check if conditions are met to show a countdown for next reminder.
+     * @returns {boolean} True if countdown should be shown
+     * @private
+     */
+    _canShowReminderCountdown() {
+      const config = getConfig();
+      
+      // Check basic conditions
+      if (!config.postSessionReminderEnabled) return false;
+      if (this.isShowing) return false;
+      if (!this.idleStartTime) return false;
+      if (window.zenPomodoroApp?.timer?.isActive) return false;
+      if (this._checkFocusTimeGoalReached()) return false;
+      
+      return true;
+    }
+
+    /**
+     * Get time remaining until next reminder (in seconds).
+     * Returns null if reminder shouldn't show or conditions aren't met.
+     * @returns {number|null} Seconds until reminder, or null if not applicable
+     */
+    getTimeUntilNextReminder() {
+      if (!this._canShowReminderCountdown()) return null;
+
+      const config = getConfig();
+      const now = Date.now();
+
+      // If in cooldown, calculate time until cooldown ends
+      if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
+        const cooldownEndMs = this.lastSkipTime + config.postSessionSkipCooldown * 60 * 1000;
+        const remainingMs = cooldownEndMs - now;
+        return Math.max(0, Math.ceil(remainingMs / 1000));
+      }
+
+      // Calculate time until first/next reminder
+      const idleTimeMs = now - this.idleStartTime;
+      const requiredIdleMs = config.postSessionIdleTime * 60 * 1000;
+      const remainingMs = requiredIdleMs - idleTimeMs;
+
+      // If reminder should already be shown, return 0
+      if (remainingMs <= 0) return 0;
+
+      return Math.ceil(remainingMs / 1000);
+    }
+
+    /**
      * Calculate the escalated skip requirement based on skip count.
      * @param {number} baseValue - Base value for the requirement
      * @returns {number} Escalated value
@@ -8988,7 +9157,7 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // Modules with destroy() methods
+      // All modules with destroy() methods
       const modulesToDestroy = [
         this.sineModBlocker,
         this.websiteBlocker,
@@ -8998,13 +9167,15 @@
         this.keyboardShortcut,
         this.overlay,
       ];
-
       modulesToDestroy.forEach((module) => module?.destroy?.());
 
-      // Modules with specific cleanup methods
-      this.workspace?.stopMonitoring?.();
-      this.timer?.stop?.();
-      this.security?.cleanupLockScreen?.();
+      // All modules with specific cleanup methods
+      const cleanupActions = [
+        () => this.workspace?.stopMonitoring?.(),
+        () => this.timer?.stop?.(),
+        () => this.security?.cleanupLockScreen?.(),
+      ];
+      cleanupActions.forEach((action) => action());
 
       this.initialized = false;
 

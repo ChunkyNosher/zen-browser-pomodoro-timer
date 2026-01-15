@@ -58,7 +58,7 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.2.1'`
+- `MOD_VERSION = '1.2.3'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -81,6 +81,7 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 | `loadPositiveIntPref(prefName, config, configKey)`    | Load positive integer preference        |
 | `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format              |
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input        |
+| `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI |
 
 ## Development Guidelines
 
@@ -92,6 +93,20 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 6. **Use `textContent`** instead of `innerHTML` for security
 7. **Use `crypto.getRandomValues()`** for random code generation
 8. **Memory leak prevention** - always clean up event listeners in hold-to-unlock handlers
+
+## MCP Tools
+
+Use these MCP tools when working on this mod:
+
+| Tool | Purpose |
+|------|---------|
+| `context7-resolve-library-id` | Find library IDs for documentation lookup |
+| `context7-query-docs` | Query library documentation |
+| `perplexity_search` | Web search for docs/examples |
+| `perplexity_reason` | Complex reasoning with web context |
+| `codescene-code_health_score` | Get code health score (target ≥7.5) |
+| `codescene-code_health_review` | Get detailed code health issues |
+| `codescene-code_health_auto_refactor` | Auto-refactor functions |
 
 ## Documentation Reminder
 
