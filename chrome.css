@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.4
+ * Version: 1.2.5
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -1633,4 +1633,22 @@
   border-radius: 6px;
   font-weight: 500;
   border: 1px solid rgb(74 158 255 / 20%);
+}
+
+/* ============================================
+   First-Time Reminder Countdown Indicator
+   Shows countdown to daily reminder in main menu
+   ============================================ */
+
+/* First-time reminder countdown indicator in main menu */
+.zen-pomodoro-first-time-countdown {
+  font-size: 12px;
+  color: #2ecc71;
+  text-align: center;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgb(46 204 113 / 10%);
+  border-radius: 6px;
+  font-weight: 500;
+  border: 1px solid rgb(46 204 113 / 20%);
 }
