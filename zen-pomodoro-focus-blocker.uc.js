@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.3';
+  const MOD_VERSION = '1.2.4';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -144,6 +144,10 @@
     postSessionSkipCount: 0,
     /** Timestamp when last skip occurred (persisted) */
     postSessionLastSkipTime: null,
+    /** Time when post-session reminder should automatically turn off (24-hour HH:MM format, e.g., '00:30' for 12:30 AM) */
+    postSessionReminderEndTime: '00:30',
+    /** Flag to track if post-session reminder is disabled for the day (resets on next timer completion) */
+    postSessionReminderDisabledForDay: false,
   };
 
   // Save state every 10 seconds instead of every second for performance (in seconds)
@@ -173,6 +177,10 @@
 
   // Post-session reminder check interval (1 minute in milliseconds)
   const POST_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+
+  // Early morning cutoff time for auto-off detection (06:00 AM in minutes since midnight)
+  // Post-session reminders only auto-disable if current time is before this cutoff
+  const EARLY_MORNING_CUTOFF_MINUTES = 6 * 60;
 
   /**
    * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
@@ -1732,6 +1740,7 @@
 
     /**
      * Reset the daily focus time tracker.
+     * Also resets the postSessionReminderDisabledForDay flag.
      * @param {Object} config - Configuration object
      * @private
      */
@@ -1746,6 +1755,13 @@
 
       config.totalFocusTimeToday = 0;
       config.lastFocusTimeResetDate = today;
+
+      // Also reset the post-session reminder disabled flag at daily reset time
+      if (config.postSessionReminderDisabledForDay) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Resetting post-session reminder disabled flag');
+        config.postSessionReminderDisabledForDay = false;
+      }
+
       saveConfig(config);
     }
 
@@ -7694,6 +7710,12 @@
         return;
       }
 
+      // Don't show if post-session reminder is showing (mutual exclusion)
+      if (window.zenPomodoroApp?.postSessionReminder?.isShowing) {
+        logger.log(LOG_CATEGORIES.TIMER, 'First-time reminder: Post-session reminder is showing');
+        return;
+      }
+
       logger.log(LOG_CATEGORIES.TIMER, 'Showing first-time reminder overlay');
       this.isShowing = true;
 
@@ -8009,6 +8031,7 @@
     /**
      * Called when a timer completes naturally (not stopped manually).
      * Starts tracking idle time for post-session reminder.
+     * Also re-enables reminders if they were disabled for the day.
      */
     onTimerComplete() {
       const config = getConfig();
@@ -8022,6 +8045,14 @@
         'Post-session reminder: Timer completed, starting idle tracking'
       );
       this.idleStartTime = Date.now();
+
+      // Re-enable post-session reminders for the day (reset the disabled flag)
+      if (config.postSessionReminderDisabledForDay) {
+        config.postSessionReminderDisabledForDay = false;
+        saveConfig(config);
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Re-enabled for the day after timer completion');
+      }
+
       // Don't reset skip count here - it resets when a NEW timer starts
     }
 
@@ -8040,6 +8071,7 @@
 
     /**
      * Start the periodic check for showing the reminder.
+     * Also checks if current time is past the end time.
      * @private
      */
     _startIdleCheck() {
@@ -8048,6 +8080,7 @@
 
       // Check every minute
       this.checkIntervalId = setInterval(() => {
+        this._checkAutoDisableTime();
         this._checkAndShowReminder();
       }, POST_SESSION_CHECK_INTERVAL_MS);
     }
@@ -8078,6 +8111,104 @@
     }
 
     /**
+     * Check if current time is past the configured end time and auto-disable reminder.
+     * This automatically turns off post-session reminders after the configured time.
+     * @private
+     */
+    _checkAutoDisableTime() {
+      const config = getConfig();
+
+      // Skip if feature is disabled or already disabled for the day
+      if (!config.postSessionReminderEnabled || config.postSessionReminderDisabledForDay) {
+        return;
+      }
+
+      const endTime = config.postSessionReminderEndTime;
+
+      // Validate time format
+      if (!isValidTimeFormat(endTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Invalid end time format', {
+          endTime: endTime,
+        });
+        return;
+      }
+
+      // Check if current time is past the end time
+      if (this._isAfterEndTime(endTime)) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Auto-disabling for the day', {
+          endTime: endTime,
+          currentTime: new Date().toLocaleTimeString(),
+        });
+
+        config.postSessionReminderDisabledForDay = true;
+        saveConfig(config);
+
+        // Hide reminder if currently showing
+        if (this.isShowing) {
+          this.hideReminder();
+        }
+      }
+    }
+
+    /**
+     * Check if a given time (in minutes since midnight) is in the early morning period.
+     * Early morning is defined as 00:00-05:59 (0-359 minutes since midnight).
+     *
+     * @param {number} minutesSinceMidnight - Minutes since midnight (0-1439)
+     * @returns {boolean} True if time is in early morning period
+     * @private
+     */
+    _isEarlyMorning(minutesSinceMidnight) {
+      return minutesSinceMidnight < EARLY_MORNING_CUTOFF_MINUTES;
+    }
+
+    /**
+     * Check if current time is at or after the configured end time.
+     * This method is designed for late-night auto-off times (e.g., 00:30 for 12:30 AM).
+     * It correctly handles the early morning period by checking if we're past the end time
+     * but still in the early morning hours (before the typical wake-up time).
+     *
+     * Logic:
+     * - If endTime is early morning (00:00-05:59), we're only "after" it if current time
+     *   is also in that early morning range AND past the end time.
+     * - If endTime is later in day (06:00-23:59), standard comparison applies.
+     *
+     * Examples (with endTime = 00:30):
+     * - Current: 23:00 → false (not yet reached early morning cutoff)
+     * - Current: 00:45 → true (past 00:30 in early morning window)
+     * - Current: 14:00 → false (outside early morning window, auto-off doesn't apply)
+     *
+     * @param {string} endTime - Time in HH:MM format (must be pre-validated by isValidTimeFormat)
+     * @returns {boolean} True if current time is in the auto-off period
+     * @private
+     */
+    _isAfterEndTime(endTime) {
+      const [hours, minutes] = endTime.split(':').map(Number);
+
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+
+      // Convert to minutes since midnight for comparison
+      const currentMinutesSinceMidnight = currentHours * 60 + currentMinutes;
+      const endMinutesSinceMidnight = hours * 60 + minutes;
+
+      // If endTime is in early morning (00:00-05:59)
+      if (this._isEarlyMorning(endMinutesSinceMidnight)) {
+        // We're only "after" the end time if:
+        // 1. Current time is also in early morning (00:00-05:59)
+        // 2. AND current time >= end time
+        return (
+          this._isEarlyMorning(currentMinutesSinceMidnight) &&
+          currentMinutesSinceMidnight >= endMinutesSinceMidnight
+        );
+      } else {
+        // For non-early-morning end times, standard comparison
+        return currentMinutesSinceMidnight >= endMinutesSinceMidnight;
+      }
+    }
+
+    /**
      * Check if conditions are met to potentially show the reminder.
      * @returns {boolean} True if basic conditions for showing are met
      * @private
@@ -8099,6 +8230,18 @@
 
       // Focus time goal must not have been reached
       if (this._checkFocusTimeGoalReached()) return false;
+
+      // Post-session reminder must not be disabled for the day
+      if (config.postSessionReminderDisabledForDay) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Disabled for the day');
+        return false;
+      }
+
+      // First-time reminder must not be showing (mutual exclusion)
+      if (window.zenPomodoroApp?.firstTimeReminder?.isShowing) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: First-time reminder is showing');
+        return false;
+      }
 
       return true;
     }
