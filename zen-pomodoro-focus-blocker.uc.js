@@ -2153,16 +2153,20 @@
      * @private
      */
     _handleWorkspaceMutation() {
-      const newWorkspace = this.getActiveWorkspace();
-      if (newWorkspace === this.activeWorkspace) return;
+      // Use a small delay to ensure DOM has fully updated before checking workspace
+      // This prevents race conditions where the active attribute hasn't been set yet
+      setTimeout(() => {
+        const newWorkspace = this.getActiveWorkspace();
+        if (newWorkspace === this.activeWorkspace) return;
 
-      this.activeWorkspace = newWorkspace;
-      this.needsValidation = true;
-      this.validateBlockedWorkspaces();
+        this.activeWorkspace = newWorkspace;
+        this.needsValidation = true;
+        this.validateBlockedWorkspaces();
 
-      if (this.onWorkspaceChange) {
-        this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
-      }
+        if (this.onWorkspaceChange) {
+          this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
+        }
+      }, 50); // 50ms delay to allow DOM to settle
     }
 
     /**
@@ -8911,6 +8915,9 @@
       logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace changed', {
         workspaceId: workspaceId,
         isBlocked: isBlocked,
+        timerActive: this.timer.isActive,
+        timerPaused: this.timer.isPaused,
+        pausedOnBlockedWorkspace: this.timer.pausedOnBlockedWorkspace,
       });
 
       this.updateOverlayVisibility();
@@ -8954,6 +8961,9 @@
         // If paused on a blocked workspace, show overlay on ALL workspaces
         // This prevents user from forgetting to unpause when leaving temporarily
         if (this.timer.pausedOnBlockedWorkspace) {
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Paused on blocked workspace - showing overlay on all workspaces', {
+            pausedOnBlockedWorkspace: true,
+          });
           this._showOverlayWithStatus();
           return;
         }
@@ -8962,9 +8972,17 @@
         // Use isWorkspaceInBlockedList() to check workspace membership directly,
         // since we already handled break/transition phases above
         const isBlocked = this.workspace.isWorkspaceInBlockedList();
+        
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Paused on unblocked workspace - checking current workspace', {
+          pausedOnBlockedWorkspace: false,
+          currentWorkspaceBlocked: isBlocked,
+        });
+        
         if (isBlocked) {
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is blocked - showing overlay');
           this._showOverlayWithStatus();
         } else {
+          logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is unblocked - hiding overlay');
           this.overlay.hide();
         }
         return;
