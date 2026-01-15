@@ -1055,15 +1055,19 @@
 
   /**
    * Format time with optional hours support.
+   * When useHours is true, includes hours in format ONLY if hours > 0.
+   * This provides automatic formatting (H:MM:SS for >= 1 hour, MM:SS otherwise).
    * @param {number} seconds - Total seconds to format
-   * @param {boolean} useHours - Whether to include hours in the format
-   * @returns {string} Formatted time string (H:MM:SS or MM:SS)
+   * @param {boolean} useHours - Enable hours display (hours shown only when > 0)
+   * @returns {string} Formatted time string (H:MM:SS when useHours && hours > 0, otherwise MM:SS)
    */
   function formatTimeWithHours(seconds, useHours = false) {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
 
+    // Include hours only when useHours is enabled AND there are hours to display
+    // This provides automatic format switching (H:MM:SS <-> MM:SS) for countdowns
     if (useHours && hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
@@ -2226,6 +2230,20 @@
     }
 
     /**
+     * Check if a specific workspace ID is in the blocked list.
+     * Uses cached config when available, reducing repeated config parsing.
+     * @param {string} workspaceId - The workspace ID to check
+     * @returns {boolean} True if the workspace is in the blocked list
+     */
+    isWorkspaceIdBlocked(workspaceId) {
+      // Use cached config if available, otherwise reload
+      if (!this.config) {
+        this.config = getConfig();
+      }
+      return this.config.blockedWorkspaces.includes(workspaceId);
+    }
+
+    /**
      * Handle workspace mutation observer callback
      * @private
      */
@@ -3326,7 +3344,12 @@
       this._updateReminderCountdown(postSessionCountdownElement, firstTimeCountdownElement);
 
       this.reminderCountdownUpdateInterval = setInterval(() => {
-        if (!postSessionCountdownElement.isConnected && !firstTimeCountdownElement.isConnected) {
+        // Stop interval when BOTH elements are disconnected from DOM (menu closed)
+        // Check isConnected only on elements that exist to avoid false positives
+        const postDisconnected = postSessionCountdownElement && !postSessionCountdownElement.isConnected;
+        const firstDisconnected = firstTimeCountdownElement && !firstTimeCountdownElement.isConnected;
+
+        if (postDisconnected && firstDisconnected) {
           this._stopReminderCountdownUpdates();
           return;
         }
@@ -9310,13 +9333,15 @@
         // If paused on unblocked workspace, still show overlay on blocked workspaces
         // WORKSPACE CHANGE FIX: Use provided workspace info if available to avoid race conditions
         // Otherwise fall back to checking current workspace
+        //
+        // NOTE: We intentionally don't use the `isBlocked` parameter here because it
+        // comes from isCurrentWorkspaceBlocked() which includes break phase logic.
+        // In paused state, we need raw workspace membership check (isWorkspaceIdBlocked)
+        // regardless of what phase the timer thinks it's in.
         let workspaceIsBlocked;
-        if (workspaceId !== null && isBlocked !== null) {
-          // Use provided workspace info (from workspace change callback)
-          // Need to re-check if this specific workspace is in blocked list since
-          // isBlocked param comes from isCurrentWorkspaceBlocked() which checks break phase
-          const config = getConfig();
-          workspaceIsBlocked = config.blockedWorkspaces.includes(workspaceId);
+        if (workspaceId !== null) {
+          // Use provided workspace ID with cached membership check
+          workspaceIsBlocked = this.workspace.isWorkspaceIdBlocked(workspaceId);
           logger.log(
             LOG_CATEGORIES.OVERLAY,
             'Using provided workspace info for paused state check',
