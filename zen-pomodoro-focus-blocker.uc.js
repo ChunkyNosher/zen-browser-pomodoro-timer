@@ -580,6 +580,23 @@
   }
 
   /**
+   * Clamp a position value within viewport bounds.
+   * @param {number} position - Current position value
+   * @param {number} size - Size of the element (width or height)
+   * @param {number} viewportSize - Size of the viewport (innerWidth or innerHeight)
+   * @returns {number} Clamped position value
+   */
+  function clampToViewportBound(position, size, viewportSize) {
+    const maxBound = viewportSize - size;
+    if (maxBound >= 0) {
+      return Math.max(0, Math.min(position, maxBound));
+    }
+    // Element larger than viewport: allow negative positions but keep part visible
+    const overflow = size - viewportSize;
+    return Math.max(-overflow, Math.min(position, 0));
+  }
+
+  /**
    * Issue 8: Setup drag functionality for dialogs
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
@@ -695,32 +712,9 @@
       const deltaX = coords.x - startX;
       const deltaY = coords.y - startY;
 
-      let newLeft = startLeft + deltaX;
-      let newTop = startTop + deltaY;
-
-      // Keep within viewport boundaries
-      const maxX = window.innerWidth - dialogWidth;
-      const maxY = window.innerHeight - dialogHeight;
-
-      if (maxX >= 0) {
-        newLeft = Math.max(0, Math.min(newLeft, maxX));
-      } else {
-        // Dialog wider than viewport: allow negative positions but ensure some part stays visible
-        const overflowX = dialogWidth - window.innerWidth;
-        const minLeft = -overflowX;
-        const maxLeftVal = 0;
-        newLeft = Math.max(minLeft, Math.min(newLeft, maxLeftVal));
-      }
-
-      if (maxY >= 0) {
-        newTop = Math.max(0, Math.min(newTop, maxY));
-      } else {
-        // Dialog taller than viewport
-        const overflowY = dialogHeight - window.innerHeight;
-        const minTop = -overflowY;
-        const maxTopVal = 0;
-        newTop = Math.max(minTop, Math.min(newTop, maxTopVal));
-      }
+      // Clamp positions to viewport boundaries using helper
+      const newLeft = clampToViewportBound(startLeft + deltaX, dialogWidth, window.innerWidth);
+      const newTop = clampToViewportBound(startTop + deltaY, dialogHeight, window.innerHeight);
 
       dialog.style.left = `${newLeft}px`;
       dialog.style.top = `${newTop}px`;
@@ -1180,6 +1174,9 @@
    * PAUSE FIX: When pausing, checks if currently on a blocked workspace using
    * isWorkspaceInBlockedList() which checks raw workspace membership without break
    * phase interference (break phase handling is separate).
+   * 
+   * NOTE: This function handles core timer state and visual indicator updates only.
+   * Callers are responsible for updating their own UI elements (e.g., button text).
    * 
    * @returns {void}
    */
@@ -3029,8 +3026,8 @@
       if (this.indicator) {
         this.indicator.setAttribute('data-phase', phase);
         
-        // PAUSED INDICATOR FIX: Set paused state for visual feedback
-        // Use the centralized method to avoid code duplication
+        // PAUSED INDICATOR FIX: keep paused state in sync during normal updates,
+        // not just on explicit pause/resume actions, using the centralized handler.
         const timer = window.zenPomodoroApp?.timer;
         if (timer) {
           this.updateIndicatorPausedState(timer.isPaused);
@@ -3087,9 +3084,8 @@
       indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
       this.indicator.setAttribute('data-phase', phase);
       
-      // PAUSED INDICATOR FIX: Set paused state for visual feedback
-      // Use the centralized method to avoid code duplication
-      this.updateIndicatorPausedState(timer.isPaused);
+      // Note: Paused state is set by actual pause/resume handlers in handlePauseResumeTimer(),
+      // not here during indicator initialization. This prevents incorrect initial state.
     }
 
     /**
@@ -3278,7 +3274,15 @@
       if (secondsUntil === 0) {
         countdownElement.textContent = 'Reminder ready to show';
       } else {
-        const timeStr = formatTime(secondsUntil);
+        // Use formatTime if available, otherwise fallback to manual formatting
+        let timeStr;
+        if (typeof formatTime === 'function') {
+          timeStr = formatTime(secondsUntil);
+        } else {
+          const minutes = Math.floor(secondsUntil / 60);
+          const seconds = secondsUntil % 60;
+          timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
         countdownElement.textContent = `Next reminder in: ${timeStr}`;
       }
     }
@@ -3568,8 +3572,8 @@
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
       dialog.appendChild(buttonDiv);
-      dialog.appendChild(versionIndicator);
       dialog.appendChild(reminderCountdown);
+      dialog.appendChild(versionIndicator);
 
       // Start reminder countdown updates (will auto-hide if not applicable)
       this._startReminderCountdownUpdates(reminderCountdown);
@@ -8124,25 +8128,32 @@
     }
 
     /**
+     * Check if conditions are met to show a countdown for next reminder.
+     * @returns {boolean} True if countdown should be shown
+     * @private
+     */
+    _canShowReminderCountdown() {
+      const config = getConfig();
+      
+      // Check basic conditions
+      if (!config.postSessionReminderEnabled) return false;
+      if (this.isShowing) return false;
+      if (!this.idleStartTime) return false;
+      if (window.zenPomodoroApp?.timer?.isActive) return false;
+      if (this._checkFocusTimeGoalReached()) return false;
+      
+      return true;
+    }
+
+    /**
      * Get time remaining until next reminder (in seconds).
      * Returns null if reminder shouldn't show or conditions aren't met.
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
     getTimeUntilNextReminder() {
+      if (!this._canShowReminderCountdown()) return null;
+
       const config = getConfig();
-
-      // Check if feature is enabled
-      if (!config.postSessionReminderEnabled) return null;
-
-      // Must have idle start time
-      if (!this.idleStartTime) return null;
-
-      // Timer must not be active
-      if (window.zenPomodoroApp?.timer?.isActive) return null;
-
-      // Focus time goal must not be reached
-      if (this._checkFocusTimeGoalReached()) return null;
-
       const now = Date.now();
 
       // If in cooldown, calculate time until cooldown ends
@@ -9146,7 +9157,7 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // Modules with destroy() methods
+      // All modules with destroy() methods
       const modulesToDestroy = [
         this.sineModBlocker,
         this.websiteBlocker,
@@ -9156,13 +9167,15 @@
         this.keyboardShortcut,
         this.overlay,
       ];
-
       modulesToDestroy.forEach((module) => module?.destroy?.());
 
-      // Modules with specific cleanup methods
-      this.workspace?.stopMonitoring?.();
-      this.timer?.stop?.();
-      this.security?.cleanupLockScreen?.();
+      // All modules with specific cleanup methods
+      const cleanupActions = [
+        () => this.workspace?.stopMonitoring?.(),
+        () => this.timer?.stop?.(),
+        () => this.security?.cleanupLockScreen?.(),
+      ];
+      cleanupActions.forEach((action) => action());
 
       this.initialized = false;
 
