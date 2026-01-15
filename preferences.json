@@ -48,5 +48,12 @@
     "label": "Daily Focus Time Goal (minutes) - reminders stop after goal",
     "type": "number",
     "defaultValue": 150
+  },
+  {
+    "property": "zen-pomodoro.postSessionReminderEndTime",
+    "label": "Post-Session Auto-Off Time (24h format, e.g., 00:30 for 12:30 AM)",
+    "type": "string",
+    "defaultValue": "00:30",
+    "placeholder": "00:30"
   }
 ]
