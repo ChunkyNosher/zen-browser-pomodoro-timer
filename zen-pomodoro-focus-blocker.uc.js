@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.6
+ * Version: 1.2.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.7';
+  const MOD_VERSION = '1.2.8';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -242,6 +242,7 @@
    * @constant {string[]}
    */
   const WORKSPACE_CONTAINER_SELECTORS = [
+    '#tabbrowser-arrowscrollbox', // Container holding zen-workspace elements (modern Zen Browser)
     '#zen-workspace-button-container',
     '#zen-workspaces-button-container',
     '[id*="workspace"]',
@@ -503,22 +504,57 @@
   }
 
   /**
+   * Load a non-empty string preference and set it in config if present.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadNonEmptyStringPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null && value !== '') {
+      config[configKey] = value;
+    }
+  }
+
+  /**
+   * Load a time preference (HH:MM format) and set it in config if valid.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadTimePref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    const hasValue = value !== null && value !== '';
+    const isValidTimePref = hasValue && isValidTimeFormat(value);
+    if (isValidTimePref) {
+      config[configKey] = value;
+    }
+  }
+
+  /**
+   * Load stored JSON config from preferences with error handling.
+   * @param {Object} config - Config object to merge into
+   * @returns {Object} Updated config object
+   */
+  function loadStoredConfigJson(config) {
+    const configStr = getPref('config', null);
+    if (!configStr) return config;
+
+    try {
+      const storedConfig = JSON.parse(configStr);
+      return { ...config, ...storedConfig };
+    } catch (e) {
+      console.error('Failed to parse config:', e);
+      return config;
+    }
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
-    // Start with default config
-    let config = { ...DEFAULT_CONFIG };
-
-    // Load from stored JSON config (legacy support)
-    const configStr = getPref('config', null);
-    if (configStr) {
-      try {
-        const storedConfig = JSON.parse(configStr);
-        config = { ...config, ...storedConfig };
-      } catch (e) {
-        console.error('Failed to parse config:', e);
-      }
-    }
+    // Start with default config, then merge stored JSON config
+    let config = loadStoredConfigJson({ ...DEFAULT_CONFIG });
 
     // Override with individual preferences if set
     // Boolean preferences (handles both true and 'true' for legacy support)
@@ -531,27 +567,12 @@
     loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
     loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
 
-    // Keyboard shortcut (requires non-empty string validation)
-    const keyboardShortcut = getPref('keyboardShortcut', null);
-    if (keyboardShortcut !== null && keyboardShortcut !== '') {
-      config.keyboardShortcut = keyboardShortcut;
-    }
+    // String preferences (requires non-empty validation)
+    loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
 
-    // First-time reminder time (requires HH:MM format validation)
-    const firstTimeReminderTime = getPref('firstTimeReminderTime', null);
-    if (firstTimeReminderTime !== null && firstTimeReminderTime !== '') {
-      if (isValidTimeFormat(firstTimeReminderTime)) {
-        config.firstTimeReminderTime = firstTimeReminderTime;
-      }
-    }
-
-    // Post-session reminder end time (requires HH:MM format validation)
-    const postSessionReminderEndTime = getPref('postSessionReminderEndTime', null);
-    if (postSessionReminderEndTime !== null && postSessionReminderEndTime !== '') {
-      if (isValidTimeFormat(postSessionReminderEndTime)) {
-        config.postSessionReminderEndTime = postSessionReminderEndTime;
-      }
-    }
+    // Time preferences (requires HH:MM format validation)
+    loadTimePref('firstTimeReminderTime', config, 'firstTimeReminderTime');
+    loadTimePref('postSessionReminderEndTime', config, 'postSessionReminderEndTime');
 
     return config;
   }
@@ -935,6 +956,31 @@
     const isInRange = parsed >= min && parsed <= max;
 
     return isValidNumber && isInRange ? parsed : defaultValue;
+  }
+
+  /**
+   * Extract and validate integer input from a dialog.
+   * This function is null-safe: returns null if element not found, returns defaultValue
+   * if the input is empty or invalid.
+   * @param {HTMLElement} dialog - The dialog element
+   * @param {Object} options - Options object
+   * @param {string} options.selector - CSS selector for the input
+   * @param {number} options.min - Minimum valid value
+   * @param {number} options.max - Maximum valid value
+   * @param {number} options.defaultValue - Default value if validation fails or input is empty
+   * @returns {number|null} Validated value, defaultValue for empty/invalid input, or null if element not found
+   */
+  function getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue }) {
+    const input = dialog.querySelector(selector);
+    if (!input) return null;
+
+    const rawValue = typeof input.value === 'string' ? input.value.trim() : '';
+    if (rawValue === '') {
+      // Treat present-but-empty input as "use default" rather than "missing element"
+      return defaultValue;
+    }
+
+    return validateIntegerInput(rawValue, min, max, defaultValue);
   }
 
   /**
@@ -2131,6 +2177,7 @@
       this.workspaceObserver = null; // Store observer for cleanup
       this.validatedWorkspaces = null; // Cache validated workspace list
       this.needsValidation = true; // Flag to track if validation is needed
+      this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
     }
 
     /**
@@ -2138,11 +2185,23 @@
      */
     getActiveWorkspace() {
       try {
-        const activeButton = document.querySelector(
+        // BUG FIX: Workspace blocking stopped working correctly on newer Zen Browser versions
+        // because the DOM structure for workspaces changed. Modern Zen builds expose the active
+        // workspace as a <zen-workspace> element, while older versions and some custom setups
+        // still rely on toolbarbutton[zen-workspace-id][active="true"]. To remain compatible
+        // across Zen Browser versions and themes, we first try the modern zen-workspace selector
+        // and then fall back to the legacy toolbarbutton-based selector.
+        let activeElement = document.querySelector('zen-workspace[active="true"][id]');
+        if (activeElement) {
+          return activeElement.id;
+        }
+        
+        // Fallback to toolbarbutton selector (legacy approach for older Zen versions/themes)
+        activeElement = document.querySelector(
           'toolbarbutton[zen-workspace-id][active="true"]'
         );
-        if (activeButton) {
-          return activeButton.getAttribute('zen-workspace-id');
+        if (activeElement) {
+          return activeElement.getAttribute('zen-workspace-id');
         }
       } catch (e) {
         console.error('Failed to get active workspace:', e);
@@ -2250,9 +2309,23 @@
      * @private
      */
     _handleWorkspaceMutation() {
+      // Clear any pending timeout to implement proper debouncing
+      if (this.mutationDebounceTimer) {
+        clearTimeout(this.mutationDebounceTimer);
+        this.mutationDebounceTimer = null;
+      }
+      
       // Use a small delay to ensure DOM has fully updated before checking workspace
-      setTimeout(() => {
+      this.mutationDebounceTimer = setTimeout(() => {
         const newWorkspace = this.getActiveWorkspace();
+        
+        // BUG FIX: Log mutation handler execution to debug workspace change detection
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace mutation detected', {
+          oldWorkspace: this.activeWorkspace,
+          newWorkspace: newWorkspace,
+          changed: newWorkspace !== this.activeWorkspace,
+        });
+        
         if (newWorkspace === this.activeWorkspace) return;
 
         this.activeWorkspace = newWorkspace;
@@ -2266,6 +2339,8 @@
           const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
           this.onWorkspaceChange(newWorkspace, isBlocked);
         }
+        
+        this.mutationDebounceTimer = null;
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
 
@@ -2276,6 +2351,10 @@
      */
     startMonitoring() {
       this.activeWorkspace = this.getActiveWorkspace();
+      
+      logger.log(LOG_CATEGORIES.WORKSPACE, 'Starting workspace monitoring', {
+        initialWorkspace: this.activeWorkspace,
+      });
 
       // Clean up existing observer if any
       if (this.workspaceObserver) {
@@ -2293,10 +2372,12 @@
       // A combined selector returns the first DOM element matching ANY selector,
       // not respecting our preference order.
       let workspaceContainer = null;
+      let workspaceContainerSelector = null;
       for (const selector of WORKSPACE_CONTAINER_SELECTORS) {
         const element = document.querySelector(selector);
         if (element) {
           workspaceContainer = element;
+          workspaceContainerSelector = selector;
           break;
         }
       }
@@ -2309,8 +2390,13 @@
           subtree: true,
           childList: true,
         });
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace observer configured', {
+          container: workspaceContainerSelector,
+          observingAttributes: ['active', 'selected', 'zen-workspace-id'],
+        });
       } else {
         console.warn('[Pomodoro Focus Blocker] No workspace container found for monitoring');
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'No workspace container found for monitoring');
       }
     }
 
@@ -2322,6 +2408,11 @@
       if (this.workspaceObserver) {
         this.workspaceObserver.disconnect();
         this.workspaceObserver = null;
+      }
+      // Clear any pending debounce timer
+      if (this.mutationDebounceTimer) {
+        clearTimeout(this.mutationDebounceTimer);
+        this.mutationDebounceTimer = null;
       }
     }
 
@@ -2438,12 +2529,30 @@
      * @private
      */
     _tryWorkspaceContainer() {
+      // BUG FIX: Try the modern zen-workspace elements first (for newer Zen Browser versions)
+      let items = document.querySelectorAll('zen-workspace');
+      if (items.length > 0) {
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
+          count: items.length,
+        });
+        console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
+        return Array.from(items).map((item) => {
+          const id = item.id; // The workspace ID is the element's id attribute
+          const name =
+            item.getAttribute('label') ||
+            item.querySelector('.zen-current-workspace-indicator-name')?.textContent?.trim() ||
+            `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+          return { id, name };
+        });
+      }
+      
+      // Fallback to legacy selectors
       const container = document.querySelector(
         '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
       );
       if (!container) return null;
 
-      const items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
+      items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
       if (items.length === 0) return null;
 
       console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
@@ -5021,72 +5130,31 @@
       config.postSessionReminderEnabled = enabledCheckbox.checked;
       config.postSessionSkipMethod = methodSelect.value;
 
-      // Save idle time
-      const idleTimeInput = dialog.querySelector('#post-session-idle-time');
-      if (idleTimeInput) {
-        config.postSessionIdleTime = validateIntegerInput(
-          idleTimeInput.value,
-          1,
-          240,
-          config.postSessionIdleTime
-        );
-      }
+      // Save integer settings using helper
+      // Note: zenUiPrefKey is used when a setting needs to be synced to the Zen Browser UI
+      // preferences system (via setPref) in addition to being saved in the config object.
+      // This allows settings to appear in Zen's native preferences UI.
+      const intSettings = [
+        { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
+        { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
+        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, zenUiPrefKey: 'postSessionFocusTimeGoal' },
+        { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
+        { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
+      ];
 
-      // Save cooldown
-      const cooldownInput = dialog.querySelector('#post-session-skip-cooldown');
-      if (cooldownInput) {
-        config.postSessionSkipCooldown = validateIntegerInput(
-          cooldownInput.value,
-          1,
-          120,
-          config.postSessionSkipCooldown
-        );
-      }
-
-      // Save focus time goal
-      const focusTimeGoalInput = dialog.querySelector('#post-session-focus-time-goal');
-      if (focusTimeGoalInput) {
-        config.postSessionFocusTimeGoal = validateIntegerInput(
-          focusTimeGoalInput.value,
-          1,
-          600,
-          config.postSessionFocusTimeGoal
-        );
-        // Save to individual preference for Zen UI sync
-        setPref('postSessionFocusTimeGoal', config.postSessionFocusTimeGoal);
-      }
+      intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
+        const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
+        if (value !== null) {
+          config[key] = value;
+          if (zenUiPrefKey) setPref(zenUiPrefKey, value);
+        }
+      });
 
       // Save end time (with HH:MM validation)
       const endTimeInput = dialog.querySelector('#post-session-end-time');
-      if (endTimeInput) {
-        const endTimeValue = endTimeInput.value;
-        if (endTimeValue && isValidTimeFormat(endTimeValue)) {
-          config.postSessionReminderEndTime = endTimeValue;
-          // Save to individual preference for Zen UI sync
-          setPref('postSessionReminderEndTime', endTimeValue);
-        }
-      }
-
-      // Save hold duration
-      const holdDurationInput = dialog.querySelector('#post-session-hold-duration');
-      if (holdDurationInput) {
-        config.postSessionSkipHoldDuration = validateIntegerInput(
-          holdDurationInput.value,
-          5,
-          120,
-          config.postSessionSkipHoldDuration
-        );
-      }
-
-      // Save code length
-      const codeLengthInput = dialog.querySelector('#post-session-code-length');
-      if (codeLengthInput) {
-        config.postSessionSkipCodeLength = validateIntegerInput(
-          codeLengthInput.value,
-          16,
-          128,
-          config.postSessionSkipCodeLength
-        );
+      if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
+        config.postSessionReminderEndTime = endTimeInput.value;
+        setPref('postSessionReminderEndTime', endTimeInput.value);
       }
 
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
