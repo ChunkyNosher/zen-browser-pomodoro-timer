@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.6';
+  const MOD_VERSION = '1.2.7';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -144,6 +144,8 @@
     postSessionSkipCount: 0,
     /** Timestamp when last skip occurred (persisted) */
     postSessionLastSkipTime: null,
+    /** Timestamp when last timer completed (persisted for countdown after browser restart) */
+    postSessionIdleStartTime: null,
     /** Time when post-session reminder should automatically turn off (24-hour HH:MM format, e.g., '00:30' for 12:30 AM) */
     postSessionReminderEndTime: '00:30',
     /** Flag to track if post-session reminder is disabled for the day (resets on next timer completion) */
@@ -2258,7 +2260,11 @@
         this.validateBlockedWorkspaces();
 
         if (this.onWorkspaceChange) {
-          this.onWorkspaceChange(newWorkspace, this.isCurrentWorkspaceBlocked());
+          // WORKSPACE BLOCKING FIX: Use isWorkspaceIdBlocked() to get raw workspace membership
+          // (not phase-filtered) so overlay visibility works correctly when paused or during breaks.
+          // Phase filtering is handled in updateOverlayVisibility().
+          const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
+          this.onWorkspaceChange(newWorkspace, isBlocked);
         }
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
@@ -8115,7 +8121,14 @@
       const reminderDate = new Date();
       reminderDate.setHours(hours, minutes, 0, 0);
 
-      // If reminder time has already passed today, return 0
+      // Check if timer was already started today
+      const today = this._getTodayDateString();
+      if (config.lastTimerStartDate === today) {
+        // Timer already started today, don't show countdown
+        return null;
+      }
+
+      // If reminder time has already passed today (and timer hasn't been started yet), return 0
       // (This will show "Daily reminder ready to show" in the UI)
       if (now >= reminderDate) {
         return 0;
@@ -8186,7 +8199,7 @@
 
     /**
      * Load persisted state from config.
-     * Restores skipCount and lastSkipTime across browser restarts.
+     * Restores skipCount, lastSkipTime, and idleStartTime across browser restarts.
      * @private
      */
     _loadState() {
@@ -8194,10 +8207,12 @@
 
       this.skipCount = config.postSessionSkipCount || 0;
       this.lastSkipTime = config.postSessionLastSkipTime || null;
+      this.idleStartTime = config.postSessionIdleStartTime || null;
 
       logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Loaded persisted state', {
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
       });
     }
 
@@ -8210,12 +8225,14 @@
 
       config.postSessionSkipCount = this.skipCount;
       config.postSessionLastSkipTime = this.lastSkipTime;
+      config.postSessionIdleStartTime = this.idleStartTime;
 
       saveConfig(config);
 
       logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Saved state', {
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
       });
     }
 
@@ -8259,11 +8276,15 @@
         return;
       }
 
+      this.idleStartTime = Date.now();
+
       logger.log(
         LOG_CATEGORIES.TIMER,
-        'Post-session reminder: Timer completed, starting idle tracking'
+        'Post-session reminder: Timer completed, starting idle tracking',
+        {
+          idleStartTime: new Date(this.idleStartTime).toISOString(),
+        }
       );
-      this.idleStartTime = Date.now();
 
       // Re-enable post-session reminders for the day (reset the disabled flag)
       if (config.postSessionReminderDisabledForDay) {
@@ -8275,6 +8296,9 @@
         );
       }
 
+      // Save state to persist idleStartTime across browser restarts
+      this._saveState();
+
       // Don't reset skip count here - it resets when a NEW timer starts
     }
 
@@ -8283,7 +8307,10 @@
      * Resets idle tracking and skip count.
      */
     onTimerStart() {
-      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state');
+      logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state', {
+        previousIdleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+        previousSkipCount: this.skipCount,
+      });
       this.idleStartTime = null;
       this.skipCount = 0;
       this.lastSkipTime = null;
@@ -8539,13 +8566,14 @@
 
       const now = Date.now();
 
-      // When there's no idle tracking yet (either because timer is still active or hasn't started),
-      // display the configured idle timeout duration as a static indicator.
-      // This shows users how long they need to be idle after timer completion before reminder appears.
-      const shouldShowStaticDuration = window.zenPomodoroApp?.timer?.isActive || !this.idleStartTime;
-      if (shouldShowStaticDuration) {
-        // Return the full idle timeout duration in seconds (e.g., 45 minutes = 2700 seconds)
-        return config.postSessionIdleTime * 60;
+      // Don't show countdown while timer is active (reminder is only for post-session)
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        return null;
+      }
+
+      // Don't show countdown if no session has completed yet (no idle tracking started)
+      if (!this.idleStartTime) {
+        return null;
       }
 
       // If in cooldown, calculate time until cooldown ends
@@ -9356,13 +9384,18 @@
       const workspaceBlocked =
         isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
 
+      // Get workspace ID for logging (use provided or query current)
+      const currentWorkspaceId = workspaceId || this.workspace.getActiveWorkspace();
+
       if (workspaceBlocked) {
         logger.log(
           LOG_CATEGORIES.OVERLAY,
           'Current workspace is blocked - showing overlay',
           {
+            workspaceId: currentWorkspaceId,
             isPaused: this.timer.isPaused,
             workspaceBlocked: workspaceBlocked,
+            isBlockedParam: isBlocked,
           }
         );
         this._showOverlayWithStatus();
@@ -9371,8 +9404,10 @@
           LOG_CATEGORIES.OVERLAY,
           'Current workspace is unblocked - hiding overlay',
           {
+            workspaceId: currentWorkspaceId,
             isPaused: this.timer.isPaused,
             workspaceBlocked: workspaceBlocked,
+            isBlockedParam: isBlocked,
           }
         );
         this.overlay.hide();
