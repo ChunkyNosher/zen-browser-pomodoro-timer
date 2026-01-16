@@ -960,18 +960,27 @@
 
   /**
    * Extract and validate integer input from a dialog.
+   * This function is null-safe: returns null if element not found, returns defaultValue
+   * if the input is empty or invalid.
    * @param {HTMLElement} dialog - The dialog element
    * @param {Object} options - Options object
    * @param {string} options.selector - CSS selector for the input
    * @param {number} options.min - Minimum valid value
    * @param {number} options.max - Maximum valid value
-   * @param {number} options.defaultValue - Default value if validation fails
-   * @returns {number|null} Validated value or null if element not found
+   * @param {number} options.defaultValue - Default value if validation fails or input is empty
+   * @returns {number|null} Validated value, defaultValue for empty/invalid input, or null if element not found
    */
   function getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue }) {
     const input = dialog.querySelector(selector);
     if (!input) return null;
-    return validateIntegerInput(input.value, min, max, defaultValue);
+
+    const rawValue = typeof input.value === 'string' ? input.value.trim() : '';
+    if (rawValue === '') {
+      // Treat present-but-empty input as "use default" rather than "missing element"
+      return defaultValue;
+    }
+
+    return validateIntegerInput(rawValue, min, max, defaultValue);
   }
 
   /**
@@ -2176,14 +2185,18 @@
      */
     getActiveWorkspace() {
       try {
-        // BUG FIX: Try multiple selectors for better compatibility across Zen Browser versions
-        // First try the zen-workspace element (modern approach)
-        let activeElement = document.querySelector('zen-workspace[active="true"]');
-        if (activeElement && activeElement.id) {
+        // BUG FIX: Workspace blocking stopped working correctly on newer Zen Browser versions
+        // because the DOM structure for workspaces changed. Modern Zen builds expose the active
+        // workspace as a <zen-workspace> element, while older versions and some custom setups
+        // still rely on toolbarbutton[zen-workspace-id][active="true"]. To remain compatible
+        // across Zen Browser versions and themes, we first try the modern zen-workspace selector
+        // and then fall back to the legacy toolbarbutton-based selector.
+        let activeElement = document.querySelector('zen-workspace[active="true"][id]');
+        if (activeElement) {
           return activeElement.id;
         }
         
-        // Fallback to toolbarbutton selector (legacy approach)
+        // Fallback to toolbarbutton selector (legacy approach for older Zen versions/themes)
         activeElement = document.querySelector(
           'toolbarbutton[zen-workspace-id][active="true"]'
         );
@@ -2299,6 +2312,7 @@
       // Clear any pending timeout to implement proper debouncing
       if (this.mutationDebounceTimer) {
         clearTimeout(this.mutationDebounceTimer);
+        this.mutationDebounceTimer = null;
       }
       
       // Use a small delay to ensure DOM has fully updated before checking workspace
@@ -2515,9 +2529,12 @@
      * @private
      */
     _tryWorkspaceContainer() {
-      // BUG FIX: Try the modern zen-workspace elements first
+      // BUG FIX: Try the modern zen-workspace elements first (for newer Zen Browser versions)
       let items = document.querySelectorAll('zen-workspace');
       if (items.length > 0) {
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
+          count: items.length,
+        });
         console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
         return Array.from(items).map((item) => {
           const id = item.id; // The workspace ID is the element's id attribute
@@ -5114,6 +5131,9 @@
       config.postSessionSkipMethod = methodSelect.value;
 
       // Save integer settings using helper
+      // Note: zenUiPrefKey is used when a setting needs to be synced to the Zen Browser UI
+      // preferences system (via setPref) in addition to being saved in the config object.
+      // This allows settings to appear in Zen's native preferences UI.
       const intSettings = [
         { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
         { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
