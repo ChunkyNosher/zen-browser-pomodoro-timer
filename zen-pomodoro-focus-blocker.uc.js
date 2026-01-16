@@ -524,7 +524,8 @@
    */
   function loadTimePref(prefName, config, configKey) {
     const value = getPref(prefName, null);
-    const isValidTimePref = value !== null && value !== '' && isValidTimeFormat(value);
+    const hasValue = value !== null && value !== '';
+    const isValidTimePref = hasValue && isValidTimeFormat(value);
     if (isValidTimePref) {
       config[configKey] = value;
     }
@@ -5116,16 +5117,16 @@
       const intSettings = [
         { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
         { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
-        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, pref: 'postSessionFocusTimeGoal' },
+        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, zenUiPrefKey: 'postSessionFocusTimeGoal' },
         { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
         { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
       ];
 
-      intSettings.forEach(({ selector, key, min, max, pref }) => {
+      intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
         const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
         if (value !== null) {
           config[key] = value;
-          if (pref) setPref(pref, value);
+          if (zenUiPrefKey) setPref(zenUiPrefKey, value);
         }
       });
 
