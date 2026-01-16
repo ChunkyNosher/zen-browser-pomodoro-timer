@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.6
+ * Version: 1.2.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.7';
+  const MOD_VERSION = '1.2.8';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -504,22 +504,56 @@
   }
 
   /**
+   * Load a non-empty string preference and set it in config if present.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadNonEmptyStringPref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    if (value !== null && value !== '') {
+      config[configKey] = value;
+    }
+  }
+
+  /**
+   * Load a time preference (HH:MM format) and set it in config if valid.
+   * @param {string} prefName - Preference name (without prefix)
+   * @param {Object} config - Config object to update
+   * @param {string} configKey - Key in config to set
+   */
+  function loadTimePref(prefName, config, configKey) {
+    const value = getPref(prefName, null);
+    const isValidTimePref = value !== null && value !== '' && isValidTimeFormat(value);
+    if (isValidTimePref) {
+      config[configKey] = value;
+    }
+  }
+
+  /**
+   * Load stored JSON config from preferences with error handling.
+   * @param {Object} config - Config object to merge into
+   * @returns {Object} Updated config object
+   */
+  function loadStoredConfigJson(config) {
+    const configStr = getPref('config', null);
+    if (!configStr) return config;
+
+    try {
+      const storedConfig = JSON.parse(configStr);
+      return { ...config, ...storedConfig };
+    } catch (e) {
+      console.error('Failed to parse config:', e);
+      return config;
+    }
+  }
+
+  /**
    * Get configuration object from preferences
    */
   function getConfig() {
-    // Start with default config
-    let config = { ...DEFAULT_CONFIG };
-
-    // Load from stored JSON config (legacy support)
-    const configStr = getPref('config', null);
-    if (configStr) {
-      try {
-        const storedConfig = JSON.parse(configStr);
-        config = { ...config, ...storedConfig };
-      } catch (e) {
-        console.error('Failed to parse config:', e);
-      }
-    }
+    // Start with default config, then merge stored JSON config
+    let config = loadStoredConfigJson({ ...DEFAULT_CONFIG });
 
     // Override with individual preferences if set
     // Boolean preferences (handles both true and 'true' for legacy support)
@@ -532,27 +566,12 @@
     loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
     loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
 
-    // Keyboard shortcut (requires non-empty string validation)
-    const keyboardShortcut = getPref('keyboardShortcut', null);
-    if (keyboardShortcut !== null && keyboardShortcut !== '') {
-      config.keyboardShortcut = keyboardShortcut;
-    }
+    // String preferences (requires non-empty validation)
+    loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
 
-    // First-time reminder time (requires HH:MM format validation)
-    const firstTimeReminderTime = getPref('firstTimeReminderTime', null);
-    if (firstTimeReminderTime !== null && firstTimeReminderTime !== '') {
-      if (isValidTimeFormat(firstTimeReminderTime)) {
-        config.firstTimeReminderTime = firstTimeReminderTime;
-      }
-    }
-
-    // Post-session reminder end time (requires HH:MM format validation)
-    const postSessionReminderEndTime = getPref('postSessionReminderEndTime', null);
-    if (postSessionReminderEndTime !== null && postSessionReminderEndTime !== '') {
-      if (isValidTimeFormat(postSessionReminderEndTime)) {
-        config.postSessionReminderEndTime = postSessionReminderEndTime;
-      }
-    }
+    // Time preferences (requires HH:MM format validation)
+    loadTimePref('firstTimeReminderTime', config, 'firstTimeReminderTime');
+    loadTimePref('postSessionReminderEndTime', config, 'postSessionReminderEndTime');
 
     return config;
   }
@@ -936,6 +955,22 @@
     const isInRange = parsed >= min && parsed <= max;
 
     return isValidNumber && isInRange ? parsed : defaultValue;
+  }
+
+  /**
+   * Extract and validate integer input from a dialog.
+   * @param {HTMLElement} dialog - The dialog element
+   * @param {Object} options - Options object
+   * @param {string} options.selector - CSS selector for the input
+   * @param {number} options.min - Minimum valid value
+   * @param {number} options.max - Maximum valid value
+   * @param {number} options.defaultValue - Default value if validation fails
+   * @returns {number|null} Validated value or null if element not found
+   */
+  function getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue }) {
+    const input = dialog.querySelector(selector);
+    if (!input) return null;
+    return validateIntegerInput(input.value, min, max, defaultValue);
   }
 
   /**
@@ -5077,72 +5112,28 @@
       config.postSessionReminderEnabled = enabledCheckbox.checked;
       config.postSessionSkipMethod = methodSelect.value;
 
-      // Save idle time
-      const idleTimeInput = dialog.querySelector('#post-session-idle-time');
-      if (idleTimeInput) {
-        config.postSessionIdleTime = validateIntegerInput(
-          idleTimeInput.value,
-          1,
-          240,
-          config.postSessionIdleTime
-        );
-      }
+      // Save integer settings using helper
+      const intSettings = [
+        { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
+        { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
+        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, pref: 'postSessionFocusTimeGoal' },
+        { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
+        { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
+      ];
 
-      // Save cooldown
-      const cooldownInput = dialog.querySelector('#post-session-skip-cooldown');
-      if (cooldownInput) {
-        config.postSessionSkipCooldown = validateIntegerInput(
-          cooldownInput.value,
-          1,
-          120,
-          config.postSessionSkipCooldown
-        );
-      }
-
-      // Save focus time goal
-      const focusTimeGoalInput = dialog.querySelector('#post-session-focus-time-goal');
-      if (focusTimeGoalInput) {
-        config.postSessionFocusTimeGoal = validateIntegerInput(
-          focusTimeGoalInput.value,
-          1,
-          600,
-          config.postSessionFocusTimeGoal
-        );
-        // Save to individual preference for Zen UI sync
-        setPref('postSessionFocusTimeGoal', config.postSessionFocusTimeGoal);
-      }
+      intSettings.forEach(({ selector, key, min, max, pref }) => {
+        const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
+        if (value !== null) {
+          config[key] = value;
+          if (pref) setPref(pref, value);
+        }
+      });
 
       // Save end time (with HH:MM validation)
       const endTimeInput = dialog.querySelector('#post-session-end-time');
-      if (endTimeInput) {
-        const endTimeValue = endTimeInput.value;
-        if (endTimeValue && isValidTimeFormat(endTimeValue)) {
-          config.postSessionReminderEndTime = endTimeValue;
-          // Save to individual preference for Zen UI sync
-          setPref('postSessionReminderEndTime', endTimeValue);
-        }
-      }
-
-      // Save hold duration
-      const holdDurationInput = dialog.querySelector('#post-session-hold-duration');
-      if (holdDurationInput) {
-        config.postSessionSkipHoldDuration = validateIntegerInput(
-          holdDurationInput.value,
-          5,
-          120,
-          config.postSessionSkipHoldDuration
-        );
-      }
-
-      // Save code length
-      const codeLengthInput = dialog.querySelector('#post-session-code-length');
-      if (codeLengthInput) {
-        config.postSessionSkipCodeLength = validateIntegerInput(
-          codeLengthInput.value,
-          16,
-          128,
-          config.postSessionSkipCodeLength
-        );
+      if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
+        config.postSessionReminderEndTime = endTimeInput.value;
+        setPref('postSessionReminderEndTime', endTimeInput.value);
       }
 
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
