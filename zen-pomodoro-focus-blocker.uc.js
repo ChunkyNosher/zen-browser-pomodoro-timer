@@ -242,6 +242,7 @@
    * @constant {string[]}
    */
   const WORKSPACE_CONTAINER_SELECTORS = [
+    '#tabbrowser-arrowscrollbox', // Container holding zen-workspace elements (modern Zen Browser)
     '#zen-workspace-button-container',
     '#zen-workspaces-button-container',
     '[id*="workspace"]',
@@ -2131,6 +2132,7 @@
       this.workspaceObserver = null; // Store observer for cleanup
       this.validatedWorkspaces = null; // Cache validated workspace list
       this.needsValidation = true; // Flag to track if validation is needed
+      this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
     }
 
     /**
@@ -2138,11 +2140,19 @@
      */
     getActiveWorkspace() {
       try {
-        const activeButton = document.querySelector(
+        // BUG FIX: Try multiple selectors for better compatibility across Zen Browser versions
+        // First try the zen-workspace element (modern approach)
+        let activeElement = document.querySelector('zen-workspace[active="true"]');
+        if (activeElement && activeElement.id) {
+          return activeElement.id;
+        }
+        
+        // Fallback to toolbarbutton selector (legacy approach)
+        activeElement = document.querySelector(
           'toolbarbutton[zen-workspace-id][active="true"]'
         );
-        if (activeButton) {
-          return activeButton.getAttribute('zen-workspace-id');
+        if (activeElement) {
+          return activeElement.getAttribute('zen-workspace-id');
         }
       } catch (e) {
         console.error('Failed to get active workspace:', e);
@@ -2250,9 +2260,22 @@
      * @private
      */
     _handleWorkspaceMutation() {
+      // Clear any pending timeout to implement proper debouncing
+      if (this.mutationDebounceTimer) {
+        clearTimeout(this.mutationDebounceTimer);
+      }
+      
       // Use a small delay to ensure DOM has fully updated before checking workspace
-      setTimeout(() => {
+      this.mutationDebounceTimer = setTimeout(() => {
         const newWorkspace = this.getActiveWorkspace();
+        
+        // BUG FIX: Log mutation handler execution to debug workspace change detection
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace mutation detected', {
+          oldWorkspace: this.activeWorkspace,
+          newWorkspace: newWorkspace,
+          changed: newWorkspace !== this.activeWorkspace,
+        });
+        
         if (newWorkspace === this.activeWorkspace) return;
 
         this.activeWorkspace = newWorkspace;
@@ -2266,6 +2289,8 @@
           const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
           this.onWorkspaceChange(newWorkspace, isBlocked);
         }
+        
+        this.mutationDebounceTimer = null;
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
 
@@ -2276,6 +2301,10 @@
      */
     startMonitoring() {
       this.activeWorkspace = this.getActiveWorkspace();
+      
+      logger.log(LOG_CATEGORIES.WORKSPACE, 'Starting workspace monitoring', {
+        initialWorkspace: this.activeWorkspace,
+      });
 
       // Clean up existing observer if any
       if (this.workspaceObserver) {
@@ -2293,10 +2322,12 @@
       // A combined selector returns the first DOM element matching ANY selector,
       // not respecting our preference order.
       let workspaceContainer = null;
+      let workspaceContainerSelector = null;
       for (const selector of WORKSPACE_CONTAINER_SELECTORS) {
         const element = document.querySelector(selector);
         if (element) {
           workspaceContainer = element;
+          workspaceContainerSelector = selector;
           break;
         }
       }
@@ -2309,8 +2340,13 @@
           subtree: true,
           childList: true,
         });
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace observer configured', {
+          container: workspaceContainerSelector,
+          observingAttributes: ['active', 'selected', 'zen-workspace-id'],
+        });
       } else {
         console.warn('[Pomodoro Focus Blocker] No workspace container found for monitoring');
+        logger.log(LOG_CATEGORIES.WORKSPACE, 'No workspace container found for monitoring');
       }
     }
 
@@ -2322,6 +2358,11 @@
       if (this.workspaceObserver) {
         this.workspaceObserver.disconnect();
         this.workspaceObserver = null;
+      }
+      // Clear any pending debounce timer
+      if (this.mutationDebounceTimer) {
+        clearTimeout(this.mutationDebounceTimer);
+        this.mutationDebounceTimer = null;
       }
     }
 
@@ -2438,12 +2479,27 @@
      * @private
      */
     _tryWorkspaceContainer() {
+      // BUG FIX: Try the modern zen-workspace elements first
+      let items = document.querySelectorAll('zen-workspace');
+      if (items.length > 0) {
+        console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
+        return Array.from(items).map((item) => {
+          const id = item.id; // The workspace ID is the element's id attribute
+          const name =
+            item.getAttribute('label') ||
+            item.querySelector('.zen-current-workspace-indicator-name')?.textContent?.trim() ||
+            `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+          return { id, name };
+        });
+      }
+      
+      // Fallback to legacy selectors
       const container = document.querySelector(
         '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
       );
       if (!container) return null;
 
-      const items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
+      items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
       if (items.length === 0) return null;
 
       console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
