@@ -7796,6 +7796,11 @@
           return;
         }
 
+        // Respect main timer's pause state - do not decrement if paused
+        if (window.zenPomodoroApp?.timer?.isPaused) {
+          return;
+        }
+
         this.remainingTime--;
 
         // Update display
@@ -9430,7 +9435,23 @@
         return;
       }
 
-      // During break phases, hide workspace overlay to allow free browsing
+      // SPECIAL CASE: When timer is paused during break/transition, block workspaces
+      // This prevents users from indefinitely pausing during break to bypass blocking
+      if (this.timer.isPaused && isInBreakPhase()) {
+        // Use provided status if available, otherwise check current workspace
+        const workspaceBlocked =
+          isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
+        
+        if (workspaceBlocked) {
+          this.overlay.show();
+        } else {
+          this.overlay.hide();
+        }
+        // Keep indicator visible to show paused state
+        return;
+      }
+
+      // During break phases (not paused), hide workspace overlay to allow free browsing
       // Note: isCurrentWorkspaceBlocked() already checks for break phase,
       // but we add an explicit check here for clarity and to update display
       if (isInBreakPhase()) {
@@ -9439,8 +9460,10 @@
         return;
       }
 
-      // During transition phase, hide workspace overlay (blocking stays disabled)
+      // During transition phase (not paused), hide workspace overlay (blocking stays disabled)
       // The transition popup is shown separately by the TransitionPhaseManager
+      // Note: This check is technically redundant as isInBreakPhase() includes transition,
+      // but kept for backwards compatibility and explicit documentation
       if (this.timer.currentPhase === 'transition') {
         this.overlay.hide();
         // Keep the indicator visible during transition so user knows timer is running
