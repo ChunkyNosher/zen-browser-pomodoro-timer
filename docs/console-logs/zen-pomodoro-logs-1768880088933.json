@@ -1,0 +1,1228 @@
+{
+  "exportedAt": "2026-01-20T03:34:48.932Z",
+  "totalEntries": 158,
+  "logs": [
+    {
+      "timestamp": "2026-01-20T03:30:38.841Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "WORKSPACE",
+      "message": "Starting workspace monitoring",
+      "data": {
+        "initialWorkspace": null
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "WORKSPACE",
+      "message": "Workspace observer configured",
+      "data": {
+        "container": "#tabbrowser-arrowscrollbox",
+        "observingAttributes": [
+          "active",
+          "selected",
+          "zen-workspace-id"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.141Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Feature disabled"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 3,
+        "lastSkipTime": "2026-01-20T03:17:24.598Z",
+        "idleStartTime": "2026-01-20T00:24:40.360Z"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:39.142Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:40.670Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": null,
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:41.206Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:41.207Z",
+      "category": "WORKSPACE",
+      "message": "Workspace detection: Using modern zen-workspace elements",
+      "data": {
+        "count": 8
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:41.207Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "timerActive": false,
+        "timerPaused": false,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.361Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.361Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.361Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.562Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.720Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:42.720Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:44.487Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:45.077Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:45.713Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:48.328Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:48.329Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:48.329Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:49.041Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:49.918Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:49.936Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:55.399Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:55.399Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:55.399Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:30:57.192Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-20T03:30:57.193Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:16.484Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:16.501Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:16.522Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:18.765Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:18.765Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:22.893Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:25.259Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:25.259Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:25.259Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:26.999Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:27.000Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:39.135Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Manually triggered for testing"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:39.135Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:39.135Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:39.135Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:39.146Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Daily reminder is showing"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:57.189Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:57.298Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:57.298Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:57.298Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:31:58.611Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Start Timer button clicked"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:58.611Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:31:58.611Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:04.024Z",
+      "category": "MENU",
+      "message": "Closing all dialogs (toggle behavior)"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:06.083Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:08.458Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:08.458Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:08.458Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:10.387Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:10.387Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:13.141Z",
+      "category": "SETTINGS",
+      "message": "Saving settings"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:13.141Z",
+      "category": "SETTINGS",
+      "message": "Saved daily reminder settings",
+      "data": {
+        "enabled": true,
+        "times": [
+          "11:15",
+          "16:15"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:13.141Z",
+      "category": "SETTINGS",
+      "message": "Saved post-session reminder settings",
+      "data": {
+        "enabled": true,
+        "idleTime": 45,
+        "skipCooldown": 30,
+        "skipMethod": "hold",
+        "focusTimeGoal": 150,
+        "endTime": "00:30"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:13.141Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:15.201Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Manually triggered for testing"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:15.201Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:15.201Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:15.201Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:34.958Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Start Timer button clicked"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:34.958Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:34.958Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:37.482Z",
+      "category": "MENU",
+      "message": "Closing all dialogs (toggle behavior)"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:39.158Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Showing reminder",
+      "data": {
+        "reminderTime": "11:15"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:39.158Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:32:39.158Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:39.159Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 4
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:32:39.159Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Daily reminder is showing"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:03.975Z",
+      "category": "TIMER",
+      "message": "Daily reminder hold-to-skip completed"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:03.976Z",
+      "category": "TIMER",
+      "message": "Daily reminder skipped",
+      "data": {
+        "skipCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:03.976Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:03.976Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 1,
+        "lastSkipTime": "2026-01-20T03:33:03.976Z",
+        "remindersShownCount": 4
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:03.976Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:05.984Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:07.288Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:07.288Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:07.288Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:09.153Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:09.153Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:21.191Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Manually triggered for testing"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:21.191Z",
+      "category": "TIMER",
+      "message": "Showing post-session reminder overlay",
+      "data": {
+        "skipCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:24.563Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Start Timer button clicked"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:24.563Z",
+      "category": "TIMER",
+      "message": "Hiding post-session reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:24.563Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:36.322Z",
+      "category": "MENU",
+      "message": "Closing all dialogs (toggle behavior)"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:38.984Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.048Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.048Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.167Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Showing reminder",
+      "data": {
+        "reminderTime": "11:15"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.167Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.167Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.167Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 1,
+        "lastSkipTime": "2026-01-20T03:33:03.976Z",
+        "remindersShownCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:39.168Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Daily reminder is showing"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:41.091Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:41.771Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:41.863Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:42.020Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:42.020Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:57.298Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:57.410Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:33:57.410Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:33:57.410Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 1,
+        "lastSkipTime": "2026-01-20T03:33:03.976Z",
+        "remindersShownCount": 6
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:22.738Z",
+      "category": "TIMER",
+      "message": "Daily reminder hold-to-skip completed"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:22.738Z",
+      "category": "TIMER",
+      "message": "Daily reminder skipped",
+      "data": {
+        "skipCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:22.739Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:22.739Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 2,
+        "lastSkipTime": "2026-01-20T03:34:22.738Z",
+        "remindersShownCount": 6
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:22.739Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:25.032Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:25.103Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:25.103Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:25.304Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:26.324Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:26.464Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:26.500Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:26.500Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:31.641Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:32.387Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:32.427Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:32.455Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:32.455Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:36.319Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:37.670Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:37.670Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:37.670Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:39.171Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Showing reminder",
+      "data": {
+        "reminderTime": "11:15"
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:39.171Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:39.171Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 35,
+        "breakDuration": 45,
+        "cycles": 3,
+        "blockedWorkspacesCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:39.171Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 2,
+        "lastSkipTime": "2026-01-20T03:34:22.738Z",
+        "remindersShownCount": 7
+      }
+    },
+    {
+      "timestamp": "2026-01-20T03:34:39.172Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Daily reminder is showing"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:45.189Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Start Timer button clicked"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:45.189Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:45.189Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:47.551Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:47.551Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:48.932Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-01-20T03:34:48.932Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 157
+      }
+    }
+  ]
+}
