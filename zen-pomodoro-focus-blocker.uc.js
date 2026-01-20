@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.9
+ * Version: 1.2.10
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.9';
+  const MOD_VERSION = '1.2.10';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -130,6 +130,8 @@
     dailyReminderSkipCount: 0,
     /** Timestamp of last daily reminder skip (persisted) */
     dailyReminderLastSkipTime: null,
+    /** Daily reminder skip cooldown in minutes (default: 10) */
+    dailyReminderSkipCooldown: 10,
     /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
     lastTimerStartDate: '',
     /** Timestamps of daily reminders shown today (persisted, array of timestamps) */
@@ -1181,11 +1183,11 @@
     }
 
     if (secondsUntil === null) {
-      element.style.display = 'none';
+      element.classList.add('zen-pomodoro-hidden');
       return;
     }
 
-    element.style.display = 'block';
+    element.classList.remove('zen-pomodoro-hidden');
 
     if (secondsUntil === 0) {
       element.textContent = options.readyText;
@@ -1899,13 +1901,11 @@
         config.dailyReminderTimes.length > 0
       ) {
         // Sort times numerically by hours and minutes and use the first one
-        const sortedTimes = config.dailyReminderTimes
-          .slice()
-          .sort((a, b) => {
-            const [aHours, aMinutes] = a.split(':').map(Number);
-            const [bHours, bMinutes] = b.split(':').map(Number);
-            return aHours - bHours || aMinutes - bMinutes;
-          });
+        const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
+          const [aHours, aMinutes] = a.split(':').map(Number);
+          const [bHours, bMinutes] = b.split(':').map(Number);
+          return aHours - bHours || aMinutes - bMinutes;
+        });
         reminderTime = sortedTimes[0];
       }
 
@@ -2266,11 +2266,9 @@
         if (activeElement) {
           return activeElement.id;
         }
-        
+
         // Fallback to toolbarbutton selector (legacy approach for older Zen versions/themes)
-        activeElement = document.querySelector(
-          'toolbarbutton[zen-workspace-id][active="true"]'
-        );
+        activeElement = document.querySelector('toolbarbutton[zen-workspace-id][active="true"]');
         if (activeElement) {
           return activeElement.getAttribute('zen-workspace-id');
         }
@@ -2385,18 +2383,18 @@
         clearTimeout(this.mutationDebounceTimer);
         this.mutationDebounceTimer = null;
       }
-      
+
       // Use a small delay to ensure DOM has fully updated before checking workspace
       this.mutationDebounceTimer = setTimeout(() => {
         const newWorkspace = this.getActiveWorkspace();
-        
+
         // BUG FIX: Log mutation handler execution to debug workspace change detection
         logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace mutation detected', {
           oldWorkspace: this.activeWorkspace,
           newWorkspace: newWorkspace,
           changed: newWorkspace !== this.activeWorkspace,
         });
-        
+
         if (newWorkspace === this.activeWorkspace) return;
 
         this.activeWorkspace = newWorkspace;
@@ -2410,7 +2408,7 @@
           const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
           this.onWorkspaceChange(newWorkspace, isBlocked);
         }
-        
+
         this.mutationDebounceTimer = null;
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
@@ -2422,7 +2420,7 @@
      */
     startMonitoring() {
       this.activeWorkspace = this.getActiveWorkspace();
-      
+
       logger.log(LOG_CATEGORIES.WORKSPACE, 'Starting workspace monitoring', {
         initialWorkspace: this.activeWorkspace,
       });
@@ -2617,9 +2615,13 @@
       const items = document.querySelectorAll('zen-workspace');
       if (items.length === 0) return null;
 
-      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
-        count: items.length,
-      });
+      logger.log(
+        LOG_CATEGORIES.WORKSPACE,
+        'Workspace detection: Using modern zen-workspace elements',
+        {
+          count: items.length,
+        }
+      );
       console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
 
       return Array.from(items).map((item) => this._extractWorkspaceFromModernElement(item));
@@ -2732,7 +2734,7 @@
         cycleProgress.textContent = `Cycle 1 of ${totalCycles}`;
       } else {
         // Hide for simple mode or when timer mode is not yet set
-        cycleProgress.style.display = 'none';
+        cycleProgress.classList.add('zen-pomodoro-hidden');
       }
 
       // Motivational message - SECURITY FIX: Use textContent
@@ -3297,6 +3299,16 @@
       this._updatePhaseLabel(phase);
       this._updateCycleProgress(phase, currentCycle, totalCycles);
       this._updateIndicator(phase, timeStr);
+
+      // Log every 30 seconds to avoid log spam
+      if (remainingTime % 30 === 0) {
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Display updated', {
+          time: timeStr,
+          phase,
+          cycle: currentCycle,
+          totalCycles,
+        });
+      }
     }
 
     /**
@@ -3335,7 +3347,7 @@
       // Only show cycle progress for pomodoro mode during focus phase
       const timerMode = window.zenPomodoroApp?.timer?.mode;
       const shouldShow = phase === 'focus' && timerMode === 'pomodoro';
-      cycleProgress.style.display = shouldShow ? 'block' : 'none';
+      cycleProgress.classList.toggle('zen-pomodoro-hidden', !shouldShow);
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
       }
@@ -3371,6 +3383,7 @@
       if (!this.overlay) return;
 
       this.overlay.setAttribute('data-phase', phase);
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay phase color updated', { phase });
 
       // Trigger transition animation
       this.overlay.setAttribute('data-transitioning', 'true');
@@ -3392,6 +3405,7 @@
       this._resetIndicatorDisplay();
 
       this.indicator.classList.add('active');
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Timer indicator shown');
     }
 
     /**
@@ -3423,6 +3437,7 @@
     hideIndicator() {
       if (this.indicator) {
         this.indicator.classList.remove('active');
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Timer indicator hidden');
       }
     }
 
@@ -3797,8 +3812,8 @@
         });
 
         // Cut Break Early button - only shown during break, long-break, or transition phases
-        const isBreakOrTransition = 
-          status.currentPhase === 'break' || 
+        const isBreakOrTransition =
+          status.currentPhase === 'break' ||
           status.currentPhase === 'long-break' ||
           status.currentPhase === 'transition';
         let cutBreakBtn = null;
@@ -3810,7 +3825,7 @@
             this._stopMenuTimerUpdates();
             dialog.remove();
             this.menuDialog = null;
-            
+
             // If in transition phase, hide the popup (which triggers onTransitionComplete callback)
             if (status.currentPhase === 'transition') {
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
@@ -3861,9 +3876,10 @@
         // Toggle indicator visibility button
         const toggleIndicatorBtn = document.createElement('button');
         toggleIndicatorBtn.className = 'zen-pomodoro-dialog-button secondary';
-        toggleIndicatorBtn.textContent = window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-          ? 'Hide Timer Indicator'
-          : 'Show Timer Indicator';
+        toggleIndicatorBtn.textContent =
+          window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
+            ? 'Hide Timer Indicator'
+            : 'Show Timer Indicator';
         toggleIndicatorBtn.addEventListener('click', () => {
           if (window.zenPomodoroApp?.overlay) {
             const indicator = window.zenPomodoroApp.overlay.indicator;
@@ -3946,13 +3962,11 @@
 
       // Post-session reminder countdown indicator
       const postSessionCountdown = document.createElement('div');
-      postSessionCountdown.className = 'zen-pomodoro-reminder-countdown';
-      postSessionCountdown.style.display = 'none';
+      postSessionCountdown.className = 'zen-pomodoro-reminder-countdown zen-pomodoro-hidden';
 
       // First-time reminder countdown indicator
       const firstTimeCountdown = document.createElement('div');
-      firstTimeCountdown.className = 'zen-pomodoro-first-time-countdown';
-      firstTimeCountdown.style.display = 'none';
+      firstTimeCountdown.className = 'zen-pomodoro-first-time-countdown zen-pomodoro-hidden';
 
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
@@ -4085,7 +4099,7 @@
         'zen-pomodoro-simple-duration-input',
         { value: config.simpleDuration, min: '1', max: '180' }
       );
-      simpleDurationRow.style.display = isSimpleMode ? 'flex' : 'none';
+      simpleDurationRow.classList.toggle('hidden', !isSimpleMode);
       simpleDurationRow.dataset.mode = 'simple';
 
       const focusDurationRow = createLabeledInputRow(
@@ -4093,7 +4107,7 @@
         'zen-pomodoro-focus-duration-input',
         { value: config.focusDuration, min: '1', max: '120' }
       );
-      focusDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      focusDurationRow.classList.toggle('hidden', isSimpleMode);
       focusDurationRow.dataset.mode = 'pomodoro';
 
       const breakDurationRow = createLabeledInputRow(
@@ -4101,7 +4115,7 @@
         'zen-pomodoro-break-duration-input',
         { value: config.breakDuration, min: '1', max: '60' }
       );
-      breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      breakDurationRow.classList.toggle('hidden', isSimpleMode);
       breakDurationRow.dataset.mode = 'pomodoro';
 
       const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input', {
@@ -4109,7 +4123,7 @@
         min: '1',
         max: '20',
       });
-      cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
+      cyclesRow.classList.toggle('hidden', isSimpleMode);
       cyclesRow.dataset.mode = 'pomodoro';
 
       return [simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow];
@@ -4252,9 +4266,9 @@
         rows.forEach((row) => {
           const mode = row.dataset.mode;
           if (mode === 'simple') {
-            row.style.display = isSimple ? 'flex' : 'none';
+            row.classList.toggle('hidden', !isSimple);
           } else if (mode === 'pomodoro') {
-            row.style.display = isSimple ? 'none' : 'flex';
+            row.classList.toggle('hidden', isSimple);
           }
         });
       });
@@ -4563,9 +4577,8 @@
 
       if (workspaces.length === 0) {
         const noWorkspacesMsg = document.createElement('div');
+        noWorkspacesMsg.className = 'zen-pomodoro-no-workspaces-msg';
         noWorkspacesMsg.textContent = 'No workspaces found';
-        noWorkspacesMsg.style.fontStyle = 'italic';
-        noWorkspacesMsg.style.opacity = '0.7';
         workspaceContainer.appendChild(noWorkspacesMsg);
       } else {
         workspaces.forEach((workspace) => {
@@ -4615,11 +4628,11 @@
       manageRulesetsButton.textContent = 'Manage Rulesets';
       manageRulesetsButton.addEventListener('click', () => {
         // Hide current settings dialog
-        dialog.style.display = 'none';
+        dialog.classList.remove('active');
         // Show ruleset settings dialog, pass callback to show settings again when done
         this.showRulesetSettingsDialog(() => {
           // Re-show settings dialog when returning
-          dialog.style.display = 'flex';
+          dialog.classList.add('active');
         });
       });
 
@@ -4714,10 +4727,10 @@
         const activeUsesHold = activeMethodSelect.value === LOCKOUT_METHODS.HOLD;
         const activeUsesCode = activeMethodSelect.value === LOCKOUT_METHODS.CODE;
 
-        idleHoldDurationRow.style.display = idleUsesHold ? '' : 'none';
-        activeHoldDurationRow.style.display = activeUsesHold ? '' : 'none';
-        idleCodeLengthRow.style.display = idleUsesCode ? '' : 'none';
-        activeCodeLengthRow.style.display = activeUsesCode ? '' : 'none';
+        idleHoldDurationRow.classList.toggle('hidden', !idleUsesHold);
+        activeHoldDurationRow.classList.toggle('hidden', !activeUsesHold);
+        idleCodeLengthRow.classList.toggle('hidden', !idleUsesCode);
+        activeCodeLengthRow.classList.toggle('hidden', !activeUsesCode);
       };
 
       idleMethodSelect.addEventListener('change', updateLockoutVisibility);
@@ -4782,9 +4795,18 @@
       reminderTimesRow.appendChild(reminderTimesLabel);
       reminderTimesRow.appendChild(reminderTimesInput);
 
-      // Show/hide times row based on enabled state
+      // Skip cooldown input
+      const dailyReminderCooldownRow = createLabeledInputRow(
+        'Skip cooldown (min):',
+        'daily-reminder-skip-cooldown',
+        { value: config.dailyReminderSkipCooldown, min: 1, max: 120 }
+      );
+
+      // Show/hide times row and cooldown row based on enabled state
       const updateReminderTimesVisibility = () => {
-        reminderTimesRow.style.display = reminderEnabledCheckbox.checked ? '' : 'none';
+        const isEnabled = reminderEnabledCheckbox.checked;
+        reminderTimesRow.classList.toggle('hidden', !isEnabled);
+        dailyReminderCooldownRow.classList.toggle('hidden', !isEnabled);
       };
       reminderEnabledCheckbox.addEventListener('change', updateReminderTimesVisibility);
       updateReminderTimesVisibility();
@@ -4797,7 +4819,7 @@
       triggerReminderButton.title = 'Trigger the daily reminder for testing (ignores time/date)';
       triggerReminderButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.dailyReminder) {
-          dialog.style.display = 'none';
+          dialog.classList.remove('active');
           window.zenPomodoroApp.dailyReminder.triggerReminderForTesting();
         }
       });
@@ -4806,6 +4828,7 @@
       reminderSection.appendChild(reminderDescription);
       reminderSection.appendChild(reminderEnabledRow);
       reminderSection.appendChild(reminderTimesRow);
+      reminderSection.appendChild(dailyReminderCooldownRow);
       reminderSection.appendChild(triggerReminderButton);
 
       // ========================================
@@ -4864,10 +4887,7 @@
 
       // Focus time goal help text
       const focusTimeHelpText = document.createElement('p');
-      focusTimeHelpText.style.fontSize = '12px';
-      focusTimeHelpText.style.color = '#666';
-      focusTimeHelpText.style.margin = '0 0 8px 0';
-      focusTimeHelpText.style.fontStyle = 'italic';
+      focusTimeHelpText.className = 'zen-pomodoro-help-text';
       focusTimeHelpText.textContent = 'Reminders stop after this much focus time is achieved.';
 
       // Reminder end time input
@@ -4888,11 +4908,9 @@
 
       // End time help text
       const endTimeHelpText = document.createElement('p');
-      endTimeHelpText.style.fontSize = '12px';
-      endTimeHelpText.style.color = '#666';
-      endTimeHelpText.style.margin = '0 0 8px 0';
-      endTimeHelpText.style.fontStyle = 'italic';
-      endTimeHelpText.textContent = 'Automatically disable reminders after this time (e.g., 00:30 for 12:30 AM).';
+      endTimeHelpText.className = 'zen-pomodoro-help-text';
+      endTimeHelpText.textContent =
+        'Automatically disable reminders after this time (e.g., 00:30 for 12:30 AM).';
 
       // Skip method select
       const postSessionMethodRow = document.createElement('div');
@@ -4933,10 +4951,7 @@
 
       // Escalation info
       const escalationInfo = document.createElement('p');
-      escalationInfo.style.fontSize = '12px';
-      escalationInfo.style.color = '#666';
-      escalationInfo.style.margin = '8px 0 0 0';
-      escalationInfo.style.fontStyle = 'italic';
+      escalationInfo.className = 'zen-pomodoro-help-text top-margin';
       escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
 
       // Development: Trigger post-session reminder button
@@ -4949,7 +4964,7 @@
 
       // Helper to set element display style
       const setElementDisplay = (element, visible) => {
-        element.style.display = visible ? '' : 'none';
+        element.classList.toggle('hidden', !visible);
       };
 
       // Show/hide settings based on enabled and method
@@ -4977,7 +4992,7 @@
 
       triggerPostSessionButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.postSessionReminder) {
-          dialog.style.display = 'none';
+          dialog.classList.remove('active');
           window.zenPomodoroApp.postSessionReminder.triggerReminderForTesting();
         }
       });
@@ -5038,7 +5053,7 @@
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveBlockedWorkspaces(workspaceContainer, config);
-        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimesInput, config);
+        this._saveReminderSettings(dialog, reminderEnabledCheckbox, reminderTimesInput, config);
         this._savePostSessionSettings(
           dialog,
           config,
@@ -5251,13 +5266,26 @@
 
     /**
      * Save daily reminder settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
      * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
      * @param {HTMLInputElement} timesInput - Times input element (comma-separated)
      * @param {Object} config - Configuration object to update
      * @private
      */
-    _saveReminderSettings(enabledCheckbox, timesInput, config) {
+    _saveReminderSettings(dialog, enabledCheckbox, timesInput, config) {
       config.dailyReminderEnabled = enabledCheckbox.checked;
+
+      // Save skip cooldown
+      const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
+      if (cooldownInput) {
+        const cooldownValue = validateIntegerInput(
+          parseInt(cooldownInput.value, 10),
+          1,
+          120,
+          config.dailyReminderSkipCooldown
+        );
+        config.dailyReminderSkipCooldown = cooldownValue;
+      }
 
       // Validate and save times (comma-separated HH:MM values)
       const timesValue = timesInput.value;
@@ -5274,6 +5302,7 @@
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
         enabled: config.dailyReminderEnabled,
         times: config.dailyReminderTimes,
+        skipCooldown: config.dailyReminderSkipCooldown,
       });
     }
 
@@ -5295,14 +5324,40 @@
       // This allows settings to appear in Zen's native preferences UI.
       const intSettings = [
         { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
-        { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
-        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, zenUiPrefKey: 'postSessionFocusTimeGoal' },
-        { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
-        { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
+        {
+          selector: '#post-session-skip-cooldown',
+          key: 'postSessionSkipCooldown',
+          min: 1,
+          max: 120,
+        },
+        {
+          selector: '#post-session-focus-time-goal',
+          key: 'postSessionFocusTimeGoal',
+          min: 1,
+          max: 600,
+          zenUiPrefKey: 'postSessionFocusTimeGoal',
+        },
+        {
+          selector: '#post-session-hold-duration',
+          key: 'postSessionSkipHoldDuration',
+          min: 5,
+          max: 120,
+        },
+        {
+          selector: '#post-session-code-length',
+          key: 'postSessionSkipCodeLength',
+          min: 16,
+          max: 128,
+        },
       ];
 
       intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
-        const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
+        const value = getValidatedIntFromDialog(dialog, {
+          selector,
+          min,
+          max,
+          defaultValue: config[key],
+        });
         if (value !== null) {
           config[key] = value;
           if (zenUiPrefKey) setPref(zenUiPrefKey, value);
@@ -5566,13 +5621,9 @@
       expandBtn.textContent = '▼';
       expandBtn.addEventListener('click', () => {
         const details = item.querySelector('.zen-pomodoro-ruleset-details');
-        if (details.style.display === 'none') {
-          details.style.display = 'block';
-          expandBtn.textContent = '▲';
-        } else {
-          details.style.display = 'none';
-          expandBtn.textContent = '▼';
-        }
+        const isCollapsed = details.classList.contains('zen-pomodoro-collapsed');
+        details.classList.toggle('zen-pomodoro-collapsed');
+        expandBtn.textContent = isCollapsed ? '▲' : '▼';
       });
 
       // Delete button - use ID instead of index
@@ -5600,8 +5651,7 @@
 
       // Details section (collapsible)
       const details = document.createElement('div');
-      details.className = 'zen-pomodoro-ruleset-details';
-      details.style.display = 'none';
+      details.className = 'zen-pomodoro-ruleset-details zen-pomodoro-collapsed';
 
       // Rules container
       const rulesContainer = document.createElement('div');
@@ -7880,7 +7930,7 @@
         return;
       }
 
-      logger.log(LOG_CATEGORIES.TIMER, 'Showing transition popup');
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition popup displayed');
 
       this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
       this._createPopup();
@@ -7905,7 +7955,7 @@
         return;
       }
 
-      logger.log(LOG_CATEGORIES.TIMER, 'Hiding transition popup');
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition popup hidden');
 
       // Clear countdown interval
       if (this.timerInterval) {
@@ -7980,6 +8030,10 @@
      * @private
      */
     _startCountdown() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition countdown started', {
+        remainingSeconds: this.remainingTime,
+      });
+
       this.timerInterval = setInterval(() => {
         // If the popup has been removed or detached externally, stop the timer
         if (!this.popup || !document.documentElement.contains(this.popup)) {
@@ -8137,13 +8191,11 @@
           Array.isArray(config.dailyReminderTimes) &&
           config.dailyReminderTimes.length > 0
         ) {
-          const sortedTimes = config.dailyReminderTimes
-            .slice()
-            .sort((a, b) => {
-              const [aHours, aMinutes] = a.split(':').map(Number);
-              const [bHours, bMinutes] = b.split(':').map(Number);
-              return aHours - bHours || aMinutes - bMinutes;
-            });
+          const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
+            const [aHours, aMinutes] = a.split(':').map(Number);
+            const [bHours, bMinutes] = b.split(':').map(Number);
+            return aHours - bHours || aMinutes - bMinutes;
+          });
           resetTime = sortedTimes[0];
         }
 
@@ -8155,7 +8207,10 @@
 
           // Only reset if we're past the reset time on the new day
           if (now >= resetDate) {
-            logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Resetting shown reminders for new day');
+            logger.log(
+              LOG_CATEGORIES.TIMER,
+              'Daily reminder: Resetting shown reminders for new day'
+            );
             this.remindersShownToday = [];
             this._saveState();
           }
@@ -8228,7 +8283,7 @@
         if (!isValidTimeFormat(timeStr)) continue;
 
         const [hours, minutes] = timeStr.split(':').map(Number);
-        
+
         if (this._shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr)) {
           return; // Only show one reminder at a time
         }
@@ -8250,6 +8305,20 @@
     }
 
     /**
+     * Check if we're still in the cooldown period after a skip.
+     * @param {number} cooldownMinutes - The cooldown period in minutes
+     * @returns {boolean} True if still in cooldown
+     * @private
+     */
+    _isInCooldownPeriod(cooldownMinutes) {
+      if (!this.lastSkipTime) return false;
+
+      const timeSinceSkipMs = Date.now() - this.lastSkipTime;
+      const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
+      return timeSinceSkipMinutes < cooldownMinutes;
+    }
+
+    /**
      * Check if reminder should be shown for a specific time.
      * @param {number} currentTimeMinutes - Current time in minutes since midnight
      * @param {number} hours - Reminder hour
@@ -8260,9 +8329,20 @@
      */
     _shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr) {
       const reminderTimeMinutes = hours * 60 + minutes;
+      const config = getConfig();
 
       // Check if we're at or past this reminder time
       if (currentTimeMinutes >= reminderTimeMinutes) {
+        // Check if in cooldown period after skip
+        if (this._isInCooldownPeriod(config.dailyReminderSkipCooldown)) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Skip cooldown active', {
+            reminderTime: timeStr,
+            lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+            cooldownMinutes: config.dailyReminderSkipCooldown,
+          });
+          return false;
+        }
+
         // Check if this reminder was already shown today
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
 
@@ -9055,7 +9135,9 @@
      */
     onTimerStart() {
       logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state', {
-        previousIdleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+        previousIdleStartTime: this.idleStartTime
+          ? new Date(this.idleStartTime).toISOString()
+          : null,
         previousSkipCount: this.skipCount,
       });
       this.idleStartTime = null;
@@ -9347,7 +9429,7 @@
      */
     getTimeUntilNextReminder() {
       const config = getConfig();
-      
+
       // Only return null if feature is disabled
       if (!config.postSessionReminderEnabled) {
         return null;
@@ -10279,16 +10361,12 @@
      * @private
      */
     _logBlockedWorkspace(workspaceId, isBlocked) {
-      logger.log(
-        LOG_CATEGORIES.OVERLAY,
-        'Current workspace is blocked - showing overlay',
-        {
-          workspaceId: workspaceId,
-          isPaused: this.timer.isPaused,
-          workspaceBlocked: true,
-          isBlockedParam: isBlocked,
-        }
-      );
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is blocked - showing overlay', {
+        workspaceId: workspaceId,
+        isPaused: this.timer.isPaused,
+        workspaceBlocked: true,
+        isBlockedParam: isBlocked,
+      });
     }
 
     /**
@@ -10298,16 +10376,12 @@
      * @private
      */
     _logUnblockedWorkspace(workspaceId, isBlocked) {
-      logger.log(
-        LOG_CATEGORIES.OVERLAY,
-        'Current workspace is unblocked - hiding overlay',
-        {
-          workspaceId: workspaceId,
-          isPaused: this.timer.isPaused,
-          workspaceBlocked: false,
-          isBlockedParam: isBlocked,
-        }
-      );
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is unblocked - hiding overlay', {
+        workspaceId: workspaceId,
+        isPaused: this.timer.isPaused,
+        workspaceBlocked: false,
+        isBlockedParam: isBlocked,
+      });
     }
 
     /**

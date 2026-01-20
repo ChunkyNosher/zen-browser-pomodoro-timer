@@ -33,19 +33,19 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ## Key Classes
 
-| Class                        | Purpose                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------ |
-| `PomodoroTimer`              | Core timer logic - handles countdown, phases (focus/break/transition), cycles, state persistence |
-| `WorkspaceDetector`          | Detects current Zen workspace, monitors workspace changes via MutationObserver                   |
-| `OverlayManager`             | Manages the workspace blocking overlay that covers content during focus                          |
-| `SecurityManager`            | Handles settings access lockouts (hold-to-unlock, code entry)                                    |
-| `WebsiteBlocker`             | LeechBlock-style website/keyword blocking with configurable rulesets                             |
-| `SineModBlocker`             | Blocks access to `about:preferences#sineMods` during active timer                                |
+| Class                        | Purpose                                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `PomodoroTimer`              | Core timer logic - handles countdown, phases (focus/break/transition), cycles, state persistence      |
+| `WorkspaceDetector`          | Detects current Zen workspace, monitors workspace changes via MutationObserver                        |
+| `OverlayManager`             | Manages the workspace blocking overlay that covers content during focus                               |
+| `SecurityManager`            | Handles settings access lockouts (hold-to-unlock, code entry)                                         |
+| `WebsiteBlocker`             | LeechBlock-style website/keyword blocking with configurable rulesets                                  |
+| `SineModBlocker`             | Blocks access to `about:preferences#sineMods` during active timer                                     |
 | `DailyReminderManager`       | Shows blocking reminders at configurable times throughout the day (replaces FirstTimeReminderManager) |
-| `PostSessionReminderManager` | Shows reminder after idle time following timer completion                                        |
-| `TransitionPhaseManager`     | Manages the "break ending soon" popup before focus resumes                                       |
-| `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                              |
-| `LogManager`                 | Comprehensive logging with export functionality                                                  |
+| `PostSessionReminderManager` | Shows reminder after idle time following timer completion                                             |
+| `TransitionPhaseManager`     | Manages the "break ending soon" popup before focus resumes                                            |
+| `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                                   |
+| `LogManager`                 | Comprehensive logging with export functionality                                                       |
 
 ---
 
@@ -53,7 +53,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.2.9';                  // Current mod version
+const MOD_VERSION = '1.2.10';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -89,18 +89,24 @@ Also, after the changes are done, I want you to run the CodeScene MCP and refact
 When working on this mod, make use of these MCP (Model Context Protocol) tools:
 
 ### Context7
+
 Use context7 to look up documentation for libraries and frameworks:
+
 - First call `context7-resolve-library-id` with the library name to get the library ID
 - Then call `context7-query-docs` with the library ID to query documentation
 - Example: For Firefox WebExtension APIs, look up "mozilla/firefox-api" or similar
 
 ### Perplexity
+
 Use perplexity for web searches and reasoning:
+
 - `perplexity_search` - For finding up-to-date information, news, or documentation
 - `perplexity_reason` - For complex reasoning tasks that benefit from web context
 
 ### CodeScene
+
 Use CodeScene for code quality analysis:
+
 - `codescene-code_health_score` - Get the overall code health score (1-10)
 - `codescene-code_health_review` - Get detailed issues affecting code health
 - `codescene-code_health_auto_refactor` - Auto-refactor specific functions
@@ -148,20 +154,21 @@ Shows reminder after configurable idle time following timer completion.
 
 ## New Configuration Options
 
-| Option                         | Type    | Default        | Description                                          |
-| ------------------------------ | ------- | -------------- | ---------------------------------------------------- |
-| `dailyReminderEnabled`         | boolean | false          | Enable daily focus reminders                         |
-| `dailyReminderTimes`           | array   | ['11:15', '16:15'] | Times in HH:MM format for daily reminders        |
-| `dailyReminderSkipMethod`      | string  | 'hold'         | Skip method: 'hold' or 'code'                        |
-| `dailyReminderSkipHoldDuration`| number  | 15             | Seconds to hold for skip                             |
-| `dailyReminderSkipCodeLength`  | number  | 32             | Characters to type for skip                          |
-| `postSessionReminderEnabled`   | boolean | true           | Enable post-session idle reminder                    |
-| `postSessionIdleTime`          | number  | 45             | Minutes before first reminder after timer completion |
-| `postSessionSkipCooldown`      | number  | 30             | Minutes between reminders after skip                 |
-| `postSessionFocusTimeGoal`     | number  | 150            | Minutes of focus time goal (2.5 hours)               |
-| `postSessionSkipMethod`        | string  | 'hold'         | Skip method: 'hold' or 'code'                        |
-| `postSessionSkipHoldDuration`  | number  | 20             | Seconds to hold for skip                             |
-| `postSessionSkipCodeLength`    | number  | 48             | Characters to type for skip                          |
+| Option                          | Type    | Default            | Description                                          |
+| ------------------------------- | ------- | ------------------ | ---------------------------------------------------- |
+| `dailyReminderEnabled`          | boolean | false              | Enable daily focus reminders                         |
+| `dailyReminderTimes`            | array   | ['11:15', '16:15'] | Times in HH:MM format for daily reminders            |
+| `dailyReminderSkipMethod`       | string  | 'hold'             | Skip method: 'hold' or 'code'                        |
+| `dailyReminderSkipHoldDuration` | number  | 15                 | Seconds to hold for skip                             |
+| `dailyReminderSkipCodeLength`   | number  | 32                 | Characters to type for skip                          |
+| `dailyReminderSkipCooldown`     | number  | 10                 | Minutes of cooldown between daily reminder skips     |
+| `postSessionReminderEnabled`    | boolean | true               | Enable post-session idle reminder                    |
+| `postSessionIdleTime`           | number  | 45                 | Minutes before first reminder after timer completion |
+| `postSessionSkipCooldown`       | number  | 30                 | Minutes between reminders after skip                 |
+| `postSessionFocusTimeGoal`      | number  | 150                | Minutes of focus time goal (2.5 hours)               |
+| `postSessionSkipMethod`         | string  | 'hold'             | Skip method: 'hold' or 'code'                        |
+| `postSessionSkipHoldDuration`   | number  | 20                 | Seconds to hold for skip                             |
+| `postSessionSkipCodeLength`     | number  | 48                 | Characters to type for skip                          |
 
 ---
 
@@ -185,23 +192,37 @@ Shows reminder after configurable idle time following timer completion.
 
 ## Copilot Memory Usage
 
+**⚠️ MANDATORY:** At the end of EVERY Copilot session that makes code changes, you MUST use the `store_memory` tool to preserve important facts learned during the session. This is not optional - failing to create memories means future sessions will repeat the same mistakes or lose valuable context.
+
 **When to Store Memories:** After completing significant changes to this repository, use the `store_memory` tool to preserve important facts about the codebase. Memories help future Copilot sessions understand conventions, patterns, and important decisions.
 
+**The `store_memory` Tool:** The tool is called `store_memory` and takes these parameters:
+- `subject` - 1-2 word topic (e.g., "button styling", "logging throttle")
+- `fact` - Clear, concise statement under 200 characters
+- `citations` - File path and line numbers (e.g., "file.js:100-120")
+- `reason` - 2-3 sentence explanation of why this is important
+- `category` - One of: "bootstrap_and_build", "user_preferences", "general", "file_specific"
+
 **Types of Facts to Store:**
+
 - New coding conventions or patterns introduced
 - Build/lint/test commands that work
 - Important architectural decisions
 - Common pitfalls or bugs to avoid
 - File structure changes
 - New features and their implementation details
+- UI/UX patterns and color schemes
+- Configuration options and their defaults
 
 **Memory Categories:**
+
 - `bootstrap_and_build` - How to build and test the project
 - `user_preferences` - Coding style preferences
 - `general` - File-independent facts about the codebase
 - `file_specific` - Facts about specific files
 
 **Example Memory Usage:**
+
 ```
 store_memory(
   subject: "time sorting",
@@ -211,3 +232,10 @@ store_memory(
   category: "general"
 )
 ```
+
+**Memory Creation Checklist (run at end of every session):**
+1. What new patterns or conventions were established?
+2. What bugs were fixed and what was the root cause?
+3. What UI/UX decisions were made?
+4. What configuration options were added or changed?
+5. What validation or error handling patterns were used?

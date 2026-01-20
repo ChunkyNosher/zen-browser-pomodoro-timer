@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.9
+ * Version: 1.2.10
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -808,6 +808,34 @@
   display: none !important;
 }
 
+/* General hidden class for any element */
+.zen-pomodoro-hidden {
+  display: none !important;
+}
+
+/* Collapsed class for ruleset details and similar collapsible elements */
+.zen-pomodoro-collapsed {
+  display: none;
+}
+
+/* No workspaces message styling */
+.zen-pomodoro-no-workspaces-msg {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Help text styling for settings descriptions */
+.zen-pomodoro-help-text {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin: 0 0 8px;
+}
+
+.zen-pomodoro-help-text.top-margin {
+  margin: 8px 0 0;
+}
+
 /* Lockout method selection styles */
 .zen-pomodoro-lockout-section {
   margin-top: 16px;
@@ -1330,9 +1358,10 @@
    user opens browser at/after reminder time
    and hasn't started a timer today yet.
    ============================================ */
-/* ============================================ */
-/* Daily Reminder Overlay (similar to post-session reminder) */
-/* ============================================ */
+
+/* ============================================
+   Daily Reminder Overlay (similar to post-session reminder)
+   ============================================ */
 #zen-pomodoro-daily-reminder {
   position: fixed !important;
   top: 0 !important;
@@ -1402,8 +1431,8 @@
 }
 
 #zen-pomodoro-daily-reminder-start-btn {
-  background-color: #2180cd !important;
-  color: #fff !important;
+  background-color: #ff9800 !important;
+  color: #000 !important;
   font-weight: 700 !important;
   padding: 14px 32px !important;
   font-size: 16px !important;
@@ -1416,7 +1445,7 @@
 }
 
 #zen-pomodoro-daily-reminder-start-btn:hover {
-  background-color: #1a6bb3 !important;
+  background-color: #f57c00 !important;
   transform: translateY(-2px);
 }
 
@@ -1425,12 +1454,14 @@
 }
 
 #zen-pomodoro-daily-reminder-skip-btn {
-  background-color: #555 !important;
+  background-color: #5a5968 !important;
   color: #fff !important;
+  padding: 14px 24px !important;
+  font-size: 14px !important;
 }
 
 #zen-pomodoro-daily-reminder-skip-btn:hover {
-  background-color: #666 !important;
+  background-color: #4a4954 !important;
 }
 
 /* Daily reminder hold challenge */
