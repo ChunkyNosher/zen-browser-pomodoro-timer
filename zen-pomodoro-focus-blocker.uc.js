@@ -130,6 +130,8 @@
     dailyReminderSkipCount: 0,
     /** Timestamp of last daily reminder skip (persisted) */
     dailyReminderLastSkipTime: null,
+    /** Daily reminder skip cooldown in minutes (default: 10) */
+    dailyReminderSkipCooldown: 10,
     /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
     lastTimerStartDate: '',
     /** Timestamps of daily reminders shown today (persisted, array of timestamps) */
@@ -8279,6 +8281,20 @@
     }
 
     /**
+     * Check if we're still in the cooldown period after a skip.
+     * @param {number} cooldownMinutes - The cooldown period in minutes
+     * @returns {boolean} True if still in cooldown
+     * @private
+     */
+    _isInCooldownPeriod(cooldownMinutes) {
+      if (!this.lastSkipTime) return false;
+
+      const timeSinceSkipMs = Date.now() - this.lastSkipTime;
+      const timeSinceSkipMinutes = timeSinceSkipMs / (60 * 1000);
+      return timeSinceSkipMinutes < cooldownMinutes;
+    }
+
+    /**
      * Check if reminder should be shown for a specific time.
      * @param {number} currentTimeMinutes - Current time in minutes since midnight
      * @param {number} hours - Reminder hour
@@ -8289,9 +8305,20 @@
      */
     _shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr) {
       const reminderTimeMinutes = hours * 60 + minutes;
+      const config = getConfig();
 
       // Check if we're at or past this reminder time
       if (currentTimeMinutes >= reminderTimeMinutes) {
+        // Check if in cooldown period after skip
+        if (this._isInCooldownPeriod(config.dailyReminderSkipCooldown)) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Skip cooldown active', {
+            reminderTime: timeStr,
+            lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+            cooldownMinutes: config.dailyReminderSkipCooldown,
+          });
+          return false;
+        }
+
         // Check if this reminder was already shown today
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
 

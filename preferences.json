@@ -42,5 +42,11 @@
     "type": "string",
     "defaultValue": "00:30",
     "placeholder": "00:30"
+  },
+  {
+    "property": "zen-pomodoro.dailyReminderSkipCooldown",
+    "label": "Daily Reminder Skip Cooldown (minutes)",
+    "type": "number",
+    "defaultValue": 10
   }
 ]
