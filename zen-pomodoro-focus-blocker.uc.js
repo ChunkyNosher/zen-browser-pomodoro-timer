@@ -3831,6 +3831,13 @@
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
             } else {
               // In regular break or long-break phase, start focus phase directly
+              // BUG FIX: Increment cycle count since we're skipping the break phase
+              // (normally incremented in _handleBreakPhaseComplete when break → transition)
+              window.zenPomodoroApp.timer.currentCycle++;
+              logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
+                currentCycle: window.zenPomodoroApp.timer.currentCycle,
+                totalCycles: window.zenPomodoroApp.timer.totalCycles
+              });
               // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
               window.zenPomodoroApp.timer.startFocusFromTransition();
               window.zenPomodoroApp.updateOverlayVisibility();
@@ -8344,11 +8351,17 @@
         }
 
         // Check if this reminder was already shown today
+        // BUT if user previously skipped and cooldown has expired, allow re-showing
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
+        const hasPreviouslySkipped = this.lastSkipTime !== null;
+        const cooldownExpired = !this._isInCooldownPeriod(config.dailyReminderSkipCooldown);
+        const shouldShowAfterSkip = hasPreviouslySkipped && cooldownExpired;
 
-        if (!wasShownToday) {
+        if (!wasShownToday || shouldShowAfterSkip) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
             reminderTime: timeStr,
+            wasShownToday: wasShownToday,
+            showingAfterSkip: shouldShowAfterSkip,
           });
           this.showReminder();
           return true;

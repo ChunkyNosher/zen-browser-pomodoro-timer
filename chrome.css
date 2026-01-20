@@ -607,11 +607,14 @@
   background: #1e1d26;
   padding: 12px;
   border-radius: 6px;
-  margin: 16px 0;
+  margin: 16px 0 8px;
   font-family: monospace;
-  word-break: break-all;
-  font-size: 14px;
+  white-space: nowrap; /* Keep code on one line */
+  overflow-x: auto; /* Allow horizontal scroll for long codes */
+  font-size: 21px; /* 50% bigger than 14px */
   line-height: 1.5;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 #zen-pomodoro-lock-code {
@@ -620,11 +623,12 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 14px;
+  font-size: 21px; /* Match the code display */
   width: 100%;
-  margin-top: 16px;
+  margin-top: 8px; /* Smaller gap for visual alignment */
   font-family: monospace !important;
   line-height: 1.5;
+  box-sizing: border-box;
 }
 
 #zen-pomodoro-lock-code:focus {
@@ -1456,12 +1460,22 @@
 #zen-pomodoro-daily-reminder-skip-btn {
   background-color: #5a5968 !important;
   color: #fff !important;
+  font-weight: 600 !important;
   padding: 14px 24px !important;
   font-size: 14px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease, transform 0.2s ease !important;
 }
 
 #zen-pomodoro-daily-reminder-skip-btn:hover {
   background-color: #4a4954 !important;
+  transform: translateY(-2px) !important;
+}
+
+#zen-pomodoro-daily-reminder-skip-btn:active {
+  transform: translateY(0) !important;
 }
 
 /* Daily reminder hold challenge */
@@ -1600,12 +1614,23 @@
 
 #zen-pomodoro-post-session-skip-btn {
   background-color: #5a5968 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
   padding: 14px 24px !important;
   font-size: 14px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease, transform 0.2s ease !important;
 }
 
 #zen-pomodoro-post-session-skip-btn:hover {
   background-color: #4a4954 !important;
+  transform: translateY(-2px) !important;
+}
+
+#zen-pomodoro-post-session-skip-btn:active {
+  transform: translateY(0) !important;
 }
 
 /* Post-Session Challenge UI */
@@ -1640,7 +1665,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 14px;
+  font-size: 21px; /* Match the code display */
   width: 100%;
   font-family: monospace !important;
   line-height: 1.5;
