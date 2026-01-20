@@ -192,7 +192,16 @@ Shows reminder after configurable idle time following timer completion.
 
 ## Copilot Memory Usage
 
+**⚠️ MANDATORY:** At the end of EVERY Copilot session that makes code changes, you MUST use the `store_memory` tool to preserve important facts learned during the session. This is not optional - failing to create memories means future sessions will repeat the same mistakes or lose valuable context.
+
 **When to Store Memories:** After completing significant changes to this repository, use the `store_memory` tool to preserve important facts about the codebase. Memories help future Copilot sessions understand conventions, patterns, and important decisions.
+
+**The `store_memory` Tool:** The tool is called `store_memory` and takes these parameters:
+- `subject` - 1-2 word topic (e.g., "button styling", "logging throttle")
+- `fact` - Clear, concise statement under 200 characters
+- `citations` - File path and line numbers (e.g., "file.js:100-120")
+- `reason` - 2-3 sentence explanation of why this is important
+- `category` - One of: "bootstrap_and_build", "user_preferences", "general", "file_specific"
 
 **Types of Facts to Store:**
 
@@ -202,6 +211,8 @@ Shows reminder after configurable idle time following timer completion.
 - Common pitfalls or bugs to avoid
 - File structure changes
 - New features and their implementation details
+- UI/UX patterns and color schemes
+- Configuration options and their defaults
 
 **Memory Categories:**
 
@@ -221,3 +232,10 @@ store_memory(
   category: "general"
 )
 ```
+
+**Memory Creation Checklist (run at end of every session):**
+1. What new patterns or conventions were established?
+2. What bugs were fixed and what was the root cause?
+3. What UI/UX decisions were made?
+4. What configuration options were added or changed?
+5. What validation or error handling patterns were used?
