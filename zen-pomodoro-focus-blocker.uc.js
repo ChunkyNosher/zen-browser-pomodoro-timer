@@ -4099,7 +4099,7 @@
         'zen-pomodoro-simple-duration-input',
         { value: config.simpleDuration, min: '1', max: '180' }
       );
-      if (!isSimpleMode) simpleDurationRow.classList.add('hidden');
+      simpleDurationRow.classList.toggle('hidden', !isSimpleMode);
       simpleDurationRow.dataset.mode = 'simple';
 
       const focusDurationRow = createLabeledInputRow(
@@ -4107,7 +4107,7 @@
         'zen-pomodoro-focus-duration-input',
         { value: config.focusDuration, min: '1', max: '120' }
       );
-      if (isSimpleMode) focusDurationRow.classList.add('hidden');
+      focusDurationRow.classList.toggle('hidden', isSimpleMode);
       focusDurationRow.dataset.mode = 'pomodoro';
 
       const breakDurationRow = createLabeledInputRow(
@@ -4115,7 +4115,7 @@
         'zen-pomodoro-break-duration-input',
         { value: config.breakDuration, min: '1', max: '60' }
       );
-      if (isSimpleMode) breakDurationRow.classList.add('hidden');
+      breakDurationRow.classList.toggle('hidden', isSimpleMode);
       breakDurationRow.dataset.mode = 'pomodoro';
 
       const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input', {
@@ -4123,7 +4123,7 @@
         min: '1',
         max: '20',
       });
-      if (isSimpleMode) cyclesRow.classList.add('hidden');
+      cyclesRow.classList.toggle('hidden', isSimpleMode);
       cyclesRow.dataset.mode = 'pomodoro';
 
       return [simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow];
