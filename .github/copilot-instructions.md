@@ -180,3 +180,34 @@ Shows reminder after configurable idle time following timer completion.
 ## Documentation Update Reminder
 
 **⚠️ IMPORTANT:** When making changes to this mod, remember to update these documentation files (`copilot-instructions.md` and `subagent.agent.md`) with any new classes, constants, features, or significant changes. This ensures Copilot and the subagent have accurate context for future tasks.
+
+---
+
+## Copilot Memory Usage
+
+**When to Store Memories:** After completing significant changes to this repository, use the `store_memory` tool to preserve important facts about the codebase. Memories help future Copilot sessions understand conventions, patterns, and important decisions.
+
+**Types of Facts to Store:**
+- New coding conventions or patterns introduced
+- Build/lint/test commands that work
+- Important architectural decisions
+- Common pitfalls or bugs to avoid
+- File structure changes
+- New features and their implementation details
+
+**Memory Categories:**
+- `bootstrap_and_build` - How to build and test the project
+- `user_preferences` - Coding style preferences
+- `general` - File-independent facts about the codebase
+- `file_specific` - Facts about specific files
+
+**Example Memory Usage:**
+```
+store_memory(
+  subject: "time sorting",
+  fact: "Always use numeric comparator when sorting HH:MM time strings, not lexicographic sort",
+  citations: "zen-pomodoro-focus-blocker.uc.js:1901",
+  reason: "Lexicographic sort causes '16:15' to sort before '9:00'. Use minutes-since-midnight comparison.",
+  category: "general"
+)
+```

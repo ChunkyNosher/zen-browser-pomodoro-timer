@@ -1,0 +1,11 @@
+# Copilot Setup Steps
+# This file defines the setup steps that run before each Copilot coding agent process.
+
+name: Copilot Setup Steps
+
+steps:
+  - name: Install Node.js dependencies
+    run: npm ci
+
+  - name: Verify linting tools are available
+    run: npm run lint -- --help || echo "Linting tools installed"

@@ -1898,8 +1898,14 @@
         Array.isArray(config.dailyReminderTimes) &&
         config.dailyReminderTimes.length > 0
       ) {
-        // Sort times and use the first one
-        const sortedTimes = config.dailyReminderTimes.slice().sort();
+        // Sort times numerically by hours and minutes and use the first one
+        const sortedTimes = config.dailyReminderTimes
+          .slice()
+          .sort((a, b) => {
+            const [aHours, aMinutes] = a.split(':').map(Number);
+            const [bHours, bMinutes] = b.split(':').map(Number);
+            return aHours - bHours || aMinutes - bMinutes;
+          });
         reminderTime = sortedTimes[0];
       }
 
@@ -8131,7 +8137,13 @@
           Array.isArray(config.dailyReminderTimes) &&
           config.dailyReminderTimes.length > 0
         ) {
-          const sortedTimes = config.dailyReminderTimes.slice().sort();
+          const sortedTimes = config.dailyReminderTimes
+            .slice()
+            .sort((a, b) => {
+              const [aHours, aMinutes] = a.split(':').map(Number);
+              const [bHours, bMinutes] = b.split(':').map(Number);
+              return aHours - bHours || aMinutes - bMinutes;
+            });
           resetTime = sortedTimes[0];
         }
 
