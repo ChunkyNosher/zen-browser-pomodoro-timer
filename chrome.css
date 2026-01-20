@@ -808,6 +808,34 @@
   display: none !important;
 }
 
+/* General hidden class for any element */
+.zen-pomodoro-hidden {
+  display: none !important;
+}
+
+/* Collapsed class for ruleset details and similar collapsible elements */
+.zen-pomodoro-collapsed {
+  display: none;
+}
+
+/* No workspaces message styling */
+.zen-pomodoro-no-workspaces-msg {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Help text styling for settings descriptions */
+.zen-pomodoro-help-text {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  margin: 0 0 8px;
+}
+
+.zen-pomodoro-help-text.top-margin {
+  margin: 8px 0 0;
+}
+
 /* Lockout method selection styles */
 .zen-pomodoro-lockout-section {
   margin-top: 16px;

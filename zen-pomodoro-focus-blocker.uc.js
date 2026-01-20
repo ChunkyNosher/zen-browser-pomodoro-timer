@@ -1183,11 +1183,11 @@
     }
 
     if (secondsUntil === null) {
-      element.style.display = 'none';
+      element.classList.add('zen-pomodoro-hidden');
       return;
     }
 
-    element.style.display = 'block';
+    element.classList.remove('zen-pomodoro-hidden');
 
     if (secondsUntil === 0) {
       element.textContent = options.readyText;
@@ -2734,7 +2734,7 @@
         cycleProgress.textContent = `Cycle 1 of ${totalCycles}`;
       } else {
         // Hide for simple mode or when timer mode is not yet set
-        cycleProgress.style.display = 'none';
+        cycleProgress.classList.add('zen-pomodoro-hidden');
       }
 
       // Motivational message - SECURITY FIX: Use textContent
@@ -3347,7 +3347,7 @@
       // Only show cycle progress for pomodoro mode during focus phase
       const timerMode = window.zenPomodoroApp?.timer?.mode;
       const shouldShow = phase === 'focus' && timerMode === 'pomodoro';
-      cycleProgress.style.display = shouldShow ? 'block' : 'none';
+      cycleProgress.classList.toggle('zen-pomodoro-hidden', !shouldShow);
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
       }
@@ -3962,13 +3962,11 @@
 
       // Post-session reminder countdown indicator
       const postSessionCountdown = document.createElement('div');
-      postSessionCountdown.className = 'zen-pomodoro-reminder-countdown';
-      postSessionCountdown.style.display = 'none';
+      postSessionCountdown.className = 'zen-pomodoro-reminder-countdown zen-pomodoro-hidden';
 
       // First-time reminder countdown indicator
       const firstTimeCountdown = document.createElement('div');
-      firstTimeCountdown.className = 'zen-pomodoro-first-time-countdown';
-      firstTimeCountdown.style.display = 'none';
+      firstTimeCountdown.className = 'zen-pomodoro-first-time-countdown zen-pomodoro-hidden';
 
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
@@ -4101,7 +4099,7 @@
         'zen-pomodoro-simple-duration-input',
         { value: config.simpleDuration, min: '1', max: '180' }
       );
-      simpleDurationRow.style.display = isSimpleMode ? 'flex' : 'none';
+      if (!isSimpleMode) simpleDurationRow.classList.add('hidden');
       simpleDurationRow.dataset.mode = 'simple';
 
       const focusDurationRow = createLabeledInputRow(
@@ -4109,7 +4107,7 @@
         'zen-pomodoro-focus-duration-input',
         { value: config.focusDuration, min: '1', max: '120' }
       );
-      focusDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      if (isSimpleMode) focusDurationRow.classList.add('hidden');
       focusDurationRow.dataset.mode = 'pomodoro';
 
       const breakDurationRow = createLabeledInputRow(
@@ -4117,7 +4115,7 @@
         'zen-pomodoro-break-duration-input',
         { value: config.breakDuration, min: '1', max: '60' }
       );
-      breakDurationRow.style.display = isSimpleMode ? 'none' : 'flex';
+      if (isSimpleMode) breakDurationRow.classList.add('hidden');
       breakDurationRow.dataset.mode = 'pomodoro';
 
       const cyclesRow = createLabeledInputRow('Number of Cycles:', 'zen-pomodoro-cycles-input', {
@@ -4125,7 +4123,7 @@
         min: '1',
         max: '20',
       });
-      cyclesRow.style.display = isSimpleMode ? 'none' : 'flex';
+      if (isSimpleMode) cyclesRow.classList.add('hidden');
       cyclesRow.dataset.mode = 'pomodoro';
 
       return [simpleDurationRow, focusDurationRow, breakDurationRow, cyclesRow];
@@ -4268,9 +4266,9 @@
         rows.forEach((row) => {
           const mode = row.dataset.mode;
           if (mode === 'simple') {
-            row.style.display = isSimple ? 'flex' : 'none';
+            row.classList.toggle('hidden', !isSimple);
           } else if (mode === 'pomodoro') {
-            row.style.display = isSimple ? 'none' : 'flex';
+            row.classList.toggle('hidden', isSimple);
           }
         });
       });
@@ -4579,9 +4577,8 @@
 
       if (workspaces.length === 0) {
         const noWorkspacesMsg = document.createElement('div');
+        noWorkspacesMsg.className = 'zen-pomodoro-no-workspaces-msg';
         noWorkspacesMsg.textContent = 'No workspaces found';
-        noWorkspacesMsg.style.fontStyle = 'italic';
-        noWorkspacesMsg.style.opacity = '0.7';
         workspaceContainer.appendChild(noWorkspacesMsg);
       } else {
         workspaces.forEach((workspace) => {
@@ -4631,11 +4628,11 @@
       manageRulesetsButton.textContent = 'Manage Rulesets';
       manageRulesetsButton.addEventListener('click', () => {
         // Hide current settings dialog
-        dialog.style.display = 'none';
+        dialog.classList.remove('active');
         // Show ruleset settings dialog, pass callback to show settings again when done
         this.showRulesetSettingsDialog(() => {
           // Re-show settings dialog when returning
-          dialog.style.display = 'flex';
+          dialog.classList.add('active');
         });
       });
 
@@ -4730,10 +4727,10 @@
         const activeUsesHold = activeMethodSelect.value === LOCKOUT_METHODS.HOLD;
         const activeUsesCode = activeMethodSelect.value === LOCKOUT_METHODS.CODE;
 
-        idleHoldDurationRow.style.display = idleUsesHold ? '' : 'none';
-        activeHoldDurationRow.style.display = activeUsesHold ? '' : 'none';
-        idleCodeLengthRow.style.display = idleUsesCode ? '' : 'none';
-        activeCodeLengthRow.style.display = activeUsesCode ? '' : 'none';
+        idleHoldDurationRow.classList.toggle('hidden', !idleUsesHold);
+        activeHoldDurationRow.classList.toggle('hidden', !activeUsesHold);
+        idleCodeLengthRow.classList.toggle('hidden', !idleUsesCode);
+        activeCodeLengthRow.classList.toggle('hidden', !activeUsesCode);
       };
 
       idleMethodSelect.addEventListener('change', updateLockoutVisibility);
@@ -4800,7 +4797,7 @@
 
       // Show/hide times row based on enabled state
       const updateReminderTimesVisibility = () => {
-        reminderTimesRow.style.display = reminderEnabledCheckbox.checked ? '' : 'none';
+        reminderTimesRow.classList.toggle('hidden', !reminderEnabledCheckbox.checked);
       };
       reminderEnabledCheckbox.addEventListener('change', updateReminderTimesVisibility);
       updateReminderTimesVisibility();
@@ -4813,7 +4810,7 @@
       triggerReminderButton.title = 'Trigger the daily reminder for testing (ignores time/date)';
       triggerReminderButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.dailyReminder) {
-          dialog.style.display = 'none';
+          dialog.classList.remove('active');
           window.zenPomodoroApp.dailyReminder.triggerReminderForTesting();
         }
       });
@@ -4880,10 +4877,7 @@
 
       // Focus time goal help text
       const focusTimeHelpText = document.createElement('p');
-      focusTimeHelpText.style.fontSize = '12px';
-      focusTimeHelpText.style.color = '#666';
-      focusTimeHelpText.style.margin = '0 0 8px 0';
-      focusTimeHelpText.style.fontStyle = 'italic';
+      focusTimeHelpText.className = 'zen-pomodoro-help-text';
       focusTimeHelpText.textContent = 'Reminders stop after this much focus time is achieved.';
 
       // Reminder end time input
@@ -4904,10 +4898,7 @@
 
       // End time help text
       const endTimeHelpText = document.createElement('p');
-      endTimeHelpText.style.fontSize = '12px';
-      endTimeHelpText.style.color = '#666';
-      endTimeHelpText.style.margin = '0 0 8px 0';
-      endTimeHelpText.style.fontStyle = 'italic';
+      endTimeHelpText.className = 'zen-pomodoro-help-text';
       endTimeHelpText.textContent =
         'Automatically disable reminders after this time (e.g., 00:30 for 12:30 AM).';
 
@@ -4950,10 +4941,7 @@
 
       // Escalation info
       const escalationInfo = document.createElement('p');
-      escalationInfo.style.fontSize = '12px';
-      escalationInfo.style.color = '#666';
-      escalationInfo.style.margin = '8px 0 0 0';
-      escalationInfo.style.fontStyle = 'italic';
+      escalationInfo.className = 'zen-pomodoro-help-text top-margin';
       escalationInfo.textContent = 'Skip requirement increases by 50% each time.';
 
       // Development: Trigger post-session reminder button
@@ -4966,7 +4954,7 @@
 
       // Helper to set element display style
       const setElementDisplay = (element, visible) => {
-        element.style.display = visible ? '' : 'none';
+        element.classList.toggle('hidden', !visible);
       };
 
       // Show/hide settings based on enabled and method
@@ -4994,7 +4982,7 @@
 
       triggerPostSessionButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.postSessionReminder) {
-          dialog.style.display = 'none';
+          dialog.classList.remove('active');
           window.zenPomodoroApp.postSessionReminder.triggerReminderForTesting();
         }
       });
@@ -5609,13 +5597,9 @@
       expandBtn.textContent = '▼';
       expandBtn.addEventListener('click', () => {
         const details = item.querySelector('.zen-pomodoro-ruleset-details');
-        if (details.style.display === 'none') {
-          details.style.display = 'block';
-          expandBtn.textContent = '▲';
-        } else {
-          details.style.display = 'none';
-          expandBtn.textContent = '▼';
-        }
+        const isCollapsed = details.classList.contains('zen-pomodoro-collapsed');
+        details.classList.toggle('zen-pomodoro-collapsed');
+        expandBtn.textContent = isCollapsed ? '▲' : '▼';
       });
 
       // Delete button - use ID instead of index
@@ -5643,8 +5627,7 @@
 
       // Details section (collapsible)
       const details = document.createElement('div');
-      details.className = 'zen-pomodoro-ruleset-details';
-      details.style.display = 'none';
+      details.className = 'zen-pomodoro-ruleset-details zen-pomodoro-collapsed';
 
       // Rules container
       const rulesContainer = document.createElement('div');
