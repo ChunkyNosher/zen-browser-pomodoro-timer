@@ -3299,6 +3299,16 @@
       this._updatePhaseLabel(phase);
       this._updateCycleProgress(phase, currentCycle, totalCycles);
       this._updateIndicator(phase, timeStr);
+
+      // Log every 30 seconds to avoid log spam
+      if (remainingTime % 30 === 0) {
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Display updated', {
+          time: timeStr,
+          phase,
+          cycle: currentCycle,
+          totalCycles,
+        });
+      }
     }
 
     /**
@@ -3373,6 +3383,7 @@
       if (!this.overlay) return;
 
       this.overlay.setAttribute('data-phase', phase);
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Overlay phase color updated', { phase });
 
       // Trigger transition animation
       this.overlay.setAttribute('data-transitioning', 'true');
@@ -3394,6 +3405,7 @@
       this._resetIndicatorDisplay();
 
       this.indicator.classList.add('active');
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Timer indicator shown');
     }
 
     /**
@@ -3425,6 +3437,7 @@
     hideIndicator() {
       if (this.indicator) {
         this.indicator.classList.remove('active');
+        logger.log(LOG_CATEGORIES.OVERLAY, 'Timer indicator hidden');
       }
     }
 
@@ -7910,7 +7923,7 @@
         return;
       }
 
-      logger.log(LOG_CATEGORIES.TIMER, 'Showing transition popup');
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition popup displayed');
 
       this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
       this._createPopup();
@@ -7935,7 +7948,7 @@
         return;
       }
 
-      logger.log(LOG_CATEGORIES.TIMER, 'Hiding transition popup');
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition popup hidden');
 
       // Clear countdown interval
       if (this.timerInterval) {
@@ -8010,6 +8023,10 @@
      * @private
      */
     _startCountdown() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Transition countdown started', {
+        remainingSeconds: this.remainingTime,
+      });
+
       this.timerInterval = setInterval(() => {
         // If the popup has been removed or detached externally, stop the timer
         if (!this.popup || !document.documentElement.contains(this.popup)) {
