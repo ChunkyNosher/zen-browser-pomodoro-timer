@@ -1442,8 +1442,15 @@
    * @param {number} delayMs - Delay for progress listener
    */
   function setupBrowserListeners(context, checkCallback, delayMs) {
-    // Tab select listener
-    context.tabSelectHandler = () => checkCallback();
+    // Tab select listener - add delay to allow tab title to update before checking
+    context.tabSelectHandler = () => {
+      // Clear any pending check to avoid race conditions
+      if (context._tabSelectDelayTimeout) {
+        clearTimeout(context._tabSelectDelayTimeout);
+      }
+      // Small delay to let tab title update
+      context._tabSelectDelayTimeout = setTimeout(checkCallback, 100);
+    };
     // eslint-disable-next-line no-undef
     if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer) {
       // eslint-disable-next-line no-undef
@@ -1482,6 +1489,12 @@
   function removeBrowserListeners(context) {
     // eslint-disable-next-line no-undef
     if (typeof gBrowser === 'undefined') return;
+
+    // Clear pending tab select timeout
+    if (context._tabSelectDelayTimeout) {
+      clearTimeout(context._tabSelectDelayTimeout);
+      context._tabSelectDelayTimeout = null;
+    }
 
     // eslint-disable-next-line no-undef
     if (context.tabSelectHandler && gBrowser.tabContainer) {
@@ -2582,41 +2595,86 @@
      */
     _tryWorkspaceContainer() {
       // BUG FIX: Try the modern zen-workspace elements first (for newer Zen Browser versions)
-      let items = document.querySelectorAll('zen-workspace');
-      if (items.length > 0) {
-        logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
-          count: items.length,
-        });
-        console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
-        return Array.from(items).map((item) => {
-          const id = item.id; // The workspace ID is the element's id attribute
-          const name =
-            item.getAttribute('label') ||
-            item.querySelector('.zen-current-workspace-indicator-name')?.textContent?.trim() ||
-            `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
-          return { id, name };
-        });
-      }
-      
+      const modernWorkspaces = this._tryModernWorkspaceElements();
+      if (modernWorkspaces) return modernWorkspaces;
+
       // Fallback to legacy selectors
-      const container = document.querySelector(
-        '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
-      );
+      return this._tryLegacyContainerWorkspaces();
+    }
+
+    /**
+     * Try to get workspaces from modern zen-workspace elements.
+     * @returns {Array|null} Workspaces array or null if none found
+     * @private
+     */
+    _tryModernWorkspaceElements() {
+      const items = document.querySelectorAll('zen-workspace');
+      if (items.length === 0) return null;
+
+      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
+        count: items.length,
+      });
+      console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
+
+      return Array.from(items).map((item) => this._extractWorkspaceFromModernElement(item));
+    }
+
+    /**
+     * Extract workspace data from a modern zen-workspace element.
+     * @param {Element} item - The zen-workspace element
+     * @returns {Object} Workspace object with id and name
+     * @private
+     */
+    _extractWorkspaceFromModernElement(item) {
+      const id = item.id;
+      const name =
+        item.getAttribute('label') ||
+        item.querySelector('.zen-current-workspace-indicator-name')?.textContent?.trim() ||
+        `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+      return { id, name };
+    }
+
+    /**
+     * Try to get workspaces from legacy container selectors.
+     * @returns {Array|null} Workspaces array or null if none found
+     * @private
+     */
+    _tryLegacyContainerWorkspaces() {
+      const container = this._findLegacyWorkspaceContainer();
       if (!container) return null;
 
-      items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
+      const items = container.querySelectorAll('[zen-workspace-id], [data-workspace-id]');
       if (items.length === 0) return null;
 
       console.log(`Zen Pomodoro: Got ${items.length} workspaces from container`);
-      return Array.from(items).map((item) => {
-        const id = item.getAttribute('zen-workspace-id') || item.getAttribute('data-workspace-id');
-        const name =
-          item.getAttribute('label') ||
-          item.getAttribute('data-name') ||
-          item.textContent?.trim() ||
-          `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
-        return { id, name };
-      });
+      return Array.from(items).map((item) => this._extractWorkspaceFromLegacyElement(item));
+    }
+
+    /**
+     * Find the legacy workspace container element.
+     * @returns {Element|null} Container element or null
+     * @private
+     */
+    _findLegacyWorkspaceContainer() {
+      return document.querySelector(
+        '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
+      );
+    }
+
+    /**
+     * Extract workspace data from a legacy container element.
+     * @param {Element} item - The workspace element
+     * @returns {Object} Workspace object with id and name
+     * @private
+     */
+    _extractWorkspaceFromLegacyElement(item) {
+      const id = item.getAttribute('zen-workspace-id') || item.getAttribute('data-workspace-id');
+      const name =
+        item.getAttribute('label') ||
+        item.getAttribute('data-name') ||
+        item.textContent?.trim() ||
+        `Workspace ${id?.substring(0, 8) || 'Unknown'}`;
+      return { id, name };
     }
   }
 
@@ -3948,6 +4006,13 @@
      * Show timer configuration dialog
      */
     showConfigDialog() {
+      // Prevent duplicate dialogs
+      const existingDialog = document.getElementById('zen-pomodoro-start-dialog');
+      if (existingDialog) {
+        logger.log(LOG_CATEGORIES.MENU, 'Start timer dialog already exists, skipping');
+        return;
+      }
+
       logger.log(LOG_CATEGORIES.MENU, 'Opening start timer dialog');
 
       const dialog = document.createElement('div');
@@ -7019,6 +7084,21 @@
 
       // Evaluate URL against rulesets and update blocker
       this._evaluateUrlAndUpdateBlocker(currentUrl);
+
+      // Schedule a delayed re-check for keyword blocking
+      // This handles cases where tab title updates after the initial check
+      if (this._hasActiveKeywordRules()) {
+        if (this._keywordRecheckTimeout) {
+          clearTimeout(this._keywordRecheckTimeout);
+        }
+        this._keywordRecheckTimeout = setTimeout(() => {
+          if (!this._shouldShowBlocker()) return;
+          const url = this._getCurrentUrl();
+          if (url && !this._isInternalBrowserPage(url)) {
+            this._evaluateUrlAndUpdateBlocker(url);
+          }
+        }, 500); // 500ms delay for title updates
+      }
     }
 
     /**
@@ -7378,6 +7458,7 @@
       try {
         // eslint-disable-next-line no-undef
         if (typeof gBrowser === 'undefined') {
+          logger.log(LOG_CATEGORIES.SECURITY, 'gBrowser not available for title check');
           return '';
         }
 
@@ -7391,6 +7472,13 @@
           gBrowser.contentTitle ||
           '';
         /* eslint-enable no-undef */
+
+        // Log for debugging
+        if (title) {
+          logger.log(LOG_CATEGORIES.SECURITY, 'Page title retrieved for keyword check', {
+            title: title.substring(0, 50) + (title.length > 50 ? '...' : ''),
+          });
+        }
 
         return title;
       } catch (e) {
@@ -7682,8 +7770,20 @@
       this._clearIntervals();
       this._disconnectContentObserver();
       this._clearGoBackCooldown();
+      this._clearKeywordRecheckTimeout();
       this._removeBlockerOverlay();
       this.isBlocking = false;
+    }
+
+    /**
+     * Clear the keyword recheck timeout if active.
+     * @private
+     */
+    _clearKeywordRecheckTimeout() {
+      if (this._keywordRecheckTimeout) {
+        clearTimeout(this._keywordRecheckTimeout);
+        this._keywordRecheckTimeout = null;
+      }
     }
 
     /**
@@ -8061,58 +8161,109 @@
      * @private
      */
     _checkAndShowReminder() {
-      const config = getConfig();
-
-      // Check if feature is enabled
-      if (!config.dailyReminderEnabled) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Feature disabled');
-        return;
-      }
-
-      // Check if timer is already active
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer already active');
-        return;
-      }
-
-      // Get reminder times array
-      const reminderTimes = config.dailyReminderTimes;
-      if (!Array.isArray(reminderTimes) || reminderTimes.length === 0) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: No reminder times configured');
+      // Check basic preconditions
+      if (!this._canShowDailyReminder()) {
         return;
       }
 
       // Reset reminders shown if new day
       this._resetIfNewDay();
 
-      // Check if any reminder should be shown now
-      const now = new Date();
-      const currentHours = now.getHours();
-      const currentMinutes = now.getMinutes();
-      const currentTimeMinutes = currentHours * 60 + currentMinutes;
+      // Check and show reminder if time matches
+      this._checkReminderTimes();
+    }
 
-      for (const timeStr of reminderTimes) {
+    /**
+     * Check if daily reminder can be shown based on feature state and timer status.
+     * @returns {boolean} True if daily reminder can potentially be shown
+     * @private
+     */
+    _canShowDailyReminder() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.dailyReminderEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Feature disabled');
+        return false;
+      }
+
+      // Check if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer already active');
+        return false;
+      }
+
+      // Get reminder times array
+      const reminderTimes = config.dailyReminderTimes;
+      if (!Array.isArray(reminderTimes) || reminderTimes.length === 0) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: No reminder times configured');
+        return false;
+      }
+
+      return true;
+    }
+
+    /**
+     * Check all configured reminder times and show reminder if conditions met.
+     * @private
+     */
+    _checkReminderTimes() {
+      const config = getConfig();
+      const now = new Date();
+      const currentTimeMinutes = this._getCurrentTimeInMinutes(now);
+
+      for (const timeStr of config.dailyReminderTimes) {
         if (!isValidTimeFormat(timeStr)) continue;
 
         const [hours, minutes] = timeStr.split(':').map(Number);
-        const reminderTimeMinutes = hours * 60 + minutes;
-
-        // Check if we're at or past this reminder time
-        if (currentTimeMinutes >= reminderTimeMinutes) {
-          // Check if this reminder was already shown today
-          const wasShownToday = this._wasReminderShownToday(hours, minutes);
-
-          if (!wasShownToday) {
-            logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
-              reminderTime: timeStr,
-            });
-            this.showReminder();
-            return; // Only show one reminder at a time
-          }
+        
+        if (this._shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr)) {
+          return; // Only show one reminder at a time
         }
       }
 
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: No reminder to show at current time');
+    }
+
+    /**
+     * Get current time in minutes since midnight.
+     * @param {Date} now - Current date/time
+     * @returns {number} Minutes since midnight
+     * @private
+     */
+    _getCurrentTimeInMinutes(now) {
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      return currentHours * 60 + currentMinutes;
+    }
+
+    /**
+     * Check if reminder should be shown for a specific time.
+     * @param {number} currentTimeMinutes - Current time in minutes since midnight
+     * @param {number} hours - Reminder hour
+     * @param {number} minutes - Reminder minute
+     * @param {string} timeStr - Time string for logging
+     * @returns {boolean} True if reminder was shown
+     * @private
+     */
+    _shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr) {
+      const reminderTimeMinutes = hours * 60 + minutes;
+
+      // Check if we're at or past this reminder time
+      if (currentTimeMinutes >= reminderTimeMinutes) {
+        // Check if this reminder was already shown today
+        const wasShownToday = this._wasReminderShownToday(hours, minutes);
+
+        if (!wasShownToday) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
+            reminderTime: timeStr,
+          });
+          this.showReminder();
+          return true;
+        }
+      }
+
+      return false;
     }
 
     /**
@@ -8125,13 +8276,6 @@
      */
     _wasReminderShownToday(hours, minutes) {
       const today = this._getTodayDateString();
-      const reminderDate = new Date();
-      reminderDate.setHours(hours, minutes, 0, 0);
-      const reminderTimeMs = reminderDate.getTime();
-
-      // Check if any shown reminder is within 2 minutes of this reminder time
-      // This prevents showing the same reminder multiple times due to periodic checks
-      const twoMinutesMs = 2 * 60 * 1000;
 
       for (const shownTimestamp of this.remindersShownToday) {
         const shownDate = new Date(shownTimestamp);
@@ -8139,8 +8283,12 @@
 
         // Only check reminders from today
         if (shownDateStr === today) {
-          const timeDiff = Math.abs(shownTimestamp - reminderTimeMs);
-          if (timeDiff < twoMinutesMs) {
+          // Compare hours and minutes directly instead of timestamp difference
+          const shownHours = shownDate.getHours();
+          const shownMinutes = shownDate.getMinutes();
+
+          // If the shown reminder matches this reminder's hour and minute (±1 minute tolerance)
+          if (shownHours === hours && Math.abs(shownMinutes - minutes) <= 1) {
             return true;
           }
         }
@@ -8615,6 +8763,9 @@
     _handleStartTimerClick() {
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Start Timer button clicked');
 
+      // Don't hide reminder yet - wait for timer to actually start
+      // The reminder will be hidden by onTimerStart() callback
+
       // Use callback if set, otherwise try to show start dialog directly
       if (this.onStartTimer) {
         this.onStartTimer();
@@ -8670,11 +8821,18 @@
 
       let nextReminderMinutes = null;
       let nextReminderHours = null;
-      let nextReminderMinutesValue = null;
 
-      for (const timeStr of reminderTimes.sort()) {
-        if (!isValidTimeFormat(timeStr)) continue;
+      // Sort reminder times by actual time of day (minutes since midnight)
+      const sortedReminderTimes = reminderTimes
+        .filter((timeStr) => isValidTimeFormat(timeStr))
+        .slice()
+        .sort((a, b) => {
+          const [aHours, aMinutes] = a.split(':').map(Number);
+          const [bHours, bMinutes] = b.split(':').map(Number);
+          return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
+        });
 
+      for (const timeStr of sortedReminderTimes) {
         const [hours, minutes] = timeStr.split(':').map(Number);
         const reminderTimeMinutes = hours * 60 + minutes;
 
@@ -8686,7 +8844,6 @@
           if (reminderTimeMinutes > currentTimeMinutes) {
             nextReminderMinutes = minutes;
             nextReminderHours = hours;
-            nextReminderMinutesValue = reminderTimeMinutes;
             break;
           } else if (reminderTimeMinutes === currentTimeMinutes) {
             // Reminder should be showing now
@@ -9041,36 +9198,88 @@
      * @private
      */
     _canPotentiallyShowReminder() {
+      return (
+        this._isPostSessionFeatureEnabled() &&
+        !this._isReminderCurrentlyShowing() &&
+        !this._isTimerCurrentlyActive() &&
+        this._hasIdleStartTime() &&
+        !this._hasFocusTimeGoalBeenReached() &&
+        !this._isReminderDisabledForDay() &&
+        !this._isDailyReminderShowing()
+      );
+    }
+
+    /**
+     * Check if post-session reminder feature is enabled.
+     * @returns {boolean} True if feature is enabled
+     * @private
+     */
+    _isPostSessionFeatureEnabled() {
       const config = getConfig();
+      return config.postSessionReminderEnabled;
+    }
 
-      // Feature must be enabled
-      if (!config.postSessionReminderEnabled) return false;
+    /**
+     * Check if reminder is currently showing.
+     * @returns {boolean} True if reminder is currently being displayed
+     * @private
+     */
+    _isReminderCurrentlyShowing() {
+      return this.isShowing;
+    }
 
-      // Must not already be showing
-      if (this.isShowing) return false;
+    /**
+     * Check if timer is currently active.
+     * @returns {boolean} True if timer is running
+     * @private
+     */
+    _isTimerCurrentlyActive() {
+      return window.zenPomodoroApp?.timer?.isActive || false;
+    }
 
-      // Timer must not be active
-      if (window.zenPomodoroApp?.timer?.isActive) return false;
+    /**
+     * Check if idle start time is set.
+     * @returns {boolean} True if timer has completed and idle tracking started
+     * @private
+     */
+    _hasIdleStartTime() {
+      return !!this.idleStartTime;
+    }
 
-      // Must have an idle start time (timer has completed)
-      if (!this.idleStartTime) return false;
+    /**
+     * Check if focus time goal has been reached.
+     * @returns {boolean} True if daily focus goal achieved
+     * @private
+     */
+    _hasFocusTimeGoalBeenReached() {
+      return this._checkFocusTimeGoalReached();
+    }
 
-      // Focus time goal must not have been reached
-      if (this._checkFocusTimeGoalReached()) return false;
-
-      // Post-session reminder must not be disabled for the day
+    /**
+     * Check if reminder has been disabled for the day.
+     * @returns {boolean} True if disabled for today
+     * @private
+     */
+    _isReminderDisabledForDay() {
+      const config = getConfig();
       if (config.postSessionReminderDisabledForDay) {
         logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Disabled for the day');
-        return false;
+        return true;
       }
+      return false;
+    }
 
-      // Daily reminder must not be showing (mutual exclusion)
+    /**
+     * Check if daily reminder is currently showing.
+     * @returns {boolean} True if daily reminder is active (mutual exclusion)
+     * @private
+     */
+    _isDailyReminderShowing() {
       if (window.zenPomodoroApp?.dailyReminder?.isShowing) {
         logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Daily reminder is showing');
-        return false;
+        return true;
       }
-
-      return true;
+      return false;
     }
 
     /**
@@ -9533,8 +9742,8 @@
     _handleStartTimerClick() {
       logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Start Timer button clicked');
 
-      // Hide reminder first
-      this.hideReminder();
+      // Don't hide reminder yet - wait for timer to actually start
+      // The reminder will be hidden by onTimerStart() callback
 
       // Use callback if set, otherwise try to show start dialog directly
       if (this.onStartTimer) {
@@ -9934,48 +10143,106 @@
      * @param {boolean} isBlocked - Optional pre-computed blocked status (avoids re-computation)
      */
     updateOverlayVisibility(workspaceId = null, isBlocked = null) {
+      // Handle timer inactive state
       if (!this.timer.isActive) {
-        this.overlay.hide();
-        this.overlay.hideIndicator();
+        this._hideOverlayAndIndicator();
         return;
       }
 
+      // Handle paused during break phase
+      if (this._isPausedDuringBreak()) {
+        this._handlePausedBreakPhase(isBlocked);
+        return;
+      }
+
+      // Handle active break phase
+      if (this._isInActiveBreakPhase()) {
+        this._hideOverlayKeepIndicator();
+        return;
+      }
+
+      // Handle transition phase
+      if (this._isInTransitionPhase()) {
+        this._hideOverlayKeepIndicator();
+        return;
+      }
+
+      // Handle regular focus phase (paused or running)
+      this._handleFocusPhase(workspaceId, isBlocked);
+    }
+
+    /**
+     * Hide both overlay and indicator.
+     * @private
+     */
+    _hideOverlayAndIndicator() {
+      this.overlay.hide();
+      this.overlay.hideIndicator();
+    }
+
+    /**
+     * Check if timer is paused during a break phase.
+     * @returns {boolean} True if paused during break
+     * @private
+     */
+    _isPausedDuringBreak() {
+      return this.timer.isPaused && isInBreakPhase();
+    }
+
+    /**
+     * Handle overlay visibility when paused during break phase.
+     * @param {boolean} isBlocked - Pre-computed blocked status
+     * @private
+     */
+    _handlePausedBreakPhase(isBlocked) {
       // SPECIAL CASE: When timer is paused during break/transition, block workspaces
       // This prevents users from indefinitely pausing during break to bypass blocking
-      if (this.timer.isPaused && isInBreakPhase()) {
-        // Use provided status if available, otherwise check current workspace
-        const workspaceBlocked =
-          isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
-        
-        if (workspaceBlocked) {
-          // Use _showOverlayWithStatus to display current phase and timer info
-          this._showOverlayWithStatus();
-        } else {
-          this.overlay.hide();
-        }
-        // Keep indicator visible to show paused state
-        return;
-      }
+      const workspaceBlocked =
+        isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
 
-      // During break phases (not paused), hide workspace overlay to allow free browsing
-      // Note: isCurrentWorkspaceBlocked() already checks for break phase,
-      // but we add an explicit check here for clarity and to update display
-      if (isInBreakPhase()) {
+      if (workspaceBlocked) {
+        // Use _showOverlayWithStatus to display current phase and timer info
+        this._showOverlayWithStatus();
+      } else {
         this.overlay.hide();
-        // Keep the indicator visible during breaks so user knows timer is running
-        return;
       }
+      // Keep indicator visible to show paused state
+    }
 
-      // During transition phase (not paused), hide workspace overlay (blocking stays disabled)
-      // The transition popup is shown separately by the TransitionPhaseManager
-      // Note: This check is technically redundant as isInBreakPhase() includes transition,
-      // but kept for backwards compatibility and explicit documentation
-      if (this.timer.currentPhase === 'transition') {
-        this.overlay.hide();
-        // Keep the indicator visible during transition so user knows timer is running
-        return;
-      }
+    /**
+     * Check if currently in an active (not paused) break phase.
+     * @returns {boolean} True if in break phase and not paused
+     * @private
+     */
+    _isInActiveBreakPhase() {
+      return isInBreakPhase();
+    }
 
+    /**
+     * Check if currently in transition phase.
+     * @returns {boolean} True if in transition phase
+     * @private
+     */
+    _isInTransitionPhase() {
+      return this.timer.currentPhase === 'transition';
+    }
+
+    /**
+     * Hide overlay but keep indicator visible.
+     * @private
+     */
+    _hideOverlayKeepIndicator() {
+      this.overlay.hide();
+      // Keep the indicator visible during breaks/transition so user knows timer is running
+    }
+
+    /**
+     * Handle overlay visibility during focus phase.
+     * @param {string} workspaceId - Optional workspace ID
+     * @param {boolean} isBlocked - Pre-computed blocked status
+     * @private
+     */
+    _handleFocusPhase(workspaceId, isBlocked) {
       // Show overlay only on blocked workspaces (same logic for paused and running states)
       // Use provided status if available, otherwise check current workspace
       const workspaceBlocked =
@@ -9985,30 +10252,50 @@
       const currentWorkspaceId = workspaceId || this.workspace.getActiveWorkspace();
 
       if (workspaceBlocked) {
-        logger.log(
-          LOG_CATEGORIES.OVERLAY,
-          'Current workspace is blocked - showing overlay',
-          {
-            workspaceId: currentWorkspaceId,
-            isPaused: this.timer.isPaused,
-            workspaceBlocked: workspaceBlocked,
-            isBlockedParam: isBlocked,
-          }
-        );
+        this._logBlockedWorkspace(currentWorkspaceId, isBlocked);
         this._showOverlayWithStatus();
       } else {
-        logger.log(
-          LOG_CATEGORIES.OVERLAY,
-          'Current workspace is unblocked - hiding overlay',
-          {
-            workspaceId: currentWorkspaceId,
-            isPaused: this.timer.isPaused,
-            workspaceBlocked: workspaceBlocked,
-            isBlockedParam: isBlocked,
-          }
-        );
+        this._logUnblockedWorkspace(currentWorkspaceId, isBlocked);
         this.overlay.hide();
       }
+    }
+
+    /**
+     * Log blocked workspace information.
+     * @param {string} workspaceId - Current workspace ID
+     * @param {boolean} isBlocked - Blocked status parameter
+     * @private
+     */
+    _logBlockedWorkspace(workspaceId, isBlocked) {
+      logger.log(
+        LOG_CATEGORIES.OVERLAY,
+        'Current workspace is blocked - showing overlay',
+        {
+          workspaceId: workspaceId,
+          isPaused: this.timer.isPaused,
+          workspaceBlocked: true,
+          isBlockedParam: isBlocked,
+        }
+      );
+    }
+
+    /**
+     * Log unblocked workspace information.
+     * @param {string} workspaceId - Current workspace ID
+     * @param {boolean} isBlocked - Blocked status parameter
+     * @private
+     */
+    _logUnblockedWorkspace(workspaceId, isBlocked) {
+      logger.log(
+        LOG_CATEGORIES.OVERLAY,
+        'Current workspace is unblocked - hiding overlay',
+        {
+          workspaceId: workspaceId,
+          isPaused: this.timer.isPaused,
+          workspaceBlocked: false,
+          isBlockedParam: isBlocked,
+        }
+      );
     }
 
     /**

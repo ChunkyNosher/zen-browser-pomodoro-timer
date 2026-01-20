@@ -13,31 +13,6 @@
     "defaultValue": true
   },
   {
-    "property": "zen-pomodoro.dailyReminderEnabled",
-    "label": "Enable Daily Focus Reminders",
-    "type": "checkbox",
-    "defaultValue": false
-  },
-  {
-    "property": "zen-pomodoro.dailyReminderTimes",
-    "label": "Daily Reminder Times (comma-separated, 24h format)",
-    "type": "string",
-    "defaultValue": "11:15,16:15",
-    "placeholder": "11:15,16:15"
-  },
-  {
-    "property": "zen-pomodoro.dailyReminderSkipHoldDuration",
-    "label": "Daily Reminder Skip Hold Duration (seconds)",
-    "type": "number",
-    "defaultValue": 15
-  },
-  {
-    "property": "zen-pomodoro.dailyReminderSkipCodeLength",
-    "label": "Daily Reminder Skip Code Length",
-    "type": "number",
-    "defaultValue": 32
-  },
-  {
     "property": "zen-pomodoro.postSessionReminderEnabled",
     "label": "Enable Post-Session Reminder",
     "type": "checkbox",
