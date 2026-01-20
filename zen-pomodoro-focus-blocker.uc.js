@@ -4795,9 +4795,18 @@
       reminderTimesRow.appendChild(reminderTimesLabel);
       reminderTimesRow.appendChild(reminderTimesInput);
 
-      // Show/hide times row based on enabled state
+      // Skip cooldown input
+      const dailyReminderCooldownRow = createLabeledInputRow(
+        'Skip cooldown (min):',
+        'daily-reminder-skip-cooldown',
+        { value: config.dailyReminderSkipCooldown, min: 1, max: 120 }
+      );
+
+      // Show/hide times row and cooldown row based on enabled state
       const updateReminderTimesVisibility = () => {
-        reminderTimesRow.classList.toggle('hidden', !reminderEnabledCheckbox.checked);
+        const isEnabled = reminderEnabledCheckbox.checked;
+        reminderTimesRow.classList.toggle('hidden', !isEnabled);
+        dailyReminderCooldownRow.classList.toggle('hidden', !isEnabled);
       };
       reminderEnabledCheckbox.addEventListener('change', updateReminderTimesVisibility);
       updateReminderTimesVisibility();
@@ -4819,6 +4828,7 @@
       reminderSection.appendChild(reminderDescription);
       reminderSection.appendChild(reminderEnabledRow);
       reminderSection.appendChild(reminderTimesRow);
+      reminderSection.appendChild(dailyReminderCooldownRow);
       reminderSection.appendChild(triggerReminderButton);
 
       // ========================================
@@ -5043,7 +5053,7 @@
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveBlockedWorkspaces(workspaceContainer, config);
-        this._saveReminderSettings(reminderEnabledCheckbox, reminderTimesInput, config);
+        this._saveReminderSettings(dialog, reminderEnabledCheckbox, reminderTimesInput, config);
         this._savePostSessionSettings(
           dialog,
           config,
@@ -5256,13 +5266,26 @@
 
     /**
      * Save daily reminder settings from settings dialog.
+     * @param {HTMLElement} dialog - The dialog element
      * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
      * @param {HTMLInputElement} timesInput - Times input element (comma-separated)
      * @param {Object} config - Configuration object to update
      * @private
      */
-    _saveReminderSettings(enabledCheckbox, timesInput, config) {
+    _saveReminderSettings(dialog, enabledCheckbox, timesInput, config) {
       config.dailyReminderEnabled = enabledCheckbox.checked;
+
+      // Save skip cooldown
+      const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
+      if (cooldownInput) {
+        const cooldownValue = validateIntegerInput(
+          parseInt(cooldownInput.value, 10),
+          1,
+          120,
+          config.dailyReminderSkipCooldown
+        );
+        config.dailyReminderSkipCooldown = cooldownValue;
+      }
 
       // Validate and save times (comma-separated HH:MM values)
       const timesValue = timesInput.value;
@@ -5279,6 +5302,7 @@
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
         enabled: config.dailyReminderEnabled,
         times: config.dailyReminderTimes,
+        skipCooldown: config.dailyReminderSkipCooldown,
       });
     }
 

@@ -161,6 +161,7 @@ Shows reminder after configurable idle time following timer completion.
 | `dailyReminderSkipMethod`       | string  | 'hold'             | Skip method: 'hold' or 'code'                        |
 | `dailyReminderSkipHoldDuration` | number  | 15                 | Seconds to hold for skip                             |
 | `dailyReminderSkipCodeLength`   | number  | 32                 | Characters to type for skip                          |
+| `dailyReminderSkipCooldown`     | number  | 10                 | Minutes of cooldown between daily reminder skips     |
 | `postSessionReminderEnabled`    | boolean | true               | Enable post-session idle reminder                    |
 | `postSessionIdleTime`           | number  | 45                 | Minutes before first reminder after timer completion |
 | `postSessionSkipCooldown`       | number  | 30                 | Minutes between reminders after skip                 |
