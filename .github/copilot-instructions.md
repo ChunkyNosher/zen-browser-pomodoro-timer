@@ -41,7 +41,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 | `SecurityManager`            | Handles settings access lockouts (hold-to-unlock, code entry)                                    |
 | `WebsiteBlocker`             | LeechBlock-style website/keyword blocking with configurable rulesets                             |
 | `SineModBlocker`             | Blocks access to `about:preferences#sineMods` during active timer                                |
-| `FirstTimeReminderManager`   | Shows blocking reminder if no timer started today after configured time                          |
+| `DailyReminderManager`       | Shows blocking reminders at configurable times throughout the day (replaces FirstTimeReminderManager) |
 | `PostSessionReminderManager` | Shows reminder after idle time following timer completion                                        |
 | `TransitionPhaseManager`     | Manages the "break ending soon" popup before focus resumes                                       |
 | `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                              |
@@ -53,7 +53,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.2.3';                  // Current mod version
+const MOD_VERSION = '1.2.9';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -72,6 +72,8 @@ BECAUSE IF IT LOOKS LIKE IT'S IMPLEMENTED PROPERLY BUT I SAY THAT THERE'S AN ISS
 Also, if there are log files that I explicitly list in a prompt/comment, make sure to find those logs files in the repo and diagnose
 what's actually going on with the bugged behaviors and issues, and also try and identify any other bugged behaviors
 in your parsing of the logs that I didn't already explicitly list out.
+
+**BUG ANALYSIS REQUIREMENT:** For all bugs and issues, it is MANDATORY to scan through the code yourself to try and identify the buggy areas BEFORE assigning a subagent to fix it. DON'T just assign the subagent to identify the issue by itself, as it has on multiple occasions came to the wrong conclusion that there was nothing to fix. Make sure you look through the code yourself and identify the specific functions/lines that need changes before delegating to the subagent.
 
 Make sure that you delegate all of the coding work to the subagent in this repo and MAKE SURE
 TO RUN THE SUBAGENT MULTIPLE TIMES TO ADDRESS SPECIFIC CATEGORIES OF ISSUES RATHER THAN JUST DOING EVERYTHING IN ONE PASS.
@@ -115,19 +117,22 @@ Configuration is stored via Firefox `Services.prefs` with the `zen-pomodoro.` pr
 ## Timer Phases
 
 1. **Focus** - Active work period, blocking enabled
-2. **Break** - Rest period, blocking disabled
-3. **Transition** - 5-minute warning before break ends, blocking disabled, popup shown
+2. **Break** - Rest period, blocking disabled (but blocked when paused)
+3. **Transition** - 5-minute warning before break ends, blocking disabled (but blocked when paused), popup shown
 
 ---
 
 ## Reminder Systems
 
-### First-Time Reminder (FirstTimeReminderManager)
+### Daily Reminders (DailyReminderManager)
 
-Shows a blocking reminder if no timer has been started today after a configurable time.
+Shows blocking reminders at configurable times throughout the day (default: 11:15 AM and 4:15 PM).
 
-- Uses periodic check (every 60 seconds) not just on init
-- Triggers based on user's local time (configurable HH:MM format)
+- Multiple configurable times per day (comma-separated HH:MM format)
+- Uses periodic check (every 60 seconds)
+- Triggers based on user's local time
+- Skip with hold/code challenge (escalating difficulty)
+- Skip count resets when timer is started
 - State persisted via `Services.prefs`
 
 ### Post-Session Reminder (PostSessionReminderManager)
@@ -143,19 +148,20 @@ Shows reminder after configurable idle time following timer completion.
 
 ## New Configuration Options
 
-| Option                        | Type    | Default | Description                                          |
-| ----------------------------- | ------- | ------- | ---------------------------------------------------- |
-| `firstTimeReminderEnabled`    | boolean | false   | Enable daily startup reminder                        |
-| `firstTimeReminderTime`       | string  | '10:00' | Time in HH:MM format for daily reminder              |
-| `postSessionReminderEnabled`  | boolean | true    | Enable post-session idle reminder                    |
-| `postSessionIdleTime`         | number  | 45      | Minutes before first reminder after timer completion |
-| `postSessionSkipCooldown`     | number  | 30      | Minutes between reminders after skip                 |
-| `postSessionFocusTimeGoal`    | number  | 150     | Minutes of focus time goal (2.5 hours)               |
-| `postSessionSkipMethod`       | string  | 'hold'  | Skip method: 'hold' or 'code'                        |
-| `postSessionSkipHoldDuration` | number  | 20      | Seconds to hold for skip                             |
-| `postSessionSkipCodeLength`   | number  | 48      | Characters to type for skip                          |
-| `postSessionSkipCount`        | number  | 0       | Current skip count (runtime state)                   |
-| `postSessionLastSkipTime`     | number  | null    | Last skip timestamp (runtime state)                  |
+| Option                         | Type    | Default        | Description                                          |
+| ------------------------------ | ------- | -------------- | ---------------------------------------------------- |
+| `dailyReminderEnabled`         | boolean | false          | Enable daily focus reminders                         |
+| `dailyReminderTimes`           | array   | ['11:15', '16:15'] | Times in HH:MM format for daily reminders        |
+| `dailyReminderSkipMethod`      | string  | 'hold'         | Skip method: 'hold' or 'code'                        |
+| `dailyReminderSkipHoldDuration`| number  | 15             | Seconds to hold for skip                             |
+| `dailyReminderSkipCodeLength`  | number  | 32             | Characters to type for skip                          |
+| `postSessionReminderEnabled`   | boolean | true           | Enable post-session idle reminder                    |
+| `postSessionIdleTime`          | number  | 45             | Minutes before first reminder after timer completion |
+| `postSessionSkipCooldown`      | number  | 30             | Minutes between reminders after skip                 |
+| `postSessionFocusTimeGoal`     | number  | 150            | Minutes of focus time goal (2.5 hours)               |
+| `postSessionSkipMethod`        | string  | 'hold'         | Skip method: 'hold' or 'code'                        |
+| `postSessionSkipHoldDuration`  | number  | 20             | Seconds to hold for skip                             |
+| `postSessionSkipCodeLength`    | number  | 48             | Characters to type for skip                          |
 
 ---
 
