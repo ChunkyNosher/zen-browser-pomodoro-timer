@@ -3680,6 +3680,33 @@
           this.menuDialog = null;
         });
 
+        // Cut Break Early button - only shown during break, long-break, or transition phases
+        const isBreakOrTransition = 
+          status.currentPhase === 'break' || 
+          status.currentPhase === 'long-break' ||
+          status.currentPhase === 'transition';
+        let cutBreakBtn = null;
+        if (isBreakOrTransition) {
+          cutBreakBtn = document.createElement('button');
+          cutBreakBtn.className = 'zen-pomodoro-dialog-button secondary';
+          cutBreakBtn.textContent = 'Cut Break Early';
+          cutBreakBtn.addEventListener('click', () => {
+            this._stopMenuTimerUpdates();
+            dialog.remove();
+            this.menuDialog = null;
+            
+            // If in transition phase, hide the popup (which triggers onTransitionComplete callback)
+            if (status.currentPhase === 'transition') {
+              window.zenPomodoroApp.transitionManager.hideTransitionPopup();
+            } else {
+              // In regular break or long-break phase, start focus phase directly
+              // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
+              window.zenPomodoroApp.timer.startFocusFromTransition();
+              window.zenPomodoroApp.updateOverlayVisibility();
+            }
+          });
+        }
+
         const stopBtn = document.createElement('button');
         stopBtn.className = 'zen-pomodoro-dialog-button secondary';
         stopBtn.textContent = 'Stop Timer';
@@ -3736,6 +3763,9 @@
 
         menuSection.appendChild(statusRow);
         menuSection.appendChild(pauseResumeBtn);
+        if (cutBreakBtn) {
+          menuSection.appendChild(cutBreakBtn);
+        }
         menuSection.appendChild(stopBtn);
         menuSection.appendChild(toggleIndicatorBtn);
         menuSection.appendChild(settingsBtn);
@@ -9443,7 +9473,8 @@
           isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
         
         if (workspaceBlocked) {
-          this.overlay.show();
+          // Use _showOverlayWithStatus to display current phase and timer info
+          this._showOverlayWithStatus();
         } else {
           this.overlay.hide();
         }
