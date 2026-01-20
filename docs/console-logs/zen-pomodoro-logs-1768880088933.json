@@ -36,11 +36,7 @@
       "message": "Workspace observer configured",
       "data": {
         "container": "#tabbrowser-arrowscrollbox",
-        "observingAttributes": [
-          "active",
-          "selected",
-          "zen-workspace-id"
-        ]
+        "observingAttributes": ["active", "selected", "zen-workspace-id"]
       }
     },
     {
@@ -564,10 +560,7 @@
       "message": "Saved daily reminder settings",
       "data": {
         "enabled": true,
-        "times": [
-          "11:15",
-          "16:15"
-        ]
+        "times": ["11:15", "16:15"]
       }
     },
     {

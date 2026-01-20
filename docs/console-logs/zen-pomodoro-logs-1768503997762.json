@@ -829,9 +829,7 @@
       "category": "SETTINGS",
       "message": "Active rulesets saved",
       "data": {
-        "rulesets": [
-          "default"
-        ]
+        "rulesets": ["default"]
       }
     },
     {

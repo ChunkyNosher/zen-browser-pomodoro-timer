@@ -75,12 +75,12 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 ## Helper Functions
 
-| Function                                              | Purpose                                 |
-| ----------------------------------------------------- | --------------------------------------- |
-| `loadBooleanPref(prefName, config, configKey)`        | Load boolean preference with validation |
-| `loadPositiveIntPref(prefName, config, configKey)`    | Load positive integer preference        |
-| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format              |
-| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input        |
+| Function                                              | Purpose                                  |
+| ----------------------------------------------------- | ---------------------------------------- |
+| `loadBooleanPref(prefName, config, configKey)`        | Load boolean preference with validation  |
+| `loadPositiveIntPref(prefName, config, configKey)`    | Load positive integer preference         |
+| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format               |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input         |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI |
 
 ## Development Guidelines
@@ -98,15 +98,15 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 Use these MCP tools when working on this mod:
 
-| Tool | Purpose |
-|------|---------|
-| `context7-resolve-library-id` | Find library IDs for documentation lookup |
-| `context7-query-docs` | Query library documentation |
-| `perplexity_search` | Web search for docs/examples |
-| `perplexity_reason` | Complex reasoning with web context |
-| `codescene-code_health_score` | Get code health score (target ≥7.5) |
-| `codescene-code_health_review` | Get detailed code health issues |
-| `codescene-code_health_auto_refactor` | Auto-refactor functions |
+| Tool                                  | Purpose                                   |
+| ------------------------------------- | ----------------------------------------- |
+| `context7-resolve-library-id`         | Find library IDs for documentation lookup |
+| `context7-query-docs`                 | Query library documentation               |
+| `perplexity_search`                   | Web search for docs/examples              |
+| `perplexity_reason`                   | Complex reasoning with web context        |
+| `codescene-code_health_score`         | Get code health score (target ≥7.5)       |
+| `codescene-code_health_review`        | Get detailed code health issues           |
+| `codescene-code_health_auto_refactor` | Auto-refactor functions                   |
 
 ## Documentation Reminder
 

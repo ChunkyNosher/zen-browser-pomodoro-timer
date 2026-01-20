@@ -1899,13 +1899,11 @@
         config.dailyReminderTimes.length > 0
       ) {
         // Sort times numerically by hours and minutes and use the first one
-        const sortedTimes = config.dailyReminderTimes
-          .slice()
-          .sort((a, b) => {
-            const [aHours, aMinutes] = a.split(':').map(Number);
-            const [bHours, bMinutes] = b.split(':').map(Number);
-            return aHours - bHours || aMinutes - bMinutes;
-          });
+        const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
+          const [aHours, aMinutes] = a.split(':').map(Number);
+          const [bHours, bMinutes] = b.split(':').map(Number);
+          return aHours - bHours || aMinutes - bMinutes;
+        });
         reminderTime = sortedTimes[0];
       }
 
@@ -2266,11 +2264,9 @@
         if (activeElement) {
           return activeElement.id;
         }
-        
+
         // Fallback to toolbarbutton selector (legacy approach for older Zen versions/themes)
-        activeElement = document.querySelector(
-          'toolbarbutton[zen-workspace-id][active="true"]'
-        );
+        activeElement = document.querySelector('toolbarbutton[zen-workspace-id][active="true"]');
         if (activeElement) {
           return activeElement.getAttribute('zen-workspace-id');
         }
@@ -2385,18 +2381,18 @@
         clearTimeout(this.mutationDebounceTimer);
         this.mutationDebounceTimer = null;
       }
-      
+
       // Use a small delay to ensure DOM has fully updated before checking workspace
       this.mutationDebounceTimer = setTimeout(() => {
         const newWorkspace = this.getActiveWorkspace();
-        
+
         // BUG FIX: Log mutation handler execution to debug workspace change detection
         logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace mutation detected', {
           oldWorkspace: this.activeWorkspace,
           newWorkspace: newWorkspace,
           changed: newWorkspace !== this.activeWorkspace,
         });
-        
+
         if (newWorkspace === this.activeWorkspace) return;
 
         this.activeWorkspace = newWorkspace;
@@ -2410,7 +2406,7 @@
           const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
           this.onWorkspaceChange(newWorkspace, isBlocked);
         }
-        
+
         this.mutationDebounceTimer = null;
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
@@ -2422,7 +2418,7 @@
      */
     startMonitoring() {
       this.activeWorkspace = this.getActiveWorkspace();
-      
+
       logger.log(LOG_CATEGORIES.WORKSPACE, 'Starting workspace monitoring', {
         initialWorkspace: this.activeWorkspace,
       });
@@ -2617,9 +2613,13 @@
       const items = document.querySelectorAll('zen-workspace');
       if (items.length === 0) return null;
 
-      logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace detection: Using modern zen-workspace elements', {
-        count: items.length,
-      });
+      logger.log(
+        LOG_CATEGORIES.WORKSPACE,
+        'Workspace detection: Using modern zen-workspace elements',
+        {
+          count: items.length,
+        }
+      );
       console.log(`Zen Pomodoro: Got ${items.length} workspaces from zen-workspace elements`);
 
       return Array.from(items).map((item) => this._extractWorkspaceFromModernElement(item));
@@ -3797,8 +3797,8 @@
         });
 
         // Cut Break Early button - only shown during break, long-break, or transition phases
-        const isBreakOrTransition = 
-          status.currentPhase === 'break' || 
+        const isBreakOrTransition =
+          status.currentPhase === 'break' ||
           status.currentPhase === 'long-break' ||
           status.currentPhase === 'transition';
         let cutBreakBtn = null;
@@ -3810,7 +3810,7 @@
             this._stopMenuTimerUpdates();
             dialog.remove();
             this.menuDialog = null;
-            
+
             // If in transition phase, hide the popup (which triggers onTransitionComplete callback)
             if (status.currentPhase === 'transition') {
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
@@ -3861,9 +3861,10 @@
         // Toggle indicator visibility button
         const toggleIndicatorBtn = document.createElement('button');
         toggleIndicatorBtn.className = 'zen-pomodoro-dialog-button secondary';
-        toggleIndicatorBtn.textContent = window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-          ? 'Hide Timer Indicator'
-          : 'Show Timer Indicator';
+        toggleIndicatorBtn.textContent =
+          window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
+            ? 'Hide Timer Indicator'
+            : 'Show Timer Indicator';
         toggleIndicatorBtn.addEventListener('click', () => {
           if (window.zenPomodoroApp?.overlay) {
             const indicator = window.zenPomodoroApp.overlay.indicator;
@@ -4892,7 +4893,8 @@
       endTimeHelpText.style.color = '#666';
       endTimeHelpText.style.margin = '0 0 8px 0';
       endTimeHelpText.style.fontStyle = 'italic';
-      endTimeHelpText.textContent = 'Automatically disable reminders after this time (e.g., 00:30 for 12:30 AM).';
+      endTimeHelpText.textContent =
+        'Automatically disable reminders after this time (e.g., 00:30 for 12:30 AM).';
 
       // Skip method select
       const postSessionMethodRow = document.createElement('div');
@@ -5295,14 +5297,40 @@
       // This allows settings to appear in Zen's native preferences UI.
       const intSettings = [
         { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
-        { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
-        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, zenUiPrefKey: 'postSessionFocusTimeGoal' },
-        { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
-        { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
+        {
+          selector: '#post-session-skip-cooldown',
+          key: 'postSessionSkipCooldown',
+          min: 1,
+          max: 120,
+        },
+        {
+          selector: '#post-session-focus-time-goal',
+          key: 'postSessionFocusTimeGoal',
+          min: 1,
+          max: 600,
+          zenUiPrefKey: 'postSessionFocusTimeGoal',
+        },
+        {
+          selector: '#post-session-hold-duration',
+          key: 'postSessionSkipHoldDuration',
+          min: 5,
+          max: 120,
+        },
+        {
+          selector: '#post-session-code-length',
+          key: 'postSessionSkipCodeLength',
+          min: 16,
+          max: 128,
+        },
       ];
 
       intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
-        const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
+        const value = getValidatedIntFromDialog(dialog, {
+          selector,
+          min,
+          max,
+          defaultValue: config[key],
+        });
         if (value !== null) {
           config[key] = value;
           if (zenUiPrefKey) setPref(zenUiPrefKey, value);
@@ -8137,13 +8165,11 @@
           Array.isArray(config.dailyReminderTimes) &&
           config.dailyReminderTimes.length > 0
         ) {
-          const sortedTimes = config.dailyReminderTimes
-            .slice()
-            .sort((a, b) => {
-              const [aHours, aMinutes] = a.split(':').map(Number);
-              const [bHours, bMinutes] = b.split(':').map(Number);
-              return aHours - bHours || aMinutes - bMinutes;
-            });
+          const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
+            const [aHours, aMinutes] = a.split(':').map(Number);
+            const [bHours, bMinutes] = b.split(':').map(Number);
+            return aHours - bHours || aMinutes - bMinutes;
+          });
           resetTime = sortedTimes[0];
         }
 
@@ -8155,7 +8181,10 @@
 
           // Only reset if we're past the reset time on the new day
           if (now >= resetDate) {
-            logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Resetting shown reminders for new day');
+            logger.log(
+              LOG_CATEGORIES.TIMER,
+              'Daily reminder: Resetting shown reminders for new day'
+            );
             this.remindersShownToday = [];
             this._saveState();
           }
@@ -8228,7 +8257,7 @@
         if (!isValidTimeFormat(timeStr)) continue;
 
         const [hours, minutes] = timeStr.split(':').map(Number);
-        
+
         if (this._shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr)) {
           return; // Only show one reminder at a time
         }
@@ -9055,7 +9084,9 @@
      */
     onTimerStart() {
       logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Timer started, resetting state', {
-        previousIdleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+        previousIdleStartTime: this.idleStartTime
+          ? new Date(this.idleStartTime).toISOString()
+          : null,
         previousSkipCount: this.skipCount,
       });
       this.idleStartTime = null;
@@ -9347,7 +9378,7 @@
      */
     getTimeUntilNextReminder() {
       const config = getConfig();
-      
+
       // Only return null if feature is disabled
       if (!config.postSessionReminderEnabled) {
         return null;
@@ -10279,16 +10310,12 @@
      * @private
      */
     _logBlockedWorkspace(workspaceId, isBlocked) {
-      logger.log(
-        LOG_CATEGORIES.OVERLAY,
-        'Current workspace is blocked - showing overlay',
-        {
-          workspaceId: workspaceId,
-          isPaused: this.timer.isPaused,
-          workspaceBlocked: true,
-          isBlockedParam: isBlocked,
-        }
-      );
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is blocked - showing overlay', {
+        workspaceId: workspaceId,
+        isPaused: this.timer.isPaused,
+        workspaceBlocked: true,
+        isBlockedParam: isBlocked,
+      });
     }
 
     /**
@@ -10298,16 +10325,12 @@
      * @private
      */
     _logUnblockedWorkspace(workspaceId, isBlocked) {
-      logger.log(
-        LOG_CATEGORIES.OVERLAY,
-        'Current workspace is unblocked - hiding overlay',
-        {
-          workspaceId: workspaceId,
-          isPaused: this.timer.isPaused,
-          workspaceBlocked: false,
-          isBlockedParam: isBlocked,
-        }
-      );
+      logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is unblocked - hiding overlay', {
+        workspaceId: workspaceId,
+        isPaused: this.timer.isPaused,
+        workspaceBlocked: false,
+        isBlockedParam: isBlocked,
+      });
     }
 
     /**
