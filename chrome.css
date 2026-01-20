@@ -1321,6 +1321,8 @@
   border: none !important;
   border-radius: 6px !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 1 !important;
   transition:
     background-color 0.2s ease,
     color 0.2s ease !important;
@@ -1443,6 +1445,8 @@
   border: none !important;
   border-radius: 8px !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 1 !important;
   transition:
     background-color 0.2s ease,
     transform 0.2s ease !important;
@@ -1466,6 +1470,8 @@
   border: none !important;
   border-radius: 8px !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 1 !important;
   transition: background-color 0.2s ease, transform 0.2s ease !important;
 }
 
@@ -1598,6 +1604,8 @@
   border: none !important;
   border-radius: 8px !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 1 !important;
   transition:
     background-color 0.2s ease,
     transform 0.2s ease !important;
@@ -1621,6 +1629,8 @@
   border: none !important;
   border-radius: 8px !important;
   cursor: pointer !important;
+  position: relative !important;
+  z-index: 1 !important;
   transition: background-color 0.2s ease, transform 0.2s ease !important;
 }
 

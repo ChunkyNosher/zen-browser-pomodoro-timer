@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.10';
+  const MOD_VERSION = '1.2.11';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -8351,17 +8351,17 @@
         }
 
         // Check if this reminder was already shown today
-        // BUT if user previously skipped and cooldown has expired, allow re-showing
+        // If user previously skipped and we've passed cooldown (checked above), allow re-showing
+        // Note: cooldown is already verified passed at line 8344, so we just need to check if
+        // user skipped (lastSkipTime exists) to determine if we should re-show
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
         const hasPreviouslySkipped = this.lastSkipTime !== null;
-        const cooldownExpired = !this._isInCooldownPeriod(config.dailyReminderSkipCooldown);
-        const shouldShowAfterSkip = hasPreviouslySkipped && cooldownExpired;
 
-        if (!wasShownToday || shouldShowAfterSkip) {
+        if (!wasShownToday || hasPreviouslySkipped) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
             reminderTime: timeStr,
             wasShownToday: wasShownToday,
-            showingAfterSkip: shouldShowAfterSkip,
+            showingAfterSkip: hasPreviouslySkipped,
           });
           this.showReminder();
           return true;
