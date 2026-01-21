@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.10
+ * Version: 1.2.12
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.11';
+  const MOD_VERSION = '1.2.12';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -8017,7 +8017,7 @@
       // "I'm Ready to Focus" button
       const readyButton = document.createElement('button');
       readyButton.id = 'zen-pomodoro-transition-ready-btn';
-      readyButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-transition-ready-btn';
+      readyButton.className = 'zen-pomodoro-transition-ready-btn';
       readyButton.textContent = "I'm Ready to Focus";
       readyButton.addEventListener('click', () => {
         this.hideTransitionPopup();
@@ -8604,7 +8604,7 @@
       // Start Timer button
       const startButton = document.createElement('button');
       startButton.id = 'zen-pomodoro-daily-reminder-start-btn';
-      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.className = 'zen-pomodoro-daily-reminder-start-btn';
       startButton.textContent = 'Start Timer';
       startButton.addEventListener('click', () => {
         this._handleStartTimerClick();
@@ -8613,7 +8613,7 @@
       // Skip button (with hold/code requirement)
       const skipButton = document.createElement('button');
       skipButton.id = 'zen-pomodoro-daily-reminder-skip-btn';
-      skipButton.className = 'zen-pomodoro-dialog-button secondary';
+      skipButton.className = 'zen-pomodoro-daily-reminder-skip-btn';
       skipButton.textContent = 'Skip for Now';
       skipButton.addEventListener('click', () => {
         this._showSkipChallenge(config);
@@ -9615,7 +9615,7 @@
       // Start Timer button
       const startButton = document.createElement('button');
       startButton.id = 'zen-pomodoro-post-session-start-btn';
-      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.className = 'zen-pomodoro-post-session-start-btn';
       startButton.textContent = 'Start Timer';
       startButton.addEventListener('click', () => {
         this._handleStartTimerClick();
@@ -9624,7 +9624,7 @@
       // Skip button (with hold/code requirement)
       const skipButton = document.createElement('button');
       skipButton.id = 'zen-pomodoro-post-session-skip-btn';
-      skipButton.className = 'zen-pomodoro-dialog-button secondary';
+      skipButton.className = 'zen-pomodoro-post-session-skip-btn';
       skipButton.textContent = 'Skip for Now';
       skipButton.addEventListener('click', () => {
         this._showSkipChallenge(config);

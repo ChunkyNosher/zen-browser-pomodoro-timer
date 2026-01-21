@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.10
+ * Version: 1.2.12
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -1314,29 +1314,28 @@
 }
 
 .zen-pomodoro-transition-ready-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 700 !important;
-  padding: 12px 20px !important;
-  border: none !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease !important;
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 700;
+  padding: 12px 20px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, color 0.2s ease;
   text-align: center;
 }
 
 .zen-pomodoro-transition-ready-btn:hover {
-  background-color: #ff9800 !important;
-  color: #000 !important;
+  background-color: #ff9800;
+  color: #000;
 }
 
 .zen-pomodoro-transition-ready-btn:active {
-  background-color: #f57c00 !important;
-  color: #000 !important;
+  background-color: #f57c00;
+  color: #000;
 }
 
 /* ACCESSIBILITY: Reduce motion animations */
@@ -1436,52 +1435,52 @@
   margin-top: 8px;
 }
 
-#zen-pomodoro-daily-reminder-start-btn {
-  background-color: #ff9800 !important;
-  color: #000 !important;
-  font-weight: 700 !important;
-  padding: 14px 32px !important;
-  font-size: 16px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease !important;
+.zen-pomodoro-daily-reminder-start-btn {
+  background-color: #ff9800;
+  color: #000;
+  font-weight: 700;
+  padding: 14px 32px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-daily-reminder-start-btn:hover {
-  background-color: #f57c00 !important;
+.zen-pomodoro-daily-reminder-start-btn:hover {
+  background-color: #f57c00;
   transform: translateY(-2px);
 }
 
-#zen-pomodoro-daily-reminder-start-btn:active {
+.zen-pomodoro-daily-reminder-start-btn:active {
+  background-color: #e65100;
   transform: translateY(0);
 }
 
-#zen-pomodoro-daily-reminder-skip-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  padding: 14px 24px !important;
-  font-size: 14px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition: background-color 0.2s ease, transform 0.2s ease !important;
+.zen-pomodoro-daily-reminder-skip-btn {
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 600;
+  padding: 14px 24px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-daily-reminder-skip-btn:hover {
-  background-color: #4a4954 !important;
-  transform: translateY(-2px) !important;
+.zen-pomodoro-daily-reminder-skip-btn:hover {
+  background-color: #4a4954;
+  transform: translateY(-2px);
 }
 
-#zen-pomodoro-daily-reminder-skip-btn:active {
-  transform: translateY(0) !important;
+.zen-pomodoro-daily-reminder-skip-btn:active {
+  background-color: #3a3944;
+  transform: translateY(0);
 }
 
 /* Daily reminder hold challenge */
@@ -1595,52 +1594,52 @@
   justify-content: center;
 }
 
-#zen-pomodoro-post-session-start-btn {
-  background-color: #ff9800 !important;
-  color: #000 !important;
-  font-weight: 700 !important;
-  padding: 14px 32px !important;
-  font-size: 16px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease !important;
+.zen-pomodoro-post-session-start-btn {
+  background-color: #ff9800;
+  color: #000;
+  font-weight: 700;
+  padding: 14px 32px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-post-session-start-btn:hover {
-  background-color: #f57c00 !important;
+.zen-pomodoro-post-session-start-btn:hover {
+  background-color: #f57c00;
   transform: translateY(-2px);
 }
 
-#zen-pomodoro-post-session-start-btn:active {
+.zen-pomodoro-post-session-start-btn:active {
+  background-color: #e65100;
   transform: translateY(0);
 }
 
-#zen-pomodoro-post-session-skip-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  padding: 14px 24px !important;
-  font-size: 14px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition: background-color 0.2s ease, transform 0.2s ease !important;
+.zen-pomodoro-post-session-skip-btn {
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 600;
+  padding: 14px 24px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-post-session-skip-btn:hover {
-  background-color: #4a4954 !important;
-  transform: translateY(-2px) !important;
+.zen-pomodoro-post-session-skip-btn:hover {
+  background-color: #4a4954;
+  transform: translateY(-2px);
 }
 
-#zen-pomodoro-post-session-skip-btn:active {
-  transform: translateY(0) !important;
+.zen-pomodoro-post-session-skip-btn:active {
+  background-color: #3a3944;
+  transform: translateY(0);
 }
 
 /* Post-Session Challenge UI */
