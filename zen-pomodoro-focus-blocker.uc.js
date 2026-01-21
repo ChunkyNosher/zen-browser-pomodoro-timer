@@ -42,7 +42,7 @@
    * Used for display in the main menu.
    * @constant {string}
    */
-  const MOD_VERSION = '1.2.10';
+  const MOD_VERSION = '1.2.11';
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -3831,6 +3831,13 @@
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
             } else {
               // In regular break or long-break phase, start focus phase directly
+              // BUG FIX: Increment cycle count since we're skipping the break phase
+              // (normally incremented in _handleBreakPhaseComplete when break → transition)
+              window.zenPomodoroApp.timer.currentCycle++;
+              logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
+                currentCycle: window.zenPomodoroApp.timer.currentCycle,
+                totalCycles: window.zenPomodoroApp.timer.totalCycles
+              });
               // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
               window.zenPomodoroApp.timer.startFocusFromTransition();
               window.zenPomodoroApp.updateOverlayVisibility();
@@ -8344,11 +8351,17 @@
         }
 
         // Check if this reminder was already shown today
+        // If user previously skipped and we've passed cooldown (checked above), allow re-showing
+        // Note: cooldown is already verified passed at line 8344, so we just need to check if
+        // user skipped (lastSkipTime exists) to determine if we should re-show
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
+        const hasPreviouslySkipped = this.lastSkipTime !== null;
 
-        if (!wasShownToday) {
+        if (!wasShownToday || hasPreviouslySkipped) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
             reminderTime: timeStr,
+            wasShownToday: wasShownToday,
+            showingAfterSkip: hasPreviouslySkipped,
           });
           this.showReminder();
           return true;
