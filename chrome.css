@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.2.10
+ * Version: 1.2.12
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -575,7 +575,9 @@
   border-radius: 12px;
   padding: 32px;
   text-align: center;
-  max-width: 500px;
+  min-width: 500px; /* Minimum width for code entry */
+  max-width: 90vw; /* Allow expansion up to 90% of viewport */
+  width: auto; /* Dynamic width based on content */
 }
 
 #zen-pomodoro-lock-content h2 {
@@ -602,7 +604,8 @@
   opacity: 0.7;
 }
 
-/* UI/UX FIX: Moved inline styles to CSS class */
+/* UI/UX FIX: Moved inline styles to CSS class
+   CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment */
 .zen-pomodoro-lock-code-display {
   background: #1e1d26;
   padding: 12px;
@@ -610,11 +613,11 @@
   margin: 16px 0 8px;
   font-family: monospace;
   white-space: nowrap; /* Keep code on one line */
-  overflow-x: auto; /* Allow horizontal scroll for long codes */
-  font-size: 21px; /* 50% bigger than 14px */
+  font-size: 17px; /* Reduced from 21px (4px smaller) */
   line-height: 1.5;
-  max-width: 100%;
   box-sizing: border-box;
+  width: max-content; /* Dynamic sizing: content determines width */
+  min-width: 100%; /* But never smaller than container */
 }
 
 #zen-pomodoro-lock-code {
@@ -623,7 +626,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 21px; /* Match the code display */
+  font-size: 17px; /* Match the code display (reduced from 21px) */
   width: 100%;
   margin-top: 8px; /* Smaller gap for visual alignment */
   font-family: monospace !important;
@@ -1314,29 +1317,28 @@
 }
 
 .zen-pomodoro-transition-ready-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 700 !important;
-  padding: 12px 20px !important;
-  border: none !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease !important;
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 700;
+  padding: 12px 20px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, color 0.2s ease;
   text-align: center;
 }
 
 .zen-pomodoro-transition-ready-btn:hover {
-  background-color: #ff9800 !important;
-  color: #000 !important;
+  background-color: #ff9800;
+  color: #000;
 }
 
 .zen-pomodoro-transition-ready-btn:active {
-  background-color: #f57c00 !important;
-  color: #000 !important;
+  background-color: #f57c00;
+  color: #000;
 }
 
 /* ACCESSIBILITY: Reduce motion animations */
@@ -1436,52 +1438,52 @@
   margin-top: 8px;
 }
 
-#zen-pomodoro-daily-reminder-start-btn {
-  background-color: #ff9800 !important;
-  color: #000 !important;
-  font-weight: 700 !important;
-  padding: 14px 32px !important;
-  font-size: 16px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease !important;
+.zen-pomodoro-daily-reminder-start-btn {
+  background-color: #ff9800;
+  color: #000;
+  font-weight: 700;
+  padding: 14px 32px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-daily-reminder-start-btn:hover {
-  background-color: #f57c00 !important;
+.zen-pomodoro-daily-reminder-start-btn:hover {
+  background-color: #f57c00;
   transform: translateY(-2px);
 }
 
-#zen-pomodoro-daily-reminder-start-btn:active {
+.zen-pomodoro-daily-reminder-start-btn:active {
+  background-color: #e65100;
   transform: translateY(0);
 }
 
-#zen-pomodoro-daily-reminder-skip-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  padding: 14px 24px !important;
-  font-size: 14px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition: background-color 0.2s ease, transform 0.2s ease !important;
+.zen-pomodoro-daily-reminder-skip-btn {
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 600;
+  padding: 14px 24px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-daily-reminder-skip-btn:hover {
-  background-color: #4a4954 !important;
-  transform: translateY(-2px) !important;
+.zen-pomodoro-daily-reminder-skip-btn:hover {
+  background-color: #4a4954;
+  transform: translateY(-2px);
 }
 
-#zen-pomodoro-daily-reminder-skip-btn:active {
-  transform: translateY(0) !important;
+.zen-pomodoro-daily-reminder-skip-btn:active {
+  background-color: #3a3944;
+  transform: translateY(0);
 }
 
 /* Daily reminder hold challenge */
@@ -1595,52 +1597,52 @@
   justify-content: center;
 }
 
-#zen-pomodoro-post-session-start-btn {
-  background-color: #ff9800 !important;
-  color: #000 !important;
-  font-weight: 700 !important;
-  padding: 14px 32px !important;
-  font-size: 16px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition:
-    background-color 0.2s ease,
-    transform 0.2s ease !important;
+.zen-pomodoro-post-session-start-btn {
+  background-color: #ff9800;
+  color: #000;
+  font-weight: 700;
+  padding: 14px 32px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-post-session-start-btn:hover {
-  background-color: #f57c00 !important;
+.zen-pomodoro-post-session-start-btn:hover {
+  background-color: #f57c00;
   transform: translateY(-2px);
 }
 
-#zen-pomodoro-post-session-start-btn:active {
+.zen-pomodoro-post-session-start-btn:active {
+  background-color: #e65100;
   transform: translateY(0);
 }
 
-#zen-pomodoro-post-session-skip-btn {
-  background-color: #5a5968 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  padding: 14px 24px !important;
-  font-size: 14px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  position: relative !important;
-  z-index: 1 !important;
-  transition: background-color 0.2s ease, transform 0.2s ease !important;
+.zen-pomodoro-post-session-skip-btn {
+  background-color: #5a5968;
+  color: #fff;
+  font-weight: 600;
+  padding: 14px 24px;
+  font-size: 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
-#zen-pomodoro-post-session-skip-btn:hover {
-  background-color: #4a4954 !important;
-  transform: translateY(-2px) !important;
+.zen-pomodoro-post-session-skip-btn:hover {
+  background-color: #4a4954;
+  transform: translateY(-2px);
 }
 
-#zen-pomodoro-post-session-skip-btn:active {
-  transform: translateY(0) !important;
+.zen-pomodoro-post-session-skip-btn:active {
+  background-color: #3a3944;
+  transform: translateY(0);
 }
 
 /* Post-Session Challenge UI */
@@ -1675,7 +1677,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 21px; /* Match the code display */
+  font-size: 17px; /* Match the code display (reduced from 21px) */
   width: 100%;
   font-family: monospace !important;
   line-height: 1.5;
