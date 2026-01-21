@@ -3805,52 +3805,6 @@
     }
 
     /**
-     * Migrate global blockedWorkspaces to default ruleset.
-     * This ensures backwards compatibility for users upgrading from older versions.
-     * Only migrates if the default ruleset exists and has no blocked workspaces.
-     * @private
-     */
-    _migrateBlockedWorkspacesToRulesets() {
-      const config = getConfig();
-
-      // Only migrate if there are global blocked workspaces
-      if (!config.blockedWorkspaces || config.blockedWorkspaces.length === 0) {
-        return;
-      }
-
-      // Find the default ruleset
-      const defaultRuleset = config.rulesets?.find((r) => r.id === 'default');
-      if (!defaultRuleset) {
-        logger.log(
-          LOG_CATEGORIES.INIT,
-          'Migration skipped: No default ruleset found',
-          { globalBlockedCount: config.blockedWorkspaces.length }
-        );
-        return;
-      }
-
-      // Only migrate if the ruleset doesn't already have blocked workspaces
-      if (!defaultRuleset.blockedWorkspaces || defaultRuleset.blockedWorkspaces.length === 0) {
-        defaultRuleset.blockedWorkspaces = [...config.blockedWorkspaces];
-        // Clear global blockedWorkspaces to prevent re-migration
-        config.blockedWorkspaces = [];
-        saveConfig(config);
-        logger.log(LOG_CATEGORIES.INIT, 'Migrated global blocked workspaces to default ruleset', {
-          migratedCount: defaultRuleset.blockedWorkspaces.length,
-        });
-      } else {
-        logger.log(
-          LOG_CATEGORIES.INIT,
-          'Migration skipped: Default ruleset already has blocked workspaces',
-          {
-            globalBlockedCount: config.blockedWorkspaces.length,
-            rulesetBlockedCount: defaultRuleset.blockedWorkspaces.length,
-          }
-        );
-      }
-    }
-
-    /**
      * Show the main Pomodoro menu dialog
      * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
      */
@@ -10721,6 +10675,50 @@
         dialog.remove();
         onConfirm();
       });
+    }
+
+    /**
+     * Migrate global blockedWorkspaces to default ruleset.
+     * This ensures backwards compatibility for users upgrading from older versions.
+     * Only migrates if the default ruleset exists and has no blocked workspaces.
+     * @private
+     */
+    _migrateBlockedWorkspacesToRulesets() {
+      const config = getConfig();
+
+      // Only migrate if there are global blocked workspaces
+      if (!config.blockedWorkspaces || config.blockedWorkspaces.length === 0) {
+        return;
+      }
+
+      // Find the default ruleset
+      const defaultRuleset = config.rulesets?.find((r) => r.id === 'default');
+      if (!defaultRuleset) {
+        logger.log(LOG_CATEGORIES.INIT, 'Migration skipped: No default ruleset found', {
+          globalBlockedCount: config.blockedWorkspaces.length,
+        });
+        return;
+      }
+
+      // Only migrate if the ruleset doesn't already have blocked workspaces
+      if (!defaultRuleset.blockedWorkspaces || defaultRuleset.blockedWorkspaces.length === 0) {
+        defaultRuleset.blockedWorkspaces = [...config.blockedWorkspaces];
+        // Clear global blockedWorkspaces to prevent re-migration
+        config.blockedWorkspaces = [];
+        saveConfig(config);
+        logger.log(LOG_CATEGORIES.INIT, 'Migrated global blocked workspaces to default ruleset', {
+          migratedCount: defaultRuleset.blockedWorkspaces.length,
+        });
+      } else {
+        logger.log(
+          LOG_CATEGORIES.INIT,
+          'Migration skipped: Default ruleset already has blocked workspaces',
+          {
+            globalBlockedCount: config.blockedWorkspaces.length,
+            rulesetBlockedCount: defaultRuleset.blockedWorkspaces.length,
+          }
+        );
+      }
     }
 
     /**
