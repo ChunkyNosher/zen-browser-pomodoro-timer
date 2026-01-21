@@ -112,6 +112,7 @@
         rules: [], // Array of rule objects: { id, pattern, type: 'website'|'keyword', condition: 'block'|'allow' }
         // Keywords only check tab titles due to browser security restrictions (cross-origin)
         checkTitleOnly: true,
+        blockedWorkspaces: [], // Array of Zen workspace UUIDs to block when this ruleset is active
       },
     ],
     /** Rulesets to enable when timer starts */
@@ -655,6 +656,31 @@
       logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to save config', { error: e.message });
       console.error('Failed to save config:', e);
     }
+  }
+
+  /**
+   * Get all blocked workspaces from active rulesets.
+   * Combines blocked workspaces from all enabled and active rulesets.
+   * @returns {string[]} Array of unique blocked workspace IDs
+   */
+  function getActiveBlockedWorkspaces() {
+    const config = getConfig();
+    const activeBlockedWorkspaces = new Set();
+
+    // Get active rulesets
+    const activeRulesetIds = config.activeRulesets || ['default'];
+
+    // Iterate through all rulesets
+    (config.rulesets || []).forEach((ruleset) => {
+      // Check if this ruleset is active and enabled
+      if (ruleset.enabled && activeRulesetIds.includes(ruleset.id)) {
+        // Add blocked workspaces from this ruleset
+        const rulesetWorkspaces = ruleset.blockedWorkspaces || [];
+        rulesetWorkspaces.forEach((wsId) => activeBlockedWorkspaces.add(wsId));
+      }
+    });
+
+    return Array.from(activeBlockedWorkspaces);
   }
 
   /**
@@ -2279,8 +2305,9 @@
     }
 
     /**
-     * Validate and clean up deleted workspaces from blocked list
-     * Only called when workspace changes are detected
+     * Validate and clean up deleted workspaces from blocked list.
+     * Now validates across all rulesets' blockedWorkspaces arrays.
+     * Only called when workspace changes are detected.
      */
     validateBlockedWorkspaces() {
       if (!this.needsValidation) {
@@ -2289,20 +2316,38 @@
 
       const existingWorkspaces = this.getAllWorkspaces();
       const existingWorkspaceIds = existingWorkspaces.map((ws) => ws.id);
-      const originalLength = this.config.blockedWorkspaces.length;
+      let configChanged = false;
 
-      // Filter out deleted workspaces
+      // Validate global blockedWorkspaces (deprecated but kept for backwards compatibility)
+      const originalGlobalLength = this.config.blockedWorkspaces.length;
       this.config.blockedWorkspaces = this.config.blockedWorkspaces.filter((wsId) =>
         existingWorkspaceIds.includes(wsId)
       );
+      if (this.config.blockedWorkspaces.length !== originalGlobalLength) {
+        configChanged = true;
+      }
+
+      // Validate blockedWorkspaces in each ruleset
+      (this.config.rulesets || []).forEach((ruleset) => {
+        if (ruleset.blockedWorkspaces && Array.isArray(ruleset.blockedWorkspaces)) {
+          const originalRulesetLength = ruleset.blockedWorkspaces.length;
+          ruleset.blockedWorkspaces = ruleset.blockedWorkspaces.filter((wsId) =>
+            existingWorkspaceIds.includes(wsId)
+          );
+          if (ruleset.blockedWorkspaces.length !== originalRulesetLength) {
+            configChanged = true;
+          }
+        }
+      });
 
       // Save config only if we removed any deleted workspaces
-      if (this.config.blockedWorkspaces.length !== originalLength) {
-        console.log('Removed deleted workspaces from blocked list');
+      if (configChanged) {
+        console.log('Removed deleted workspaces from blocked lists');
         saveConfig(this.config);
       }
 
-      this.validatedWorkspaces = [...this.config.blockedWorkspaces];
+      // Cache the combined blocked workspaces from active rulesets
+      this.validatedWorkspaces = getActiveBlockedWorkspaces();
       this.needsValidation = false;
     }
 
@@ -2335,7 +2380,7 @@
 
     /**
      * Private helper to check if current workspace is in the blocked list.
-     * Reloads config to get latest blocked workspaces on each call.
+     * Reloads config and checks against combined blocked workspaces from active rulesets.
      * Returns false if no active workspace can be detected.
      * @param {string} logMessage - Description for logging purposes
      * @returns {boolean} True if current workspace is in the blocked list, false otherwise
@@ -2350,11 +2395,14 @@
         return false;
       }
 
-      const isBlocked = this.config.blockedWorkspaces.includes(activeWorkspace);
+      // Get blocked workspaces from all active rulesets
+      const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+      const isBlocked = activeBlockedWorkspaces.includes(activeWorkspace);
+
       logger.log(LOG_CATEGORIES.WORKSPACE, logMessage, {
         workspaceId: activeWorkspace,
         isBlocked: isBlocked,
-        blockedCount: this.config.blockedWorkspaces.length,
+        blockedCount: activeBlockedWorkspaces.length,
       });
       return isBlocked;
     }
@@ -2370,7 +2418,9 @@
       if (!this.config) {
         this.config = getConfig();
       }
-      return this.config.blockedWorkspaces.includes(workspaceId);
+      // Get blocked workspaces from all active rulesets
+      const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+      return activeBlockedWorkspaces.includes(workspaceId);
     }
 
     /**
@@ -3744,6 +3794,52 @@
     }
 
     /**
+     * Migrate global blockedWorkspaces to default ruleset.
+     * This ensures backwards compatibility for users upgrading from older versions.
+     * Only migrates if the default ruleset exists and has no blocked workspaces.
+     * @private
+     */
+    _migrateBlockedWorkspacesToRulesets() {
+      const config = getConfig();
+
+      // Only migrate if there are global blocked workspaces
+      if (!config.blockedWorkspaces || config.blockedWorkspaces.length === 0) {
+        return;
+      }
+
+      // Find the default ruleset
+      const defaultRuleset = config.rulesets?.find((r) => r.id === 'default');
+      if (!defaultRuleset) {
+        logger.log(
+          LOG_CATEGORIES.INIT,
+          'Migration skipped: No default ruleset found',
+          { globalBlockedCount: config.blockedWorkspaces.length }
+        );
+        return;
+      }
+
+      // Only migrate if the ruleset doesn't already have blocked workspaces
+      if (!defaultRuleset.blockedWorkspaces || defaultRuleset.blockedWorkspaces.length === 0) {
+        defaultRuleset.blockedWorkspaces = [...config.blockedWorkspaces];
+        // Clear global blockedWorkspaces to prevent re-migration
+        config.blockedWorkspaces = [];
+        saveConfig(config);
+        logger.log(LOG_CATEGORIES.INIT, 'Migrated global blocked workspaces to default ruleset', {
+          migratedCount: defaultRuleset.blockedWorkspaces.length,
+        });
+      } else {
+        logger.log(
+          LOG_CATEGORIES.INIT,
+          'Migration skipped: Default ruleset already has blocked workspaces',
+          {
+            globalBlockedCount: config.blockedWorkspaces.length,
+            rulesetBlockedCount: defaultRuleset.blockedWorkspaces.length,
+          }
+        );
+      }
+    }
+
+    /**
      * Show the main Pomodoro menu dialog
      * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
      */
@@ -4567,51 +4663,6 @@
       messageRow.appendChild(messageInput);
 
       // ========================================
-      // Workspace selection UI
-      // ========================================
-      const workspaceRow = document.createElement('div');
-      workspaceRow.className = 'zen-pomodoro-config-row zen-pomodoro-workspace-row';
-
-      const workspaceLabel = document.createElement('label');
-      workspaceLabel.textContent = 'Blocked Workspaces:';
-
-      const workspaceContainer = document.createElement('div');
-      workspaceContainer.className = 'zen-pomodoro-workspace-list';
-
-      const workspaces = window.zenPomodoroApp
-        ? window.zenPomodoroApp.workspace.getAllWorkspaces()
-        : [];
-
-      if (workspaces.length === 0) {
-        const noWorkspacesMsg = document.createElement('div');
-        noWorkspacesMsg.className = 'zen-pomodoro-no-workspaces-msg';
-        noWorkspacesMsg.textContent = 'No workspaces found';
-        workspaceContainer.appendChild(noWorkspacesMsg);
-      } else {
-        workspaces.forEach((workspace) => {
-          const checkboxWrapper = document.createElement('div');
-          checkboxWrapper.className = 'zen-pomodoro-checkbox-row';
-
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.id = `workspace-${workspace.id}`;
-          checkbox.value = workspace.id;
-          checkbox.checked = config.blockedWorkspaces.includes(workspace.id);
-
-          const label = document.createElement('label');
-          label.setAttribute('for', `workspace-${workspace.id}`);
-          label.textContent = workspace.name;
-
-          checkboxWrapper.appendChild(checkbox);
-          checkboxWrapper.appendChild(label);
-          workspaceContainer.appendChild(checkboxWrapper);
-        });
-      }
-
-      workspaceRow.appendChild(workspaceLabel);
-      workspaceRow.appendChild(workspaceContainer);
-
-      // ========================================
       // Website Blocking Rulesets Section
       // (Opens in separate dialog for better organization)
       // ========================================
@@ -5033,7 +5084,6 @@
       configSection.appendChild(breakRow);
       configSection.appendChild(cyclesRow);
       configSection.appendChild(messageRow);
-      configSection.appendChild(workspaceRow);
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       configSection.appendChild(reminderSection);
@@ -5059,7 +5109,6 @@
         this._saveKeyboardShortcut(shortcutInput, config);
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
-        this._saveBlockedWorkspaces(workspaceContainer, config);
         this._saveReminderSettings(dialog, reminderEnabledCheckbox, reminderTimesInput, config);
         this._savePostSessionSettings(
           dialog,
@@ -5700,10 +5749,82 @@
       titleOnlyRow.appendChild(titleOnlyCheckbox);
       titleOnlyRow.appendChild(titleOnlyLabel);
 
+      // Workspace selection UI for this ruleset
+      const workspaceSection = document.createElement('div');
+      workspaceSection.className = 'zen-pomodoro-ruleset-workspace-section';
+      workspaceSection.style.marginTop = '16px';
+
+      const workspaceTitle = document.createElement('div');
+      workspaceTitle.textContent = 'Blocked Workspaces:';
+      workspaceTitle.style.fontWeight = 'bold';
+      workspaceTitle.style.marginBottom = '8px';
+
+      const workspaceContainer = document.createElement('div');
+      workspaceContainer.className = 'zen-pomodoro-workspace-list';
+      workspaceContainer.id = `workspace-container-${ruleset.id}`;
+
+      const workspaces = window.zenPomodoroApp
+        ? window.zenPomodoroApp.workspace.getAllWorkspaces()
+        : [];
+
+      if (workspaces.length === 0) {
+        const noWorkspacesMsg = document.createElement('div');
+        noWorkspacesMsg.className = 'zen-pomodoro-no-workspaces-msg';
+        noWorkspacesMsg.textContent = 'No workspaces found';
+        workspaceContainer.appendChild(noWorkspacesMsg);
+      } else {
+        // Ensure ruleset has blockedWorkspaces array
+        if (!ruleset.blockedWorkspaces) {
+          ruleset.blockedWorkspaces = [];
+        }
+
+        workspaces.forEach((workspace) => {
+          const checkboxWrapper = document.createElement('div');
+          checkboxWrapper.className = 'zen-pomodoro-checkbox-row';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.id = `workspace-${ruleset.id}-${workspace.id}`;
+          checkbox.value = workspace.id;
+          checkbox.checked = ruleset.blockedWorkspaces.includes(workspace.id);
+          checkbox.addEventListener('change', () => {
+            // Find ruleset by ID to avoid stale reference
+            const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
+            if (rulesetIndex !== -1) {
+              const currentRuleset = config.rulesets[rulesetIndex];
+              if (!currentRuleset.blockedWorkspaces) {
+                currentRuleset.blockedWorkspaces = [];
+              }
+              if (checkbox.checked) {
+                if (!currentRuleset.blockedWorkspaces.includes(workspace.id)) {
+                  currentRuleset.blockedWorkspaces.push(workspace.id);
+                }
+              } else {
+                currentRuleset.blockedWorkspaces = currentRuleset.blockedWorkspaces.filter(
+                  (wsId) => wsId !== workspace.id
+                );
+              }
+            }
+          });
+
+          const label = document.createElement('label');
+          label.setAttribute('for', `workspace-${ruleset.id}-${workspace.id}`);
+          label.textContent = workspace.name;
+
+          checkboxWrapper.appendChild(checkbox);
+          checkboxWrapper.appendChild(label);
+          workspaceContainer.appendChild(checkboxWrapper);
+        });
+      }
+
+      workspaceSection.appendChild(workspaceTitle);
+      workspaceSection.appendChild(workspaceContainer);
+
       // Assemble details
       details.appendChild(rulesContainer);
       details.appendChild(addRuleBtn);
       details.appendChild(titleOnlyRow);
+      details.appendChild(workspaceSection);
 
       item.appendChild(headerRow);
       item.appendChild(details);
@@ -8550,6 +8671,21 @@
     }
 
     /**
+     * Called when timer completes a full session.
+     * Resets skip count and cooldown to ensure clean state.
+     */
+    onTimerComplete() {
+      logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer completed, resetting skip state', {
+        previousSkipCount: this.skipCount,
+        previousLastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      });
+
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+      this._saveState();
+    }
+
+    /**
      * Create the blocking reminder overlay.
      * @private
      */
@@ -9116,13 +9252,19 @@
         return;
       }
 
+      // Reset skip state when timer completes
+      this.skipCount = 0;
+      this.lastSkipTime = null;
+
       this.idleStartTime = Date.now();
 
       logger.log(
         LOG_CATEGORIES.TIMER,
-        'Post-session reminder: Timer completed, starting idle tracking',
+        'Post-session reminder: Timer completed, starting idle tracking and resetting skip state',
         {
           idleStartTime: new Date(this.idleStartTime).toISOString(),
+          resetSkipCount: this.skipCount,
+          resetLastSkipTime: this.lastSkipTime,
         }
       );
 
@@ -9136,10 +9278,8 @@
         );
       }
 
-      // Save state to persist idleStartTime across browser restarts
+      // Save state to persist idleStartTime and reset skip state across browser restarts
       this._saveState();
-
-      // Don't reset skip count here - it resets when a NEW timer starts
     }
 
     /**
@@ -9951,6 +10091,9 @@
       logger.log(LOG_CATEGORIES.INIT, 'Application ready');
       console.log('Zen Pomodoro Focus Blocker ready');
 
+      // Migrate global blockedWorkspaces to default ruleset if needed
+      this._migrateBlockedWorkspacesToRulesets();
+
       // Initialize modules
       logger.log(LOG_CATEGORIES.INIT, 'Initializing keyboard shortcut handler');
       this.keyboardShortcut.init();
@@ -10166,6 +10309,9 @@
 
       // Show completion notification
       this.showNotification('complete');
+
+      // Reset daily reminder skip state
+      this.dailyReminder.onTimerComplete();
 
       // Notify Post-Session Reminder that timer completed (starts idle tracking)
       this.postSessionReminder.onTimerComplete();
