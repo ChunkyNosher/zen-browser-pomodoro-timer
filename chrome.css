@@ -575,7 +575,9 @@
   border-radius: 12px;
   padding: 32px;
   text-align: center;
-  max-width: 500px;
+  min-width: 500px; /* Minimum width for code entry */
+  max-width: 90vw; /* Allow expansion up to 90% of viewport */
+  width: auto; /* Dynamic width based on content */
 }
 
 #zen-pomodoro-lock-content h2 {
@@ -602,7 +604,8 @@
   opacity: 0.7;
 }
 
-/* UI/UX FIX: Moved inline styles to CSS class */
+/* UI/UX FIX: Moved inline styles to CSS class
+   CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment */
 .zen-pomodoro-lock-code-display {
   background: #1e1d26;
   padding: 12px;
@@ -610,11 +613,13 @@
   margin: 16px 0 8px;
   font-family: monospace;
   white-space: nowrap; /* Keep code on one line */
-  overflow-x: auto; /* Allow horizontal scroll for long codes */
-  font-size: 21px; /* 50% bigger than 14px */
+  font-size: 17px; /* Reduced from 21px (4px smaller) */
   line-height: 1.5;
-  max-width: 100%;
   box-sizing: border-box;
+  display: inline-block; /* Dynamic width based on content */
+  min-width: 100%; /* Minimum full width */
+  width: auto; /* Allow expansion beyond container */
+  max-width: none; /* Remove max-width constraint for dynamic sizing */
 }
 
 #zen-pomodoro-lock-code {
@@ -623,7 +628,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 21px; /* Match the code display */
+  font-size: 17px; /* Match the code display (reduced from 21px) */
   width: 100%;
   margin-top: 8px; /* Smaller gap for visual alignment */
   font-family: monospace !important;
@@ -1674,7 +1679,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  font-size: 21px; /* Match the code display */
+  font-size: 17px; /* Match the code display (reduced from 21px) */
   width: 100%;
   font-family: monospace !important;
   line-height: 1.5;

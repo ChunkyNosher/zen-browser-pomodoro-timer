@@ -2131,6 +2131,7 @@
 
     /**
      * Resume the timer
+     * BROWSER RESTART FIX: Start interval if not already running (restored from restart)
      */
     resume() {
       this.isPaused = false;
@@ -2139,6 +2140,13 @@
         remainingTime: this.remainingTime,
         phase: this.currentPhase,
       });
+
+      // BROWSER RESTART FIX: Start interval if not running (happens after restore from restart)
+      if (!this.intervalId && this.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Starting interval on resume (was not running)');
+        this.startInterval();
+      }
+
       this.saveState();
     }
 
