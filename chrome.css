@@ -616,10 +616,8 @@
   font-size: 17px; /* Reduced from 21px (4px smaller) */
   line-height: 1.5;
   box-sizing: border-box;
-  display: inline-block; /* Dynamic width based on content */
-  min-width: 100%; /* Minimum full width */
-  width: auto; /* Allow expansion beyond container */
-  max-width: none; /* Remove max-width constraint for dynamic sizing */
+  width: max-content; /* Dynamic sizing: content determines width */
+  min-width: 100%; /* But never smaller than container */
 }
 
 #zen-pomodoro-lock-code {

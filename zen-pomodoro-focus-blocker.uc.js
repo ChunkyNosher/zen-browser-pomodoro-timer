@@ -2141,7 +2141,10 @@
         phase: this.currentPhase,
       });
 
-      // BROWSER RESTART FIX: Start interval if not running (happens after restore from restart)
+      // BROWSER RESTART FIX: Start interval if not running
+      // After browser restart, loadState() restores timer in paused state WITHOUT starting interval.
+      // When user clicks resume, we need to start the interval to get UI updates.
+      // Conditions: interval not running (!intervalId) AND timer was actually restored (isActive)
       if (!this.intervalId && this.isActive) {
         logger.log(LOG_CATEGORIES.TIMER, 'Starting interval on resume (was not running)');
         this.startInterval();
