@@ -1841,20 +1841,20 @@
   font-size: 13px !important;
 }
 
-/* Dump dialog buttons - white on purple theme */
+/* Dump dialog buttons - white on purple theme with improved contrast */
 #zen-pomodoro-dump-dialog .zen-pomodoro-dialog-button {
-  background: rgb(255 255 255 / 20%) !important;
+  background: rgb(255 255 255 / 28%) !important;
   color: #fff !important;
-  border: 1px solid rgb(255 255 255 / 30%) !important;
+  border: 1px solid rgb(255 255 255 / 45%) !important;
 }
 
 #zen-pomodoro-dump-dialog .zen-pomodoro-dialog-button:hover {
-  background: rgb(255 255 255 / 30%) !important;
-  border-color: rgb(255 255 255 / 50%) !important;
+  background: rgb(255 255 255 / 38%) !important;
+  border-color: rgb(255 255 255 / 60%) !important;
 }
 
 #zen-pomodoro-dump-dialog .zen-pomodoro-dialog-button:active {
-  background: rgb(255 255 255 / 15%) !important;
+  background: rgb(255 255 255 / 24%) !important;
 }
 
 /* Calm pulsing animation for dump timer (subtle) */

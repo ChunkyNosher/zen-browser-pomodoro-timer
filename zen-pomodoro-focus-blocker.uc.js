@@ -93,6 +93,9 @@
     /** Daily reminder check interval (1 minute in milliseconds) */
     DAILY_REMINDER_CHECK_INTERVAL_MS: 60 * 1000,
 
+    /** Startup delay before showing daily reminder (3 seconds to allow timer state restoration) */
+    DAILY_REMINDER_STARTUP_DELAY_MS: 3 * 1000,
+
     /** Early morning cutoff time for auto-off detection (06:00 AM in minutes since midnight) */
     EARLY_MORNING_CUTOFF_MINUTES: 6 * 60,
 
@@ -1008,6 +1011,7 @@
   const POST_SESSION_CHECK_INTERVAL_MS = Constants.POST_SESSION_CHECK_INTERVAL_MS;
   const DAILY_REMINDER_ESCALATION_FACTOR = Constants.DAILY_REMINDER_ESCALATION_FACTOR;
   const DAILY_REMINDER_CHECK_INTERVAL_MS = Constants.DAILY_REMINDER_CHECK_INTERVAL_MS;
+  const DAILY_REMINDER_STARTUP_DELAY_MS = Constants.DAILY_REMINDER_STARTUP_DELAY_MS;
   const EARLY_MORNING_CUTOFF_MINUTES = Constants.EARLY_MORNING_CUTOFF_MINUTES;
   const WORKSPACE_MUTATION_DELAY_MS = Constants.WORKSPACE_MUTATION_DELAY_MS;
   const REGEX_ESCAPE_PATTERN = Constants.REGEX_ESCAPE_PATTERN;
@@ -4095,13 +4099,14 @@
           }
         });
 
-        // Distraction Dump button - only during focus phase and not paused
+        // Distraction Dump button - only during focus phase
+        // Available even when paused since Distraction Dump serves a different purpose
+        // (temporarily lifting ALL blocks for thought capture, not just pausing timer)
         let dumpBtn = null;
         const config = getConfig();
         if (
           config.distractionDumpEnabled &&
-          status.currentPhase === 'focus' &&
-          !status.isPaused
+          status.currentPhase === 'focus'
         ) {
           dumpBtn = document.createElement('button');
           dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
@@ -8376,7 +8381,14 @@
     init() {
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Daily Reminder Manager');
       this._loadState();
-      this._checkAndShowReminder();
+
+      // Add startup delay before showing daily reminder to allow timer state restoration
+      // This prevents the reminder from appearing immediately on browser start if timer
+      // was active before a PC restart/crash
+      setTimeout(() => {
+        this._checkAndShowReminder();
+      }, DAILY_REMINDER_STARTUP_DELAY_MS);
+
       this._startPeriodicCheck();
     }
 
@@ -10275,7 +10287,7 @@
      */
     showDumpConfigDialog() {
       const config = getConfig();
-      
+
       if (!config.distractionDumpEnabled) {
         logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump feature is disabled');
         return;
@@ -10361,10 +10373,6 @@
     }
 
     /**
-     * Start a distraction dump session.
-     * @param {number} duration - Duration in minutes
-     */
-    /**
      * Check if a distraction dump can be started.
      * @returns {boolean} True if dump can start
      * @private
@@ -10417,20 +10425,35 @@
      * @private
      */
     _disableDumpMode() {
-      // Restore website blocker
-      if (window.zenPomodoroApp?.websiteBlocker) {
-        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = false;
-        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
-      }
+      this._restoreWebsiteBlocker();
+      this._restoreTimerIfNotPausedBefore();
+      window.zenPomodoroApp?.updateOverlayVisibility?.();
+    }
 
-      // Resume the main timer
+    /**
+     * Restore the website blocker after dump ends.
+     * @private
+     */
+    _restoreWebsiteBlocker() {
+      const websiteBlocker = window.zenPomodoroApp?.websiteBlocker;
+      if (websiteBlocker) {
+        websiteBlocker.distractionDumpActive = false;
+        websiteBlocker._checkCurrentPage();
+      }
+    }
+
+    /**
+     * Resume the main timer only if it wasn't paused before dump started.
+     * This preserves the user's intent if they had manually paused before starting dump.
+     * @private
+     */
+    _restoreTimerIfNotPausedBefore() {
       const timer = window.zenPomodoroApp?.timer;
-      if (timer?.isActive && timer.isPaused) {
+      const wasPausedBefore = this.savedTimerState?.isPaused;
+      const shouldResume = timer?.isActive && timer.isPaused && !wasPausedBefore;
+      if (shouldResume) {
         timer.resume();
       }
-
-      // Update overlay visibility
-      window.zenPomodoroApp?.updateOverlayVisibility?.();
     }
 
     /**
@@ -11347,6 +11370,18 @@
 
   // Create and store the app instance for cleanup
   const app = new ZenPomodoroApp();
+
+  // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
+  // This ensures state is saved even on sudden browser/PC shutdown
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      if (app?.timer?.isActive) {
+        app.timer.saveState();
+        logger.log(LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+      }
+    }
+  );
 
   // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
   // This ensures SineModBlocker and other modules are properly destroyed
