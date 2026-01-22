@@ -137,6 +137,8 @@
     lastTimerStartDate: '',
     /** Timestamps of daily reminders shown today (persisted, array of timestamps) */
     dailyRemindersShownToday: [],
+    /** Timestamp when last timer completed (used for grace period before showing daily reminder) */
+    dailyReminderLastTimerCompleteTime: null,
     /** Post-session reminder settings - shows reminder after timer completes */
     postSessionReminderEnabled: true,
     /** Minutes after timer completion before first reminder (default: 45) */
@@ -197,6 +199,13 @@
 
   // Daily reminder escalation factor (50% increase per skip)
   const DAILY_REMINDER_ESCALATION_FACTOR = 1.5;
+
+  /**
+   * Grace period in milliseconds after timer completion before daily reminders can show.
+   * Prevents immediate reminder popup after completing a timer.
+   * @constant {number}
+   */
+  const DAILY_REMINDER_POST_COMPLETION_GRACE_MS = 60 * 1000; // 1 minute
 
   // Daily reminder check interval (1 minute in milliseconds)
   const DAILY_REMINDER_CHECK_INTERVAL_MS = 60 * 1000;
@@ -8202,6 +8211,7 @@
       this.skipCount = 0; // Number of times user has skipped
       this.lastSkipTime = null; // When the last skip occurred
       this.remindersShownToday = []; // Array of timestamps when reminders were shown today
+      this.lastTimerCompleteTime = null; // When the last timer completed (for grace period)
       this._holdIntervalId = null; // Hold-to-unlock interval
       this._holdTimerElement = null; // Timer display element for hold mode
       this._holdHandlersCleanup = null; // Cleanup function for hold handlers
@@ -8227,6 +8237,7 @@
       this.skipCount = config.dailyReminderSkipCount || 0;
       this.lastSkipTime = config.dailyReminderLastSkipTime || null;
       this.remindersShownToday = config.dailyRemindersShownToday || [];
+      this.lastTimerCompleteTime = config.dailyReminderLastTimerCompleteTime || null;
 
       // Reset reminders shown today if it's a new day
       this._resetIfNewDay();
@@ -8235,6 +8246,9 @@
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
         remindersShownCount: this.remindersShownToday.length,
+        lastTimerCompleteTime: this.lastTimerCompleteTime
+          ? new Date(this.lastTimerCompleteTime).toISOString()
+          : null,
       });
     }
 
@@ -8247,12 +8261,16 @@
       config.dailyReminderSkipCount = this.skipCount;
       config.dailyReminderLastSkipTime = this.lastSkipTime;
       config.dailyRemindersShownToday = this.remindersShownToday;
+      config.dailyReminderLastTimerCompleteTime = this.lastTimerCompleteTime;
       saveConfig(config);
 
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Saved state', {
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
         remindersShownCount: this.remindersShownToday.length,
+        lastTimerCompleteTime: this.lastTimerCompleteTime
+          ? new Date(this.lastTimerCompleteTime).toISOString()
+          : null,
       });
     }
 
@@ -8351,6 +8369,22 @@
       if (window.zenPomodoroApp?.timer?.isActive) {
         logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer already active');
         return false;
+      }
+
+      // Check if we're in grace period after timer completion
+      if (this.lastTimerCompleteTime) {
+        const timeSinceComplete = Date.now() - this.lastTimerCompleteTime;
+        if (timeSinceComplete < DAILY_REMINDER_POST_COMPLETION_GRACE_MS) {
+          logger.log(
+            LOG_CATEGORIES.TIMER,
+            'Daily reminder: Grace period after timer completion',
+            {
+              timeSinceCompleteMs: timeSinceComplete,
+              gracePeriodMs: DAILY_REMINDER_POST_COMPLETION_GRACE_MS,
+            }
+          );
+          return false;
+        }
       }
 
       // Get reminder times array
@@ -8539,6 +8573,9 @@
       this.remindersShownToday.push(Date.now());
       this._saveState();
 
+      // Pause post-session reminder while daily reminder is showing
+      window.zenPomodoroApp?.postSessionReminder?.pauseIdleTracking();
+
       this._createOverlay();
       document.documentElement.appendChild(this.reminderOverlay);
     }
@@ -8554,6 +8591,9 @@
 
       logger.log(LOG_CATEGORIES.TIMER, 'Hiding daily reminder overlay');
       this.isShowing = false;
+
+      // Resume post-session reminder idle tracking
+      window.zenPomodoroApp?.postSessionReminder?.resumeIdleTracking();
 
       // Clear time display interval
       this._clearTimeDisplayInterval();
@@ -8647,6 +8687,7 @@
 
       this.skipCount = 0;
       this.lastSkipTime = null;
+      this.lastTimerCompleteTime = Date.now();
       this._saveState();
     }
 
@@ -9126,6 +9167,7 @@
       this.onStartTimer = null; // Callback when user clicks "Start Timer"
       this._holdIntervalId = null; // Hold-to-unlock interval
       this._holdTimerElement = null; // Timer display element for hold mode
+      this._pausedIdleStartTime = null; // Temporarily stored idleStartTime when paused by daily reminder
     }
 
     /**
@@ -9263,6 +9305,44 @@
       this.lastSkipTime = null;
       this._saveState(); // Persist the reset state
       this.hideReminder();
+    }
+
+    /**
+     * Pause idle tracking while daily reminder is showing.
+     * Saves the current idleStartTime and temporarily nullifies it.
+     */
+    pauseIdleTracking() {
+      if (this.idleStartTime) {
+        this._pausedIdleStartTime = this.idleStartTime;
+        this.idleStartTime = null;
+        logger.log(
+          LOG_CATEGORIES.TIMER,
+          'Post-session reminder: Paused idle tracking (daily reminder showing)',
+          {
+            pausedIdleStartTime: this._pausedIdleStartTime
+              ? new Date(this._pausedIdleStartTime).toISOString()
+              : null,
+          }
+        );
+      }
+    }
+
+    /**
+     * Resume idle tracking after daily reminder is hidden.
+     * Restores the previously paused idleStartTime.
+     */
+    resumeIdleTracking() {
+      if (this._pausedIdleStartTime) {
+        this.idleStartTime = this._pausedIdleStartTime;
+        this._pausedIdleStartTime = null;
+        logger.log(
+          LOG_CATEGORIES.TIMER,
+          'Post-session reminder: Resumed idle tracking (daily reminder hidden)',
+          {
+            idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+          }
+        );
+      }
     }
 
     /**
