@@ -8448,12 +8448,12 @@
           return false;
         }
 
-        // Check if this reminder was already shown today (and not skipped - cooldown checked above)
-        // If user previously skipped (and cooldown passed), allow re-showing
+        // Check if this reminder was already shown today.
+        // If user previously skipped and cooldown passed (checked above), allow re-showing.
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
         const hasPreviouslySkipped = this.lastSkipTime !== null;
 
-        // Show if: (1) not shown yet, OR (2) was shown but user skipped (cooldown already checked above)
+        // Show if: (1) not shown yet today, OR (2) user previously skipped (cooldown already verified above)
         if (!wasShownToday || hasPreviouslySkipped) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
             reminderTime: timeStr,
