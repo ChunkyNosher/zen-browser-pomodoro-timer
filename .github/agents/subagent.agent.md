@@ -71,6 +71,8 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 - Configurable duration (1-35 minutes, default 25)
 - Purple-themed UI for visual distinction
 - Auto-resumes main timer when dump ends
+- **Only ONE dump per focus phase** (resets when entering new focus cycle)
+- Tracks `dumpUsedThisFocusPhase` flag, reset by `resetForNewFocusPhase()`
 
 ## Important Constants
 

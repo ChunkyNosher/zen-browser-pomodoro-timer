@@ -185,10 +185,12 @@ Shows reminder after configurable idle time following timer completion.
 Allows users to pause their focus timer and capture distracting thoughts without using focus time.
 
 - Only available during focus phase (not break/transition)
+- **Only ONE dump allowed per focus phase** (resets when entering new focus cycle)
 - Pauses main timer and temporarily lifts ALL blocking (workspace overlay + website blocks)
 - Configurable duration (default: 25 minutes, max: 35 minutes)
 - Purple-themed UI to distinguish from regular timer
 - Auto-resumes main timer when dump ends
+- Button shows "Dump Used" with disabled state when already used in current focus phase
 
 ---
 

@@ -4102,21 +4102,33 @@
         // Distraction Dump button - only during focus phase
         // Available even when paused since Distraction Dump serves a different purpose
         // (temporarily lifting ALL blocks for thought capture, not just pausing timer)
+        // Only one dump is allowed per focus phase
         let dumpBtn = null;
         const config = getConfig();
+        const dumpManager = window.zenPomodoroApp?.distractionDump;
+        const isDumpAvailable = dumpManager?.isDumpAvailable();
         if (
           config.distractionDumpEnabled &&
           status.currentPhase === 'focus'
         ) {
           dumpBtn = document.createElement('button');
           dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
-          dumpBtn.textContent = '🧠 Distraction Dump';
-          dumpBtn.addEventListener('click', () => {
-            this._stopMenuTimerUpdates();
-            dialog.remove();
-            this.menuDialog = null;
-            window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
-          });
+          if (isDumpAvailable) {
+            dumpBtn.textContent = '🧠 Distraction Dump';
+            dumpBtn.addEventListener('click', () => {
+              this._stopMenuTimerUpdates();
+              dialog.remove();
+              this.menuDialog = null;
+              window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+            });
+          } else {
+            // Dump already used this focus phase
+            dumpBtn.textContent = '🧠 Dump Used';
+            dumpBtn.disabled = true;
+            dumpBtn.title = 'Distraction Dump can only be used once per focus phase';
+            dumpBtn.style.opacity = '0.5';
+            dumpBtn.style.cursor = 'not-allowed';
+          }
         }
 
         menuSection.appendChild(statusRow);
@@ -10280,6 +10292,24 @@
       this.dumpTimeRemaining = 0;
       this.savedTimerState = null; // Stores the paused timer state
       this.dumpDialog = null;
+      this.dumpUsedThisFocusPhase = false; // Track if dump was used in current focus phase
+    }
+
+    /**
+     * Reset the dump usage flag for a new focus phase.
+     * Called when entering a new focus phase (new cycle or new timer).
+     */
+    resetForNewFocusPhase() {
+      this.dumpUsedThisFocusPhase = false;
+      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump reset for new focus phase');
+    }
+
+    /**
+     * Check if distraction dump is available for the current focus phase.
+     * @returns {boolean} True if dump is available
+     */
+    isDumpAvailable() {
+      return !this.dumpUsedThisFocusPhase && !this.isActive;
     }
 
     /**
@@ -10290,6 +10320,12 @@
 
       if (!config.distractionDumpEnabled) {
         logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump feature is disabled');
+        return;
+      }
+
+      // Check if dump is available for this focus phase
+      if (this.dumpUsedThisFocusPhase) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already used this focus phase');
         return;
       }
 
@@ -10383,6 +10419,12 @@
         return false;
       }
 
+      // Only one dump per focus phase is allowed
+      if (this.dumpUsedThisFocusPhase) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - already used in this focus phase');
+        return false;
+      }
+
       const timer = window.zenPomodoroApp?.timer;
       if (!timer?.isActive) {
         logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - timer not active');
@@ -10468,6 +10510,7 @@
       logger.log(LOG_CATEGORIES.TIMER, 'Starting distraction dump', { duration });
 
       this.isActive = true;
+      this.dumpUsedThisFocusPhase = true; // Mark dump as used for this focus phase
       this.dumpTimeRemaining = duration * 60; // Convert to seconds
 
       // Save current timer state
@@ -10805,6 +10848,9 @@
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
 
+      // Reset distraction dump availability for new timer session
+      this.distractionDump.resetForNewFocusPhase();
+
       // Notify Sine Mod Blocker that timer started
       this.sineModBlocker.onTimerStart();
 
@@ -10863,6 +10909,11 @@
 
       this.overlay.updatePhaseColor(phase);
       this.updateOverlayVisibility();
+
+      // Reset distraction dump availability when entering a new focus phase
+      if (phase === 'focus') {
+        this.distractionDump.resetForNewFocusPhase();
+      }
 
       // Show notification if enabled
       const config = getConfig();
