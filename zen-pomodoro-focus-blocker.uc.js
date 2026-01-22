@@ -10364,23 +10364,83 @@
      * Start a distraction dump session.
      * @param {number} duration - Duration in minutes
      */
-    startDump(duration) {
+    /**
+     * Check if a distraction dump can be started.
+     * @returns {boolean} True if dump can start
+     * @private
+     */
+    _canStartDump() {
       if (this.isActive) {
         logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already active');
-        return;
+        return false;
       }
 
       const timer = window.zenPomodoroApp?.timer;
       if (!timer?.isActive) {
         logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - timer not active');
-        return;
+        return false;
       }
 
       // Only allow during focus phase
       if (timer.currentPhase !== 'focus') {
         logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - not in focus phase');
-        return;
+        return false;
       }
+
+      return true;
+    }
+
+    /**
+     * Enable dump mode - pause timer and lift all blocks.
+     * @private
+     */
+    _enableDumpMode() {
+      const timer = window.zenPomodoroApp?.timer;
+
+      // Pause the main timer if not already paused
+      if (timer && !timer.isPaused) {
+        timer.pause();
+      }
+
+      // Notify WebsiteBlocker that dump is active
+      if (window.zenPomodoroApp?.websiteBlocker) {
+        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = true;
+        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
+      }
+
+      // Hide workspace overlay if showing
+      window.zenPomodoroApp?.overlay?.hide();
+    }
+
+    /**
+     * Disable dump mode - restore timer and all blocks.
+     * @private
+     */
+    _disableDumpMode() {
+      // Restore website blocker
+      if (window.zenPomodoroApp?.websiteBlocker) {
+        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = false;
+        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
+      }
+
+      // Resume the main timer
+      const timer = window.zenPomodoroApp?.timer;
+      if (timer?.isActive && timer.isPaused) {
+        timer.resume();
+      }
+
+      // Update overlay visibility
+      window.zenPomodoroApp?.updateOverlayVisibility?.();
+    }
+
+    /**
+     * Start a distraction dump session.
+     * @param {number} duration - Duration in minutes
+     */
+    startDump(duration) {
+      if (!this._canStartDump()) return;
+
+      const timer = window.zenPomodoroApp?.timer;
 
       logger.log(LOG_CATEGORIES.TIMER, 'Starting distraction dump', { duration });
 
@@ -10393,23 +10453,7 @@
         isPaused: timer.isPaused,
       };
 
-      // Pause the main timer
-      if (!timer.isPaused) {
-        timer.pause();
-      }
-
-      // Notify WebsiteBlocker that dump is active
-      if (window.zenPomodoroApp?.websiteBlocker) {
-        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = true;
-        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
-      }
-
-      // Hide workspace overlay if showing
-      if (window.zenPomodoroApp?.overlay) {
-        window.zenPomodoroApp.overlay.hide();
-      }
-
-      // Create and show dump dialog
+      this._enableDumpMode();
       this._createDumpDialog(duration);
 
       // Start countdown
@@ -10424,6 +10468,22 @@
     }
 
     /**
+     * Clean up dump dialog and interval.
+     * @private
+     */
+    _cleanupDumpUI() {
+      if (this.dumpInterval) {
+        clearInterval(this.dumpInterval);
+        this.dumpInterval = null;
+      }
+
+      if (this.dumpDialog) {
+        this.dumpDialog.remove();
+        this.dumpDialog = null;
+      }
+    }
+
+    /**
      * End the distraction dump and restore the timer.
      */
     endDump() {
@@ -10432,36 +10492,8 @@
       logger.log(LOG_CATEGORIES.TIMER, 'Ending distraction dump');
 
       this.isActive = false;
-
-      // Clear interval
-      if (this.dumpInterval) {
-        clearInterval(this.dumpInterval);
-        this.dumpInterval = null;
-      }
-
-      // Close dump dialog
-      if (this.dumpDialog) {
-        this.dumpDialog.remove();
-        this.dumpDialog = null;
-      }
-
-      // Restore website blocker
-      if (window.zenPomodoroApp?.websiteBlocker) {
-        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = false;
-        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
-      }
-
-      // Resume the main timer
-      const timer = window.zenPomodoroApp?.timer;
-      if (timer?.isActive && timer.isPaused) {
-        timer.resume();
-      }
-
-      // Update overlay visibility
-      if (window.zenPomodoroApp?.updateOverlayVisibility) {
-        window.zenPomodoroApp.updateOverlayVisibility();
-      }
-
+      this._cleanupDumpUI();
+      this._disableDumpMode();
       this.savedTimerState = null;
     }
 
