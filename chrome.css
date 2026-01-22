@@ -618,6 +618,7 @@
   box-sizing: border-box;
   width: max-content; /* Dynamic sizing: content determines width */
   min-width: 100%; /* But never smaller than container */
+  text-align: left; /* Left-aligned for better code readability */
 }
 
 #zen-pomodoro-lock-code {
@@ -1685,6 +1686,25 @@
 }
 
 .zen-pomodoro-post-session-code-input:focus {
+  outline: none;
+  border-color: #ff9800;
+}
+
+/* Daily reminder code input field */
+.zen-pomodoro-lock-code-input {
+  background-color: #1e1d26;
+  color: #fff;
+  border: 2px solid #3a3944;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 17px; /* Match the code display */
+  width: 100%;
+  font-family: monospace !important;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.zen-pomodoro-lock-code-input:focus {
   outline: none;
   border-color: #ff9800;
 }
