@@ -207,6 +207,12 @@
       postSessionIdleStartTime: null,
       postSessionReminderEndTime: '00:30',
       postSessionReminderDisabledForDay: false,
+      /** Distraction Dump feature - allows users to capture distracting thoughts */
+      distractionDumpEnabled: true,
+      /** Default duration for distraction dump in minutes */
+      distractionDumpDuration: 25,
+      /** Maximum duration for distraction dump in minutes */
+      distractionDumpMaxDuration: 35,
     },
   };
 
@@ -4089,8 +4095,30 @@
           }
         });
 
+        // Distraction Dump button - only during focus phase and not paused
+        let dumpBtn = null;
+        const config = getConfig();
+        if (
+          config.distractionDumpEnabled &&
+          status.currentPhase === 'focus' &&
+          !status.isPaused
+        ) {
+          dumpBtn = document.createElement('button');
+          dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
+          dumpBtn.textContent = '🧠 Distraction Dump';
+          dumpBtn.addEventListener('click', () => {
+            this._stopMenuTimerUpdates();
+            dialog.remove();
+            this.menuDialog = null;
+            window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+          });
+        }
+
         menuSection.appendChild(statusRow);
         menuSection.appendChild(pauseResumeBtn);
+        if (dumpBtn) {
+          menuSection.appendChild(dumpBtn);
+        }
         if (cutBreakBtn) {
           menuSection.appendChild(cutBreakBtn);
         }
@@ -7210,6 +7238,7 @@
       this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
       this._goBackCooldownActive = false; // Cooldown flag to prevent re-blocking after "Go Back"
       this._goBackCooldownTimeout = null; // Timeout ID for cooldown cleanup
+      this.distractionDumpActive = false; // Flag to disable blocking during distraction dump
     }
 
     /**
@@ -7234,10 +7263,15 @@
     /**
      * Check if the blocker should be shown based on timer state.
      * BREAK PHASE FIX: Returns false during break phases to allow free browsing
-     * @returns {boolean} True if timer is active and NOT in break phase
+     * DISTRACTION DUMP: Returns false during distraction dump to allow capturing thoughts
+     * @returns {boolean} True if timer is active and NOT in break phase or dump
      * @private
      */
     _shouldShowBlocker() {
+      // During distraction dump, website blocking is disabled to allow capturing thoughts
+      if (this.distractionDumpActive) {
+        return false;
+      }
       // During break phases, website blocking is disabled to allow free browsing
       if (isInBreakPhase()) {
         return false;
@@ -10219,6 +10253,304 @@
   }
 
   // ============================================
+  // DistractionDumpManager Class
+  // ============================================
+
+  /**
+   * Manages the Distraction Dump feature.
+   * Allows users to pause their timer and capture distracting thoughts
+   * without blocking or using up focus time.
+   */
+  class DistractionDumpManager {
+    constructor() {
+      this.isActive = false;
+      this.dumpInterval = null;
+      this.dumpTimeRemaining = 0;
+      this.savedTimerState = null; // Stores the paused timer state
+      this.dumpDialog = null;
+    }
+
+    /**
+     * Show the configuration dialog to set dump duration before starting.
+     */
+    showDumpConfigDialog() {
+      const config = getConfig();
+      
+      if (!config.distractionDumpEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump feature is disabled');
+        return;
+      }
+
+      // Create dialog
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dump-config-dialog';
+      dialog.className = 'zen-pomodoro-dialog';
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = '🧠 Distraction Dump';
+      dialog.appendChild(title);
+
+      // Description
+      const description = document.createElement('p');
+      description.className = 'zen-pomodoro-dialog-description';
+      description.textContent = 
+        'Take a break to capture distracting thoughts without using your focus time. ' +
+        'Your timer will pause and all blocks will be temporarily lifted.';
+      dialog.appendChild(description);
+
+      // Duration input section
+      const durationSection = document.createElement('div');
+      durationSection.className = 'zen-pomodoro-dialog-section';
+
+      const durationLabel = document.createElement('label');
+      durationLabel.className = 'zen-pomodoro-dialog-label';
+      durationLabel.textContent = 'Dump Duration (minutes):';
+      durationSection.appendChild(durationLabel);
+
+      const durationInput = document.createElement('input');
+      durationInput.type = 'number';
+      durationInput.className = 'zen-pomodoro-dialog-input';
+      durationInput.min = '1';
+      durationInput.max = config.distractionDumpMaxDuration.toString();
+      durationInput.value = config.distractionDumpDuration.toString();
+      durationSection.appendChild(durationInput);
+
+      dialog.appendChild(durationSection);
+
+      // Buttons
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+      });
+
+      const startButton = document.createElement('button');
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Dump';
+      startButton.addEventListener('click', () => {
+        const duration = validateIntegerInput(
+          parseInt(durationInput.value, 10),
+          1,
+          config.distractionDumpMaxDuration,
+          config.distractionDumpDuration
+        );
+        dialog.remove();
+        this.startDump(duration);
+      });
+
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(startButton);
+      dialog.appendChild(buttonDiv);
+
+      // Add to DOM first
+      document.documentElement.appendChild(dialog);
+
+      // Position dialog
+      applyLastDialogPosition(dialog);
+
+      // Make dialog draggable
+      setupDialogDrag(dialog);
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump config dialog shown');
+    }
+
+    /**
+     * Start a distraction dump session.
+     * @param {number} duration - Duration in minutes
+     */
+    startDump(duration) {
+      if (this.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already active');
+        return;
+      }
+
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer?.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - timer not active');
+        return;
+      }
+
+      // Only allow during focus phase
+      if (timer.currentPhase !== 'focus') {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - not in focus phase');
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting distraction dump', { duration });
+
+      this.isActive = true;
+      this.dumpTimeRemaining = duration * 60; // Convert to seconds
+
+      // Save current timer state
+      this.savedTimerState = {
+        remainingTime: timer.remainingTime,
+        isPaused: timer.isPaused,
+      };
+
+      // Pause the main timer
+      if (!timer.isPaused) {
+        timer.pause();
+      }
+
+      // Notify WebsiteBlocker that dump is active
+      if (window.zenPomodoroApp?.websiteBlocker) {
+        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = true;
+        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
+      }
+
+      // Hide workspace overlay if showing
+      if (window.zenPomodoroApp?.overlay) {
+        window.zenPomodoroApp.overlay.hide();
+      }
+
+      // Create and show dump dialog
+      this._createDumpDialog(duration);
+
+      // Start countdown
+      this.dumpInterval = setInterval(() => {
+        this.dumpTimeRemaining--;
+        this._updateDisplay(this.dumpTimeRemaining);
+
+        if (this.dumpTimeRemaining <= 0) {
+          this.endDump();
+        }
+      }, 1000);
+    }
+
+    /**
+     * End the distraction dump and restore the timer.
+     */
+    endDump() {
+      if (!this.isActive) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Ending distraction dump');
+
+      this.isActive = false;
+
+      // Clear interval
+      if (this.dumpInterval) {
+        clearInterval(this.dumpInterval);
+        this.dumpInterval = null;
+      }
+
+      // Close dump dialog
+      if (this.dumpDialog) {
+        this.dumpDialog.remove();
+        this.dumpDialog = null;
+      }
+
+      // Restore website blocker
+      if (window.zenPomodoroApp?.websiteBlocker) {
+        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = false;
+        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
+      }
+
+      // Resume the main timer
+      const timer = window.zenPomodoroApp?.timer;
+      if (timer?.isActive && timer.isPaused) {
+        timer.resume();
+      }
+
+      // Update overlay visibility
+      if (window.zenPomodoroApp?.updateOverlayVisibility) {
+        window.zenPomodoroApp.updateOverlayVisibility();
+      }
+
+      this.savedTimerState = null;
+    }
+
+    /**
+     * Create the dump dialog UI.
+     * @param {number} duration - Duration in minutes
+     * @private
+     */
+    _createDumpDialog(duration) {
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dump-dialog';
+      dialog.className = 'zen-pomodoro-dialog zen-pomodoro-dump-active';
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = '🧠 Distraction Dump Active';
+      dialog.appendChild(title);
+
+      // Status text
+      const status = document.createElement('p');
+      status.className = 'zen-pomodoro-dump-status';
+      status.textContent = 
+        'Timer paused. All blocks temporarily lifted. Use this time to capture your thoughts.';
+      dialog.appendChild(status);
+
+      // Timer display
+      const timerDisplay = document.createElement('div');
+      timerDisplay.className = 'zen-pomodoro-dump-timer';
+      timerDisplay.textContent = formatTime(duration * 60);
+      dialog.appendChild(timerDisplay);
+
+      // Helpful message
+      const helpText = document.createElement('p');
+      helpText.className = 'zen-pomodoro-dialog-description';
+      helpText.style.textAlign = 'center';
+      helpText.textContent = 'Write in your journal or notes. Your main timer is safely paused.';
+      dialog.appendChild(helpText);
+
+      // Buttons
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const endButton = document.createElement('button');
+      endButton.className = 'zen-pomodoro-dialog-button';
+      endButton.textContent = 'End Dump & Resume Timer';
+      endButton.addEventListener('click', () => {
+        this.endDump();
+      });
+
+      buttonDiv.appendChild(endButton);
+      dialog.appendChild(buttonDiv);
+
+      // Add to DOM first
+      document.documentElement.appendChild(dialog);
+      this.dumpDialog = dialog;
+
+      // Position dialog
+      applyLastDialogPosition(dialog);
+
+      // Make dialog draggable
+      setupDialogDrag(dialog);
+    }
+
+    /**
+     * Update the dump timer display.
+     * @param {number} timeInSeconds - Time remaining in seconds
+     * @private
+     */
+    _updateDisplay(timeInSeconds) {
+      if (!this.dumpDialog) return;
+
+      const timerDisplay = this.dumpDialog.querySelector('.zen-pomodoro-dump-timer');
+      if (timerDisplay) {
+        timerDisplay.textContent = formatTime(timeInSeconds);
+      }
+    }
+
+    /**
+     * Clean up the distraction dump manager.
+     */
+    destroy() {
+      if (this.isActive) {
+        this.endDump();
+      }
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -10234,6 +10566,7 @@
       this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
       this.dailyReminder = new DailyReminderManager(); // Daily reminders at configured times
       this.postSessionReminder = new PostSessionReminderManager(); // Post-session idle reminder
+      this.distractionDump = new DistractionDumpManager(); // Distraction dump for capturing thoughts
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -10956,6 +11289,7 @@
         this.transitionManager,
         this.dailyReminder,
         this.postSessionReminder,
+        this.distractionDump,
         this.keyboardShortcut,
         this.overlay,
       ];
