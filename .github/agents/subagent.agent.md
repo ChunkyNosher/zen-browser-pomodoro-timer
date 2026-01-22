@@ -36,14 +36,23 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 - `SecurityManager` - Settings lockout screens
 - `WebsiteBlocker` - Website/keyword blocking
 - `SineModBlocker` - Blocks mod settings access
-- `FirstTimeReminderManager` - Daily startup reminder (periodic check every 60s)
+- `DailyReminderManager` - Daily startup reminders (periodic check every 60s)
 - `PostSessionReminderManager` - Idle time reminder with escalating skips
+- `DistractionDumpManager` - Pause timer and lift blocks for thought capture
+
+## Module Architecture
+
+The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
+
+- `Constants` - Plain object with all application constants
+- `Storage` - IIFE for Firefox Services.prefs operations
+- `Utils` - IIFE for general utility functions
 
 ## Reminder Systems
 
-### First-Time Reminder
+### Daily Reminder (DailyReminderManager)
 
-- Shows blocking reminder if no timer started today after configured time
+- Shows blocking reminders at configurable times throughout the day
 - Uses periodic check (every 60 seconds) not just on init
 - Triggers based on user's local time
 
@@ -55,10 +64,20 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 - Focus time tracking - stops after focus time goal (default 2.5h)
 - Focus time resets on daily reminder time, not midnight
 
+### Distraction Dump (DistractionDumpManager)
+
+- Pauses main timer during focus phase
+- Temporarily unblocks ALL workspaces and websites
+- Configurable duration (1-35 minutes, default 25)
+- Purple-themed UI for visual distinction
+- Auto-resumes main timer when dump ends
+- **Only ONE dump per focus phase** (resets when entering new focus cycle)
+- Tracks `dumpUsedThisFocusPhase` flag, reset by `resetForNewFocusPhase()`
+
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.2.3'`
+- `MOD_VERSION = '1.3.0'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -66,12 +85,15 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 | Option                       | Type    | Default | Description                             |
 | ---------------------------- | ------- | ------- | --------------------------------------- |
-| `firstTimeReminderEnabled`   | boolean | false   | Enable daily startup reminder           |
-| `firstTimeReminderTime`      | string  | '10:00' | Time in HH:MM format for daily reminder |
+| `dailyReminderEnabled`       | boolean | false   | Enable daily startup reminder           |
+| `dailyReminderTimes`         | array   | ['11:15', '16:15'] | Times for daily reminders    |
 | `postSessionReminderEnabled` | boolean | true    | Enable post-session idle reminder       |
 | `postSessionIdleTime`        | number  | 45      | Minutes before first reminder           |
 | `postSessionSkipCooldown`    | number  | 30      | Minutes between reminders after skip    |
 | `postSessionFocusTimeGoal`   | number  | 150     | Focus time goal in minutes (2.5 hours)  |
+| `distractionDumpEnabled`     | boolean | true    | Enable Distraction Dump feature         |
+| `distractionDumpDuration`    | number  | 25      | Default dump duration in minutes        |
+| `distractionDumpMaxDuration` | number  | 35      | Maximum dump duration in minutes        |
 
 ## Helper Functions
 

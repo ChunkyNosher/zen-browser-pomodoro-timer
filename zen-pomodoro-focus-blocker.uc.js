@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.2.12
+ * Version: 1.3.0
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -26,23 +26,202 @@
  * - Viewport boundary checks
  * - Accessibility improvements
  * - Settings consolidated to preferences.json
+ *
+ * ARCHITECTURE:
+ * - Modular IIFE pattern for better code organization
+ * - Clear module boundaries with public interfaces
+ * - No global variable pollution
  */
 
 (() => {
   'use strict';
 
   // ============================================
-  // Constants and Configuration
+  // Constants Module
   // ============================================
 
-  const PREF_PREFIX = 'zen-pomodoro';
-
   /**
-   * Version number for the mod.
-   * Used for display in the main menu.
-   * @constant {string}
+   * Constants module - Plain object containing all application constants.
+   * This module has no dependencies and is referenced by all other modules.
    */
-  const MOD_VERSION = '1.2.12';
+  const Constants = {
+    PREF_PREFIX: 'zen-pomodoro',
+    MOD_VERSION: '1.3.0',
+
+    /** Modifier keys used by the keyboard shortcut recorder */
+    MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
+
+    /** Valid lockout method types for settings access control */
+    LOCKOUT_METHODS: {
+      CODE: 'code',
+      HOLD: 'hold',
+    },
+
+    /** Data attribute name used to mark dialogs that should not save their position */
+    DATA_NO_POSITION_SAVE: 'data-no-position-save',
+
+    /** Save state interval in seconds (every 10 seconds for performance) */
+    SAVE_STATE_INTERVAL_SECONDS: 10,
+
+    /** Delay for DOM settling after timer start (in milliseconds) */
+    DOM_SETTLE_DELAY_MS: 100,
+
+    /** Delay for showing restoration notification after DOM is ready (in milliseconds) */
+    RESTORATION_NOTIFICATION_DELAY_MS: 500,
+
+    /** Maximum z-index value for overlay (highest possible value for 32-bit signed integer) */
+    MAX_OVERLAY_Z_INDEX: '2147483647',
+
+    /** Minimum content area dimension for valid overlay bounds (in pixels) */
+    MIN_CONTENT_AREA_DIMENSION: 100,
+
+    /** Debounce delay for content observer checks (in milliseconds) */
+    CONTENT_OBSERVER_DEBOUNCE_DELAY_MS: 500,
+
+    /** Transition phase duration in seconds (5 minutes warning before focus resumes) */
+    TRANSITION_PHASE_DURATION_SECONDS: 5 * 60,
+
+    /** Post-session reminder escalation factor (50% increase per skip) */
+    POST_SESSION_ESCALATION_FACTOR: 1.5,
+
+    /** Post-session reminder check interval (1 minute in milliseconds) */
+    POST_SESSION_CHECK_INTERVAL_MS: 60 * 1000,
+
+    /** Daily reminder escalation factor (50% increase per skip) */
+    DAILY_REMINDER_ESCALATION_FACTOR: 1.5,
+
+    /** Daily reminder check interval (1 minute in milliseconds) */
+    DAILY_REMINDER_CHECK_INTERVAL_MS: 60 * 1000,
+
+    /** Startup delay before showing daily reminder (3 seconds to allow timer state restoration) */
+    DAILY_REMINDER_STARTUP_DELAY_MS: 3 * 1000,
+
+    /** Early morning cutoff time for auto-off detection (06:00 AM in minutes since midnight) */
+    EARLY_MORNING_CUTOFF_MINUTES: 6 * 60,
+
+    /** Delay for workspace mutation handling to allow DOM to settle (in milliseconds) */
+    WORKSPACE_MUTATION_DELAY_MS: 50,
+
+    /** Regex pattern for escaping all regex metacharacters (including backslashes) in strings */
+    REGEX_ESCAPE_PATTERN: /[.*+?^${}()|[\]\\]/g,
+
+    /** Regex pattern for escaping regex metacharacters except asterisk (for wildcard patterns) */
+    REGEX_ESCAPE_PATTERN_KEEP_ASTERISK: /[.+?^${}()|[\]\\]/g,
+
+    /** Log categories for different parts of the application */
+    LOG_CATEGORIES: {
+      TIMER: 'TIMER',
+      SETTINGS: 'SETTINGS',
+      MENU: 'MENU',
+      OVERLAY: 'OVERLAY',
+      WORKSPACE: 'WORKSPACE',
+      SECURITY: 'SECURITY',
+      INIT: 'INIT',
+    },
+
+    /** Delay (in ms) before revoking the URL after export download starts */
+    URL_REVOKE_DELAY_MS: 200,
+
+    /** Keys to filter out from logged data for security */
+    SENSITIVE_KEYS: ['password', 'code', 'secret', 'token', 'credential', 'auth'],
+
+    /** Selectors to try for workspace container for MutationObserver (order matters) */
+    WORKSPACE_CONTAINER_SELECTORS: [
+      '#tabbrowser-arrowscrollbox',
+      '#zen-workspace-button-container',
+      '#zen-workspaces-button-container',
+      '[id*="workspace"]',
+      '#navigator-toolbox',
+    ],
+
+    /** Selectors to try for content area to append overlay (order matters) */
+    CONTENT_AREA_SELECTORS: [
+      '#tabbrowser-tabbox',
+      '#tabbrowser-tabpanels',
+      '#appcontent',
+      '#zen-main-view',
+      '#browser',
+      '#main-window',
+    ],
+
+    /** Attribute names to check for workspace name, in priority order */
+    WORKSPACE_NAME_ATTRIBUTES: [
+      'data-workspace-name',
+      'data-name',
+      'label',
+      'tooltiptext',
+      'aria-label',
+      'title',
+    ],
+
+    /** Default configuration object */
+    DEFAULT_CONFIG: {
+      timerMode: 'pomodoro',
+      simpleDuration: 25,
+      focusDuration: 25,
+      breakDuration: 5,
+      cycles: 4,
+      blockedWorkspaces: [],
+      overlayColor: '#808080',
+      motivationalMessage: 'Get back to work.',
+      settingsLockIdleMethod: 'hold',
+      settingsLockActiveMethod: 'code',
+      settingsLockIdleHoldDuration: 10,
+      settingsLockActiveHoldDuration: 25,
+      settingsLockIdleCodeLength: 48,
+      settingsLockActiveCodeLength: 96,
+      settingsLockActiveCharacterSet: 'all-typeable',
+      enableNotifications: true,
+      enableAudioAlerts: false,
+      phase: 'focus',
+      keyboardShortcut: 'Alt+Shift+P',
+      rulesets: [
+        {
+          id: 'default',
+          name: 'Default Blocklist',
+          enabled: true,
+          rules: [],
+          checkTitleOnly: true,
+          blockedWorkspaces: [],
+        },
+      ],
+      activeRulesets: ['default'],
+      dailyReminderEnabled: false,
+      dailyReminderTimes: ['11:15', '16:15'],
+      dailyReminderSkipMethod: 'hold',
+      dailyReminderSkipHoldDuration: 15,
+      dailyReminderSkipCodeLength: 32,
+      dailyReminderSkipCount: 0,
+      dailyReminderLastSkipTime: null,
+      dailyReminderSkipCooldown: 10,
+      lastTimerStartTime: null,
+      dailyRemindersShownToday: [],
+      postSessionReminderEnabled: true,
+      postSessionIdleTime: 45,
+      postSessionSkipCooldown: 30,
+      postSessionSkipMethod: 'hold',
+      postSessionSkipHoldDuration: 20,
+      postSessionSkipCodeLength: 48,
+      postSessionFocusTimeGoal: 150,
+      totalFocusTimeToday: 0,
+      lastFocusTimeResetDate: '',
+      postSessionSkipCount: 0,
+      postSessionLastSkipTime: null,
+      postSessionIdleStartTime: null,
+      postSessionReminderEndTime: '00:30',
+      postSessionReminderDisabledForDay: false,
+      /** Distraction Dump feature - allows users to capture distracting thoughts */
+      distractionDumpEnabled: true,
+      /** Default duration for distraction dump in minutes */
+      distractionDumpDuration: 25,
+      /** Maximum duration for distraction dump in minutes */
+      distractionDumpMaxDuration: 35,
+    },
+  };
+
+  // ============================================
+  // State Variables
+  // ============================================
 
   /**
    * Stores the last dialog position for maintaining position across dialogs.
@@ -52,264 +231,9 @@
    */
   let lastDialogPosition = null;
 
-  /**
-   * Modifier keys used by the keyboard shortcut recorder.
-   * These are the keys that can be combined with a regular key to form a shortcut.
-   * @constant {string[]}
-   */
-  const MODIFIER_KEYS = ['Control', 'Alt', 'Shift', 'Meta'];
-
-  /**
-   * Valid lockout method types for settings access control.
-   * @constant {Object}
-   * @property {string} CODE - Requires entering a randomly generated code
-   * @property {string} HOLD - Requires holding a button for a duration
-   */
-  const LOCKOUT_METHODS = {
-    CODE: 'code',
-    HOLD: 'hold',
-  };
-
-  /**
-   * Data attribute name used to mark dialogs that should not save their position.
-   * Used by the transition popup to prevent affecting settings menu positioning.
-   * @constant {string}
-   */
-  const DATA_NO_POSITION_SAVE = 'data-no-position-save';
-
-  const DEFAULT_CONFIG = {
-    timerMode: 'pomodoro',
-    simpleDuration: 25,
-    focusDuration: 25,
-    breakDuration: 5,
-    cycles: 4,
-    blockedWorkspaces: [],
-    overlayColor: '#808080',
-    motivationalMessage: 'Get back to work.',
-    /** @type {'hold'|'code'} Method to use when timer is idle */
-    settingsLockIdleMethod: LOCKOUT_METHODS.HOLD,
-    /** @type {'hold'|'code'} Method to use when timer is active */
-    settingsLockActiveMethod: LOCKOUT_METHODS.CODE,
-    /** Hold duration in seconds when timer is idle */
-    settingsLockIdleHoldDuration: 10,
-    /** Hold duration in seconds when timer is active */
-    settingsLockActiveHoldDuration: 25,
-    /** Code length when timer is idle */
-    settingsLockIdleCodeLength: 48,
-    /** Code length when timer is active */
-    settingsLockActiveCodeLength: 96,
-    settingsLockActiveCharacterSet: 'all-typeable',
-    enableNotifications: true,
-    enableAudioAlerts: false,
-    phase: 'focus',
-    keyboardShortcut: 'Alt+Shift+P',
-    /** Website blocking rulesets (LeechBlock-style) */
-    rulesets: [
-      {
-        id: 'default',
-        name: 'Default Blocklist',
-        enabled: true,
-        rules: [], // Array of rule objects: { id, pattern, type: 'website'|'keyword', condition: 'block'|'allow' }
-        // Keywords only check tab titles due to browser security restrictions (cross-origin)
-        checkTitleOnly: true,
-        blockedWorkspaces: [], // Array of Zen workspace UUIDs to block when this ruleset is active
-      },
-    ],
-    /** Rulesets to enable when timer starts */
-    activeRulesets: ['default'],
-    /** Daily reminder settings (replaces first-time reminder) */
-    dailyReminderEnabled: false,
-    /** Daily reminder times in 24-hour HH:MM format (array of times) */
-    dailyReminderTimes: ['11:15', '16:15'], // Default: 11:15 AM and 4:15 PM
-    /** Daily reminder skip method: 'hold' or 'code' */
-    dailyReminderSkipMethod: LOCKOUT_METHODS.HOLD,
-    /** Initial hold duration in seconds for daily reminder skip (default: 15) */
-    dailyReminderSkipHoldDuration: 15,
-    /** Initial code length for daily reminder skip (default: 32) */
-    dailyReminderSkipCodeLength: 32,
-    /** Daily reminder skip count (persisted) */
-    dailyReminderSkipCount: 0,
-    /** Timestamp of last daily reminder skip (persisted) */
-    dailyReminderLastSkipTime: null,
-    /** Daily reminder skip cooldown in minutes (default: 10) */
-    dailyReminderSkipCooldown: 10,
-    /** Timestamp when last timer was started (used to track if timer was started after reminder time) */
-    lastTimerStartTime: null,
-    /** Timestamps of daily reminders shown today (persisted, array of timestamps) */
-    dailyRemindersShownToday: [],
-    /** Post-session reminder settings - shows reminder after timer completes */
-    postSessionReminderEnabled: true,
-    /** Minutes after timer completion before first reminder (default: 45) */
-    postSessionIdleTime: 45,
-    /** Minutes before another reminder after skip (default: 30) */
-    postSessionSkipCooldown: 30,
-    /** @type {'hold'|'code'} Method to use for skip button requirement */
-    postSessionSkipMethod: LOCKOUT_METHODS.HOLD,
-    /** Initial hold duration in seconds for skip (default: 20) */
-    postSessionSkipHoldDuration: 20,
-    /** Initial code length for skip (default: 48) */
-    postSessionSkipCodeLength: 48,
-    /** Minutes of focus time required before post-session reminders stop (default: 150 = 2h 30min) */
-    postSessionFocusTimeGoal: 150,
-    /** Total focus time accumulated today in minutes (persisted) */
-    totalFocusTimeToday: 0,
-    /** Last date the focus time was reset (YYYY-MM-DD format, used to reset at daily reminder time) */
-    lastFocusTimeResetDate: '',
-    /** Persisted skip count for post-session reminder */
-    postSessionSkipCount: 0,
-    /** Timestamp when last skip occurred (persisted) */
-    postSessionLastSkipTime: null,
-    /** Timestamp when last timer completed (persisted for countdown after browser restart) */
-    postSessionIdleStartTime: null,
-    /** Time when post-session reminder should automatically turn off (24-hour HH:MM format, e.g., '00:30' for 12:30 AM) */
-    postSessionReminderEndTime: '00:30',
-    /** Flag to track if post-session reminder is disabled for the day (resets on next timer completion) */
-    postSessionReminderDisabledForDay: false,
-  };
-
-  // Save state every 10 seconds instead of every second for performance (in seconds)
-  const SAVE_STATE_INTERVAL_SECONDS = 10;
-
-  // Delay for DOM settling after timer start (in milliseconds)
-  const DOM_SETTLE_DELAY_MS = 100;
-
-  // Delay for showing restoration notification after DOM is ready (in milliseconds)
-  const RESTORATION_NOTIFICATION_DELAY_MS = 500;
-
-  // Maximum z-index value for overlay (highest possible value for 32-bit signed integer)
-  const MAX_OVERLAY_Z_INDEX = '2147483647';
-
-  // Minimum content area dimension for valid overlay bounds (in pixels)
-  const MIN_CONTENT_AREA_DIMENSION = 100;
-
-  // Debounce delay for content observer checks (in milliseconds)
-  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = 500;
-
-  // Transition phase duration in seconds (5 minutes)
-  // This is the "break ending soon" warning period before focus resumes
-  const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;
-
-  // Post-session reminder escalation factor (50% increase per skip)
-  const POST_SESSION_ESCALATION_FACTOR = 1.5;
-
-  // Post-session reminder check interval (1 minute in milliseconds)
-  const POST_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
-
-  // Daily reminder escalation factor (50% increase per skip)
-  const DAILY_REMINDER_ESCALATION_FACTOR = 1.5;
-
-  // Daily reminder check interval (1 minute in milliseconds)
-  const DAILY_REMINDER_CHECK_INTERVAL_MS = 60 * 1000;
-
-  // Early morning cutoff time for auto-off detection (06:00 AM in minutes since midnight)
-  // Post-session reminders only auto-disable if current time is before this cutoff
-  const EARLY_MORNING_CUTOFF_MINUTES = 6 * 60;
-
-  // Delay for workspace mutation handling to allow DOM to settle (in milliseconds)
-  // This prevents race conditions where the active attribute hasn't been set yet
-  const WORKSPACE_MUTATION_DELAY_MS = 50;
-
-  /**
-   * Regex pattern for escaping all regex metacharacters (including backslashes) in strings.
-   * Used to safely include literal strings in dynamically constructed regular expressions.
-   * @constant {RegExp}
-   */
-  const REGEX_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/g;
-
-  /**
-   * Regex pattern for escaping regex metacharacters except asterisk (for wildcard patterns).
-   * Asterisk (*) is preserved so it can be converted to .* for glob-style matching.
-   * @constant {RegExp}
-   */
-  const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = /[.+?^${}()|[\]\\]/g;
-
   // ============================================
   // LogManager Class
   // ============================================
-
-  /**
-   * Log categories for different parts of the application.
-   * @constant {Object}
-   */
-  const LOG_CATEGORIES = {
-    TIMER: 'TIMER',
-    SETTINGS: 'SETTINGS',
-    MENU: 'MENU',
-    OVERLAY: 'OVERLAY',
-    WORKSPACE: 'WORKSPACE',
-    SECURITY: 'SECURITY',
-    INIT: 'INIT',
-  };
-
-  /**
-   * Delay (in ms) before revoking the URL after export download starts.
-   * Should be long enough to ensure download initiates but short enough to avoid memory leaks.
-   * @constant {number}
-   */
-  const URL_REVOKE_DELAY_MS = 200;
-
-  /**
-   * Keys to filter out from logged data for security.
-   * Only filters top-level object keys; nested sensitive data may still be logged.
-   * If stricter filtering is needed, consider deep-scanning string values for patterns
-   * or implementing a whitelist approach instead.
-   * @constant {string[]}
-   */
-  const SENSITIVE_KEYS = ['password', 'code', 'secret', 'token', 'credential', 'auth'];
-
-  /**
-   * Selectors to try for workspace container for MutationObserver.
-   * Order matters - earlier selectors are preferred.
-   * @constant {string[]}
-   */
-  const WORKSPACE_CONTAINER_SELECTORS = [
-    '#tabbrowser-arrowscrollbox', // Container holding zen-workspace elements (modern Zen Browser)
-    '#zen-workspace-button-container',
-    '#zen-workspaces-button-container',
-    '[id*="workspace"]',
-    '#navigator-toolbox',
-  ];
-
-  /**
-   * Selectors to try for content area to append overlay.
-   * Order matters - earlier selectors are preferred.
-   * '#tabbrowser-tabbox' is first as it contains all tab panels and works best
-   * for properly covering browser content in Firefox/Zen browsers.
-   * @constant {string[]}
-   */
-  const CONTENT_AREA_SELECTORS = [
-    '#tabbrowser-tabbox',
-    '#tabbrowser-tabpanels',
-    '#appcontent',
-    '#zen-main-view',
-    '#browser',
-    '#main-window',
-  ];
-
-  // ============================================
-  // Helper Functions
-  // ============================================
-
-  /**
-   * Find rule in config and execute callback if found.
-   * Reduces code duplication in rule event handlers.
-   * @param {Object} config - Configuration object
-   * @param {string} rulesetId - Ruleset ID to find
-   * @param {string} ruleId - Rule ID to find
-   * @param {function} callback - Callback with (rule, ruleIndex, rulesArray) params
-   * @returns {boolean} True if rule was found and callback was executed
-   */
-  function findRuleAndExecute(config, rulesetId, ruleId, callback) {
-    const rulesetIndex = config.rulesets.findIndex((r) => r.id === rulesetId);
-    if (rulesetIndex === -1) return false;
-
-    const rulesArray = config.rulesets[rulesetIndex].rules;
-    const ruleIndex = rulesArray.findIndex((r) => r.id === ruleId);
-    if (ruleIndex === -1) return false;
-
-    callback(rulesArray[ruleIndex], ruleIndex, rulesArray);
-    return true;
-  }
 
   /**
    * LogManager class for comprehensive logging with export functionality.
@@ -364,7 +288,7 @@
      */
     _isSensitiveKey(key) {
       const lowerKey = key.toLowerCase();
-      return SENSITIVE_KEYS.some((sensitive) => lowerKey.includes(sensitive));
+      return Constants.SENSITIVE_KEYS.some((sensitive) => lowerKey.includes(sensitive));
     }
 
     /**
@@ -426,7 +350,7 @@
      */
     exportLogs() {
       // Log the export event before creating export data for accurate count
-      this.log(LOG_CATEGORIES.SETTINGS, 'Logs exported', { entryCount: this.logs.length });
+      this.log(Constants.LOG_CATEGORIES.SETTINGS, 'Logs exported', { entryCount: this.logs.length });
 
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -443,7 +367,7 @@
       a.click();
 
       // Revoke URL after a brief delay to ensure download has started
-      setTimeout(() => URL.revokeObjectURL(url), URL_REVOKE_DELAY_MS);
+      setTimeout(() => URL.revokeObjectURL(url), Constants.URL_REVOKE_DELAY_MS);
     }
   }
 
@@ -451,263 +375,656 @@
   const logger = new LogManager(1000);
 
   // ============================================
-  // Utility Functions
+  // Storage Module
   // ============================================
 
   /**
-   * Get preference from Firefox Services
+   * Storage Module - Handles all Firefox preferences (Services.prefs) operations.
+   * No other module should directly call Services.prefs.
+   * Public Interface:
+   * - getPref(key, defaultValue)
+   * - setPref(key, value)
+   * - loadConfig()
+   * - saveConfig(config)
    */
-  function getPref(key, defaultValue) {
-    const prefKey = `${PREF_PREFIX}.${key}`;
-    try {
-      if (Services.prefs.prefHasUserValue(prefKey)) {
-        const prefType = Services.prefs.getPrefType(prefKey);
-        if (prefType === Services.prefs.PREF_STRING) {
-          return Services.prefs.getCharPref(prefKey);
-        } else if (prefType === Services.prefs.PREF_INT) {
-          return Services.prefs.getIntPref(prefKey);
-        } else if (prefType === Services.prefs.PREF_BOOL) {
-          return Services.prefs.getBoolPref(prefKey);
+  const Storage = (() => {
+    /**
+     * Get preference from Firefox Services
+     * @param {string} key - Preference key (without prefix)
+     * @param {*} defaultValue - Default value if preference not found
+     * @returns {*} Preference value or defaultValue
+     */
+    function getPref(key, defaultValue) {
+      const prefKey = `${Constants.PREF_PREFIX}.${key}`;
+      try {
+        if (Services.prefs.prefHasUserValue(prefKey)) {
+          const prefType = Services.prefs.getPrefType(prefKey);
+          if (prefType === Services.prefs.PREF_STRING) {
+            return Services.prefs.getCharPref(prefKey);
+          } else if (prefType === Services.prefs.PREF_INT) {
+            return Services.prefs.getIntPref(prefKey);
+          } else if (prefType === Services.prefs.PREF_BOOL) {
+            return Services.prefs.getBoolPref(prefKey);
+          }
+        }
+      } catch (e) {
+        console.error(`Failed to get pref ${prefKey}:`, e);
+      }
+      return defaultValue;
+    }
+
+    /**
+     * Set preference in Firefox Services
+     * @param {string} key - Preference key (without prefix)
+     * @param {*} value - Value to set (string, number, or boolean)
+     */
+    function setPref(key, value) {
+      const prefKey = `${Constants.PREF_PREFIX}.${key}`;
+      try {
+        if (typeof value === 'string') {
+          Services.prefs.setCharPref(prefKey, value);
+        } else if (typeof value === 'number') {
+          Services.prefs.setIntPref(prefKey, value);
+        } else if (typeof value === 'boolean') {
+          Services.prefs.setBoolPref(prefKey, value);
+        }
+      } catch (e) {
+        console.error(`Failed to set pref ${prefKey}:`, e);
+      }
+    }
+
+    /**
+     * Load stored JSON config from preferences with error handling.
+     * @param {Object} config - Config object to merge into
+     * @returns {Object} Updated config object
+     * @private
+     */
+    function loadStoredConfigJson(config) {
+      const configStr = getPref('config', null);
+      if (!configStr) return config;
+
+      try {
+        const storedConfig = JSON.parse(configStr);
+        return { ...config, ...storedConfig };
+      } catch (e) {
+        console.error('Failed to parse config:', e);
+        return config;
+      }
+    }
+
+    /**
+     * Load a boolean preference and set it in config if present.
+     * Handles both true boolean values and 'true' string values.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadBooleanPref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null) {
+        config[configKey] = value === true || value === 'true';
+      }
+    }
+
+    /**
+     * Load a positive integer preference and set it in config if present and valid.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadPositiveIntPref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null) {
+        const intValue = typeof value === 'number' ? value : parseInt(value, 10);
+        if (!isNaN(intValue) && intValue > 0) {
+          config[configKey] = intValue;
         }
       }
-    } catch (e) {
-      console.error(`Failed to get pref ${prefKey}:`, e);
     }
-    return defaultValue;
-  }
 
-  /**
-   * Set preference in Firefox Services
-   */
-  function setPref(key, value) {
-    const prefKey = `${PREF_PREFIX}.${key}`;
-    try {
-      if (typeof value === 'string') {
-        Services.prefs.setCharPref(prefKey, value);
-      } else if (typeof value === 'number') {
-        Services.prefs.setIntPref(prefKey, value);
-      } else if (typeof value === 'boolean') {
-        Services.prefs.setBoolPref(prefKey, value);
-      }
-    } catch (e) {
-      console.error(`Failed to set pref ${prefKey}:`, e);
-    }
-  }
-
-  /**
-   * Load a boolean preference and set it in config if present.
-   * Handles both true boolean values and 'true' string values.
-   * @param {string} prefName - Preference name (without prefix)
-   * @param {Object} config - Config object to update
-   * @param {string} configKey - Key in config to set
-   */
-  function loadBooleanPref(prefName, config, configKey) {
-    const value = getPref(prefName, null);
-    if (value !== null) {
-      config[configKey] = value === true || value === 'true';
-    }
-  }
-
-  /**
-   * Load a positive integer preference and set it in config if present and valid.
-   * @param {string} prefName - Preference name (without prefix)
-   * @param {Object} config - Config object to update
-   * @param {string} configKey - Key in config to set
-   */
-  function loadPositiveIntPref(prefName, config, configKey) {
-    const value = getPref(prefName, null);
-    if (value !== null) {
-      const intValue = typeof value === 'number' ? value : parseInt(value, 10);
-      if (!isNaN(intValue) && intValue > 0) {
-        config[configKey] = intValue;
+    /**
+     * Load a non-empty string preference and set it in config if present.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadNonEmptyStringPref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null && value !== '') {
+        config[configKey] = value;
       }
     }
-  }
 
-  /**
-   * Load a non-empty string preference and set it in config if present.
-   * @param {string} prefName - Preference name (without prefix)
-   * @param {Object} config - Config object to update
-   * @param {string} configKey - Key in config to set
-   */
-  function loadNonEmptyStringPref(prefName, config, configKey) {
-    const value = getPref(prefName, null);
-    if (value !== null && value !== '') {
-      config[configKey] = value;
+    /**
+     * Validate time format (HH:MM, 24-hour) with range checking.
+     * @param {string} timeStr - Time string to validate
+     * @returns {boolean} True if valid time format
+     * @private
+     */
+    function isValidTimeFormat(timeStr) {
+      if (!timeStr || typeof timeStr !== 'string') return false;
+
+      const match = timeStr.match(/^(\d{2}):(\d{2})$/);
+      if (!match) return false;
+
+      const hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+
+      return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
     }
-  }
 
-  /**
-   * Load a time preference (HH:MM format) and set it in config if valid.
-   * @param {string} prefName - Preference name (without prefix)
-   * @param {Object} config - Config object to update
-   * @param {string} configKey - Key in config to set
-   */
-  function loadTimePref(prefName, config, configKey) {
-    const value = getPref(prefName, null);
-    const hasValue = value !== null && value !== '';
-    const isValidTimePref = hasValue && isValidTimeFormat(value);
-    if (isValidTimePref) {
-      config[configKey] = value;
-    }
-  }
-
-  /**
-   * Load a comma-separated time list preference and set it in config if valid.
-   * Validates each time in HH:MM format and filters out invalid times.
-   * @param {string} prefName - Preference name (without prefix)
-   * @param {Object} config - Config object to update
-   * @param {string} configKey - Key in config to set
-   */
-  function loadTimeArrayPref(prefName, config, configKey) {
-    const value = getPref(prefName, null);
-    if (value !== null && value !== '') {
-      // Split by comma and trim whitespace
-      const times = value.split(',').map((t) => t.trim());
-      // Filter to only valid times
-      const validTimes = times.filter((t) => isValidTimeFormat(t));
-      if (validTimes.length > 0) {
-        config[configKey] = validTimes;
+    /**
+     * Load a time preference (HH:MM format) and set it in config if valid.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadTimePref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      const hasValue = value !== null && value !== '';
+      const isValidTimePref = hasValue && isValidTimeFormat(value);
+      if (isValidTimePref) {
+        config[configKey] = value;
       }
     }
-  }
 
-  /**
-   * Load stored JSON config from preferences with error handling.
-   * @param {Object} config - Config object to merge into
-   * @returns {Object} Updated config object
-   */
-  function loadStoredConfigJson(config) {
-    const configStr = getPref('config', null);
-    if (!configStr) return config;
+    /**
+     * Load a comma-separated time list preference and set it in config if valid.
+     * Validates each time in HH:MM format and filters out invalid times.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadTimeArrayPref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null && value !== '') {
+        // Split by comma and trim whitespace
+        const times = value.split(',').map((t) => t.trim());
+        // Filter to only valid times
+        const validTimes = times.filter((t) => isValidTimeFormat(t));
+        if (validTimes.length > 0) {
+          config[configKey] = validTimes;
+        }
+      }
+    }
 
-    try {
-      const storedConfig = JSON.parse(configStr);
-      return { ...config, ...storedConfig };
-    } catch (e) {
-      console.error('Failed to parse config:', e);
+    /**
+     * Get configuration object from preferences.
+     * Loads default config, then merges stored JSON config, then applies individual preference overrides.
+     * @returns {Object} Configuration object
+     */
+    function loadConfig() {
+      // Start with default config, then merge stored JSON config
+      let config = loadStoredConfigJson({ ...Constants.DEFAULT_CONFIG });
+
+      // Override with individual preferences if set
+      // Boolean preferences (handles both true and 'true' for legacy support)
+      loadBooleanPref('enableNotifications', config, 'enableNotifications');
+      loadBooleanPref('dailyReminderEnabled', config, 'dailyReminderEnabled');
+      loadBooleanPref('postSessionReminderEnabled', config, 'postSessionReminderEnabled');
+
+      // Positive integer preferences
+      loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
+      loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
+      loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
+      loadPositiveIntPref('dailyReminderSkipHoldDuration', config, 'dailyReminderSkipHoldDuration');
+      loadPositiveIntPref('dailyReminderSkipCodeLength', config, 'dailyReminderSkipCodeLength');
+
+      // String preferences (requires non-empty validation)
+      loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
+
+      // Time preferences (requires HH:MM format validation)
+      loadTimePref('postSessionReminderEndTime', config, 'postSessionReminderEndTime');
+
+      // Time array preferences (comma-separated HH:MM times)
+      loadTimeArrayPref('dailyReminderTimes', config, 'dailyReminderTimes');
+
       return config;
     }
-  }
 
-  /**
-   * Get configuration object from preferences
-   */
-  function getConfig() {
-    // Start with default config, then merge stored JSON config
-    let config = loadStoredConfigJson({ ...DEFAULT_CONFIG });
-
-    // Override with individual preferences if set
-    // Boolean preferences (handles both true and 'true' for legacy support)
-    loadBooleanPref('enableNotifications', config, 'enableNotifications');
-    loadBooleanPref('dailyReminderEnabled', config, 'dailyReminderEnabled');
-    loadBooleanPref('postSessionReminderEnabled', config, 'postSessionReminderEnabled');
-
-    // Positive integer preferences
-    loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
-    loadPositiveIntPref('postSessionSkipCooldown', config, 'postSessionSkipCooldown');
-    loadPositiveIntPref('postSessionFocusTimeGoal', config, 'postSessionFocusTimeGoal');
-    loadPositiveIntPref('dailyReminderSkipHoldDuration', config, 'dailyReminderSkipHoldDuration');
-    loadPositiveIntPref('dailyReminderSkipCodeLength', config, 'dailyReminderSkipCodeLength');
-
-    // String preferences (requires non-empty validation)
-    loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
-
-    // Time preferences (requires HH:MM format validation)
-    loadTimePref('postSessionReminderEndTime', config, 'postSessionReminderEndTime');
-
-    // Time array preferences (comma-separated HH:MM times)
-    loadTimeArrayPref('dailyReminderTimes', config, 'dailyReminderTimes');
-
-    return config;
-  }
-
-  /**
-   * Validate time format (HH:MM, 24-hour) with range checking.
-   * @param {string} timeStr - Time string to validate
-   * @returns {boolean} True if valid time format
-   */
-  function isValidTimeFormat(timeStr) {
-    if (!timeStr || typeof timeStr !== 'string') return false;
-
-    const match = timeStr.match(/^(\d{2}):(\d{2})$/);
-    if (!match) return false;
-
-    const hours = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-
-    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
-  }
-
-  /**
-   * Save configuration object to preferences
-   */
-  function saveConfig(config) {
-    try {
-      setPref('config', JSON.stringify(config));
-      logger.log(LOG_CATEGORIES.SETTINGS, 'Configuration saved', {
-        timerMode: config.timerMode,
-        focusDuration: config.focusDuration,
-        breakDuration: config.breakDuration,
-        cycles: config.cycles,
-        blockedWorkspacesCount: config.blockedWorkspaces?.length || 0,
-      });
-    } catch (e) {
-      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to save config', { error: e.message });
-      console.error('Failed to save config:', e);
-    }
-  }
-
-  /**
-   * Get all blocked workspaces from active rulesets.
-   * Combines blocked workspaces from all enabled and active rulesets.
-   * @returns {string[]} Array of unique blocked workspace IDs
-   */
-  function getActiveBlockedWorkspaces() {
-    const config = getConfig();
-    const activeBlockedWorkspaces = new Set();
-
-    // Get active rulesets
-    const activeRulesetIds = config.activeRulesets || ['default'];
-
-    // Iterate through all rulesets
-    (config.rulesets || []).forEach((ruleset) => {
-      // Check if this ruleset is active and enabled
-      if (ruleset.enabled && activeRulesetIds.includes(ruleset.id)) {
-        // Add blocked workspaces from this ruleset
-        const rulesetWorkspaces = ruleset.blockedWorkspaces || [];
-        rulesetWorkspaces.forEach((wsId) => activeBlockedWorkspaces.add(wsId));
+    /**
+     * Save configuration object to preferences.
+     * @param {Object} config - Configuration object to save
+     */
+    function saveConfig(config) {
+      try {
+        setPref('config', JSON.stringify(config));
+        logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Configuration saved', {
+          timerMode: config.timerMode,
+          focusDuration: config.focusDuration,
+          breakDuration: config.breakDuration,
+          cycles: config.cycles,
+          blockedWorkspacesCount: config.blockedWorkspaces?.length || 0,
+        });
+      } catch (e) {
+        logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Failed to save config', { error: e.message });
+        console.error('Failed to save config:', e);
       }
-    });
-
-    return Array.from(activeBlockedWorkspaces);
-  }
-
-  /**
-   * Format time in MM:SS format
-   */
-  function formatTime(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  /**
-   * Clamp a position value within viewport bounds.
-   * @param {number} position - Current position value
-   * @param {number} size - Size of the element (width or height)
-   * @param {number} viewportSize - Size of the viewport (innerWidth or innerHeight)
-   * @returns {number} Clamped position value
-   */
-  function clampToViewportBound(position, size, viewportSize) {
-    const maxBound = viewportSize - size;
-    if (maxBound >= 0) {
-      return Math.max(0, Math.min(position, maxBound));
     }
-    // Element larger than viewport: allow negative positions but keep part visible
-    const overflow = size - viewportSize;
-    return Math.max(-overflow, Math.min(position, 0));
+
+    // Public interface
+    return {
+      getPref,
+      setPref,
+      loadConfig,
+      saveConfig,
+    };
+  })();
+
+  // ============================================
+  // Utils Module
+  // ============================================
+
+  /**
+   * Utils Module - General utility functions used across the application.
+   * Public Interface:
+   * - formatTime(seconds)
+   * - formatTimeWithHours(seconds, useHours)
+   * - getPhaseLabel(phase)
+   * - getShortPhaseLabel(phase)
+   * - sanitizeText(text)
+   * - validateIntegerInput(value, min, max, defaultValue)
+   * - getValidatedIntFromDialog(dialog, options)
+   * - generateRandomCode(length, charset)
+   * - clampToViewportBound(position, size, viewportSize)
+   * - isValidWorkspaceArray(workspaces)
+   * - formatWorkspacesFromApi(workspaces)
+   * - extractWorkspaceNameFromButton(btn, id)
+   * - getActiveBlockedWorkspaces()
+   * - findRuleAndExecute(config, rulesetId, ruleId, callback)
+   */
+  const Utils = (() => {
+    /**
+     * Format time in MM:SS format
+     * @param {number} seconds - Total seconds
+     * @returns {string} Formatted time string (MM:SS)
+     */
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Format time with optional hours support.
+     * When useHours is true, includes hours in format ONLY if hours > 0.
+     * This provides automatic formatting (H:MM:SS for >= 1 hour, MM:SS otherwise).
+     * @param {number} seconds - Total seconds to format
+     * @param {boolean} useHours - Enable hours display (hours shown only when > 0)
+     * @returns {string} Formatted time string (H:MM:SS when useHours && hours > 0, otherwise MM:SS)
+     */
+    function formatTimeWithHours(seconds, useHours = false) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+
+      // Include hours only when useHours is enabled AND there are hours to display
+      // This provides automatic format switching (H:MM:SS <-> MM:SS) for countdowns
+      if (useHours && hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      }
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Get phase display label from phase identifier.
+     * @param {string} phase - Phase identifier ('focus', 'break', 'transition')
+     * @returns {string} Human-readable phase label
+     */
+    function getPhaseLabel(phase) {
+      const labels = {
+        focus: 'Focus Period',
+        break: 'Break Time',
+        'long-break': 'Break Time', // Keep for backwards compatibility with saved state
+        transition: 'Transition',
+      };
+      return labels[phase] || 'Focus Period';
+    }
+
+    /**
+     * Get short phase label for indicator.
+     * @param {string} phase - Phase identifier
+     * @returns {string} Short phase label
+     */
+    function getShortPhaseLabel(phase) {
+      if (phase === 'focus') return 'Focus';
+      if (phase === 'transition') return 'Transition';
+      return 'Break';
+    }
+
+    /**
+     * Sanitize text content to prevent XSS attacks.
+     * Removes HTML-like characters (<, >) that could be used for injection.
+     * This is a defense-in-depth measure since we use textContent instead of innerHTML.
+     * @param {string} text - The text to sanitize
+     * @returns {string} Sanitized text with HTML characters removed
+     */
+    function sanitizeText(text) {
+      if (typeof text !== 'string') return '';
+      return text.replace(/[<>]/g, '');
+    }
+
+    /**
+     * Validate integer input with min/max bounds.
+     * LOGIC FIX: Input validation for settings.
+     * @param {*} value - Value to validate
+     * @param {number} min - Minimum valid value
+     * @param {number} max - Maximum valid value
+     * @param {number} defaultValue - Default value if validation fails
+     * @returns {number} Validated value or defaultValue
+     */
+    function validateIntegerInput(value, min, max, defaultValue) {
+      const parsed = parseInt(value, 10);
+      const isValidNumber = !isNaN(parsed);
+      const isInRange = parsed >= min && parsed <= max;
+
+      return isValidNumber && isInRange ? parsed : defaultValue;
+    }
+
+    /**
+     * Extract and validate integer input from a dialog.
+     * This function is null-safe: returns null if element not found, returns defaultValue
+     * if the input is empty or invalid.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} options - Options object
+     * @param {string} options.selector - CSS selector for the input
+     * @param {number} options.min - Minimum valid value
+     * @param {number} options.max - Maximum valid value
+     * @param {number} options.defaultValue - Default value if validation fails or input is empty
+     * @returns {number|null} Validated value, defaultValue for empty/invalid input, or null if element not found
+     */
+    function getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue }) {
+      const input = dialog.querySelector(selector);
+      if (!input) return null;
+
+      const rawValue = typeof input.value === 'string' ? input.value.trim() : '';
+      if (rawValue === '') {
+        // Treat present-but-empty input as "use default" rather than "missing element"
+        return defaultValue;
+      }
+
+      return validateIntegerInput(rawValue, min, max, defaultValue);
+    }
+
+    /**
+     * Generate cryptographically secure random code for settings lock.
+     * SECURITY FIX: Uses crypto.getRandomValues() instead of Math.random()
+     * @param {number} length - Length of code to generate
+     * @param {string} charset - Character set ('alphanumeric' or 'all-typeable')
+     * @returns {string} Generated random code
+     */
+    function generateRandomCode(length, charset) {
+      const chars =
+        charset === 'alphanumeric'
+          ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+          : 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+      // Use crypto.getRandomValues for cryptographically secure random generation
+      const randomValues = new Uint32Array(length);
+      crypto.getRandomValues(randomValues);
+
+      let code = '';
+      for (let i = 0; i < length; i++) {
+        code += chars.charAt(randomValues[i] % chars.length);
+      }
+      return code;
+    }
+
+    /**
+     * Clamp a position value within viewport bounds.
+     * @param {number} position - Current position value
+     * @param {number} size - Size of the element (width or height)
+     * @param {number} viewportSize - Size of the viewport (innerWidth or innerHeight)
+     * @returns {number} Clamped position value
+     */
+    function clampToViewportBound(position, size, viewportSize) {
+      const maxBound = viewportSize - size;
+      if (maxBound >= 0) {
+        return Math.max(0, Math.min(position, maxBound));
+      }
+      // Element larger than viewport: allow negative positions but keep part visible
+      const overflow = size - viewportSize;
+      return Math.max(-overflow, Math.min(position, 0));
+    }
+
+    /**
+     * Check if a workspace array is valid and non-empty.
+     * @param {*} workspaces - The workspaces value to check
+     * @returns {boolean} True if valid non-empty array
+     */
+    function isValidWorkspaceArray(workspaces) {
+      return workspaces && Array.isArray(workspaces) && workspaces.length > 0;
+    }
+
+    /**
+     * Format workspace data from API response to standard format.
+     * @param {Array} workspaces - Raw workspace array from API
+     * @returns {Array<{id: string, name: string}>} Formatted workspace array
+     */
+    function formatWorkspacesFromApi(workspaces) {
+      return workspaces.map((ws) => ({
+        id: ws.uuid || ws.id,
+        name: ws.name || ws.title || 'Unnamed Workspace',
+      }));
+    }
+
+    /**
+     * Check if a workspace name is valid (non-empty and not 'undefined').
+     * @param {*} name - The name to check
+     * @returns {boolean} True if valid
+     * @private
+     */
+    function isValidName(name) {
+      return Boolean(name) && name !== 'undefined' && name !== '';
+    }
+
+    /**
+     * Create a fallback workspace name from an ID.
+     * @param {string} id - The workspace ID
+     * @returns {string} Fallback name
+     * @private
+     */
+    function createFallbackWorkspaceName(id) {
+      const idPrefix = id?.substring(0, 8) || 'Unknown';
+      return `Workspace ${idPrefix}`;
+    }
+
+    /**
+     * Extract workspace name from a DOM button element.
+     * Tries multiple attributes in priority order.
+     * @param {Element} btn - The button element
+     * @param {string} id - The workspace ID (for fallback name)
+     * @returns {string} The workspace name
+     */
+    function extractWorkspaceNameFromButton(btn, id) {
+      // Try each attribute in priority order
+      for (const attr of Constants.WORKSPACE_NAME_ATTRIBUTES) {
+        const name = btn.getAttribute(attr);
+        if (isValidName(name)) return name;
+      }
+
+      // Try to find a label element
+      const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
+      const labelName = labelEl?.textContent?.trim();
+      if (isValidName(labelName)) return labelName;
+
+      // Try button text content
+      const textName = btn.textContent?.trim();
+      if (isValidName(textName)) return textName;
+
+      // Fallback name using truncated ID
+      return createFallbackWorkspaceName(id);
+    }
+
+    /**
+     * Get all blocked workspaces from active rulesets.
+     * Combines blocked workspaces from all enabled and active rulesets.
+     * @returns {string[]} Array of unique blocked workspace IDs
+     */
+    function getActiveBlockedWorkspaces() {
+      const config = Storage.loadConfig();
+      const activeBlockedWorkspaces = new Set();
+
+      // Get active rulesets
+      const activeRulesetIds = config.activeRulesets || ['default'];
+
+      // Iterate through all rulesets
+      (config.rulesets || []).forEach((ruleset) => {
+        // Check if this ruleset is active and enabled
+        if (ruleset.enabled && activeRulesetIds.includes(ruleset.id)) {
+          // Add blocked workspaces from this ruleset
+          const rulesetWorkspaces = ruleset.blockedWorkspaces || [];
+          rulesetWorkspaces.forEach((wsId) => activeBlockedWorkspaces.add(wsId));
+        }
+      });
+
+      return Array.from(activeBlockedWorkspaces);
+    }
+
+    /**
+     * Find rule in config and execute callback if found.
+     * Reduces code duplication in rule event handlers.
+     * @param {Object} config - Configuration object
+     * @param {string} rulesetId - Ruleset ID to find
+     * @param {string} ruleId - Rule ID to find
+     * @param {function} callback - Callback with (rule, ruleIndex, rulesArray) params
+     * @returns {boolean} True if rule was found and callback was executed
+     */
+    function findRuleAndExecute(config, rulesetId, ruleId, callback) {
+      const rulesetIndex = config.rulesets.findIndex((r) => r.id === rulesetId);
+      if (rulesetIndex === -1) return false;
+
+      const rulesArray = config.rulesets[rulesetIndex].rules;
+      const ruleIndex = rulesArray.findIndex((r) => r.id === ruleId);
+      if (ruleIndex === -1) return false;
+
+      callback(rulesArray[ruleIndex], ruleIndex, rulesArray);
+      return true;
+    }
+
+    // Public interface
+    return {
+      formatTime,
+      formatTimeWithHours,
+      getPhaseLabel,
+      getShortPhaseLabel,
+      sanitizeText,
+      validateIntegerInput,
+      getValidatedIntFromDialog,
+      generateRandomCode,
+      clampToViewportBound,
+      isValidWorkspaceArray,
+      formatWorkspacesFromApi,
+      extractWorkspaceNameFromButton,
+      getActiveBlockedWorkspaces,
+      findRuleAndExecute,
+    };
+  })();
+
+  // ============================================
+  // Legacy Helper Functions (to be migrated)
+  // ============================================
+
+  /**
+   * LEGACY WRAPPERS - These provide backward compatibility for existing code.
+   * These should be gradually replaced with direct module calls throughout the codebase.
+   */
+
+  // Storage legacy wrappers
+  function getPref(key, defaultValue) {
+    return Storage.getPref(key, defaultValue);
   }
+  function setPref(key, value) {
+    Storage.setPref(key, value);
+  }
+  function getConfig() {
+    return Storage.loadConfig();
+  }
+  function saveConfig(config) {
+    Storage.saveConfig(config);
+  }
+
+  // Utils legacy wrappers
+  function formatTime(seconds) {
+    return Utils.formatTime(seconds);
+  }
+  function formatTimeWithHours(seconds, useHours) {
+    return Utils.formatTimeWithHours(seconds, useHours);
+  }
+  function getPhaseLabel(phase) {
+    return Utils.getPhaseLabel(phase);
+  }
+  function getShortPhaseLabel(phase) {
+    return Utils.getShortPhaseLabel(phase);
+  }
+  function sanitizeText(text) {
+    return Utils.sanitizeText(text);
+  }
+  function validateIntegerInput(value, min, max, defaultValue) {
+    return Utils.validateIntegerInput(value, min, max, defaultValue);
+  }
+  function getValidatedIntFromDialog(dialog, options) {
+    return Utils.getValidatedIntFromDialog(dialog, options);
+  }
+  function generateRandomCode(length, charset) {
+    return Utils.generateRandomCode(length, charset);
+  }
+  function clampToViewportBound(position, size, viewportSize) {
+    return Utils.clampToViewportBound(position, size, viewportSize);
+  }
+  function isValidWorkspaceArray(workspaces) {
+    return Utils.isValidWorkspaceArray(workspaces);
+  }
+  function formatWorkspacesFromApi(workspaces) {
+    return Utils.formatWorkspacesFromApi(workspaces);
+  }
+  function extractWorkspaceNameFromButton(btn, id) {
+    return Utils.extractWorkspaceNameFromButton(btn, id);
+  }
+  function getActiveBlockedWorkspaces() {
+    return Utils.getActiveBlockedWorkspaces();
+  }
+  function findRuleAndExecute(config, rulesetId, ruleId, callback) {
+    return Utils.findRuleAndExecute(config, rulesetId, ruleId, callback);
+  }
+
+  // Constants legacy accessors (for backward compatibility)
+  const PREF_PREFIX = Constants.PREF_PREFIX;
+  const MOD_VERSION = Constants.MOD_VERSION;
+  const MODIFIER_KEYS = Constants.MODIFIER_KEYS;
+  const LOCKOUT_METHODS = Constants.LOCKOUT_METHODS;
+  const DATA_NO_POSITION_SAVE = Constants.DATA_NO_POSITION_SAVE;
+  const DEFAULT_CONFIG = Constants.DEFAULT_CONFIG;
+  const SAVE_STATE_INTERVAL_SECONDS = Constants.SAVE_STATE_INTERVAL_SECONDS;
+  const DOM_SETTLE_DELAY_MS = Constants.DOM_SETTLE_DELAY_MS;
+  const RESTORATION_NOTIFICATION_DELAY_MS = Constants.RESTORATION_NOTIFICATION_DELAY_MS;
+  const MAX_OVERLAY_Z_INDEX = Constants.MAX_OVERLAY_Z_INDEX;
+  const MIN_CONTENT_AREA_DIMENSION = Constants.MIN_CONTENT_AREA_DIMENSION;
+  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = Constants.CONTENT_OBSERVER_DEBOUNCE_DELAY_MS;
+  const TRANSITION_PHASE_DURATION_SECONDS = Constants.TRANSITION_PHASE_DURATION_SECONDS;
+  const POST_SESSION_ESCALATION_FACTOR = Constants.POST_SESSION_ESCALATION_FACTOR;
+  const POST_SESSION_CHECK_INTERVAL_MS = Constants.POST_SESSION_CHECK_INTERVAL_MS;
+  const DAILY_REMINDER_ESCALATION_FACTOR = Constants.DAILY_REMINDER_ESCALATION_FACTOR;
+  const DAILY_REMINDER_CHECK_INTERVAL_MS = Constants.DAILY_REMINDER_CHECK_INTERVAL_MS;
+  const DAILY_REMINDER_STARTUP_DELAY_MS = Constants.DAILY_REMINDER_STARTUP_DELAY_MS;
+  const EARLY_MORNING_CUTOFF_MINUTES = Constants.EARLY_MORNING_CUTOFF_MINUTES;
+  const WORKSPACE_MUTATION_DELAY_MS = Constants.WORKSPACE_MUTATION_DELAY_MS;
+  const REGEX_ESCAPE_PATTERN = Constants.REGEX_ESCAPE_PATTERN;
+  const REGEX_ESCAPE_PATTERN_KEEP_ASTERISK = Constants.REGEX_ESCAPE_PATTERN_KEEP_ASTERISK;
+  const LOG_CATEGORIES = Constants.LOG_CATEGORIES;
+  const WORKSPACE_CONTAINER_SELECTORS = Constants.WORKSPACE_CONTAINER_SELECTORS;
+  const CONTENT_AREA_SELECTORS = Constants.CONTENT_AREA_SELECTORS;
+  const WORKSPACE_NAME_ATTRIBUTES = Constants.WORKSPACE_NAME_ATTRIBUTES;
+  const URL_REVOKE_DELAY_MS = Constants.URL_REVOKE_DELAY_MS;
+
+  // ============================================
+  // Remaining Helper Functions
+  // ============================================
 
   /**
    * Issue 8: Setup drag functionality for dialogs
@@ -996,200 +1313,21 @@
   }
 
   /**
-   * Generate cryptographically secure random code for settings lock
-   * SECURITY FIX: Uses crypto.getRandomValues() instead of Math.random()
+   * Validate time format (HH:MM, 24-hour) with range checking.
+   * This function is used widely throughout the codebase for time validation.
+   * @param {string} timeStr - Time string to validate
+   * @returns {boolean} True if valid time format
    */
-  function generateRandomCode(length, charset) {
-    const chars =
-      charset === 'alphanumeric'
-        ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-        : 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+  function isValidTimeFormat(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return false;
 
-    // Use crypto.getRandomValues for cryptographically secure random generation
-    const randomValues = new Uint32Array(length);
-    crypto.getRandomValues(randomValues);
+    const match = timeStr.match(/^(\d{2}):(\d{2})$/);
+    if (!match) return false;
 
-    let code = '';
-    for (let i = 0; i < length; i++) {
-      code += chars.charAt(randomValues[i] % chars.length);
-    }
-    return code;
-  }
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
 
-  /**
-   * Validate integer input with min/max bounds
-   * LOGIC FIX: Input validation for settings
-   */
-  function validateIntegerInput(value, min, max, defaultValue) {
-    const parsed = parseInt(value, 10);
-    const isValidNumber = !isNaN(parsed);
-    const isInRange = parsed >= min && parsed <= max;
-
-    return isValidNumber && isInRange ? parsed : defaultValue;
-  }
-
-  /**
-   * Extract and validate integer input from a dialog.
-   * This function is null-safe: returns null if element not found, returns defaultValue
-   * if the input is empty or invalid.
-   * @param {HTMLElement} dialog - The dialog element
-   * @param {Object} options - Options object
-   * @param {string} options.selector - CSS selector for the input
-   * @param {number} options.min - Minimum valid value
-   * @param {number} options.max - Maximum valid value
-   * @param {number} options.defaultValue - Default value if validation fails or input is empty
-   * @returns {number|null} Validated value, defaultValue for empty/invalid input, or null if element not found
-   */
-  function getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue }) {
-    const input = dialog.querySelector(selector);
-    if (!input) return null;
-
-    const rawValue = typeof input.value === 'string' ? input.value.trim() : '';
-    if (rawValue === '') {
-      // Treat present-but-empty input as "use default" rather than "missing element"
-      return defaultValue;
-    }
-
-    return validateIntegerInput(rawValue, min, max, defaultValue);
-  }
-
-  /**
-   * Sanitize text content to prevent XSS attacks.
-   * Removes HTML-like characters (<, >) that could be used for injection.
-   * This is a defense-in-depth measure since we use textContent instead of innerHTML.
-   * @param {string} text - The text to sanitize
-   * @returns {string} Sanitized text with HTML characters removed
-   */
-  function sanitizeText(text) {
-    if (typeof text !== 'string') return '';
-    return text.replace(/[<>]/g, '');
-  }
-
-  /**
-   * Check if a workspace array is valid and non-empty.
-   * @param {*} workspaces - The workspaces value to check
-   * @returns {boolean} True if valid non-empty array
-   */
-  function isValidWorkspaceArray(workspaces) {
-    return workspaces && Array.isArray(workspaces) && workspaces.length > 0;
-  }
-
-  /**
-   * Format workspace data from API response to standard format.
-   * @param {Array} workspaces - Raw workspace array from API
-   * @returns {Array<{id: string, name: string}>} Formatted workspace array
-   */
-  function formatWorkspacesFromApi(workspaces) {
-    return workspaces.map((ws) => ({
-      id: ws.uuid || ws.id,
-      name: ws.name || ws.title || 'Unnamed Workspace',
-    }));
-  }
-
-  /**
-   * Attribute names to check for workspace name, in priority order.
-   * @constant {string[]}
-   */
-  const WORKSPACE_NAME_ATTRIBUTES = [
-    'data-workspace-name',
-    'data-name',
-    'label',
-    'tooltiptext',
-    'aria-label',
-    'title',
-  ];
-
-  /**
-   * Extract workspace name from a DOM button element.
-   * Tries multiple attributes in priority order.
-   * @param {Element} btn - The button element
-   * @param {string} id - The workspace ID (for fallback name)
-   * @returns {string} The workspace name
-   */
-  function extractWorkspaceNameFromButton(btn, id) {
-    // Try each attribute in priority order
-    for (const attr of WORKSPACE_NAME_ATTRIBUTES) {
-      const name = btn.getAttribute(attr);
-      if (isValidName(name)) return name;
-    }
-
-    // Try to find a label element
-    const labelEl = btn.querySelector('.tab-label, .tab-text, .workspace-label, label');
-    const labelName = labelEl?.textContent?.trim();
-    if (isValidName(labelName)) return labelName;
-
-    // Try button text content
-    const textName = btn.textContent?.trim();
-    if (isValidName(textName)) return textName;
-
-    // Fallback name using truncated ID
-    return createFallbackWorkspaceName(id);
-  }
-
-  /**
-   * Check if a workspace name is valid (non-empty and not 'undefined').
-   * @param {*} name - The name to check
-   * @returns {boolean} True if valid
-   */
-  function isValidName(name) {
-    return Boolean(name) && name !== 'undefined' && name !== '';
-  }
-
-  /**
-   * Create a fallback workspace name from an ID.
-   * @param {string} id - The workspace ID
-   * @returns {string} Fallback name
-   */
-  function createFallbackWorkspaceName(id) {
-    const idPrefix = id?.substring(0, 8) || 'Unknown';
-    return `Workspace ${idPrefix}`;
-  }
-
-  /**
-   * Get phase display label from phase identifier.
-   * @param {string} phase - Phase identifier ('focus', 'break', 'transition')
-   * @returns {string} Human-readable phase label
-   */
-  function getPhaseLabel(phase) {
-    const labels = {
-      focus: 'Focus Period',
-      break: 'Break Time',
-      'long-break': 'Break Time', // Keep for backwards compatibility with saved state
-      transition: 'Transition',
-    };
-    return labels[phase] || 'Focus Period';
-  }
-
-  /**
-   * Get short phase label for indicator.
-   * @param {string} phase - Phase identifier
-   * @returns {string} Short phase label
-   */
-  function getShortPhaseLabel(phase) {
-    if (phase === 'focus') return 'Focus';
-    if (phase === 'transition') return 'Transition';
-    return 'Break';
-  }
-
-  /**
-   * Format time with optional hours support.
-   * When useHours is true, includes hours in format ONLY if hours > 0.
-   * This provides automatic formatting (H:MM:SS for >= 1 hour, MM:SS otherwise).
-   * @param {number} seconds - Total seconds to format
-   * @param {boolean} useHours - Enable hours display (hours shown only when > 0)
-   * @returns {string} Formatted time string (H:MM:SS when useHours && hours > 0, otherwise MM:SS)
-   */
-  function formatTimeWithHours(seconds, useHours = false) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    // Include hours only when useHours is enabled AND there are hours to display
-    // This provides automatic format switching (H:MM:SS <-> MM:SS) for countdowns
-    if (useHours && hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
   }
 
   /**
@@ -3961,8 +4099,43 @@
           }
         });
 
+        // Distraction Dump button - only during focus phase
+        // Available even when paused since Distraction Dump serves a different purpose
+        // (temporarily lifting ALL blocks for thought capture, not just pausing timer)
+        // Only one dump is allowed per focus phase
+        let dumpBtn = null;
+        const config = getConfig();
+        const dumpManager = window.zenPomodoroApp?.distractionDump;
+        const isDumpAvailable = dumpManager?.isDumpAvailable();
+        if (
+          config.distractionDumpEnabled &&
+          status.currentPhase === 'focus'
+        ) {
+          dumpBtn = document.createElement('button');
+          dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
+          if (isDumpAvailable) {
+            dumpBtn.textContent = '🧠 Distraction Dump';
+            dumpBtn.addEventListener('click', () => {
+              this._stopMenuTimerUpdates();
+              dialog.remove();
+              this.menuDialog = null;
+              window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+            });
+          } else {
+            // Dump already used this focus phase
+            dumpBtn.textContent = '🧠 Dump Used';
+            dumpBtn.disabled = true;
+            dumpBtn.title = 'Distraction Dump can only be used once per focus phase';
+            dumpBtn.style.opacity = '0.5';
+            dumpBtn.style.cursor = 'not-allowed';
+          }
+        }
+
         menuSection.appendChild(statusRow);
         menuSection.appendChild(pauseResumeBtn);
+        if (dumpBtn) {
+          menuSection.appendChild(dumpBtn);
+        }
         if (cutBreakBtn) {
           menuSection.appendChild(cutBreakBtn);
         }
@@ -7082,6 +7255,7 @@
       this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
       this._goBackCooldownActive = false; // Cooldown flag to prevent re-blocking after "Go Back"
       this._goBackCooldownTimeout = null; // Timeout ID for cooldown cleanup
+      this.distractionDumpActive = false; // Flag to disable blocking during distraction dump
     }
 
     /**
@@ -7106,10 +7280,15 @@
     /**
      * Check if the blocker should be shown based on timer state.
      * BREAK PHASE FIX: Returns false during break phases to allow free browsing
-     * @returns {boolean} True if timer is active and NOT in break phase
+     * DISTRACTION DUMP: Returns false during distraction dump to allow capturing thoughts
+     * @returns {boolean} True if timer is active and NOT in break phase or dump
      * @private
      */
     _shouldShowBlocker() {
+      // During distraction dump, website blocking is disabled to allow capturing thoughts
+      if (this.distractionDumpActive) {
+        return false;
+      }
       // During break phases, website blocking is disabled to allow free browsing
       if (isInBreakPhase()) {
         return false;
@@ -8214,7 +8393,14 @@
     init() {
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Daily Reminder Manager');
       this._loadState();
-      this._checkAndShowReminder();
+
+      // Add startup delay before showing daily reminder to allow timer state restoration
+      // This prevents the reminder from appearing immediately on browser start if timer
+      // was active before a PC restart/crash
+      setTimeout(() => {
+        this._checkAndShowReminder();
+      }, DAILY_REMINDER_STARTUP_DELAY_MS);
+
       this._startPeriodicCheck();
     }
 
@@ -10091,6 +10277,378 @@
   }
 
   // ============================================
+  // DistractionDumpManager Class
+  // ============================================
+
+  /**
+   * Manages the Distraction Dump feature.
+   * Allows users to pause their timer and capture distracting thoughts
+   * without blocking or using up focus time.
+   */
+  class DistractionDumpManager {
+    constructor() {
+      this.isActive = false;
+      this.dumpInterval = null;
+      this.dumpTimeRemaining = 0;
+      this.savedTimerState = null; // Stores the paused timer state
+      this.dumpDialog = null;
+      this.dumpUsedThisFocusPhase = false; // Track if dump was used in current focus phase
+    }
+
+    /**
+     * Reset the dump usage flag for a new focus phase.
+     * Called when entering a new focus phase (new cycle or new timer).
+     */
+    resetForNewFocusPhase() {
+      this.dumpUsedThisFocusPhase = false;
+      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump reset for new focus phase');
+    }
+
+    /**
+     * Check if distraction dump is available for the current focus phase.
+     * @returns {boolean} True if dump is available
+     */
+    isDumpAvailable() {
+      return !this.dumpUsedThisFocusPhase && !this.isActive;
+    }
+
+    /**
+     * Show the configuration dialog to set dump duration before starting.
+     */
+    showDumpConfigDialog() {
+      const config = getConfig();
+
+      if (!config.distractionDumpEnabled) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump feature is disabled');
+        return;
+      }
+
+      // Check if dump is available for this focus phase
+      if (this.dumpUsedThisFocusPhase) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already used this focus phase');
+        return;
+      }
+
+      // Create dialog
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dump-config-dialog';
+      dialog.className = 'zen-pomodoro-dialog';
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = '🧠 Distraction Dump';
+      dialog.appendChild(title);
+
+      // Description
+      const description = document.createElement('p');
+      description.className = 'zen-pomodoro-dialog-description';
+      description.textContent = 
+        'Take a break to capture distracting thoughts without using your focus time. ' +
+        'Your timer will pause and all blocks will be temporarily lifted.';
+      dialog.appendChild(description);
+
+      // Duration input section
+      const durationSection = document.createElement('div');
+      durationSection.className = 'zen-pomodoro-dialog-section';
+
+      const durationLabel = document.createElement('label');
+      durationLabel.className = 'zen-pomodoro-dialog-label';
+      durationLabel.textContent = 'Dump Duration (minutes):';
+      durationSection.appendChild(durationLabel);
+
+      const durationInput = document.createElement('input');
+      durationInput.type = 'number';
+      durationInput.className = 'zen-pomodoro-dialog-input';
+      durationInput.min = '1';
+      durationInput.max = config.distractionDumpMaxDuration.toString();
+      durationInput.value = config.distractionDumpDuration.toString();
+      durationSection.appendChild(durationInput);
+
+      dialog.appendChild(durationSection);
+
+      // Buttons
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+      });
+
+      const startButton = document.createElement('button');
+      startButton.className = 'zen-pomodoro-dialog-button';
+      startButton.textContent = 'Start Dump';
+      startButton.addEventListener('click', () => {
+        const duration = validateIntegerInput(
+          parseInt(durationInput.value, 10),
+          1,
+          config.distractionDumpMaxDuration,
+          config.distractionDumpDuration
+        );
+        dialog.remove();
+        this.startDump(duration);
+      });
+
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(startButton);
+      dialog.appendChild(buttonDiv);
+
+      // Add to DOM first
+      document.documentElement.appendChild(dialog);
+
+      // Position dialog
+      applyLastDialogPosition(dialog);
+
+      // Make dialog draggable
+      setupDialogDrag(dialog);
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump config dialog shown');
+    }
+
+    /**
+     * Check if a distraction dump can be started.
+     * @returns {boolean} True if dump can start
+     * @private
+     */
+    _canStartDump() {
+      if (this.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already active');
+        return false;
+      }
+
+      // Only one dump per focus phase is allowed
+      if (this.dumpUsedThisFocusPhase) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - already used in this focus phase');
+        return false;
+      }
+
+      const timer = window.zenPomodoroApp?.timer;
+      if (!timer?.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - timer not active');
+        return false;
+      }
+
+      // Only allow during focus phase
+      if (timer.currentPhase !== 'focus') {
+        logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - not in focus phase');
+        return false;
+      }
+
+      return true;
+    }
+
+    /**
+     * Enable dump mode - pause timer and lift all blocks.
+     * @private
+     */
+    _enableDumpMode() {
+      const timer = window.zenPomodoroApp?.timer;
+
+      // Pause the main timer if not already paused
+      if (timer && !timer.isPaused) {
+        timer.pause();
+      }
+
+      // Notify WebsiteBlocker that dump is active
+      if (window.zenPomodoroApp?.websiteBlocker) {
+        window.zenPomodoroApp.websiteBlocker.distractionDumpActive = true;
+        window.zenPomodoroApp.websiteBlocker._checkCurrentPage();
+      }
+
+      // Hide workspace overlay if showing
+      window.zenPomodoroApp?.overlay?.hide();
+    }
+
+    /**
+     * Disable dump mode - restore timer and all blocks.
+     * @private
+     */
+    _disableDumpMode() {
+      this._restoreWebsiteBlocker();
+      this._restoreTimerIfNotPausedBefore();
+      window.zenPomodoroApp?.updateOverlayVisibility?.();
+    }
+
+    /**
+     * Restore the website blocker after dump ends.
+     * @private
+     */
+    _restoreWebsiteBlocker() {
+      const websiteBlocker = window.zenPomodoroApp?.websiteBlocker;
+      if (websiteBlocker) {
+        websiteBlocker.distractionDumpActive = false;
+        websiteBlocker._checkCurrentPage();
+      }
+    }
+
+    /**
+     * Resume the main timer only if it wasn't paused before dump started.
+     * This preserves the user's intent if they had manually paused before starting dump.
+     * @private
+     */
+    _restoreTimerIfNotPausedBefore() {
+      const timer = window.zenPomodoroApp?.timer;
+      const wasPausedBefore = this.savedTimerState?.isPaused;
+      const shouldResume = timer?.isActive && timer.isPaused && !wasPausedBefore;
+      if (shouldResume) {
+        timer.resume();
+      }
+    }
+
+    /**
+     * Start a distraction dump session.
+     * @param {number} duration - Duration in minutes
+     */
+    startDump(duration) {
+      if (!this._canStartDump()) return;
+
+      const timer = window.zenPomodoroApp?.timer;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting distraction dump', { duration });
+
+      this.isActive = true;
+      this.dumpUsedThisFocusPhase = true; // Mark dump as used for this focus phase
+      this.dumpTimeRemaining = duration * 60; // Convert to seconds
+
+      // Save current timer state
+      this.savedTimerState = {
+        remainingTime: timer.remainingTime,
+        isPaused: timer.isPaused,
+      };
+
+      this._enableDumpMode();
+      this._createDumpDialog(duration);
+
+      // Start countdown
+      this.dumpInterval = setInterval(() => {
+        this.dumpTimeRemaining--;
+        this._updateDisplay(this.dumpTimeRemaining);
+
+        if (this.dumpTimeRemaining <= 0) {
+          this.endDump();
+        }
+      }, 1000);
+    }
+
+    /**
+     * Clean up dump dialog and interval.
+     * @private
+     */
+    _cleanupDumpUI() {
+      if (this.dumpInterval) {
+        clearInterval(this.dumpInterval);
+        this.dumpInterval = null;
+      }
+
+      if (this.dumpDialog) {
+        this.dumpDialog.remove();
+        this.dumpDialog = null;
+      }
+    }
+
+    /**
+     * End the distraction dump and restore the timer.
+     */
+    endDump() {
+      if (!this.isActive) return;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Ending distraction dump');
+
+      this.isActive = false;
+      this._cleanupDumpUI();
+      this._disableDumpMode();
+      this.savedTimerState = null;
+    }
+
+    /**
+     * Create the dump dialog UI.
+     * @param {number} duration - Duration in minutes
+     * @private
+     */
+    _createDumpDialog(duration) {
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dump-dialog';
+      dialog.className = 'zen-pomodoro-dialog zen-pomodoro-dump-active';
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = '🧠 Distraction Dump Active';
+      dialog.appendChild(title);
+
+      // Status text
+      const status = document.createElement('p');
+      status.className = 'zen-pomodoro-dump-status';
+      status.textContent = 
+        'Timer paused. All blocks temporarily lifted. Use this time to capture your thoughts.';
+      dialog.appendChild(status);
+
+      // Timer display
+      const timerDisplay = document.createElement('div');
+      timerDisplay.className = 'zen-pomodoro-dump-timer';
+      timerDisplay.textContent = formatTime(duration * 60);
+      dialog.appendChild(timerDisplay);
+
+      // Helpful message
+      const helpText = document.createElement('p');
+      helpText.className = 'zen-pomodoro-dialog-description';
+      helpText.style.textAlign = 'center';
+      helpText.textContent = 'Write in your journal or notes. Your main timer is safely paused.';
+      dialog.appendChild(helpText);
+
+      // Buttons
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const endButton = document.createElement('button');
+      endButton.className = 'zen-pomodoro-dialog-button';
+      endButton.textContent = 'End Dump & Resume Timer';
+      endButton.addEventListener('click', () => {
+        this.endDump();
+      });
+
+      buttonDiv.appendChild(endButton);
+      dialog.appendChild(buttonDiv);
+
+      // Add to DOM first
+      document.documentElement.appendChild(dialog);
+      this.dumpDialog = dialog;
+
+      // Position dialog
+      applyLastDialogPosition(dialog);
+
+      // Make dialog draggable
+      setupDialogDrag(dialog);
+    }
+
+    /**
+     * Update the dump timer display.
+     * @param {number} timeInSeconds - Time remaining in seconds
+     * @private
+     */
+    _updateDisplay(timeInSeconds) {
+      if (!this.dumpDialog) return;
+
+      const timerDisplay = this.dumpDialog.querySelector('.zen-pomodoro-dump-timer');
+      if (timerDisplay) {
+        timerDisplay.textContent = formatTime(timeInSeconds);
+      }
+    }
+
+    /**
+     * Clean up the distraction dump manager.
+     */
+    destroy() {
+      if (this.isActive) {
+        this.endDump();
+      }
+    }
+  }
+
+  // ============================================
   // Main Application Class
   // ============================================
 
@@ -10106,6 +10664,7 @@
       this.transitionManager = new TransitionPhaseManager(); // Transition popup manager
       this.dailyReminder = new DailyReminderManager(); // Daily reminders at configured times
       this.postSessionReminder = new PostSessionReminderManager(); // Post-session idle reminder
+      this.distractionDump = new DistractionDumpManager(); // Distraction dump for capturing thoughts
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -10289,6 +10848,9 @@
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
 
+      // Reset distraction dump availability for new timer session
+      this.distractionDump.resetForNewFocusPhase();
+
       // Notify Sine Mod Blocker that timer started
       this.sineModBlocker.onTimerStart();
 
@@ -10347,6 +10909,11 @@
 
       this.overlay.updatePhaseColor(phase);
       this.updateOverlayVisibility();
+
+      // Reset distraction dump availability when entering a new focus phase
+      if (phase === 'focus') {
+        this.distractionDump.resetForNewFocusPhase();
+      }
 
       // Show notification if enabled
       const config = getConfig();
@@ -10828,6 +11395,7 @@
         this.transitionManager,
         this.dailyReminder,
         this.postSessionReminder,
+        this.distractionDump,
         this.keyboardShortcut,
         this.overlay,
       ];
@@ -10853,6 +11421,18 @@
 
   // Create and store the app instance for cleanup
   const app = new ZenPomodoroApp();
+
+  // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
+  // This ensures state is saved even on sudden browser/PC shutdown
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      if (app?.timer?.isActive) {
+        app.timer.saveState();
+        logger.log(LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+      }
+    }
+  );
 
   // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
   // This ensures SineModBlocker and other modules are properly destroyed

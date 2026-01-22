@@ -46,6 +46,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 | `TransitionPhaseManager`     | Manages the "break ending soon" popup before focus resumes                                            |
 | `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                                   |
 | `LogManager`                 | Comprehensive logging with export functionality                                                       |
+| `DistractionDumpManager`     | Manages "Distraction Dump" feature - pauses timer, unblocks everything for thought capture            |
 
 ---
 
@@ -53,10 +54,39 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.2.10';                  // Current mod version
+const MOD_VERSION = '1.3.0';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
+const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before showing daily reminder
+```
+
+---
+
+## Module Architecture (IIFE Pattern)
+
+The codebase uses a modular IIFE (Immediately Invoked Function Expression) architecture for better organization:
+
+### Core Modules
+
+| Module      | Type        | Purpose                                                    |
+| ----------- | ----------- | ---------------------------------------------------------- |
+| `Constants` | Plain Object | All application constants (PREF_PREFIX, DEFAULT_CONFIG, etc.) |
+| `Storage`   | IIFE        | Firefox Services.prefs operations (getPref, setPref, loadConfig, saveConfig) |
+| `Utils`     | IIFE        | General utility functions (formatTime, validateIntegerInput, etc.) |
+
+### Module Usage Pattern
+
+```javascript
+// Constants are accessed directly
+const config = { ...Constants.DEFAULT_CONFIG };
+
+// Storage module for preferences
+const savedConfig = Storage.loadConfig();
+Storage.saveConfig(config);
+
+// Utils module for helpers
+const timeStr = Utils.formatTime(seconds);
 ```
 
 ---
@@ -150,6 +180,18 @@ Shows reminder after configurable idle time following timer completion.
 - Focus time tracking - reminders stop after configurable focus time goal (default 2h 30min)
 - Focus time resets on daily reminder time, not midnight
 
+### Distraction Dump (DistractionDumpManager)
+
+Allows users to pause their focus timer and capture distracting thoughts without using focus time.
+
+- Only available during focus phase (not break/transition)
+- **Only ONE dump allowed per focus phase** (resets when entering new focus cycle)
+- Pauses main timer and temporarily lifts ALL blocking (workspace overlay + website blocks)
+- Configurable duration (default: 25 minutes, max: 35 minutes)
+- Purple-themed UI to distinguish from regular timer
+- Auto-resumes main timer when dump ends
+- Button shows "Dump Used" with disabled state when already used in current focus phase
+
 ---
 
 ## New Configuration Options
@@ -169,6 +211,9 @@ Shows reminder after configurable idle time following timer completion.
 | `postSessionSkipMethod`         | string  | 'hold'             | Skip method: 'hold' or 'code'                        |
 | `postSessionSkipHoldDuration`   | number  | 20                 | Seconds to hold for skip                             |
 | `postSessionSkipCodeLength`     | number  | 48                 | Characters to type for skip                          |
+| `distractionDumpEnabled`        | boolean | true               | Enable Distraction Dump feature                      |
+| `distractionDumpDuration`       | number  | 25                 | Default dump duration in minutes                     |
+| `distractionDumpMaxDuration`    | number  | 35                 | Maximum dump duration in minutes                     |
 
 ---
 
