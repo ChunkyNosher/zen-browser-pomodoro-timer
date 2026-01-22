@@ -133,12 +133,10 @@
     dailyReminderLastSkipTime: null,
     /** Daily reminder skip cooldown in minutes (default: 10) */
     dailyReminderSkipCooldown: 10,
-    /** Last date a timer was started (YYYY-MM-DD format) - used to track daily reminder */
-    lastTimerStartDate: '',
+    /** Timestamp when last timer was started (used to track if timer was started after reminder time) */
+    lastTimerStartTime: null,
     /** Timestamps of daily reminders shown today (persisted, array of timestamps) */
     dailyRemindersShownToday: [],
-    /** Timestamp when last timer completed (used for grace period before showing daily reminder) */
-    dailyReminderLastTimerCompleteTime: null,
     /** Post-session reminder settings - shows reminder after timer completes */
     postSessionReminderEnabled: true,
     /** Minutes after timer completion before first reminder (default: 45) */
@@ -199,13 +197,6 @@
 
   // Daily reminder escalation factor (50% increase per skip)
   const DAILY_REMINDER_ESCALATION_FACTOR = 1.5;
-
-  /**
-   * Grace period in milliseconds after timer completion before daily reminders can show.
-   * Prevents immediate reminder popup after completing a timer.
-   * @constant {number}
-   */
-  const DAILY_REMINDER_POST_COMPLETION_GRACE_MS = 60 * 1000; // 1 minute
 
   // Daily reminder check interval (1 minute in milliseconds)
   const DAILY_REMINDER_CHECK_INTERVAL_MS = 60 * 1000;
@@ -8211,7 +8202,6 @@
       this.skipCount = 0; // Number of times user has skipped
       this.lastSkipTime = null; // When the last skip occurred
       this.remindersShownToday = []; // Array of timestamps when reminders were shown today
-      this.lastTimerCompleteTime = null; // When the last timer completed (for grace period)
       this._holdIntervalId = null; // Hold-to-unlock interval
       this._holdTimerElement = null; // Timer display element for hold mode
       this._holdHandlersCleanup = null; // Cleanup function for hold handlers
@@ -8237,7 +8227,6 @@
       this.skipCount = config.dailyReminderSkipCount || 0;
       this.lastSkipTime = config.dailyReminderLastSkipTime || null;
       this.remindersShownToday = config.dailyRemindersShownToday || [];
-      this.lastTimerCompleteTime = config.dailyReminderLastTimerCompleteTime || null;
 
       // Reset reminders shown today if it's a new day
       this._resetIfNewDay();
@@ -8246,9 +8235,6 @@
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
         remindersShownCount: this.remindersShownToday.length,
-        lastTimerCompleteTime: this.lastTimerCompleteTime
-          ? new Date(this.lastTimerCompleteTime).toISOString()
-          : null,
       });
     }
 
@@ -8261,16 +8247,12 @@
       config.dailyReminderSkipCount = this.skipCount;
       config.dailyReminderLastSkipTime = this.lastSkipTime;
       config.dailyRemindersShownToday = this.remindersShownToday;
-      config.dailyReminderLastTimerCompleteTime = this.lastTimerCompleteTime;
       saveConfig(config);
 
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Saved state', {
         skipCount: this.skipCount,
         lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
         remindersShownCount: this.remindersShownToday.length,
-        lastTimerCompleteTime: this.lastTimerCompleteTime
-          ? new Date(this.lastTimerCompleteTime).toISOString()
-          : null,
       });
     }
 
@@ -8371,22 +8353,6 @@
         return false;
       }
 
-      // Check if we're in grace period after timer completion
-      if (this.lastTimerCompleteTime) {
-        const timeSinceComplete = Date.now() - this.lastTimerCompleteTime;
-        if (timeSinceComplete < DAILY_REMINDER_POST_COMPLETION_GRACE_MS) {
-          logger.log(
-            LOG_CATEGORIES.TIMER,
-            'Daily reminder: Grace period after timer completion',
-            {
-              timeSinceCompleteMs: timeSinceComplete,
-              gracePeriodMs: DAILY_REMINDER_POST_COMPLETION_GRACE_MS,
-            }
-          );
-          return false;
-        }
-      }
-
       // Get reminder times array
       const reminderTimes = config.dailyReminderTimes;
       if (!Array.isArray(reminderTimes) || reminderTimes.length === 0) {
@@ -8460,6 +8426,18 @@
 
       // Check if we're at or past this reminder time
       if (currentTimeMinutes >= reminderTimeMinutes) {
+        // Check if a timer was started today AFTER this reminder time
+        // If so, don't show the reminder again (user already responded by starting a timer)
+        if (this._wasTimerStartedAfterReminderTime(hours, minutes)) {
+          logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer already started after this time', {
+            reminderTime: timeStr,
+            lastTimerStartTime: config.lastTimerStartTime
+              ? new Date(config.lastTimerStartTime).toISOString()
+              : null,
+          });
+          return false;
+        }
+
         // Check if in cooldown period after skip
         if (this._isInCooldownPeriod(config.dailyReminderSkipCooldown)) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Skip cooldown active', {
@@ -8470,13 +8448,12 @@
           return false;
         }
 
-        // Check if this reminder was already shown today
-        // If user previously skipped and we've passed cooldown (checked above), allow re-showing
-        // Note: cooldown is already verified passed at line 8344, so we just need to check if
-        // user skipped (lastSkipTime exists) to determine if we should re-show
+        // Check if this reminder was already shown today (and not skipped - cooldown checked above)
+        // If user previously skipped (and cooldown passed), allow re-showing
         const wasShownToday = this._wasReminderShownToday(hours, minutes);
         const hasPreviouslySkipped = this.lastSkipTime !== null;
 
+        // Show if: (1) not shown yet, OR (2) was shown but user skipped (cooldown already checked above)
         if (!wasShownToday || hasPreviouslySkipped) {
           logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Showing reminder', {
             reminderTime: timeStr,
@@ -8489,6 +8466,40 @@
       }
 
       return false;
+    }
+
+    /**
+     * Check if a timer was started today after the specified reminder time.
+     * This prevents showing the reminder again after user started a timer.
+     * @param {number} reminderHours - Reminder hour (0-23)
+     * @param {number} reminderMinutes - Reminder minute (0-59)
+     * @returns {boolean} True if timer was started after the reminder time today
+     * @private
+     */
+    _wasTimerStartedAfterReminderTime(reminderHours, reminderMinutes) {
+      const config = getConfig();
+      const lastTimerStartTime = config.lastTimerStartTime;
+
+      if (!lastTimerStartTime) {
+        return false;
+      }
+
+      const startDate = new Date(lastTimerStartTime);
+      const today = this._getTodayDateString();
+      const startDateStr = this._getDateString(startDate);
+
+      // Only consider timer starts from today
+      if (startDateStr !== today) {
+        return false;
+      }
+
+      // Check if timer was started at or after the reminder time
+      const startHours = startDate.getHours();
+      const startMinutes = startDate.getMinutes();
+      const startTimeMinutes = startHours * 60 + startMinutes;
+      const reminderTimeMinutes = reminderHours * 60 + reminderMinutes;
+
+      return startTimeMinutes >= reminderTimeMinutes;
     }
 
     /**
@@ -8657,11 +8668,11 @@
 
     /**
      * Record that a timer was started.
-     * Resets skip count and clears last skip time.
+     * Saves timestamp and resets skip count.
      */
     recordTimerStarted() {
       const config = getConfig();
-      config.lastTimerStartDate = this._getTodayDateString();
+      config.lastTimerStartTime = Date.now();
 
       // Reset skip count when timer starts
       this.skipCount = 0;
@@ -8671,13 +8682,15 @@
       this._saveState();
 
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer started, resetting skip count', {
-        date: config.lastTimerStartDate,
+        lastTimerStartTime: new Date(config.lastTimerStartTime).toISOString(),
       });
     }
 
     /**
      * Called when timer completes a full session.
      * Resets skip count and cooldown to ensure clean state.
+     * Note: We do NOT clear lastTimerStartTime here - it's used to prevent
+     * showing the reminder again after timer completion for that time slot.
      */
     onTimerComplete() {
       logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Timer completed, resetting skip state', {
@@ -8687,7 +8700,6 @@
 
       this.skipCount = 0;
       this.lastSkipTime = null;
-      this.lastTimerCompleteTime = Date.now();
       this._saveState();
     }
 
