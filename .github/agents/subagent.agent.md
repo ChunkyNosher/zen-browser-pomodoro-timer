@@ -77,7 +77,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.0'`
+- `MOD_VERSION = '1.3.1'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -129,6 +129,21 @@ Use these MCP tools when working on this mod:
 | `codescene-code_health_score`         | Get code health score (target ≥7.5)       |
 | `codescene-code_health_review`        | Get detailed code health issues           |
 | `codescene-code_health_auto_refactor` | Auto-refactor functions                   |
+
+## Known Bug Patterns
+
+### Dialog Visibility Bug Pattern
+
+**Pattern:** Dialogs created with `.zen-pomodoro-dialog` class but missing `active` class will be invisible (`display: none`).
+
+**Always check:** When creating new dialogs, ensure the className includes `active`:
+```javascript
+dialog.className = 'zen-pomodoro-dialog active';
+```
+
+### CSS Box Model Alignment
+
+**Pattern:** When aligning text elements, ensure both have matching borders (visible or transparent) for consistent spacing.
 
 ## Documentation Reminder
 

@@ -46,7 +46,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.0',
+    MOD_VERSION: '1.3.1',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -10332,7 +10332,7 @@
       // Create dialog
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-dump-config-dialog';
-      dialog.className = 'zen-pomodoro-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
 
       // Title
       const title = document.createElement('h2');
@@ -10571,7 +10571,7 @@
     _createDumpDialog(duration) {
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-dump-dialog';
-      dialog.className = 'zen-pomodoro-dialog zen-pomodoro-dump-active';
+      dialog.className = 'zen-pomodoro-dialog active zen-pomodoro-dump-active';
 
       // Title
       const title = document.createElement('h2');

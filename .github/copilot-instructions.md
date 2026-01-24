@@ -54,7 +54,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.0';                  // Current mod version
+const MOD_VERSION = '1.3.1';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -226,6 +226,32 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                         |
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
+
+---
+
+## Bug Fixes in v1.3.1
+
+### Distraction Dump Dialog Visibility Fix
+
+**Issue:** The Distraction Dump button was non-functional because dialogs were created without the `active` CSS class.
+
+**Root Cause:** In `DistractionDumpManager`:
+- `showDumpConfigDialog()` created dialog with `className = 'zen-pomodoro-dialog'` but `.zen-pomodoro-dialog` has `display: none` in CSS
+- `_createDumpDialog()` used `className = 'zen-pomodoro-dialog zen-pomodoro-dump-active'` but `.zen-pomodoro-dump-active` only adds `backdrop-filter`, not `display: flex`
+
+**Fix:** Added `active` class to both dialog creation points:
+- Line 10335: `className = 'zen-pomodoro-dialog active'`
+- Line 10574: `className = 'zen-pomodoro-dialog active zen-pomodoro-dump-active'`
+
+### Code Lockout Screen Alignment Fix
+
+**Issue:** The input text box was narrower than the displayed code, and characters weren't aligned.
+
+**Root Cause:** The code display (`.zen-pomodoro-lock-code-display`) had no border, while the input (`#zen-pomodoro-lock-code`) had a 2px border causing visual offset.
+
+**Fix:** In `chrome.css`:
+- Added `border: 2px solid transparent;` to `.zen-pomodoro-lock-code-display` for consistent box model
+- Changed input to use `width: max-content; min-width: 100%;` to match display sizing
 
 ---
 
