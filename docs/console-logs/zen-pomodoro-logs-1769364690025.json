@@ -1,0 +1,3747 @@
+{
+  "exportedAt": "2026-01-25T18:11:30.024Z",
+  "totalEntries": 405,
+  "logs": [
+    {
+      "timestamp": "2026-01-25T18:09:03.353Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.828Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.828Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.828Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "WORKSPACE",
+      "message": "Starting workspace monitoring",
+      "data": {
+        "initialWorkspace": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "WORKSPACE",
+      "message": "Workspace observer configured",
+      "data": {
+        "container": "#tabbrowser-arrowscrollbox",
+        "observingAttributes": [
+          "active",
+          "selected",
+          "zen-workspace-id"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 1,
+        "lastSkipTime": "2026-01-25T18:01:58.756Z",
+        "remindersShownCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 2,
+        "lastSkipTime": "2026-01-25T18:01:23.457Z",
+        "idleStartTime": "2026-01-25T02:37:58.638Z"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:03.829Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:06.239Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": null,
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:06.745Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:06.747Z",
+      "category": "WORKSPACE",
+      "message": "Workspace detection: Using modern zen-workspace elements",
+      "data": {
+        "count": 8
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:06.747Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "timerActive": false,
+        "timerPaused": false,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:07.168Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-01-25T18:01:58.756Z",
+        "cooldownMinutes": 20
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:07.168Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.382Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.382Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.635Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.635Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.636Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:08.636Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:09.872Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:10.635Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:12.055Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:12.055Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:13.329Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:23.981Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:25.366Z",
+      "category": "MENU",
+      "message": "Opening ruleset settings dialog"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:26.280Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:26.283Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:26.859Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:26.859Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:26.859Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:29.121Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:30.499Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.850Z",
+      "category": "MENU",
+      "message": "Start button clicked - starting timer immediately"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.850Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.851Z",
+      "category": "SETTINGS",
+      "message": "Active rulesets saved",
+      "data": {
+        "rulesets": [
+          "default"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.851Z",
+      "category": "TIMER",
+      "message": "Timer started",
+      "data": {
+        "mode": "simple",
+        "cycles": 3,
+        "duration": 180,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.852Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 347.33331298828125,
+        "width": 2204.666748046875,
+        "height": 1346
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.852Z",
+      "category": "OVERLAY",
+      "message": "Overlay attached with fixed positioning",
+      "data": {
+        "selector": "#tabbrowser-tabbox",
+        "bounds": {
+          "top": 38,
+          "left": 347.33331298828125,
+          "width": 2204.666748046875,
+          "height": 1346
+        }
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.852Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 347.33331298828125,
+        "width": 2204.666748046875,
+        "height": 1346
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.852Z",
+      "category": "OVERLAY",
+      "message": "Timer indicator shown"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.853Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.854Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": false,
+        "workspaceBlocked": true,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.854Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.854Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 347.33331298828125,
+        "width": 2204.666748046875,
+        "height": 1346
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.854Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 347.33331298828125,
+        "width": 2204.666748046875,
+        "height": 1346
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "OVERLAY",
+      "message": "Overlay phase color updated",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "OVERLAY",
+      "message": "Display updated",
+      "data": {
+        "time": "3:00",
+        "phase": "focus",
+        "cycle": 1,
+        "totalCycles": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "TIMER",
+      "message": "Distraction dump reset for new focus phase"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "SECURITY",
+      "message": "Showing Sine Mod blocker overlay"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer started, resetting skip count",
+      "data": {
+        "lastTimerStartTime": "2026-01-25T18:09:34.855Z"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Timer started, resetting state",
+      "data": {
+        "previousIdleStartTime": "2026-01-25T02:37:58.638Z",
+        "previousSkipCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.855Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "idleStartTime": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.864Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 347.33331298828125,
+        "width": 2204.666748046875,
+        "height": 1346
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.969Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.970Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": false,
+        "workspaceBlocked": true,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.970Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:34.970Z",
+      "category": "OVERLAY",
+      "message": "Display updated",
+      "data": {
+        "time": "3:00",
+        "phase": "focus",
+        "cycle": 1,
+        "totalCycles": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.888Z",
+      "category": "TIMER",
+      "message": "Resetting daily focus time",
+      "data": {
+        "previousTotal": 12.5000000000002,
+        "previousResetDate": "2026-01-24",
+        "newResetDate": "2026-01-25"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.888Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.889Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.889Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.890Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.890Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": false,
+        "workspaceBlocked": true,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:35.890Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.850Z",
+      "category": "SECURITY",
+      "message": "User clicked Go Back on Sine Mod blocker"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.903Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.904Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.905Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": false,
+        "workspaceBlocked": true,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.905Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.905Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": true
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.905Z",
+      "category": "SECURITY",
+      "message": "Hiding Sine Mod blocker overlay"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.930Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:36.965Z",
+      "category": "SECURITY",
+      "message": "Hiding Sine Mod blocker overlay"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:37.936Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:37.937Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:37.938Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": false,
+        "workspaceBlocked": true,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:37.938Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.398Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.398Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.398Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.399Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.400Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "timerActive": true,
+        "timerPaused": false,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.400Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.707Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.756Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.815Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:39.815Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.249Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.432Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.432Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.433Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.433Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:40.433Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.673Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.674Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.674Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.674Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.675Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.675Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:41.828Z",
+      "category": "TIMER",
+      "message": "Distraction dump config dialog shown"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:42.217Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:42.217Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:42.734Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:42.735Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:42.735Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:43.822Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:43.822Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:43.823Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:44.835Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:44.836Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:44.836Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:45.848Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:45.849Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:45.849Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:46.981Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:46.981Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:46.981Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:46.981Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:47.992Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:47.992Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:47.993Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:49.003Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:49.004Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:49.004Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:50.022Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:50.023Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:50.023Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:50.104Z",
+      "category": "TIMER",
+      "message": "Starting distraction dump",
+      "data": {
+        "duration": 25
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:50.104Z",
+      "category": "TIMER",
+      "message": "Timer paused",
+      "data": {
+        "remainingTime": 166,
+        "phase": "focus",
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:55.840Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.363Z",
+      "category": "TIMER",
+      "message": "Timer resumed",
+      "data": {
+        "remainingTime": 166,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.364Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.364Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.364Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.892Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.893Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:09:59.893Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:00.946Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:00.946Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:00.946Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:01.382Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:10:01.950Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:01.951Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:01.951Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:02.615Z",
+      "category": "WORKSPACE",
+      "message": "Workspace in blocked list check (no phase check)",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:02.615Z",
+      "category": "TIMER",
+      "message": "Timer paused",
+      "data": {
+        "remainingTime": 163,
+        "phase": "focus",
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:02.615Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:02.615Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": true,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:02.615Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": true
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:03.860Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-01-25T18:10:08.933Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.879Z",
+      "category": "TIMER",
+      "message": "Ending distraction dump"
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.880Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.880Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.880Z",
+      "category": "TIMER",
+      "message": "Timer resumed",
+      "data": {
+        "remainingTime": 163,
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.881Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:16.881Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:17.392Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Joseph Pecson | JPecs | Instagram, TikTok, Twitch ..."
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:17.392Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://linktr.ee/jpecs",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:17.722Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:17.723Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:17.723Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:18.736Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:18.737Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:18.737Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:19.746Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:19.747Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:19.747Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:20.753Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:20.753Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:20.754Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:20.755Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:21.653Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:10:21.758Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:21.759Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:21.759Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:22.764Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:22.765Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:22.765Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:22.863Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:22.863Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]",
+        "timerActive": true
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:23.773Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:23.773Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:23.773Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:24.793Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:24.794Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:24.794Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:25.801Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:25.802Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:25.802Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:26.803Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:26.804Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:26.804Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:27.835Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:27.835Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:27.835Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:28.909Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:28.910Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:28.910Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:30.134Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:30.134Z",
+      "category": "OVERLAY",
+      "message": "Display updated",
+      "data": {
+        "time": "2:30",
+        "phase": "focus",
+        "cycle": 1,
+        "totalCycles": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:30.135Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:30.135Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:31.145Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:31.145Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:31.145Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:31.145Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:32.160Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:32.161Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:32.161Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:33.163Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:33.164Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:33.164Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:34.173Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:34.173Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:34.173Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:35.183Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:35.183Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:35.183Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:36.184Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:36.184Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:36.184Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:37.198Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:37.198Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:37.198Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:38.214Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:38.214Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:38.214Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:39.237Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:39.238Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:39.238Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:40.248Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:40.248Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:40.248Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:41.272Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:41.273Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:41.273Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:41.273Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:42.281Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:42.282Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:42.282Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:43.305Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:43.305Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:43.306Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:44.314Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:44.315Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:44.315Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:45.320Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:45.320Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:45.320Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:46.347Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:46.348Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:46.348Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:47.363Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:47.363Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:47.363Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:48.366Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:48.367Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:48.367Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:49.375Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:49.375Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:49.375Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:50.384Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:50.385Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:50.385Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:51.399Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:51.399Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:51.399Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:51.399Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:52.402Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:52.402Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:52.402Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:53.409Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:53.410Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:53.410Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:54.415Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:54.416Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:54.416Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:55.421Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:55.422Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:55.422Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:56.439Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:56.440Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:56.440Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:57.445Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:57.446Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:57.446Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:58.451Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:58.452Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:58.452Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:59.457Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:59.457Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:10:59.457Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:00.480Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:00.480Z",
+      "category": "OVERLAY",
+      "message": "Display updated",
+      "data": {
+        "time": "2:00",
+        "phase": "focus",
+        "cycle": 1,
+        "totalCycles": 3
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:00.481Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:00.481Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:01.493Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:01.493Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:01.493Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:01.493Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:02.501Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:02.502Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:02.502Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:03.515Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:03.515Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:03.515Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:03.872Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:04.531Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:04.532Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:04.532Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:05.557Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:05.558Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:05.558Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:06.565Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:06.565Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:06.565Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:07.567Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:07.568Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:07.568Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:08.577Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:08.578Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:08.578Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:09.621Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:09.622Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:09.622Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:10.717Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:10.717Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:10.717Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:11.093Z",
+      "category": "SECURITY",
+      "message": "Code verification failed - incorrect code"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:11.841Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:11.841Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:11.842Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:11.842Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:12.912Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:12.912Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:12.912Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:14.005Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:14.006Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:14.006Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:15.010Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:15.010Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:15.010Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:16.016Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:16.016Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:16.017Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:17.018Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:17.018Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:17.018Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:18.099Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:18.099Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:18.099Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:19.113Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:19.114Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:19.114Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:20.115Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:20.115Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:20.116Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:21.138Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:21.138Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:21.138Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:22.148Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:22.148Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:22.149Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:22.149Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:22.969Z",
+      "category": "SECURITY",
+      "message": "Code verification successful"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.166Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.166Z",
+      "category": "WORKSPACE",
+      "message": "Workspace blocked check",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "blockedCount": 5
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.167Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": false,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.818Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.818Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 98,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:23.818Z",
+      "category": "OVERLAY",
+      "message": "Timer indicator hidden"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:24.927Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:25.813Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:25.813Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:25.813Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-01-25T18:11:27.433Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:27.433Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:30.024Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-01-25T18:11:30.024Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 404
+      }
+    }
+  ]
+}
