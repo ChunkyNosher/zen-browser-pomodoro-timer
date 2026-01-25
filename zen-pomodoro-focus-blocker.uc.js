@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.2
+ * Version: 1.3.3
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.2',
+    MOD_VERSION: '1.3.3',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -2411,6 +2411,52 @@
     }
 
     /**
+     * Skip to the next block in custom cycle mode (for cutting break early).
+     * If there's no next block, completes the timer.
+     * @returns {boolean} True if successfully skipped, false if timer completed or not in custom mode
+     */
+    skipToNextCustomBlock() {
+      if (this.mode !== 'custom' || !this.customCycleBlocks) {
+        logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in custom mode');
+        return false;
+      }
+
+      // Move to next block
+      this.currentBlockIndex++;
+
+      // Check if cycle is complete
+      if (this.currentBlockIndex >= this.customCycleBlocks.length) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete (cut break early)');
+        this.completeTimer();
+        return false;
+      }
+
+      // Set up next block
+      const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
+      this.currentPhase = nextBlock.type;
+      this.remainingTime = nextBlock.duration * 60;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Skipping to next custom cycle block', {
+        blockIndex: this.currentBlockIndex,
+        blockType: nextBlock.type,
+        duration: nextBlock.duration,
+      });
+
+      // Notify phase change
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      // Reset distraction dump for new focus phase
+      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
+        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
+      }
+
+      this.saveState();
+      return true;
+    }
+
+    /**
      * Pause the timer
      * @param {boolean} isOnBlockedWorkspace - Whether the timer is being paused on a blocked workspace
      */
@@ -4277,20 +4323,26 @@
             dialog.remove();
             this.menuDialog = null;
 
+            const timer = window.zenPomodoroApp.timer;
+
             // If in transition phase, hide the popup (which triggers onTransitionComplete callback)
             if (status.currentPhase === 'transition') {
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
+            } else if (timer.mode === 'custom') {
+              // Custom cycle mode: skip to next block
+              timer.skipToNextCustomBlock();
+              window.zenPomodoroApp.updateOverlayVisibility();
             } else {
               // In regular break or long-break phase, start focus phase directly
               // BUG FIX: Increment cycle count since we're skipping the break phase
               // (normally incremented in _handleBreakPhaseComplete when break → transition)
-              window.zenPomodoroApp.timer.currentCycle++;
+              timer.currentCycle++;
               logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
-                currentCycle: window.zenPomodoroApp.timer.currentCycle,
-                totalCycles: window.zenPomodoroApp.timer.totalCycles
+                currentCycle: timer.currentCycle,
+                totalCycles: timer.totalCycles
               });
               // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
-              window.zenPomodoroApp.timer.startFocusFromTransition();
+              timer.startFocusFromTransition();
               window.zenPomodoroApp.updateOverlayVisibility();
             }
           });
@@ -11169,6 +11221,7 @@
 
       applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
+      setupDialogDrag(dialog);
     }
 
     /**
@@ -11302,11 +11355,20 @@
         }
         // Make a deep copy to avoid modifying the original until save
         this.currentEditingCycle = JSON.parse(JSON.stringify(this.currentEditingCycle));
+        // Add default durations if not present (backward compatibility)
+        if (!this.currentEditingCycle.defaultFocusDuration) {
+          this.currentEditingCycle.defaultFocusDuration = 25;
+        }
+        if (!this.currentEditingCycle.defaultBreakDuration) {
+          this.currentEditingCycle.defaultBreakDuration = 5;
+        }
       } else {
         // Create new cycle with default values
         this.currentEditingCycle = {
           id: this._generateCycleId(),
           name: 'New Custom Cycle',
+          defaultFocusDuration: 25,
+          defaultBreakDuration: 5,
           blocks: [
             { type: 'focus', duration: 25 },
             { type: 'break', duration: 5 },
@@ -11351,10 +11413,78 @@
       nameRow.appendChild(nameLabel);
       nameRow.appendChild(nameInput);
 
+      // Default duration inputs row
+      const durationRow = document.createElement('div');
+      durationRow.className = 'zen-pomodoro-config-row';
+      durationRow.style.display = 'flex';
+      durationRow.style.gap = '16px';
+      durationRow.style.alignItems = 'center';
+      durationRow.style.marginTop = '12px';
+
+      // Focus block duration
+      const focusDurationContainer = document.createElement('div');
+      focusDurationContainer.style.display = 'flex';
+      focusDurationContainer.style.flexDirection = 'column';
+      focusDurationContainer.style.flex = '1';
+      
+      const focusDurationLabel = document.createElement('label');
+      focusDurationLabel.textContent = 'Focus Block Duration (min):';
+      focusDurationLabel.style.fontSize = '12px';
+      focusDurationLabel.style.marginBottom = '4px';
+      
+      const focusDurationInput = document.createElement('input');
+      focusDurationInput.type = 'number';
+      focusDurationInput.className = 'zen-pomodoro-dialog-input';
+      focusDurationInput.min = '1';
+      focusDurationInput.max = '120';
+      focusDurationInput.value = this.currentEditingCycle.defaultFocusDuration;
+      focusDurationInput.style.width = '100%';
+      focusDurationInput.addEventListener('input', () => {
+        const value = parseInt(focusDurationInput.value, 10);
+        if (value >= 1 && value <= 120) {
+          this.currentEditingCycle.defaultFocusDuration = value;
+        }
+      });
+      
+      focusDurationContainer.appendChild(focusDurationLabel);
+      focusDurationContainer.appendChild(focusDurationInput);
+
+      // Break block duration
+      const breakDurationContainer = document.createElement('div');
+      breakDurationContainer.style.display = 'flex';
+      breakDurationContainer.style.flexDirection = 'column';
+      breakDurationContainer.style.flex = '1';
+      
+      const breakDurationLabel = document.createElement('label');
+      breakDurationLabel.textContent = 'Break Block Duration (min):';
+      breakDurationLabel.style.fontSize = '12px';
+      breakDurationLabel.style.marginBottom = '4px';
+      
+      const breakDurationInput = document.createElement('input');
+      breakDurationInput.type = 'number';
+      breakDurationInput.className = 'zen-pomodoro-dialog-input';
+      breakDurationInput.min = '1';
+      breakDurationInput.max = '120';
+      breakDurationInput.value = this.currentEditingCycle.defaultBreakDuration;
+      breakDurationInput.style.width = '100%';
+      breakDurationInput.addEventListener('input', () => {
+        const value = parseInt(breakDurationInput.value, 10);
+        if (value >= 1 && value <= 120) {
+          this.currentEditingCycle.defaultBreakDuration = value;
+        }
+      });
+      
+      breakDurationContainer.appendChild(breakDurationLabel);
+      breakDurationContainer.appendChild(breakDurationInput);
+
+      durationRow.appendChild(focusDurationContainer);
+      durationRow.appendChild(breakDurationContainer);
+
       // Blocks container
       const blocksLabel = document.createElement('label');
       blocksLabel.textContent = 'Timer Blocks:';
       blocksLabel.style.display = 'block';
+      blocksLabel.style.marginTop = '20px';
       blocksLabel.style.marginBottom = '8px';
       blocksLabel.style.fontWeight = 'bold';
 
@@ -11365,13 +11495,44 @@
       // Render blocks
       this._renderBlocks(blocksContainer);
 
-      // Add Block button
+      // Add Block controls row (dropdown + button)
+      const addBlockRow = document.createElement('div');
+      addBlockRow.style.display = 'flex';
+      addBlockRow.style.gap = '8px';
+      addBlockRow.style.alignItems = 'center';
+      addBlockRow.style.marginTop = '12px';
+
+      const blockTypeSelect = document.createElement('select');
+      blockTypeSelect.className = 'zen-pomodoro-dialog-input';
+      blockTypeSelect.style.flex = '1';
+      
+      const focusOption = document.createElement('option');
+      focusOption.value = 'focus';
+      focusOption.textContent = '🎯 Focus';
+      
+      const breakOption = document.createElement('option');
+      breakOption.value = 'break';
+      breakOption.textContent = '☕ Break';
+      
+      blockTypeSelect.appendChild(focusOption);
+      blockTypeSelect.appendChild(breakOption);
+
       const addBlockButton = document.createElement('button');
-      addBlockButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-add-block-btn';
+      addBlockButton.className = 'zen-pomodoro-dialog-button secondary';
       addBlockButton.textContent = '+ Add Block';
+      addBlockButton.style.width = 'auto';
+      addBlockButton.style.padding = '8px 16px';
       addBlockButton.addEventListener('click', () => {
-        this._showAddBlockMenu(blocksContainer);
+        const selectedType = blockTypeSelect.value;
+        const duration = selectedType === 'focus' 
+          ? this.currentEditingCycle.defaultFocusDuration 
+          : this.currentEditingCycle.defaultBreakDuration;
+        this.addBlock(selectedType, duration);
+        this._renderBlocks(blocksContainer);
       });
+
+      addBlockRow.appendChild(blockTypeSelect);
+      addBlockRow.appendChild(addBlockButton);
 
       // Save and Cancel buttons
       const buttonDiv = document.createElement('div');
@@ -11406,13 +11567,15 @@
       dialog.appendChild(backButton);
       dialog.appendChild(title);
       dialog.appendChild(nameRow);
+      dialog.appendChild(durationRow);
       dialog.appendChild(blocksLabel);
       dialog.appendChild(blocksContainer);
-      dialog.appendChild(addBlockButton);
+      dialog.appendChild(addBlockRow);
       dialog.appendChild(buttonDiv);
 
       applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
+      setupDialogDrag(dialog);
     }
 
     /**
