@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.3.1
+ * Version: 1.3.2
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -12,6 +12,11 @@
  * - Added workspace selection UI styles
  * - Added context menu styles
  * - Added lock screen code display styles
+ * 
+ * NEW IN 1.3.2:
+ * - Fixed code lockout screen UI alignment with container wrapper
+ * - Small dump indicator replaces large dialog (matches timer indicator size)
+ * - Mutually exclusive reminder modes (daily/post-session/off)
  * 
  * NEW IN 1.3.0:
  * - IIFE modular architecture for better code organization
@@ -321,6 +326,44 @@
   }
 }
 
+/* DISTRACTION DUMP INDICATOR: Purple styling when dump is active
+   The dump indicator replaces the timer indicator during a distraction dump.
+   Same size and position, but purple gradient to distinguish from focus/break. */
+#zen-pomodoro-indicator.dump-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  cursor: pointer; /* Clickable to end dump */
+}
+
+#zen-pomodoro-indicator.dump-active #zen-pomodoro-indicator-dot {
+  background-color: #9370db; /* Purple dot for dump mode */
+}
+
+/* Override paused state when dump is active (dump takes precedence) */
+#zen-pomodoro-indicator.dump-active[data-paused='true'] {
+  opacity: 1;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* ACCESSIBILITY FIX: Wrap dump pulse animation in prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  #zen-pomodoro-indicator.dump-active #zen-pomodoro-indicator-dot {
+    animation: dump-indicator-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes dump-indicator-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
 /* ============================================
    Dialog Styling - Unified approach using class
    ============================================ */
@@ -608,6 +651,18 @@
   opacity: 0.7;
 }
 
+/* CODE CONTAINER FIX: Wraps code display and input for perfect alignment
+   The container uses inline-flex to size to code content width,
+   then children stretch to fill the container width */
+.zen-pomodoro-code-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  min-width: 300px;
+  margin: 16px 0 0;
+}
+
 /* UI/UX FIX: Moved inline styles to CSS class
    CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment */
 .zen-pomodoro-lock-code-display {
@@ -615,14 +670,13 @@
   border: 2px solid transparent; /* Match input border width for alignment */
   padding: 12px;
   border-radius: 6px;
-  margin: 16px 0 8px;
+  margin: 0 0 8px; /* Adjusted margin for container layout */
   font-family: monospace;
   white-space: nowrap; /* Keep code on one line */
   font-size: 17px; /* Reduced from 21px (4px smaller) */
   line-height: 1.5;
   box-sizing: border-box;
-  width: max-content; /* Dynamic sizing: content determines width */
-  min-width: 100%; /* But never smaller than container */
+  width: 100%; /* Fill container width */
   text-align: left; /* Left-aligned for better code readability */
 }
 
@@ -633,9 +687,8 @@
   border-radius: 6px;
   padding: 12px;
   font-size: 17px; /* Match the code display (reduced from 21px) */
-  width: max-content; /* Match display dynamic sizing */
-  min-width: 100%; /* Match display minimum width */
-  margin-top: 8px; /* Smaller gap for visual alignment */
+  width: 100%; /* Fill container width - matches code display */
+  margin-top: 0; /* No top margin, container handles spacing */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
