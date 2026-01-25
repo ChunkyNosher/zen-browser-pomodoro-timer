@@ -14,6 +14,11 @@
  * - Added lock screen code display styles
  * 
  * NEW IN 1.3.2:
+ * - Custom Cycle Manager UI with drag-and-drop block reordering
+ * - Visual distinction for focus and break blocks
+ * - Responsive block editor with smooth transitions
+ * 
+ * NEW IN 1.3.2:
  * - Fixed code lockout screen UI alignment with container wrapper
  * - Small dump indicator replaces large dialog (matches timer indicator size)
  * - Mutually exclusive reminder modes (daily/post-session/off)
@@ -1937,4 +1942,186 @@
 .zen-pomodoro-dump-active {
   /* stylelint-disable-next-line property-no-vendor-prefix */
   backdrop-filter: blur(8px) !important;
+}
+
+/* ============================================
+   Custom Cycle Manager Styles
+   ============================================ */
+
+/* Custom Cycles List */
+.zen-pomodoro-cycles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Individual cycle list item */
+.zen-pomodoro-cycle-list-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background-color: rgb(255 255 255 / 5%);
+  border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  transition: background-color 0.2s ease;
+}
+
+.zen-pomodoro-cycle-list-item:hover {
+  background-color: rgb(255 255 255 / 8%);
+}
+
+/* Cycle name and info */
+.zen-pomodoro-cycle-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.zen-pomodoro-cycle-info {
+  font-size: 12px;
+  color: #888;
+}
+
+/* Cycle action buttons */
+.zen-pomodoro-cycle-buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Custom Cycle Editor Dialog */
+.zen-pomodoro-cycle-editor-dialog {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+/* Blocks container */
+.zen-pomodoro-cycle-blocks-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+  background-color: rgb(0 0 0 / 20%);
+  border-radius: 8px;
+}
+
+/* Individual block card */
+.zen-pomodoro-cycle-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: rgb(255 255 255 / 5%);
+  border-radius: 8px;
+  border: 2px solid rgb(255 255 255 / 10%);
+  transition: all 0.2s ease;
+  cursor: move;
+}
+
+.zen-pomodoro-cycle-block:hover {
+  background-color: rgb(255 255 255 / 8%);
+  border-color: rgb(255 255 255 / 15%);
+}
+
+.zen-pomodoro-cycle-block.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+/* Focus block styling */
+.zen-pomodoro-cycle-block-focus {
+  border-left: 4px solid #2180cd;
+}
+
+/* Break block styling */
+.zen-pomodoro-cycle-block-break {
+  border-left: 4px solid #2ec491;
+}
+
+/* Drag handle */
+.zen-pomodoro-cycle-block-handle {
+  font-size: 20px;
+  color: #888;
+  cursor: grab;
+  user-select: none;
+  padding: 4px;
+}
+
+.zen-pomodoro-cycle-block-handle:active {
+  cursor: grabbing;
+}
+
+/* Block type icon */
+.zen-pomodoro-cycle-block-type {
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* Block info container */
+.zen-pomodoro-cycle-block-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+/* Block label (Focus/Break) */
+.zen-pomodoro-cycle-block-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Block duration input */
+.zen-pomodoro-cycle-block-duration {
+  width: 80px;
+  background-color: #1e1d26;
+  color: #fff;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.zen-pomodoro-cycle-block-duration:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+/* Block delete button */
+.zen-pomodoro-cycle-block-delete {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.zen-pomodoro-cycle-block-delete:hover {
+  background-color: rgb(231 76 60 / 20%);
+  color: #e74c3c;
+}
+
+/* Add block button */
+.zen-pomodoro-add-block-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Add block menu */
+.zen-pomodoro-add-block-menu {
+  min-width: 350px;
 }
