@@ -2421,6 +2421,12 @@
         return false;
       }
 
+      // Validate we're in a break phase before allowing skip
+      if (this.currentPhase !== 'break') {
+        logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in break phase, cannot skip');
+        return false;
+      }
+
       // Move to next block
       this.currentBlockIndex++;
 
@@ -4330,8 +4336,11 @@
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
             } else if (timer.mode === 'custom') {
               // Custom cycle mode: skip to next block
-              timer.skipToNextCustomBlock();
-              window.zenPomodoroApp.updateOverlayVisibility();
+              // Only update overlay if skip was successful (returns true)
+              // Returns false if timer completed or not in break phase
+              if (timer.skipToNextCustomBlock()) {
+                window.zenPomodoroApp.updateOverlayVisibility();
+              }
             } else {
               // In regular break or long-break phase, start focus phase directly
               // BUG FIX: Increment cycle count since we're skipping the break phase
@@ -11441,8 +11450,11 @@
       focusDurationInput.style.width = '100%';
       focusDurationInput.addEventListener('input', () => {
         const value = parseInt(focusDurationInput.value, 10);
-        if (value >= 1 && value <= 120) {
+        if (!isNaN(value) && value >= 1 && value <= 120) {
           this.currentEditingCycle.defaultFocusDuration = value;
+        } else {
+          // Reset to previous valid value if input is invalid
+          focusDurationInput.value = this.currentEditingCycle.defaultFocusDuration;
         }
       });
       
@@ -11469,8 +11481,11 @@
       breakDurationInput.style.width = '100%';
       breakDurationInput.addEventListener('input', () => {
         const value = parseInt(breakDurationInput.value, 10);
-        if (value >= 1 && value <= 120) {
+        if (!isNaN(value) && value >= 1 && value <= 120) {
           this.currentEditingCycle.defaultBreakDuration = value;
+        } else {
+          // Reset to previous valid value if input is invalid
+          breakDurationInput.value = this.currentEditingCycle.defaultBreakDuration;
         }
       });
       
