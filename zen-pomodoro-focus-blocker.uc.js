@@ -4874,14 +4874,27 @@
           if (mode === 'custom') {
             // Get selected custom cycle
             const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
-            if (cycleSelect && cycleSelect.value) {
-              const savedCycles = config.customCycles || [];
-              const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
-              if (selectedCycle) {
-                window.zenPomodoroApp.startCustomCycle(selectedCycle);
-              } else {
-                logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
-              }
+            const savedCycles = config.customCycles || [];
+            
+            // Validate that a custom cycle is selected
+            if (!cycleSelect || !cycleSelect.value) {
+              window.zenPomodoroApp.showCustomAlert(
+                'No Cycle Selected',
+                'Please select a custom cycle or create one first.'
+              );
+              return;
+            }
+            
+            const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
+            if (selectedCycle) {
+              window.zenPomodoroApp.startCustomCycle(selectedCycle);
+            } else {
+              logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
+              window.zenPomodoroApp.showCustomAlert(
+                'Cycle Not Found',
+                'The selected custom cycle could not be found. Please select another cycle.'
+              );
+              return;
             }
           } else {
             window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
@@ -5546,7 +5559,9 @@
 
       // Show/hide subsections based on selected reminder mode
       const updateReminderModeVisibility = () => {
-        const selectedMode = document.querySelector('input[name="reminder-mode"]:checked')?.value;
+        // Scope lookup to the current settings dialog to avoid picking radios from other dialogs
+        const root = reminderSection.closest('.zen-pomodoro-dialog') || document;
+        const selectedMode = root.querySelector('input[name="reminder-mode"]:checked')?.value;
         setElementDisplay(
           dailyReminderSubsection,
           selectedMode === Constants.REMINDER_MODES.DAILY
@@ -5829,10 +5844,14 @@
       if (!selectedMode) {
         logger.log(LOG_CATEGORIES.SETTINGS, 'No reminder mode selected, defaulting to none');
         config.reminderMode = Constants.REMINDER_MODES.NONE;
+        // Also persist to dedicated pref for Zen preferences UI
+        setPref('reminderMode', Constants.REMINDER_MODES.NONE);
         return;
       }
 
       config.reminderMode = selectedMode;
+      // Persist to dedicated pref for Zen preferences UI to ensure it survives restart
+      setPref('reminderMode', selectedMode);
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saving reminder mode', { mode: selectedMode });
 
       // Save daily reminder settings if daily mode is selected
@@ -11517,7 +11536,25 @@
 
       blockDiv.addEventListener('drop', (e) => {
         e.preventDefault();
-        const targetIndex = parseInt(blockDiv.dataset.index);
+        
+        // Compute target index from current DOM order instead of stale dataset.index
+        const container = blockDiv.parentElement;
+        if (!container) {
+          return;
+        }
+        
+        const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+        const draggedElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
+        
+        if (!draggedElement) {
+          return;
+        }
+        
+        const targetIndex = blocks.indexOf(draggedElement);
+        if (targetIndex === -1) {
+          return;
+        }
+        
         if (this.draggedBlockIndex !== null && this.draggedBlockIndex !== targetIndex) {
           this.reorderBlocks(this.draggedBlockIndex, targetIndex);
         }
@@ -12042,7 +12079,6 @@
      * @param {Object} customCycle - Custom cycle configuration object
      */
     startCustomCycle(customCycle) {
-      console.log(`Starting custom cycle: ${customCycle.name}`);
       logger.log(LOG_CATEGORIES.TIMER, 'Starting custom cycle', { cycleName: customCycle.name });
 
       this.timer.startCustomCycle(customCycle);
