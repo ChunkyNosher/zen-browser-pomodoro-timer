@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.0
+ * Version: 1.3.2
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -18,6 +18,7 @@
  * - Hold-to-unlock for settings access
  * - Notification permission requests
  * - Custom confirmation dialogs
+ * - Custom Pomodoro Cycles (NEW in 1.3.2)
  *
  * CODE QUALITY:
  * - Proper input validation
@@ -46,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.1',
+    MOD_VERSION: '1.3.2',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -55,6 +56,13 @@
     LOCKOUT_METHODS: {
       CODE: 'code',
       HOLD: 'hold',
+    },
+
+    /** Reminder mode types - only one can be active at a time */
+    REMINDER_MODES: {
+      NONE: 'none',
+      DAILY: 'daily',
+      POST_SESSION: 'post-session',
     },
 
     /** Data attribute name used to mark dialogs that should not save their position */
@@ -117,6 +125,12 @@
       WORKSPACE: 'WORKSPACE',
       SECURITY: 'SECURITY',
       INIT: 'INIT',
+    },
+
+    /** Alert messages for Distraction Dump timer locking */
+    DISTRACTION_DUMP_LOCK_ALERT: {
+      TITLE: 'Timer Locked',
+      MESSAGE: 'Timer is locked during Distraction Dump. End the dump first.',
     },
 
     /** Delay (in ms) before revoking the URL after export download starts */
@@ -186,7 +200,7 @@
         },
       ],
       activeRulesets: ['default'],
-      dailyReminderEnabled: false,
+      reminderMode: 'post-session', // Options: 'none', 'daily', 'post-session'
       dailyReminderTimes: ['11:15', '16:15'],
       dailyReminderSkipMethod: 'hold',
       dailyReminderSkipHoldDuration: 15,
@@ -196,7 +210,6 @@
       dailyReminderSkipCooldown: 10,
       lastTimerStartTime: null,
       dailyRemindersShownToday: [],
-      postSessionReminderEnabled: true,
       postSessionIdleTime: 45,
       postSessionSkipCooldown: 30,
       postSessionSkipMethod: 'hold',
@@ -216,6 +229,8 @@
       distractionDumpDuration: 25,
       /** Maximum duration for distraction dump in minutes */
       distractionDumpMaxDuration: 35,
+      /** Custom Pomodoro Cycles - user-defined custom timer sequences */
+      customCycles: [],
     },
   };
 
@@ -554,6 +569,25 @@
     }
 
     /**
+     * Load and validate reminder mode from preferences.
+     * Only accepts valid reminder mode values from REMINDER_MODES constant.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Configuration object to update
+     * @param {string} configKey - Key to update in config object
+     * @private
+     */
+    function loadReminderModePref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null && value !== '') {
+        // Validate that the value is one of the allowed reminder modes
+        const validModes = Object.values(Constants.REMINDER_MODES);
+        if (validModes.includes(value)) {
+          config[configKey] = value;
+        }
+      }
+    }
+
+    /**
      * Get configuration object from preferences.
      * Loads default config, then merges stored JSON config, then applies individual preference overrides.
      * @returns {Object} Configuration object
@@ -562,11 +596,26 @@
       // Start with default config, then merge stored JSON config
       let config = loadStoredConfigJson({ ...Constants.DEFAULT_CONFIG });
 
+      // MIGRATION: Convert old boolean flags to new reminderMode
+      if (config.dailyReminderEnabled !== undefined || config.postSessionReminderEnabled !== undefined) {
+        if (config.dailyReminderEnabled === true) {
+          config.reminderMode = Constants.REMINDER_MODES.DAILY;
+        } else if (config.postSessionReminderEnabled === true) {
+          config.reminderMode = Constants.REMINDER_MODES.POST_SESSION;
+        } else {
+          config.reminderMode = Constants.REMINDER_MODES.NONE;
+        }
+        // Clean up old keys
+        delete config.dailyReminderEnabled;
+        delete config.postSessionReminderEnabled;
+        logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Migrated reminder settings to new format', {
+          reminderMode: config.reminderMode,
+        });
+      }
+
       // Override with individual preferences if set
       // Boolean preferences (handles both true and 'true' for legacy support)
       loadBooleanPref('enableNotifications', config, 'enableNotifications');
-      loadBooleanPref('dailyReminderEnabled', config, 'dailyReminderEnabled');
-      loadBooleanPref('postSessionReminderEnabled', config, 'postSessionReminderEnabled');
 
       // Positive integer preferences
       loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
@@ -577,6 +626,9 @@
 
       // String preferences (requires non-empty validation)
       loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
+
+      // Reminder mode preference (enum validation)
+      loadReminderModePref('reminderMode', config, 'reminderMode');
 
       // Time preferences (requires HH:MM format validation)
       loadTimePref('postSessionReminderEndTime', config, 'postSessionReminderEndTime');
@@ -1497,6 +1549,16 @@
   }
 
   /**
+   * Check if Distraction Dump is currently blocking timer control actions.
+   * This helper function provides a centralized check to avoid code duplication.
+   *
+   * @returns {boolean} True if Distraction Dump is active and blocking timer actions
+   */
+  function isDistractionDumpBlocking() {
+    return Boolean(window.zenPomodoroApp?.distractionDump?.isActive);
+  }
+
+  /**
    * Handle timer pause/resume logic with overlay and indicator updates.
    * This helper function consolidates the pause/resume logic to eliminate code duplication.
    *
@@ -1515,6 +1577,12 @@
     if (!window.zenPomodoroApp.timer) return;
     if (!window.zenPomodoroApp.workspace) return;
     if (!window.zenPomodoroApp.overlay) return;
+
+    // Check if Distraction Dump is active - don't allow pause/resume during dump
+    if (isDistractionDumpBlocking()) {
+      logger.log(LOG_CATEGORIES.TIMER, 'Cannot pause/resume timer - Distraction Dump is active');
+      return;
+    }
 
     const timer = window.zenPomodoroApp.timer;
 
@@ -1929,6 +1997,10 @@
       this.onPhaseChange = null;
       this.onComplete = null;
       this.tickCounter = 0; // Counter for reducing save frequency
+      // Custom cycle properties
+      this.customCycle = null; // Current custom cycle configuration
+      this.customCycleBlocks = null; // Array of blocks from custom cycle
+      this.currentBlockIndex = 0; // Current block index in custom cycle
     }
 
     /**
@@ -1966,6 +2038,40 @@
         cycles: cycles,
         duration: this.remainingTime,
         phase: this.currentPhase,
+      });
+
+      this.startInterval();
+      this.saveState();
+    }
+
+    /**
+     * Start a custom cycle timer
+     * @param {Object} customCycle - Custom cycle configuration
+     */
+    startCustomCycle(customCycle) {
+      this.mode = 'custom';
+      this.customCycle = customCycle;
+      this.customCycleBlocks = [...customCycle.blocks]; // Make a copy
+      this.currentBlockIndex = 0;
+      this.currentCycle = 1;
+      this.totalCycles = 1; // Custom cycles are single-run sequences
+      this.isActive = true;
+      this.isPaused = false;
+      this.tickCounter = 0;
+
+      // Get base config from preferences
+      this.config = getConfig();
+      this.savedConfig = { ...this.config };
+
+      // Set up first block
+      const firstBlock = this.customCycleBlocks[0];
+      this.currentPhase = firstBlock.type;
+      this.remainingTime = firstBlock.duration * 60;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle started', {
+        cycleName: customCycle.name,
+        blockCount: this.customCycleBlocks.length,
+        firstBlock: firstBlock,
       });
 
       this.startInterval();
@@ -2141,6 +2247,12 @@
         return;
       }
 
+      // Handle custom cycle mode
+      if (this.mode === 'custom') {
+        this._handleCustomCycleBlockComplete();
+        return;
+      }
+
       // Handle transition phase completion - starts actual focus phase
       if (this.currentPhase === 'transition') {
         this._handleTransitionPhaseComplete();
@@ -2163,6 +2275,52 @@
 
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
+    }
+
+    /**
+     * Handle completion of a block in custom cycle mode.
+     * @private
+     */
+    _handleCustomCycleBlockComplete() {
+      const completedBlock = this.customCycleBlocks[this.currentBlockIndex];
+      logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle block complete', {
+        blockIndex: this.currentBlockIndex,
+        blockType: completedBlock.type,
+        blocksRemaining: this.customCycleBlocks.length - this.currentBlockIndex - 1,
+      });
+
+      // Move to next block
+      this.currentBlockIndex++;
+
+      // Check if cycle is complete
+      if (this.currentBlockIndex >= this.customCycleBlocks.length) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete');
+        this.completeTimer();
+        return;
+      }
+
+      // Set up next block
+      const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
+      this.currentPhase = nextBlock.type;
+      this.remainingTime = nextBlock.duration * 60;
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
+        blockIndex: this.currentBlockIndex,
+        blockType: nextBlock.type,
+        duration: nextBlock.duration,
+      });
+
+      // Notify phase change
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      // Reset distraction dump for new focus phase
+      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
+        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
       }
 
       this.saveState();
@@ -2342,6 +2500,10 @@
         totalCycles: this.totalCycles,
         mode: this.mode,
         savedConfig: this.savedConfig, // Store config with state
+        // Custom cycle state
+        customCycle: this.customCycle,
+        customCycleBlocks: this.customCycleBlocks,
+        currentBlockIndex: this.currentBlockIndex,
       };
       setPref('timer-state', JSON.stringify(state));
     }
@@ -2368,6 +2530,13 @@
             this.currentCycle = state.currentCycle;
             this.totalCycles = state.totalCycles;
             this.mode = state.mode;
+
+            // Restore custom cycle state if present
+            if (state.mode === 'custom') {
+              this.customCycle = state.customCycle;
+              this.customCycleBlocks = state.customCycleBlocks;
+              this.currentBlockIndex = state.currentBlockIndex || 0;
+            }
 
             // Restore saved config
             if (state.savedConfig) {
@@ -3359,6 +3528,14 @@
       if (pauseButton) {
         pauseButton.addEventListener('click', () => {
           if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
+            // Check if Distraction Dump is active - provide user feedback
+            if (isDistractionDumpBlocking()) {
+              window.zenPomodoroApp.showCustomAlert(
+                Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+                Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+              );
+              return;
+            }
             handlePauseResumeTimer();
             // Update button text based on new state
             pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
@@ -3653,6 +3830,73 @@
       logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', {
         isPaused: isPaused,
       });
+    }
+
+    /**
+     * Switch indicator to dump mode - purple styling and dump timer display.
+     * Applies the 'dump-active' CSS class which triggers purple gradient background,
+     * purple dot color, and clickable cursor. Shows the indicator if not already visible.
+     * @param {number} timeInSeconds - Time remaining in dump in seconds
+     */
+    showDumpIndicator(timeInSeconds) {
+      if (!this.indicator) this.createOverlay();
+
+      // Add dump-active class for purple styling
+      this.indicator.classList.add('dump-active');
+
+      // Update text to show dump time (no emoji for accessibility)
+      const indicatorText = this.indicator.querySelector('#zen-pomodoro-indicator-text');
+      if (indicatorText) {
+        indicatorText.textContent = `Dump: ${formatTime(timeInSeconds)}`;
+      }
+
+      // Show indicator if not already visible
+      if (!this.indicator.classList.contains('active')) {
+        this.indicator.classList.add('active');
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Dump indicator shown', { timeInSeconds });
+    }
+
+    /**
+     * Update dump indicator time display.
+     * Updates only the text content to show remaining dump time.
+     * Does not change styling or visibility.
+     * @param {number} timeInSeconds - Time remaining in dump in seconds
+     */
+    updateDumpIndicator(timeInSeconds) {
+      if (!this.indicator) return;
+
+      const indicatorText = this.indicator.querySelector('#zen-pomodoro-indicator-text');
+      if (indicatorText) {
+        indicatorText.textContent = `Dump: ${formatTime(timeInSeconds)}`;
+      }
+    }
+
+    /**
+     * Switch indicator back to normal timer mode.
+     * Removes the 'dump-active' class and restores normal timer display.
+     * If the timer is active, shows current phase and time.
+     * If the timer is not active, hides the indicator completely.
+     */
+    hideDumpIndicator() {
+      if (!this.indicator) return;
+
+      // Remove dump-active class
+      this.indicator.classList.remove('dump-active');
+
+      // Restore normal timer display
+      const timer = window.zenPomodoroApp?.timer;
+      if (timer && timer.isActive) {
+        const timeStr = formatTime(timer.remainingTime);
+        const phase = timer.currentPhase || 'focus';
+        this._updateIndicator(phase, timeStr);
+      } else {
+        // If timer is not active, hide the indicator
+        this.hideIndicator();
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Dump indicator hidden, normal indicator restored');
     }
 
     /**
@@ -4004,6 +4248,14 @@
         pauseResumeBtn.className = 'zen-pomodoro-dialog-button';
         pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
         pauseResumeBtn.addEventListener('click', () => {
+          // Check if Distraction Dump is active - provide user feedback
+          if (isDistractionDumpBlocking()) {
+            window.zenPomodoroApp.showCustomAlert(
+              Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+              Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+            );
+            return;
+          }
           this._stopMenuTimerUpdates();
           handlePauseResumeTimer();
           dialog.remove();
@@ -4175,9 +4427,22 @@
           this.showRulesetSettingsDialog();
         });
 
+        const customCyclesBtn = document.createElement('button');
+        customCyclesBtn.className = 'zen-pomodoro-dialog-button secondary';
+        customCyclesBtn.textContent = 'Custom Cycles';
+        customCyclesBtn.addEventListener('click', () => {
+          saveDialogPosition(dialog);
+          dialog.remove();
+          this.menuDialog = null;
+          if (window.zenPomodoroApp?.customCycles) {
+            window.zenPomodoroApp.customCycles.showCustomCyclesMenu();
+          }
+        });
+
         menuSection.appendChild(startBtn);
         menuSection.appendChild(settingsBtn);
         menuSection.appendChild(rulesetBtn);
+        menuSection.appendChild(customCyclesBtn);
       }
 
       // Buttons section
@@ -4295,9 +4560,15 @@
         'zen-pomodoro-mode-select',
         [
           { value: 'simple', text: 'Simple Timer', selected: isSimpleMode },
-          { value: 'pomodoro', text: 'Pomodoro Mode', selected: !isSimpleMode },
+          { value: 'pomodoro', text: 'Pomodoro Mode', selected: !isSimpleMode && config.timerMode !== 'custom' },
+          { value: 'custom', text: 'Custom Cycle', selected: config.timerMode === 'custom' },
         ]
       );
+
+      // Custom cycle selection row (only shown when custom mode is selected)
+      const customCycleRow = this._createCustomCycleSelectRow(config);
+      customCycleRow.classList.toggle('hidden', config.timerMode !== 'custom');
+      customCycleRow.dataset.mode = 'custom';
 
       // Duration inputs
       const durationRows = this._createDurationInputRows(config, isSimpleMode);
@@ -4306,7 +4577,7 @@
       const activeRulesetsRow = this._createActiveRulesetsRow(config);
 
       // Add to config section
-      [modeRow, ...durationRows, activeRulesetsRow].forEach((row) =>
+      [modeRow, customCycleRow, ...durationRows, activeRulesetsRow].forEach((row) =>
         configSection.appendChild(row)
       );
 
@@ -4322,7 +4593,7 @@
       setupDialogDrag(dialog);
 
       // Event handlers
-      this._setupModeToggleHandler(modeSelect, durationRows);
+      this._setupModeToggleHandler(modeSelect, [...durationRows, customCycleRow]);
       cancelButton.addEventListener('click', () => dialog.remove());
       this._setupStartHandler(dialog, config, modeSelect, startButton);
     }
@@ -4503,16 +4774,61 @@
      */
     _setupModeToggleHandler(modeSelect, rows) {
       modeSelect.addEventListener('change', () => {
-        const isSimple = modeSelect.value === 'simple';
+        const selectedMode = modeSelect.value;
         rows.forEach((row) => {
           const mode = row.dataset.mode;
           if (mode === 'simple') {
-            row.classList.toggle('hidden', !isSimple);
+            row.classList.toggle('hidden', selectedMode !== 'simple');
           } else if (mode === 'pomodoro') {
-            row.classList.toggle('hidden', isSimple);
+            row.classList.toggle('hidden', selectedMode !== 'pomodoro');
+          } else if (mode === 'custom') {
+            row.classList.toggle('hidden', selectedMode !== 'custom');
           }
         });
       });
+    }
+
+    /**
+     * Create the custom cycle selection row.
+     * @param {Object} config - Configuration object
+     * @returns {HTMLElement} Custom cycle selection row
+     * @private
+     */
+    _createCustomCycleSelectRow(config) {
+      const savedCycles = config.customCycles || [];
+      const row = document.createElement('div');
+      row.className = 'zen-pomodoro-config-row';
+
+      const label = document.createElement('label');
+      label.textContent = 'Select Cycle:';
+
+      if (savedCycles.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.style.fontSize = '12px';
+        emptyMessage.style.color = '#888';
+        emptyMessage.style.margin = '8px 0';
+        emptyMessage.textContent = 'No custom cycles available. Create one in Custom Cycles settings.';
+        
+        row.appendChild(label);
+        row.appendChild(emptyMessage);
+        return row;
+      }
+
+      const select = document.createElement('select');
+      select.id = 'zen-pomodoro-custom-cycle-select';
+      select.className = 'zen-pomodoro-dialog-input';
+
+      savedCycles.forEach((cycle) => {
+        const option = document.createElement('option');
+        option.value = cycle.id;
+        option.textContent = cycle.name;
+        select.appendChild(option);
+      });
+
+      row.appendChild(label);
+      row.appendChild(select);
+
+      return row;
     }
 
     /**
@@ -4555,7 +4871,34 @@
         dialog.remove();
 
         if (window.zenPomodoroApp) {
-          window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+          if (mode === 'custom') {
+            // Get selected custom cycle
+            const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
+            const savedCycles = config.customCycles || [];
+            
+            // Validate that a custom cycle is selected
+            if (!cycleSelect || !cycleSelect.value) {
+              window.zenPomodoroApp.showCustomAlert(
+                'No Cycle Selected',
+                'Please select a custom cycle or create one first.'
+              );
+              return;
+            }
+            
+            const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
+            if (selectedCycle) {
+              window.zenPomodoroApp.startCustomCycle(selectedCycle);
+            } else {
+              logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
+              window.zenPomodoroApp.showCustomAlert(
+                'Cycle Not Found',
+                'The selected custom cycle could not be found. Please select another cycle.'
+              );
+              return;
+            }
+          } else {
+            window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+          }
         }
       };
 
@@ -4579,7 +4922,7 @@
         sessionOverrides.simpleDuration = simpleDurationInput
           ? validateIntegerInput(simpleDurationInput.value, 1, 180, config.simpleDuration)
           : config.simpleDuration;
-      } else {
+      } else if (mode === 'pomodoro') {
         const focusDurationInput = dialog.querySelector('#zen-pomodoro-focus-duration-input');
         const breakDurationInput = dialog.querySelector('#zen-pomodoro-break-duration-input');
         sessionOverrides.focusDuration = focusDurationInput
@@ -4589,6 +4932,7 @@
           ? validateIntegerInput(breakDurationInput.value, 1, 60, config.breakDuration)
           : config.breakDuration;
       }
+      // Custom mode doesn't need overrides as cycle config contains all durations
 
       return sessionOverrides;
     }
@@ -4942,37 +5286,87 @@
       lockoutSection.appendChild(activeCodeLengthRow);
 
       // ========================================
-      // Daily Reminder Section
+      // Unified Reminder Section
       // ========================================
       const reminderSection = document.createElement('div');
       reminderSection.className = 'zen-pomodoro-lockout-section';
 
       const reminderTitle = document.createElement('div');
       reminderTitle.className = 'zen-pomodoro-lockout-section-title';
-      reminderTitle.textContent = '⏰ Daily Focus Reminders';
+      reminderTitle.textContent = '⏰ Reminder Settings';
 
       const reminderDescription = document.createElement('p');
       reminderDescription.style.fontSize = '13px';
       reminderDescription.style.color = '#888';
       reminderDescription.style.margin = '0 0 12px 0';
       reminderDescription.textContent =
-        'Show blocking reminders at specific times throughout the day. You can start a timer or skip (with challenge).';
+        'Choose one reminder mode: Daily (at scheduled times), Post-Session (after timer completion), or Off.';
 
-      // Enable/disable checkbox
-      const reminderEnabledRow = document.createElement('div');
-      reminderEnabledRow.className = 'zen-pomodoro-checkbox-row';
+      // Radio button group for reminder modes
+      const reminderModeGroup = document.createElement('div');
+      reminderModeGroup.style.marginBottom = '16px';
 
-      const reminderEnabledCheckbox = document.createElement('input');
-      reminderEnabledCheckbox.type = 'checkbox';
-      reminderEnabledCheckbox.id = 'daily-reminder-enabled';
-      reminderEnabledCheckbox.checked = config.dailyReminderEnabled;
+      // Helper function to create radio option
+      const createRadioOption = (value, label, description) => {
+        const radioRow = document.createElement('div');
+        radioRow.style.marginBottom = '8px';
 
-      const reminderEnabledLabel = document.createElement('label');
-      reminderEnabledLabel.setAttribute('for', 'daily-reminder-enabled');
-      reminderEnabledLabel.textContent = 'Enable daily reminders';
+        const radioInput = document.createElement('input');
+        radioInput.type = 'radio';
+        radioInput.name = 'reminder-mode';
+        radioInput.id = `reminder-mode-${value}`;
+        radioInput.value = value;
+        radioInput.checked = config.reminderMode === value;
 
-      reminderEnabledRow.appendChild(reminderEnabledCheckbox);
-      reminderEnabledRow.appendChild(reminderEnabledLabel);
+        const radioLabel = document.createElement('label');
+        radioLabel.setAttribute('for', `reminder-mode-${value}`);
+        radioLabel.style.marginLeft = '8px';
+        radioLabel.textContent = label;
+
+        if (description) {
+          const descSpan = document.createElement('span');
+          descSpan.style.color = '#888';
+          descSpan.style.fontSize = '12px';
+          descSpan.style.marginLeft = '4px';
+          descSpan.textContent = description;
+          radioLabel.appendChild(descSpan);
+        }
+
+        radioRow.appendChild(radioInput);
+        radioRow.appendChild(radioLabel);
+        return { row: radioRow, input: radioInput };
+      };
+
+      const offRadio = createRadioOption(Constants.REMINDER_MODES.NONE, 'Off', '(no reminders)');
+      const dailyRadio = createRadioOption(
+        Constants.REMINDER_MODES.DAILY,
+        'Daily Reminders',
+        '(at scheduled times)'
+      );
+      const postSessionRadio = createRadioOption(
+        Constants.REMINDER_MODES.POST_SESSION,
+        'Post-Session Reminders',
+        '(after timer completion)'
+      );
+
+      reminderModeGroup.appendChild(offRadio.row);
+      reminderModeGroup.appendChild(dailyRadio.row);
+      reminderModeGroup.appendChild(postSessionRadio.row);
+
+      // ========================================
+      // Daily Reminder Settings Subsection
+      // ========================================
+      const dailyReminderSubsection = document.createElement('div');
+      dailyReminderSubsection.className = 'zen-pomodoro-subsection';
+      dailyReminderSubsection.style.marginTop = '16px';
+      dailyReminderSubsection.style.paddingLeft = '24px';
+      dailyReminderSubsection.style.borderLeft = '3px solid #007acc';
+
+      const dailySubtitle = document.createElement('div');
+      dailySubtitle.style.fontSize = '14px';
+      dailySubtitle.style.fontWeight = 'bold';
+      dailySubtitle.style.marginBottom = '12px';
+      dailySubtitle.textContent = 'Daily Reminder Settings';
 
       // Reminder times input (comma-separated)
       const reminderTimesRow = document.createElement('div');
@@ -4998,20 +5392,11 @@
         { value: config.dailyReminderSkipCooldown, min: 1, max: 120 }
       );
 
-      // Show/hide times row and cooldown row based on enabled state
-      const updateReminderTimesVisibility = () => {
-        const isEnabled = reminderEnabledCheckbox.checked;
-        reminderTimesRow.classList.toggle('hidden', !isEnabled);
-        dailyReminderCooldownRow.classList.toggle('hidden', !isEnabled);
-      };
-      reminderEnabledCheckbox.addEventListener('change', updateReminderTimesVisibility);
-      updateReminderTimesVisibility();
-
       // Development: Trigger reminder button
       const triggerReminderButton = document.createElement('button');
       triggerReminderButton.className = 'zen-pomodoro-dialog-button secondary';
       triggerReminderButton.id = 'zen-pomodoro-trigger-daily-reminder';
-      triggerReminderButton.textContent = '🧪 Test Reminder';
+      triggerReminderButton.textContent = '🧪 Test Daily Reminder';
       triggerReminderButton.title = 'Trigger the daily reminder for testing (ignores time/date)';
       triggerReminderButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.dailyReminder) {
@@ -5020,45 +5405,25 @@
         }
       });
 
-      reminderSection.appendChild(reminderTitle);
-      reminderSection.appendChild(reminderDescription);
-      reminderSection.appendChild(reminderEnabledRow);
-      reminderSection.appendChild(reminderTimesRow);
-      reminderSection.appendChild(dailyReminderCooldownRow);
-      reminderSection.appendChild(triggerReminderButton);
+      dailyReminderSubsection.appendChild(dailySubtitle);
+      dailyReminderSubsection.appendChild(reminderTimesRow);
+      dailyReminderSubsection.appendChild(dailyReminderCooldownRow);
+      dailyReminderSubsection.appendChild(triggerReminderButton);
 
       // ========================================
-      // Post-Session Reminder Section
+      // Post-Session Settings Subsection
       // ========================================
-      const postSessionSection = document.createElement('div');
-      postSessionSection.className = 'zen-pomodoro-lockout-section';
+      const postSessionSubsection = document.createElement('div');
+      postSessionSubsection.className = 'zen-pomodoro-subsection';
+      postSessionSubsection.style.marginTop = '16px';
+      postSessionSubsection.style.paddingLeft = '24px';
+      postSessionSubsection.style.borderLeft = '3px solid #007acc';
 
-      const postSessionTitle = document.createElement('div');
-      postSessionTitle.className = 'zen-pomodoro-lockout-section-title';
-      postSessionTitle.textContent = '⏱️ Post-Session Reminder';
-
-      const postSessionDescription = document.createElement('p');
-      postSessionDescription.style.fontSize = '13px';
-      postSessionDescription.style.color = '#888';
-      postSessionDescription.style.margin = '0 0 12px 0';
-      postSessionDescription.textContent =
-        'Remind to start a new timer after idle time following completion.';
-
-      // Enable/disable checkbox
-      const postSessionEnabledRow = document.createElement('div');
-      postSessionEnabledRow.className = 'zen-pomodoro-checkbox-row';
-
-      const postSessionEnabledCheckbox = document.createElement('input');
-      postSessionEnabledCheckbox.type = 'checkbox';
-      postSessionEnabledCheckbox.id = 'post-session-reminder-enabled';
-      postSessionEnabledCheckbox.checked = config.postSessionReminderEnabled;
-
-      const postSessionEnabledLabel = document.createElement('label');
-      postSessionEnabledLabel.setAttribute('for', 'post-session-reminder-enabled');
-      postSessionEnabledLabel.textContent = 'Enable post-session reminder';
-
-      postSessionEnabledRow.appendChild(postSessionEnabledCheckbox);
-      postSessionEnabledRow.appendChild(postSessionEnabledLabel);
+      const postSessionSubtitle = document.createElement('div');
+      postSessionSubtitle.style.fontSize = '14px';
+      postSessionSubtitle.style.fontWeight = 'bold';
+      postSessionSubtitle.style.marginBottom = '12px';
+      postSessionSubtitle.textContent = 'Post-Session Settings';
 
       // Idle time input
       const postSessionIdleTimeRow = createLabeledInputRow(
@@ -5158,34 +5523,6 @@
       triggerPostSessionButton.title =
         'Trigger the post-session reminder for testing (ignores idle time)';
 
-      // Helper to set element display style
-      const setElementDisplay = (element, visible) => {
-        element.classList.toggle('hidden', !visible);
-      };
-
-      // Show/hide settings based on enabled and method
-      const updatePostSessionVisibility = () => {
-        const isEnabled = postSessionEnabledCheckbox.checked;
-        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
-
-        // Set visibility for elements that depend only on isEnabled
-        [
-          postSessionIdleTimeRow,
-          postSessionCooldownRow,
-          postSessionFocusTimeRow,
-          focusTimeHelpText,
-          postSessionEndTimeRow,
-          endTimeHelpText,
-          postSessionMethodRow,
-          escalationInfo,
-          triggerPostSessionButton,
-        ].forEach((el) => setElementDisplay(el, isEnabled));
-
-        // Set visibility for method-specific elements
-        setElementDisplay(postSessionHoldDurationRow, isEnabled && usesHold);
-        setElementDisplay(postSessionCodeLengthRow, isEnabled && !usesHold);
-      };
-
       triggerPostSessionButton.addEventListener('click', () => {
         if (window.zenPomodoroApp?.postSessionReminder) {
           dialog.classList.remove('active');
@@ -5193,24 +5530,67 @@
         }
       });
 
-      postSessionEnabledCheckbox.addEventListener('change', updatePostSessionVisibility);
-      postSessionMethodSelect.addEventListener('change', updatePostSessionVisibility);
-      updatePostSessionVisibility();
+      // Helper to set element display style
+      const setElementDisplay = (element, visible) => {
+        element.classList.toggle('hidden', !visible);
+      };
 
-      postSessionSection.appendChild(postSessionTitle);
-      postSessionSection.appendChild(postSessionDescription);
-      postSessionSection.appendChild(postSessionEnabledRow);
-      postSessionSection.appendChild(postSessionIdleTimeRow);
-      postSessionSection.appendChild(postSessionCooldownRow);
-      postSessionSection.appendChild(postSessionFocusTimeRow);
-      postSessionSection.appendChild(focusTimeHelpText);
-      postSessionSection.appendChild(postSessionEndTimeRow);
-      postSessionSection.appendChild(endTimeHelpText);
-      postSessionSection.appendChild(postSessionMethodRow);
-      postSessionSection.appendChild(postSessionHoldDurationRow);
-      postSessionSection.appendChild(postSessionCodeLengthRow);
-      postSessionSection.appendChild(escalationInfo);
-      postSessionSection.appendChild(triggerPostSessionButton);
+      // Show/hide settings based on skip method
+      const updatePostSessionMethodVisibility = () => {
+        const usesHold = postSessionMethodSelect.value === LOCKOUT_METHODS.HOLD;
+        setElementDisplay(postSessionHoldDurationRow, usesHold);
+        setElementDisplay(postSessionCodeLengthRow, !usesHold);
+      };
+
+      postSessionMethodSelect.addEventListener('change', updatePostSessionMethodVisibility);
+
+      postSessionSubsection.appendChild(postSessionSubtitle);
+      postSessionSubsection.appendChild(postSessionIdleTimeRow);
+      postSessionSubsection.appendChild(postSessionCooldownRow);
+      postSessionSubsection.appendChild(postSessionFocusTimeRow);
+      postSessionSubsection.appendChild(focusTimeHelpText);
+      postSessionSubsection.appendChild(postSessionEndTimeRow);
+      postSessionSubsection.appendChild(endTimeHelpText);
+      postSessionSubsection.appendChild(postSessionMethodRow);
+      postSessionSubsection.appendChild(postSessionHoldDurationRow);
+      postSessionSubsection.appendChild(postSessionCodeLengthRow);
+      postSessionSubsection.appendChild(escalationInfo);
+      postSessionSubsection.appendChild(triggerPostSessionButton);
+
+      // Show/hide subsections based on selected reminder mode
+      const updateReminderModeVisibility = () => {
+        // Scope lookup to the current settings dialog to avoid picking radios from other dialogs
+        const root = reminderSection.closest('.zen-pomodoro-dialog') || document;
+        const selectedMode = root.querySelector('input[name="reminder-mode"]:checked')?.value;
+        setElementDisplay(
+          dailyReminderSubsection,
+          selectedMode === Constants.REMINDER_MODES.DAILY
+        );
+        setElementDisplay(
+          postSessionSubsection,
+          selectedMode === Constants.REMINDER_MODES.POST_SESSION
+        );
+
+        // Update post-session method visibility if post-session is selected
+        if (selectedMode === Constants.REMINDER_MODES.POST_SESSION) {
+          updatePostSessionMethodVisibility();
+        }
+      };
+
+      // Add event listeners to radio buttons
+      [offRadio.input, dailyRadio.input, postSessionRadio.input].forEach((radio) => {
+        radio.addEventListener('change', updateReminderModeVisibility);
+      });
+
+      // Initial visibility update
+      updateReminderModeVisibility();
+
+      // Assemble reminder section
+      reminderSection.appendChild(reminderTitle);
+      reminderSection.appendChild(reminderDescription);
+      reminderSection.appendChild(reminderModeGroup);
+      reminderSection.appendChild(dailyReminderSubsection);
+      reminderSection.appendChild(postSessionSubsection);
 
       // ========================================
       // Assemble config section
@@ -5225,7 +5605,6 @@
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       configSection.appendChild(reminderSection);
-      configSection.appendChild(postSessionSection);
 
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -5247,13 +5626,7 @@
         this._saveKeyboardShortcut(shortcutInput, config);
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
-        this._saveReminderSettings(dialog, reminderEnabledCheckbox, reminderTimesInput, config);
-        this._savePostSessionSettings(
-          dialog,
-          config,
-          postSessionEnabledCheckbox,
-          postSessionMethodSelect
-        );
+        this._saveReminderSettings(dialog, config);
 
         saveConfig(config);
         this._updateOverlayMessage(config);
@@ -5459,120 +5832,128 @@
     }
 
     /**
-     * Save daily reminder settings from settings dialog.
+     * Save reminder settings from settings dialog (unified for both daily and post-session).
      * @param {HTMLElement} dialog - The dialog element
-     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
-     * @param {HTMLInputElement} timesInput - Times input element (comma-separated)
      * @param {Object} config - Configuration object to update
      * @private
      */
-    _saveReminderSettings(dialog, enabledCheckbox, timesInput, config) {
-      config.dailyReminderEnabled = enabledCheckbox.checked;
-
-      // Save skip cooldown
-      const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
-      if (cooldownInput) {
-        const cooldownValue = validateIntegerInput(
-          parseInt(cooldownInput.value, 10),
-          1,
-          120,
-          config.dailyReminderSkipCooldown
-        );
-        config.dailyReminderSkipCooldown = cooldownValue;
+    _saveReminderSettings(dialog, config) {
+      // Get the selected reminder mode from radio buttons
+      const selectedMode = dialog.querySelector('input[name="reminder-mode"]:checked')?.value;
+      
+      if (!selectedMode) {
+        logger.log(LOG_CATEGORIES.SETTINGS, 'No reminder mode selected, defaulting to none');
+        config.reminderMode = Constants.REMINDER_MODES.NONE;
+        // Also persist to dedicated pref for Zen preferences UI
+        setPref('reminderMode', Constants.REMINDER_MODES.NONE);
+        return;
       }
 
-      // Validate and save times (comma-separated HH:MM values)
-      const timesValue = timesInput.value;
-      if (timesValue) {
-        // Split by comma and trim whitespace
-        const times = timesValue.split(',').map((t) => t.trim());
-        // Filter to only valid times
-        const validTimes = times.filter((t) => isValidTimeFormat(t));
-        if (validTimes.length > 0) {
-          config.dailyReminderTimes = validTimes;
+      config.reminderMode = selectedMode;
+      // Persist to dedicated pref for Zen preferences UI to ensure it survives restart
+      setPref('reminderMode', selectedMode);
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saving reminder mode', { mode: selectedMode });
+
+      // Save daily reminder settings if daily mode is selected
+      if (selectedMode === Constants.REMINDER_MODES.DAILY) {
+        // Save skip cooldown
+        const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
+        if (cooldownInput) {
+          const cooldownValue = validateIntegerInput(
+            parseInt(cooldownInput.value, 10),
+            1,
+            120,
+            config.dailyReminderSkipCooldown
+          );
+          config.dailyReminderSkipCooldown = cooldownValue;
         }
-      }
 
-      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
-        enabled: config.dailyReminderEnabled,
-        times: config.dailyReminderTimes,
-        skipCooldown: config.dailyReminderSkipCooldown,
-      });
-    }
+        // Validate and save times (comma-separated HH:MM values)
+        const timesInput = dialog.querySelector('#daily-reminder-times');
+        if (timesInput) {
+          const timesValue = timesInput.value;
+          if (timesValue) {
+            // Split by comma and trim whitespace
+            const times = timesValue.split(',').map((t) => t.trim());
+            // Filter to only valid times
+            const validTimes = times.filter((t) => isValidTimeFormat(t));
+            if (validTimes.length > 0) {
+              config.dailyReminderTimes = validTimes;
+            }
+          }
+        }
 
-    /**
-     * Save post-session reminder settings from settings dialog.
-     * @param {HTMLElement} dialog - The dialog element
-     * @param {Object} config - Configuration object to update
-     * @param {HTMLInputElement} enabledCheckbox - Enabled checkbox element
-     * @param {HTMLSelectElement} methodSelect - Skip method select element
-     * @private
-     */
-    _savePostSessionSettings(dialog, config, enabledCheckbox, methodSelect) {
-      config.postSessionReminderEnabled = enabledCheckbox.checked;
-      config.postSessionSkipMethod = methodSelect.value;
-
-      // Save integer settings using helper
-      // Note: zenUiPrefKey is used when a setting needs to be synced to the Zen Browser UI
-      // preferences system (via setPref) in addition to being saved in the config object.
-      // This allows settings to appear in Zen's native preferences UI.
-      const intSettings = [
-        { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
-        {
-          selector: '#post-session-skip-cooldown',
-          key: 'postSessionSkipCooldown',
-          min: 1,
-          max: 120,
-        },
-        {
-          selector: '#post-session-focus-time-goal',
-          key: 'postSessionFocusTimeGoal',
-          min: 1,
-          max: 600,
-          zenUiPrefKey: 'postSessionFocusTimeGoal',
-        },
-        {
-          selector: '#post-session-hold-duration',
-          key: 'postSessionSkipHoldDuration',
-          min: 5,
-          max: 120,
-        },
-        {
-          selector: '#post-session-code-length',
-          key: 'postSessionSkipCodeLength',
-          min: 16,
-          max: 128,
-        },
-      ];
-
-      intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
-        const value = getValidatedIntFromDialog(dialog, {
-          selector,
-          min,
-          max,
-          defaultValue: config[key],
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
+          times: config.dailyReminderTimes,
+          skipCooldown: config.dailyReminderSkipCooldown,
         });
-        if (value !== null) {
-          config[key] = value;
-          if (zenUiPrefKey) setPref(zenUiPrefKey, value);
-        }
-      });
-
-      // Save end time (with HH:MM validation)
-      const endTimeInput = dialog.querySelector('#post-session-end-time');
-      if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
-        config.postSessionReminderEndTime = endTimeInput.value;
-        setPref('postSessionReminderEndTime', endTimeInput.value);
       }
 
-      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
-        enabled: config.postSessionReminderEnabled,
-        idleTime: config.postSessionIdleTime,
-        skipCooldown: config.postSessionSkipCooldown,
-        skipMethod: config.postSessionSkipMethod,
-        focusTimeGoal: config.postSessionFocusTimeGoal,
-        endTime: config.postSessionReminderEndTime,
-      });
+      // Save post-session reminder settings if post-session mode is selected
+      if (selectedMode === Constants.REMINDER_MODES.POST_SESSION) {
+        const methodSelect = dialog.querySelector('#post-session-skip-method');
+        if (methodSelect) {
+          config.postSessionSkipMethod = methodSelect.value;
+        }
+
+        // Save integer settings using helper
+        const intSettings = [
+          { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
+          {
+            selector: '#post-session-skip-cooldown',
+            key: 'postSessionSkipCooldown',
+            min: 1,
+            max: 120,
+          },
+          {
+            selector: '#post-session-focus-time-goal',
+            key: 'postSessionFocusTimeGoal',
+            min: 1,
+            max: 600,
+            zenUiPrefKey: 'postSessionFocusTimeGoal',
+          },
+          {
+            selector: '#post-session-hold-duration',
+            key: 'postSessionSkipHoldDuration',
+            min: 5,
+            max: 120,
+          },
+          {
+            selector: '#post-session-code-length',
+            key: 'postSessionSkipCodeLength',
+            min: 16,
+            max: 128,
+          },
+        ];
+
+        intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
+          const value = getValidatedIntFromDialog(dialog, {
+            selector,
+            min,
+            max,
+            defaultValue: config[key],
+          });
+          if (value !== null) {
+            config[key] = value;
+            if (zenUiPrefKey) setPref(zenUiPrefKey, value);
+          }
+        });
+
+        // Save end time (with HH:MM validation)
+        const endTimeInput = dialog.querySelector('#post-session-end-time');
+        if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
+          config.postSessionReminderEndTime = endTimeInput.value;
+          setPref('postSessionReminderEndTime', endTimeInput.value);
+        }
+
+        logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
+          skipMethod: config.postSessionSkipMethod,
+          idleTime: config.postSessionIdleTime,
+          skipCooldown: config.postSessionSkipCooldown,
+          focusTimeGoal: config.postSessionFocusTimeGoal,
+          endTime: config.postSessionReminderEndTime,
+        });
+      }
     }
 
     /**
@@ -6588,6 +6969,9 @@
         ? 'Timer is active. Enter the code below to unlock settings:'
         : 'Enter the code below to unlock settings:';
 
+      const codeContainer = document.createElement('div');
+      codeContainer.className = 'zen-pomodoro-code-container';
+
       const codeDiv = document.createElement('div');
       codeDiv.className = 'zen-pomodoro-lock-code-display';
       codeDiv.textContent = code;
@@ -6596,6 +6980,9 @@
       input.type = 'text';
       input.id = 'zen-pomodoro-lock-code';
       input.placeholder = 'Enter code here';
+
+      codeContainer.appendChild(codeDiv);
+      codeContainer.appendChild(input);
 
       // Shared verification function
       const verifyCode = () => {
@@ -6625,8 +7012,7 @@
 
       lockContent.appendChild(h2);
       lockContent.appendChild(p);
-      lockContent.appendChild(codeDiv);
-      lockContent.appendChild(input);
+      lockContent.appendChild(codeContainer);
       lockContent.appendChild(buttonDiv);
 
       // Focus the input field for better UX
@@ -8527,9 +8913,9 @@
     _canShowDailyReminder() {
       const config = getConfig();
 
-      // Check if feature is enabled
-      if (!config.dailyReminderEnabled) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Feature disabled');
+      // Check if feature is enabled via reminderMode
+      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Feature disabled (reminderMode not set to daily)');
         return false;
       }
 
@@ -9110,6 +9496,10 @@
       instructions.className = 'zen-pomodoro-daily-reminder-instructions';
       instructions.textContent = `Enter the ${escalatedLength}-character code below to skip:`;
 
+      // Code container
+      const codeContainer = document.createElement('div');
+      codeContainer.className = 'zen-pomodoro-code-container';
+
       // Code display
       const codeDiv = document.createElement('div');
       codeDiv.className = 'zen-pomodoro-lock-code-display';
@@ -9122,6 +9512,9 @@
       input.placeholder = 'Enter code...';
       input.autocomplete = 'off';
       input.spellcheck = false;
+
+      codeContainer.appendChild(codeDiv);
+      codeContainer.appendChild(input);
 
       // Button row
       const buttonRow = document.createElement('div');
@@ -9164,8 +9557,7 @@
       buttonRow.appendChild(verifyButton);
 
       container.appendChild(instructions);
-      container.appendChild(codeDiv);
-      container.appendChild(input);
+      container.appendChild(codeContainer);
       container.appendChild(buttonRow);
 
       // Focus input
@@ -9245,7 +9637,7 @@
       const config = getConfig();
 
       // Return null if feature is disabled
-      if (!config.dailyReminderEnabled) {
+      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) {
         return null;
       }
 
@@ -9452,8 +9844,8 @@
      */
     onTimerComplete() {
       const config = getConfig();
-      if (!config.postSessionReminderEnabled) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Feature disabled');
+      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Feature disabled (reminderMode not set to post-session)');
         return;
       }
 
@@ -9593,7 +9985,7 @@
       const config = getConfig();
 
       // Skip if feature is disabled or already disabled for the day
-      if (!config.postSessionReminderEnabled || config.postSessionReminderDisabledForDay) {
+      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION || config.postSessionReminderDisabledForDay) {
         return;
       }
 
@@ -9706,7 +10098,7 @@
      */
     _isPostSessionFeatureEnabled() {
       const config = getConfig();
-      return config.postSessionReminderEnabled;
+      return config.reminderMode === Constants.REMINDER_MODES.POST_SESSION;
     }
 
     /**
@@ -9809,7 +10201,7 @@
       const config = getConfig();
 
       // Check basic conditions
-      if (!config.postSessionReminderEnabled) return false;
+      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) return false;
       if (this.isShowing) return false;
       if (!this.idleStartTime) return false;
       if (window.zenPomodoroApp?.timer?.isActive) return false;
@@ -9827,7 +10219,7 @@
       const config = getConfig();
 
       // Only return null if feature is disabled
-      if (!config.postSessionReminderEnabled) {
+      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) {
         return null;
       }
 
@@ -10167,6 +10559,10 @@
       instructions.className = 'zen-pomodoro-post-session-instructions';
       instructions.textContent = `Enter the ${escalatedLength}-character code below to skip:`;
 
+      // Code container
+      const codeContainer = document.createElement('div');
+      codeContainer.className = 'zen-pomodoro-code-container';
+
       // Code display
       const codeDiv = document.createElement('div');
       codeDiv.className = 'zen-pomodoro-lock-code-display';
@@ -10178,6 +10574,9 @@
       input.id = 'zen-pomodoro-post-session-code-input';
       input.className = 'zen-pomodoro-post-session-code-input';
       input.placeholder = 'Enter code here';
+
+      codeContainer.appendChild(codeDiv);
+      codeContainer.appendChild(input);
 
       // Button row
       const buttonRow = document.createElement('div');
@@ -10217,8 +10616,7 @@
       buttonRow.appendChild(verifyButton);
 
       container.appendChild(instructions);
-      container.appendChild(codeDiv);
-      container.appendChild(input);
+      container.appendChild(codeContainer);
       container.appendChild(buttonRow);
 
       // Focus input
@@ -10291,7 +10689,7 @@
       this.dumpInterval = null;
       this.dumpTimeRemaining = 0;
       this.savedTimerState = null; // Stores the paused timer state
-      this.dumpDialog = null;
+      this.dumpIndicatorClickHandler = null; // Click handler for ending dump
       this.dumpUsedThisFocusPhase = false; // Track if dump was used in current focus phase
     }
 
@@ -10520,7 +10918,9 @@
       };
 
       this._enableDumpMode();
-      this._createDumpDialog(duration);
+      
+      // Set up small purple indicator with click handler to end dump
+      this._setupDumpIndicator();
 
       // Start countdown
       this.dumpInterval = setInterval(() => {
@@ -10534,7 +10934,77 @@
     }
 
     /**
-     * Clean up dump dialog and interval.
+     * Set up dump indicator and click handler.
+     * @private
+     */
+    _setupDumpIndicator() {
+      const overlay = window.zenPomodoroApp?.overlay;
+      if (!overlay) return;
+
+      // Show dump indicator
+      overlay.showDumpIndicator(this.dumpTimeRemaining);
+
+      // Set up click handler to end dump
+      const indicator = overlay.indicator;
+      if (indicator) {
+        // Store handler for cleanup
+        this.dumpIndicatorClickHandler = () => {
+          this._showEndDumpConfirmation();
+        };
+        indicator.addEventListener('click', this.dumpIndicatorClickHandler);
+      }
+    }
+
+    /**
+     * Show confirmation dialog to end dump early.
+     * @private
+     */
+    _showEndDumpConfirmation() {
+      if (!this.isActive) return;
+
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-dump-end-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
+
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = 'End Distraction Dump?';
+      dialog.appendChild(title);
+
+      const description = document.createElement('p');
+      description.className = 'zen-pomodoro-dialog-description';
+      description.textContent = 'End the dump and resume your focus timer? All blocks will be restored.';
+      dialog.appendChild(description);
+
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        dialog.remove();
+      });
+
+      const endButton = document.createElement('button');
+      endButton.className = 'zen-pomodoro-dialog-button zen-pomodoro-dialog-button-primary';
+      endButton.textContent = 'End Dump & Resume';
+      endButton.addEventListener('click', () => {
+        dialog.remove();
+        this.endDump();
+      });
+
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(endButton);
+      dialog.appendChild(buttonDiv);
+
+      document.documentElement.appendChild(dialog);
+      applyLastDialogPosition(dialog);
+      setupDialogDrag(dialog);
+    }
+
+    /**
+     * Clean up dump UI (indicator click handler and interval).
      * @private
      */
     _cleanupDumpUI() {
@@ -10543,10 +11013,16 @@
         this.dumpInterval = null;
       }
 
-      if (this.dumpDialog) {
-        this.dumpDialog.remove();
-        this.dumpDialog = null;
+      // Remove click handler from indicator
+      const overlay = window.zenPomodoroApp?.overlay;
+      const indicator = overlay?.indicator;
+      if (indicator && this.dumpIndicatorClickHandler) {
+        indicator.removeEventListener('click', this.dumpIndicatorClickHandler);
+        this.dumpIndicatorClickHandler = null;
       }
+
+      // Hide dump indicator and restore normal indicator
+      overlay?.hideDumpIndicator();
     }
 
     /**
@@ -10564,77 +11040,14 @@
     }
 
     /**
-     * Create the dump dialog UI.
-     * @param {number} duration - Duration in minutes
-     * @private
-     */
-    _createDumpDialog(duration) {
-      const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-dump-dialog';
-      dialog.className = 'zen-pomodoro-dialog active zen-pomodoro-dump-active';
-
-      // Title
-      const title = document.createElement('h2');
-      title.className = 'zen-pomodoro-dialog-title';
-      title.textContent = '🧠 Distraction Dump Active';
-      dialog.appendChild(title);
-
-      // Status text
-      const status = document.createElement('p');
-      status.className = 'zen-pomodoro-dump-status';
-      status.textContent = 
-        'Timer paused. All blocks temporarily lifted. Use this time to capture your thoughts.';
-      dialog.appendChild(status);
-
-      // Timer display
-      const timerDisplay = document.createElement('div');
-      timerDisplay.className = 'zen-pomodoro-dump-timer';
-      timerDisplay.textContent = formatTime(duration * 60);
-      dialog.appendChild(timerDisplay);
-
-      // Helpful message
-      const helpText = document.createElement('p');
-      helpText.className = 'zen-pomodoro-dialog-description';
-      helpText.style.textAlign = 'center';
-      helpText.textContent = 'Write in your journal or notes. Your main timer is safely paused.';
-      dialog.appendChild(helpText);
-
-      // Buttons
-      const buttonDiv = document.createElement('div');
-      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-
-      const endButton = document.createElement('button');
-      endButton.className = 'zen-pomodoro-dialog-button';
-      endButton.textContent = 'End Dump & Resume Timer';
-      endButton.addEventListener('click', () => {
-        this.endDump();
-      });
-
-      buttonDiv.appendChild(endButton);
-      dialog.appendChild(buttonDiv);
-
-      // Add to DOM first
-      document.documentElement.appendChild(dialog);
-      this.dumpDialog = dialog;
-
-      // Position dialog
-      applyLastDialogPosition(dialog);
-
-      // Make dialog draggable
-      setupDialogDrag(dialog);
-    }
-
-    /**
-     * Update the dump timer display.
+     * Update the dump indicator display.
      * @param {number} timeInSeconds - Time remaining in seconds
      * @private
      */
     _updateDisplay(timeInSeconds) {
-      if (!this.dumpDialog) return;
-
-      const timerDisplay = this.dumpDialog.querySelector('.zen-pomodoro-dump-timer');
-      if (timerDisplay) {
-        timerDisplay.textContent = formatTime(timeInSeconds);
+      const overlay = window.zenPomodoroApp?.overlay;
+      if (overlay) {
+        overlay.updateDumpIndicator(timeInSeconds);
       }
     }
 
@@ -10645,6 +11058,793 @@
       if (this.isActive) {
         this.endDump();
       }
+    }
+  }
+
+  // ============================================
+  // Custom Cycle Manager
+  // ============================================
+
+  /**
+   * Manages custom Pomodoro cycles.
+   * Allows users to create, edit, and manage custom timer sequences
+   * with different durations for each focus and break phase.
+   */
+  class CustomCycleManager {
+    constructor() {
+      this.currentEditingCycle = null;
+      this.editingCycleDialog = null;
+      this.draggedBlockIndex = null;
+    }
+
+    /**
+     * Show the main custom cycles menu listing all saved cycles.
+     */
+    showCustomCyclesMenu() {
+      logger.log(LOG_CATEGORIES.MENU, 'Opening custom cycles menu');
+
+      const config = getConfig();
+      const savedCycles = config.customCycles || [];
+
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-custom-cycles-dialog';
+      dialog.className = 'zen-pomodoro-dialog active';
+
+      // Back button
+      const backButton = document.createElement('button');
+      backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
+      backButton.textContent = '← Back';
+      backButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        // Return to main menu
+        if (window.zenPomodoroApp?.keyboardShortcut) {
+          window.zenPomodoroApp.keyboardShortcut.showPomodoroMenu();
+        }
+      });
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = 'Custom Cycles';
+      
+      // Description
+      const description = document.createElement('p');
+      description.className = 'zen-pomodoro-dialog-description';
+      description.textContent = 
+        'Create custom timer sequences with different durations for each phase.';
+      description.style.fontSize = '13px';
+      description.style.color = '#888';
+      description.style.margin = '0 0 16px 0';
+
+      // Cycles list container
+      const cyclesContainer = document.createElement('div');
+      cyclesContainer.className = 'zen-pomodoro-cycles-list';
+      cyclesContainer.style.marginBottom = '16px';
+
+      if (savedCycles.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.style.color = '#888';
+        emptyMessage.style.fontSize = '13px';
+        emptyMessage.style.textAlign = 'center';
+        emptyMessage.style.padding = '20px';
+        emptyMessage.textContent = 'No custom cycles yet. Create one to get started!';
+        cyclesContainer.appendChild(emptyMessage);
+      } else {
+        savedCycles.forEach((cycle) => {
+          const cycleItem = this._createCycleListItem(cycle, config, dialog);
+          cyclesContainer.appendChild(cycleItem);
+        });
+      }
+
+      // Create New button
+      const createButton = document.createElement('button');
+      createButton.className = 'zen-pomodoro-dialog-button';
+      createButton.textContent = '+ Create New Cycle';
+      createButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.showCycleEditor(null);
+      });
+
+      // Close button
+      const closeButton = document.createElement('button');
+      closeButton.className = 'zen-pomodoro-dialog-button secondary';
+      closeButton.textContent = 'Close';
+      closeButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+      });
+
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+      buttonDiv.appendChild(createButton);
+      buttonDiv.appendChild(closeButton);
+
+      dialog.appendChild(backButton);
+      dialog.appendChild(title);
+      dialog.appendChild(description);
+      dialog.appendChild(cyclesContainer);
+      dialog.appendChild(buttonDiv);
+
+      applyLastDialogPosition(dialog);
+      document.documentElement.appendChild(dialog);
+    }
+
+    /**
+     * Create a list item for a single saved cycle.
+     * @param {Object} cycle - The cycle object
+     * @param {Object} config - Current configuration
+     * @param {HTMLElement} parentDialog - Parent dialog element
+     * @returns {HTMLElement} The cycle list item element
+     * @private
+     */
+    _createCycleListItem(cycle, config, parentDialog) {
+      const item = document.createElement('div');
+      item.className = 'zen-pomodoro-cycle-list-item';
+
+      // Cycle name and info
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'zen-pomodoro-cycle-name';
+      nameDiv.textContent = cycle.name;
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'zen-pomodoro-cycle-info';
+      const blockCount = cycle.blocks.length;
+      const totalMinutes = cycle.blocks.reduce((sum, block) => sum + block.duration, 0);
+      infoDiv.textContent = `${blockCount} blocks • ${totalMinutes} minutes total`;
+
+      const leftContent = document.createElement('div');
+      leftContent.style.flex = '1';
+      leftContent.appendChild(nameDiv);
+      leftContent.appendChild(infoDiv);
+
+      // Button container
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'zen-pomodoro-cycle-buttons';
+
+      // Edit button
+      const editButton = document.createElement('button');
+      editButton.className = 'zen-pomodoro-dialog-button secondary small';
+      editButton.textContent = 'Edit';
+      editButton.addEventListener('click', () => {
+        saveDialogPosition(parentDialog);
+        parentDialog.remove();
+        this.showCycleEditor(cycle.id);
+      });
+
+      // Delete button
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'zen-pomodoro-dialog-button secondary small';
+      deleteButton.textContent = 'Delete';
+      deleteButton.addEventListener('click', () => {
+        this._confirmDeleteCycle(cycle, config, parentDialog);
+      });
+
+      buttonsDiv.appendChild(editButton);
+      buttonsDiv.appendChild(deleteButton);
+
+      item.appendChild(leftContent);
+      item.appendChild(buttonsDiv);
+
+      return item;
+    }
+
+    /**
+     * Show confirmation dialog before deleting a cycle.
+     * @param {Object} cycle - The cycle to delete
+     * @param {Object} config - Current configuration
+     * @param {HTMLElement} parentDialog - Parent dialog to refresh
+     * @private
+     */
+    _confirmDeleteCycle(cycle, config, parentDialog) {
+      const confirmDialog = document.createElement('div');
+      confirmDialog.className = 'zen-pomodoro-dialog active';
+      confirmDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
+
+      const title = document.createElement('h2');
+      title.textContent = 'Delete Cycle?';
+
+      const message = document.createElement('p');
+      message.textContent = `Are you sure you want to delete "${cycle.name}"? This cannot be undone.`;
+      message.style.marginBottom = '20px';
+
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        confirmDialog.remove();
+      });
+
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'zen-pomodoro-dialog-button';
+      deleteButton.textContent = 'Delete';
+      deleteButton.style.backgroundColor = '#e74c3c';
+      deleteButton.addEventListener('click', () => {
+        this.deleteCycle(cycle.id);
+        confirmDialog.remove();
+        // Refresh the cycles list
+        saveDialogPosition(parentDialog);
+        parentDialog.remove();
+        this.showCustomCyclesMenu();
+      });
+
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(deleteButton);
+
+      confirmDialog.appendChild(title);
+      confirmDialog.appendChild(message);
+      confirmDialog.appendChild(buttonDiv);
+
+      applyLastDialogPosition(confirmDialog);
+      document.documentElement.appendChild(confirmDialog);
+    }
+
+    /**
+     * Show the cycle editor for creating or editing a cycle.
+     * @param {string|null} cycleId - ID of cycle to edit, or null to create new
+     */
+    showCycleEditor(cycleId = null) {
+      logger.log(LOG_CATEGORIES.MENU, cycleId ? 'Editing custom cycle' : 'Creating new custom cycle');
+
+      const config = getConfig();
+      const savedCycles = config.customCycles || [];
+      
+      // Load existing cycle or create new one
+      if (cycleId) {
+        this.currentEditingCycle = savedCycles.find((c) => c.id === cycleId);
+        if (!this.currentEditingCycle) {
+          logger.log(LOG_CATEGORIES.MENU, `Cycle ${cycleId} not found`);
+          return;
+        }
+        // Make a deep copy to avoid modifying the original until save
+        this.currentEditingCycle = JSON.parse(JSON.stringify(this.currentEditingCycle));
+      } else {
+        // Create new cycle with default values
+        this.currentEditingCycle = {
+          id: this._generateCycleId(),
+          name: 'New Custom Cycle',
+          blocks: [
+            { type: 'focus', duration: 25 },
+            { type: 'break', duration: 5 },
+          ],
+        };
+      }
+
+      const dialog = document.createElement('div');
+      dialog.id = 'zen-pomodoro-cycle-editor-dialog';
+      dialog.className = 'zen-pomodoro-dialog active zen-pomodoro-cycle-editor-dialog';
+      this.editingCycleDialog = dialog;
+
+      // Back button
+      const backButton = document.createElement('button');
+      backButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-back-button';
+      backButton.textContent = '← Back';
+      backButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.editingCycleDialog = null;
+        this.showCustomCyclesMenu();
+      });
+
+      // Title
+      const title = document.createElement('h2');
+      title.className = 'zen-pomodoro-dialog-title';
+      title.textContent = cycleId ? 'Edit Custom Cycle' : 'Create Custom Cycle';
+
+      // Cycle name input
+      const nameRow = document.createElement('div');
+      nameRow.className = 'zen-pomodoro-config-row';
+      const nameLabel = document.createElement('label');
+      nameLabel.textContent = 'Cycle Name:';
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'zen-pomodoro-dialog-input';
+      nameInput.value = this.currentEditingCycle.name;
+      nameInput.placeholder = 'e.g., Deep Work Session';
+      nameInput.addEventListener('input', () => {
+        this.currentEditingCycle.name = nameInput.value;
+      });
+      nameRow.appendChild(nameLabel);
+      nameRow.appendChild(nameInput);
+
+      // Blocks container
+      const blocksLabel = document.createElement('label');
+      blocksLabel.textContent = 'Timer Blocks:';
+      blocksLabel.style.display = 'block';
+      blocksLabel.style.marginBottom = '8px';
+      blocksLabel.style.fontWeight = 'bold';
+
+      const blocksContainer = document.createElement('div');
+      blocksContainer.className = 'zen-pomodoro-cycle-blocks-container';
+      blocksContainer.id = 'zen-pomodoro-cycle-blocks';
+
+      // Render blocks
+      this._renderBlocks(blocksContainer);
+
+      // Add Block button
+      const addBlockButton = document.createElement('button');
+      addBlockButton.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-add-block-btn';
+      addBlockButton.textContent = '+ Add Block';
+      addBlockButton.addEventListener('click', () => {
+        this._showAddBlockMenu(blocksContainer);
+      });
+
+      // Save and Cancel buttons
+      const buttonDiv = document.createElement('div');
+      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.editingCycleDialog = null;
+        this.showCustomCyclesMenu();
+      });
+
+      const saveButton = document.createElement('button');
+      saveButton.className = 'zen-pomodoro-dialog-button';
+      saveButton.textContent = 'Save Cycle';
+      saveButton.addEventListener('click', () => {
+        if (this._validateCycle()) {
+          this.saveCycle();
+          saveDialogPosition(dialog);
+          dialog.remove();
+          this.editingCycleDialog = null;
+          this.showCustomCyclesMenu();
+        }
+      });
+
+      buttonDiv.appendChild(cancelButton);
+      buttonDiv.appendChild(saveButton);
+
+      dialog.appendChild(backButton);
+      dialog.appendChild(title);
+      dialog.appendChild(nameRow);
+      dialog.appendChild(blocksLabel);
+      dialog.appendChild(blocksContainer);
+      dialog.appendChild(addBlockButton);
+      dialog.appendChild(buttonDiv);
+
+      applyLastDialogPosition(dialog);
+      document.documentElement.appendChild(dialog);
+    }
+
+    /**
+     * Render the blocks in the editor.
+     * @param {HTMLElement} container - Container element for blocks
+     * @private
+     */
+    _renderBlocks(container) {
+      container.innerHTML = '';
+
+      if (this.currentEditingCycle.blocks.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.style.color = '#888';
+        emptyMessage.style.fontSize = '13px';
+        emptyMessage.style.textAlign = 'center';
+        emptyMessage.style.padding = '20px';
+        emptyMessage.textContent = 'No blocks yet. Add your first block to get started!';
+        container.appendChild(emptyMessage);
+        return;
+      }
+
+      this.currentEditingCycle.blocks.forEach((block, index) => {
+        const blockElement = this._createBlockElement(block, index);
+        container.appendChild(blockElement);
+      });
+    }
+
+    /**
+     * Create a block element for the editor.
+     * @param {Object} block - Block object
+     * @param {number} index - Block index
+     * @returns {HTMLElement} Block element
+     * @private
+     */
+    _createBlockElement(block, index) {
+      const blockDiv = document.createElement('div');
+      blockDiv.className = `zen-pomodoro-cycle-block zen-pomodoro-cycle-block-${block.type}`;
+      blockDiv.draggable = true;
+      blockDiv.dataset.index = index;
+
+      // Drag handle
+      const dragHandle = document.createElement('div');
+      dragHandle.className = 'zen-pomodoro-cycle-block-handle';
+      dragHandle.textContent = '⋮⋮';
+      dragHandle.title = 'Drag to reorder';
+
+      // Block type icon
+      const typeIcon = document.createElement('div');
+      typeIcon.className = 'zen-pomodoro-cycle-block-type';
+      typeIcon.textContent = block.type === 'focus' ? '🎯' : '☕';
+
+      // Block info
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'zen-pomodoro-cycle-block-info';
+      
+      const typeLabel = document.createElement('div');
+      typeLabel.className = 'zen-pomodoro-cycle-block-label';
+      typeLabel.textContent = block.type === 'focus' ? 'Focus' : 'Break';
+      
+      const durationInput = document.createElement('input');
+      durationInput.type = 'number';
+      durationInput.min = '1';
+      durationInput.max = '120';
+      durationInput.value = block.duration;
+      durationInput.className = 'zen-pomodoro-cycle-block-duration';
+      durationInput.addEventListener('change', () => {
+        const newDuration = validateIntegerInput(durationInput.value, 1, 120, block.duration);
+        durationInput.value = newDuration;
+        this.currentEditingCycle.blocks[index].duration = newDuration;
+      });
+      
+      const minutesLabel = document.createElement('span');
+      minutesLabel.textContent = ' minutes';
+      minutesLabel.style.fontSize = '12px';
+      minutesLabel.style.color = '#888';
+
+      infoDiv.appendChild(typeLabel);
+      infoDiv.appendChild(durationInput);
+      infoDiv.appendChild(minutesLabel);
+
+      // Delete button
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'zen-pomodoro-cycle-block-delete';
+      deleteButton.textContent = '✕';
+      deleteButton.title = 'Delete block';
+      deleteButton.addEventListener('click', () => {
+        this.removeBlock(index);
+      });
+
+      blockDiv.appendChild(dragHandle);
+      blockDiv.appendChild(typeIcon);
+      blockDiv.appendChild(infoDiv);
+      blockDiv.appendChild(deleteButton);
+
+      // Drag and drop handlers
+      blockDiv.addEventListener('dragstart', (e) => {
+        this.draggedBlockIndex = index;
+        blockDiv.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      blockDiv.addEventListener('dragend', () => {
+        blockDiv.classList.remove('dragging');
+        this.draggedBlockIndex = null;
+      });
+
+      blockDiv.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        const afterElement = this._getDragAfterElement(blockDiv.parentElement, e.clientY);
+        if (afterElement == null) {
+          blockDiv.parentElement.appendChild(blockDiv.parentElement.querySelector('.dragging'));
+        } else {
+          blockDiv.parentElement.insertBefore(
+            blockDiv.parentElement.querySelector('.dragging'),
+            afterElement
+          );
+        }
+      });
+
+      blockDiv.addEventListener('drop', (e) => {
+        e.preventDefault();
+        
+        // Compute target index from current DOM order instead of stale dataset.index
+        const container = blockDiv.parentElement;
+        if (!container) {
+          return;
+        }
+        
+        const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+        const draggedElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
+        
+        if (!draggedElement) {
+          return;
+        }
+        
+        const targetIndex = blocks.indexOf(draggedElement);
+        if (targetIndex === -1) {
+          return;
+        }
+        
+        if (this.draggedBlockIndex !== null && this.draggedBlockIndex !== targetIndex) {
+          this.reorderBlocks(this.draggedBlockIndex, targetIndex);
+        }
+      });
+
+      return blockDiv;
+    }
+
+    /**
+     * Get the element after which the dragged element should be inserted.
+     * @param {HTMLElement} container - Container element
+     * @param {number} y - Mouse Y position
+     * @returns {HTMLElement|null} Element after which to insert
+     * @private
+     */
+    _getDragAfterElement(container, y) {
+      const draggableElements = [
+        ...container.querySelectorAll('.zen-pomodoro-cycle-block:not(.dragging)'),
+      ];
+
+      return draggableElements.reduce(
+        (closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          } else {
+            return closest;
+          }
+        },
+        { offset: Number.NEGATIVE_INFINITY }
+      ).element;
+    }
+
+    /**
+     * Show menu to add a new block.
+     * @param {HTMLElement} blocksContainer - Container for blocks
+     * @private
+     */
+    _showAddBlockMenu(blocksContainer) {
+      const menu = document.createElement('div');
+      menu.className = 'zen-pomodoro-dialog active zen-pomodoro-add-block-menu';
+      menu.setAttribute(DATA_NO_POSITION_SAVE, 'true');
+
+      const title = document.createElement('h2');
+      title.textContent = 'Add Block';
+
+      const description = document.createElement('p');
+      description.textContent = 'Choose the type of block to add:';
+      description.style.marginBottom = '16px';
+      description.style.fontSize = '13px';
+
+      // Block type buttons
+      const buttonsDiv = document.createElement('div');
+      buttonsDiv.className = 'zen-pomodoro-dialog-buttons';
+      buttonsDiv.style.flexDirection = 'column';
+      buttonsDiv.style.gap = '8px';
+
+      const focusButton = document.createElement('button');
+      focusButton.className = 'zen-pomodoro-dialog-button';
+      focusButton.textContent = '🎯 Focus Block (25 min)';
+      focusButton.addEventListener('click', () => {
+        this.addBlock('focus', 25);
+        menu.remove();
+        this._renderBlocks(blocksContainer);
+      });
+
+      const breakButton = document.createElement('button');
+      breakButton.className = 'zen-pomodoro-dialog-button';
+      breakButton.textContent = '☕ Break Block (5 min)';
+      breakButton.addEventListener('click', () => {
+        this.addBlock('break', 5);
+        menu.remove();
+        this._renderBlocks(blocksContainer);
+      });
+
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
+      cancelButton.textContent = 'Cancel';
+      cancelButton.addEventListener('click', () => {
+        menu.remove();
+      });
+
+      buttonsDiv.appendChild(focusButton);
+      buttonsDiv.appendChild(breakButton);
+      buttonsDiv.appendChild(cancelButton);
+
+      menu.appendChild(title);
+      menu.appendChild(description);
+      menu.appendChild(buttonsDiv);
+
+      applyLastDialogPosition(menu);
+      document.documentElement.appendChild(menu);
+    }
+
+    /**
+     * Add a new block to the current editing cycle.
+     * @param {string} type - Block type ('focus' or 'break')
+     * @param {number} duration - Duration in minutes
+     */
+    addBlock(type, duration) {
+      this.currentEditingCycle.blocks.push({ type, duration });
+      logger.log(LOG_CATEGORIES.MENU, `Added ${type} block (${duration} min)`);
+    }
+
+    /**
+     * Remove a block from the current editing cycle.
+     * @param {number} index - Index of block to remove
+     */
+    removeBlock(index) {
+      if (this.currentEditingCycle.blocks.length <= 1) {
+        // Show error - must have at least one block
+        const errorDialog = document.createElement('div');
+        errorDialog.className = 'zen-pomodoro-dialog active';
+        errorDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
+
+        const title = document.createElement('h2');
+        title.textContent = 'Cannot Delete';
+
+        const message = document.createElement('p');
+        message.textContent = 'A cycle must have at least one block.';
+        message.style.marginBottom = '20px';
+
+        const okButton = document.createElement('button');
+        okButton.className = 'zen-pomodoro-dialog-button';
+        okButton.textContent = 'OK';
+        okButton.addEventListener('click', () => {
+          errorDialog.remove();
+        });
+
+        errorDialog.appendChild(title);
+        errorDialog.appendChild(message);
+        errorDialog.appendChild(okButton);
+
+        applyLastDialogPosition(errorDialog);
+        document.documentElement.appendChild(errorDialog);
+        return;
+      }
+
+      this.currentEditingCycle.blocks.splice(index, 1);
+      logger.log(LOG_CATEGORIES.MENU, `Removed block at index ${index}`);
+      
+      // Re-render blocks
+      const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+      if (blocksContainer) {
+        this._renderBlocks(blocksContainer);
+      }
+    }
+
+    /**
+     * Reorder blocks by moving a block from one index to another.
+     * @param {number} fromIndex - Source index
+     * @param {number} toIndex - Target index
+     */
+    reorderBlocks(fromIndex, toIndex) {
+      if (fromIndex === toIndex) return;
+
+      const block = this.currentEditingCycle.blocks[fromIndex];
+      this.currentEditingCycle.blocks.splice(fromIndex, 1);
+      this.currentEditingCycle.blocks.splice(toIndex, 0, block);
+      
+      logger.log(LOG_CATEGORIES.MENU, `Reordered block from ${fromIndex} to ${toIndex}`);
+      
+      // Re-render blocks to update indices
+      const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+      if (blocksContainer) {
+        this._renderBlocks(blocksContainer);
+      }
+    }
+
+    /**
+     * Validate the current editing cycle.
+     * @returns {boolean} True if valid
+     * @private
+     */
+    _validateCycle() {
+      if (!this.currentEditingCycle.name || this.currentEditingCycle.name.trim() === '') {
+        this._showValidationError('Please enter a name for the cycle.');
+        return false;
+      }
+
+      if (this.currentEditingCycle.blocks.length === 0) {
+        this._showValidationError('A cycle must have at least one block.');
+        return false;
+      }
+
+      // Check that all blocks have valid durations
+      for (const block of this.currentEditingCycle.blocks) {
+        if (!block.duration || block.duration < 1 || block.duration > 120) {
+          this._showValidationError('All blocks must have a duration between 1 and 120 minutes.');
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    /**
+     * Show a validation error dialog.
+     * @param {string} message - Error message
+     * @private
+     */
+    _showValidationError(message) {
+      const errorDialog = document.createElement('div');
+      errorDialog.className = 'zen-pomodoro-dialog active';
+      errorDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
+
+      const title = document.createElement('h2');
+      title.textContent = 'Validation Error';
+
+      const messageP = document.createElement('p');
+      messageP.textContent = message;
+      messageP.style.marginBottom = '20px';
+
+      const okButton = document.createElement('button');
+      okButton.className = 'zen-pomodoro-dialog-button';
+      okButton.textContent = 'OK';
+      okButton.addEventListener('click', () => {
+        errorDialog.remove();
+      });
+
+      errorDialog.appendChild(title);
+      errorDialog.appendChild(messageP);
+      errorDialog.appendChild(okButton);
+
+      applyLastDialogPosition(errorDialog);
+      document.documentElement.appendChild(errorDialog);
+    }
+
+    /**
+     * Save the current editing cycle.
+     */
+    saveCycle() {
+      const config = getConfig();
+      const savedCycles = config.customCycles || [];
+      
+      // Find if cycle already exists
+      const existingIndex = savedCycles.findIndex((c) => c.id === this.currentEditingCycle.id);
+      
+      if (existingIndex !== -1) {
+        // Update existing cycle
+        savedCycles[existingIndex] = this.currentEditingCycle;
+        logger.log(LOG_CATEGORIES.MENU, `Updated custom cycle: ${this.currentEditingCycle.name}`);
+      } else {
+        // Add new cycle
+        savedCycles.push(this.currentEditingCycle);
+        logger.log(LOG_CATEGORIES.MENU, `Created new custom cycle: ${this.currentEditingCycle.name}`);
+      }
+      
+      config.customCycles = savedCycles;
+      saveConfig(config);
+      
+      this.currentEditingCycle = null;
+    }
+
+    /**
+     * Delete a saved cycle.
+     * @param {string} cycleId - ID of cycle to delete
+     */
+    deleteCycle(cycleId) {
+      const config = getConfig();
+      const savedCycles = config.customCycles || [];
+      
+      const index = savedCycles.findIndex((c) => c.id === cycleId);
+      if (index !== -1) {
+        const cycleName = savedCycles[index].name;
+        savedCycles.splice(index, 1);
+        config.customCycles = savedCycles;
+        saveConfig(config);
+        logger.log(LOG_CATEGORIES.MENU, `Deleted custom cycle: ${cycleName}`);
+      }
+    }
+
+    /**
+     * Get all saved custom cycles.
+     * @returns {Array} Array of saved cycles
+     */
+    getSavedCycles() {
+      const config = getConfig();
+      return config.customCycles || [];
+    }
+
+    /**
+     * Generate a unique ID for a new cycle.
+     * @returns {string} Unique cycle ID
+     * @private
+     */
+    _generateCycleId() {
+      return `cycle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
   }
 
@@ -10665,6 +11865,7 @@
       this.dailyReminder = new DailyReminderManager(); // Daily reminders at configured times
       this.postSessionReminder = new PostSessionReminderManager(); // Post-session idle reminder
       this.distractionDump = new DistractionDumpManager(); // Distraction dump for capturing thoughts
+      this.customCycles = new CustomCycleManager(); // Custom cycle manager for advanced pomodoro cycles
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
@@ -10845,6 +12046,42 @@
       console.log(`Starting timer: mode=${mode}, cycles=${cycles}`);
 
       this.timer.start(mode, cycles, sessionOverrides);
+      this.overlay.showIndicator();
+      this.updateOverlayVisibility();
+
+      // Reset distraction dump availability for new timer session
+      this.distractionDump.resetForNewFocusPhase();
+
+      // Notify Sine Mod Blocker that timer started
+      this.sineModBlocker.onTimerStart();
+
+      // Notify Website Blocker that timer started
+      this.websiteBlocker.onTimerStart();
+
+      // Record timer start date for daily reminder tracking
+      this.dailyReminder.recordTimerStarted();
+
+      // Hide daily reminder if showing (timer has been started)
+      this.dailyReminder.hideReminder();
+
+      // Notify Post-Session Reminder that timer started (resets idle tracking)
+      this.postSessionReminder.onTimerStart();
+
+      // Double-check overlay visibility after a short delay
+      // This ensures the DOM has settled after timer start
+      setTimeout(() => {
+        this.updateOverlayVisibility();
+      }, DOM_SETTLE_DELAY_MS);
+    }
+
+    /**
+     * Start a custom cycle timer
+     * @param {Object} customCycle - Custom cycle configuration object
+     */
+    startCustomCycle(customCycle) {
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting custom cycle', { cycleName: customCycle.name });
+
+      this.timer.startCustomCycle(customCycle);
       this.overlay.showIndicator();
       this.updateOverlayVisibility();
 

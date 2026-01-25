@@ -13,10 +13,24 @@
     "defaultValue": true
   },
   {
-    "property": "zen-pomodoro.postSessionReminderEnabled",
-    "label": "Enable Post-Session Reminder",
-    "type": "checkbox",
-    "defaultValue": true
+    "property": "zen-pomodoro.reminderMode",
+    "label": "Reminder Mode",
+    "type": "dropdown",
+    "defaultValue": "post-session",
+    "options": [
+      {
+        "label": "Off",
+        "value": "none"
+      },
+      {
+        "label": "Daily Reminders",
+        "value": "daily"
+      },
+      {
+        "label": "Post-Session Reminders",
+        "value": "post-session"
+      }
+    ]
   },
   {
     "property": "zen-pomodoro.postSessionIdleTime",
