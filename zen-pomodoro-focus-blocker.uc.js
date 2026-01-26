@@ -2469,15 +2469,8 @@
         return true;
       }
 
-      // Regular Pomodoro mode: skip to break phase
-      const isLastCycle = this.currentCycle >= this.totalCycles;
-      if (isLastCycle) {
-        // On last cycle, complete the timer
-        this.completeTimer();
-        return true;
-      }
-
-      // Move to break phase
+      // Regular Pomodoro mode: always skip to break phase
+      // Even on last cycle, user should get their break before timer completes
       this.currentPhase = 'break';
       this.remainingTime = this.config.breakDuration * 60;
 
@@ -4621,7 +4614,7 @@
               this._stopMenuTimerUpdates();
               dialog.remove();
               this.menuDialog = null;
-              window.zenPomodoroApp.distractionDump._showEndDumpConfirmation();
+              window.zenPomodoroApp.distractionDump.showEndDumpConfirmation();
             });
           } else if (isDumpAvailable) {
             // Dump is available - show Start Dump option
@@ -11211,7 +11204,7 @@
       if (indicator) {
         // Store handler for cleanup
         this.dumpIndicatorClickHandler = () => {
-          this._showEndDumpConfirmation();
+          this.showEndDumpConfirmation();
         };
         indicator.addEventListener('click', this.dumpIndicatorClickHandler);
       }
@@ -11219,9 +11212,8 @@
 
     /**
      * Show confirmation dialog to end dump early.
-     * @private
      */
-    _showEndDumpConfirmation() {
+    showEndDumpConfirmation() {
       if (!this.isActive) return;
 
       const dialog = document.createElement('div');
@@ -11732,8 +11724,13 @@
       breakOption.value = 'break';
       breakOption.textContent = '☕ Break';
       
+      const transitionOption = document.createElement('option');
+      transitionOption.value = 'transition';
+      transitionOption.textContent = '⏰ Transition';
+      
       blockTypeSelect.appendChild(focusOption);
       blockTypeSelect.appendChild(breakOption);
+      blockTypeSelect.appendChild(transitionOption);
 
       const addBlockButton = document.createElement('button');
       addBlockButton.className = 'zen-pomodoro-dialog-button secondary';
@@ -11742,9 +11739,15 @@
       addBlockButton.style.padding = '8px 16px';
       addBlockButton.addEventListener('click', () => {
         const selectedType = blockTypeSelect.value;
-        const duration = selectedType === 'focus' 
-          ? this.currentEditingCycle.defaultFocusDuration 
-          : this.currentEditingCycle.defaultBreakDuration;
+        let duration;
+        if (selectedType === 'focus') {
+          duration = this.currentEditingCycle.defaultFocusDuration;
+        } else if (selectedType === 'break') {
+          duration = this.currentEditingCycle.defaultBreakDuration;
+        } else {
+          // Transition: default to 5 minutes
+          duration = 5;
+        }
         this.addBlock(selectedType, duration);
         this._renderBlocks(blocksContainer);
       });
@@ -11843,7 +11846,8 @@
       // Block type icon
       const typeIcon = document.createElement('div');
       typeIcon.className = 'zen-pomodoro-cycle-block-type';
-      typeIcon.textContent = block.type === 'focus' ? '🎯' : '☕';
+      const typeIcons = { focus: '🎯', break: '☕', transition: '⏰' };
+      typeIcon.textContent = typeIcons[block.type] || '❓';
 
       // Block info
       const infoDiv = document.createElement('div');
@@ -11851,16 +11855,18 @@
       
       const typeLabel = document.createElement('div');
       typeLabel.className = 'zen-pomodoro-cycle-block-label';
-      typeLabel.textContent = block.type === 'focus' ? 'Focus' : 'Break';
+      const typeLabels = { focus: 'Focus', break: 'Break', transition: 'Transition' };
+      typeLabel.textContent = typeLabels[block.type] || 'Unknown';
       
       const durationInput = document.createElement('input');
       durationInput.type = 'number';
       durationInput.min = '1';
-      durationInput.max = '120';
+      durationInput.max = block.type === 'transition' ? '15' : '120';
       durationInput.value = block.duration;
       durationInput.className = 'zen-pomodoro-cycle-block-duration';
       durationInput.addEventListener('change', () => {
-        const newDuration = validateIntegerInput(durationInput.value, 1, 120, block.duration);
+        const maxDuration = block.type === 'transition' ? 15 : 120;
+        const newDuration = validateIntegerInput(durationInput.value, 1, maxDuration, block.duration);
         durationInput.value = newDuration;
         this.currentEditingCycle.blocks[index].duration = newDuration;
       });

@@ -2049,6 +2049,12 @@
   border-left: 4px solid #2ec491;
 }
 
+/* Transition block styling */
+.zen-pomodoro-cycle-block-transition {
+  border-left: 4px solid #ff9800;
+  background: linear-gradient(to right, rgb(255 152 0 / 10%), transparent);
+}
+
 /* Drag handle */
 .zen-pomodoro-cycle-block-handle {
   font-size: 20px;
