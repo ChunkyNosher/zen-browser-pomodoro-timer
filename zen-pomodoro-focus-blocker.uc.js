@@ -2411,39 +2411,79 @@
     }
 
     /**
-     * Skip to the next block in custom cycle mode (for cutting break early).
-     * If there's no next block, completes the timer.
-     * @returns {boolean} True if successfully skipped, false if timer completed or not in custom mode
+     * Check if the timer can skip to next custom cycle block.
+     * @returns {boolean} True if skip is allowed
+     * @private
      */
-    skipToNextCustomBlock() {
+    _canSkipCustomBlock() {
       if (this.mode !== 'custom' || !this.customCycleBlocks) {
         logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in custom mode');
         return false;
       }
 
-      // Validate we're in a break phase before allowing skip
       if (this.currentPhase !== 'break') {
         logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in break phase, cannot skip');
         return false;
       }
 
-      // Move to next block
+      return true;
+    }
+
+    /**
+     * Find the next non-break block index, skipping consecutive break blocks.
+     * @param {number} startIndex - Starting index
+     * @returns {number} Index of next non-break block, or blocks.length if none found
+     * @private
+     */
+    _findNextNonBreakBlockIndex(startIndex) {
+      let index = startIndex;
+      while (
+        index < this.customCycleBlocks.length &&
+        this.customCycleBlocks[index]?.type === 'break'
+      ) {
+        index++;
+      }
+      return index;
+    }
+
+    /**
+     * Skip to the next block in custom cycle mode (for cutting break early).
+     * Skips over any consecutive break blocks to reach the next focus block.
+     * If there's no next block, completes the timer.
+     * @returns {boolean} True if successfully skipped, false if timer completed or not in custom mode
+     */
+    skipToNextCustomBlock() {
+      if (!this._canSkipCustomBlock()) return false;
+
+      // Move to next block index
+      const originalIndex = this.currentBlockIndex;
       this.currentBlockIndex++;
 
-      // Check if cycle is complete
+      // If we're already past the end, the cycle is complete
       if (this.currentBlockIndex >= this.customCycleBlocks.length) {
         logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete (cut break early)');
         this.completeTimer();
         return false;
       }
 
-      // Set up next block
+      // Skip over any consecutive break blocks; user likely expects to jump to next focus block
+      this.currentBlockIndex = this._findNextNonBreakBlockIndex(this.currentBlockIndex);
+
+      // If we ran out of blocks while skipping breaks, the cycle is complete
+      if (this.currentBlockIndex >= this.customCycleBlocks.length) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete while skipping consecutive breaks (cut break early)');
+        this.completeTimer();
+        return false;
+      }
+
+      // Set up next non-break block (typically a focus block)
       const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
       this.currentPhase = nextBlock.type;
       this.remainingTime = nextBlock.duration * 60;
 
       logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Skipping to next custom cycle block', {
-        blockIndex: this.currentBlockIndex,
+        fromIndex: originalIndex,
+        toIndex: this.currentBlockIndex,
         blockType: nextBlock.type,
         duration: nextBlock.duration,
       });
@@ -11448,14 +11488,15 @@
       focusDurationInput.max = '120';
       focusDurationInput.value = this.currentEditingCycle.defaultFocusDuration;
       focusDurationInput.style.width = '100%';
-      focusDurationInput.addEventListener('input', () => {
-        const value = parseInt(focusDurationInput.value, 10);
-        if (!isNaN(value) && value >= 1 && value <= 120) {
-          this.currentEditingCycle.defaultFocusDuration = value;
-        } else {
-          // Reset to previous valid value if input is invalid
-          focusDurationInput.value = this.currentEditingCycle.defaultFocusDuration;
-        }
+      focusDurationInput.addEventListener('change', () => {
+        const validated = validateIntegerInput(
+          focusDurationInput.value,
+          1,
+          120,
+          this.currentEditingCycle.defaultFocusDuration
+        );
+        this.currentEditingCycle.defaultFocusDuration = validated;
+        focusDurationInput.value = validated;
       });
       
       focusDurationContainer.appendChild(focusDurationLabel);
@@ -11479,14 +11520,15 @@
       breakDurationInput.max = '120';
       breakDurationInput.value = this.currentEditingCycle.defaultBreakDuration;
       breakDurationInput.style.width = '100%';
-      breakDurationInput.addEventListener('input', () => {
-        const value = parseInt(breakDurationInput.value, 10);
-        if (!isNaN(value) && value >= 1 && value <= 120) {
-          this.currentEditingCycle.defaultBreakDuration = value;
-        } else {
-          // Reset to previous valid value if input is invalid
-          breakDurationInput.value = this.currentEditingCycle.defaultBreakDuration;
-        }
+      breakDurationInput.addEventListener('change', () => {
+        const validated = validateIntegerInput(
+          breakDurationInput.value,
+          1,
+          120,
+          this.currentEditingCycle.defaultBreakDuration
+        );
+        this.currentEditingCycle.defaultBreakDuration = validated;
+        breakDurationInput.value = validated;
       });
       
       breakDurationContainer.appendChild(breakDurationLabel);
