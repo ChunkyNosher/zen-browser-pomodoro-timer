@@ -7,6 +7,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 **Key Features:**
 
 - Customizable Pomodoro and simple timer modes
+- **Custom Cycles** with configurable focus/break block sequences and per-cycle duration defaults
 - Workspace-based blocking (blocks entire workspaces during focus)
 - Website/keyword blocking (LeechBlock-style rulesets)
 - Settings protection with hold-to-unlock and code entry lockouts
@@ -47,6 +48,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 | `KeyboardShortcutHandler`    | Global keyboard shortcut handling and configuration                                                   |
 | `LogManager`                 | Comprehensive logging with export functionality                                                       |
 | `DistractionDumpManager`     | Manages "Distraction Dump" feature - pauses timer, unblocks everything for thought capture            |
+| `CustomCycleManager`         | Manages custom Pomodoro cycles with drag-and-drop block editing and per-cycle duration defaults       |
 
 ---
 
@@ -54,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.1';                  // Current mod version
+const MOD_VERSION = '1.3.3';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -229,6 +231,61 @@ Allows users to pause their focus timer and capture distracting thoughts without
 
 ---
 
+## Bug Fixes in v1.3.3
+
+### Code Lockout Screen UI Alignment Fix
+
+**Issue:** The input text box was narrower than the displayed code, and first characters weren't aligned.
+
+**Root Cause:** The CSS container used `display: inline-flex` with `width: max-content`, but input elements don't properly stretch within inline-flex containers.
+
+**Fix:** In `chrome.css`:
+- Changed `.zen-pomodoro-code-container` from `display: inline-flex` to `display: flex`
+- This allows the input element to properly stretch to match the code display width
+
+### Custom Cycles Dialogs Not Draggable
+
+**Issue:** The Custom Cycles and Create Custom Cycle submenu boxes were not draggable like other dialogs.
+
+**Root Cause:** In `CustomCycleManager`, both `showCustomCyclesMenu()` and `showCycleEditor()` called `applyLastDialogPosition(dialog)` but did NOT call `setupDialogDrag(dialog)` after appending dialogs to the DOM.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `setupDialogDrag(dialog);` after `document.documentElement.appendChild(dialog);` in both methods
+- Line ~11172 for `showCustomCyclesMenu()`
+- Line ~11526 for `showCycleEditor()`
+
+### Add Block UX Improvement
+
+**Issue:** Adding blocks required a popup dialog asking what type of block to add.
+
+**Fix:** Redesigned the UI:
+- Replaced popup dialog with inline dropdown + button
+- Dropdown selects block type (Focus/Break) with icons
+- "Add Block" button immediately adds block with selected type
+- No extra clicks required
+
+### Per-Cycle Duration Defaults
+
+**Issue:** Block durations were hardcoded to 25/5 minutes when adding new blocks.
+
+**Fix:** 
+- Added `defaultFocusDuration` and `defaultBreakDuration` properties to custom cycle objects
+- Added duration input fields in the cycle editor UI
+- When "Add Block" is clicked, uses the cycle's configured duration defaults
+- Values are isolated per cycle and persist when saved
+
+### Custom Cycles Cut Break Early Support
+
+**Issue:** "Cut Break Early" didn't work correctly with custom cycles - it used pomodoro mode logic.
+
+**Fix:** Added `skipToNextCustomBlock()` method to `PomodoroTimer` class:
+- Properly increments `currentBlockIndex` instead of `currentCycle`
+- Sets up the next block's phase and duration from the custom cycle
+- Handles cycle completion if no more blocks
+- Updated "Cut Break Early" handler to detect custom mode and call appropriate method
+
+---
+
 ## Bug Fixes in v1.3.1
 
 ### Distraction Dump Dialog Visibility Fix
@@ -252,6 +309,35 @@ Allows users to pause their focus timer and capture distracting thoughts without
 **Fix:** In `chrome.css`:
 - Added `border: 2px solid transparent;` to `.zen-pomodoro-lock-code-display` for consistent box model
 - Changed input to use `width: max-content; min-width: 100%;` to match display sizing
+
+---
+
+## Custom Cycles Feature
+
+Custom cycles allow users to create personalized timer sequences with any combination of focus and break blocks.
+
+### Cycle Object Structure
+
+```javascript
+{
+  id: 'cycle-xxx',              // Unique identifier
+  name: 'Custom Cycle',         // User-defined name
+  defaultFocusDuration: 25,     // Default duration for new focus blocks (minutes)
+  defaultBreakDuration: 5,      // Default duration for new break blocks (minutes)
+  blocks: [                     // Array of timer blocks
+    { type: 'focus', duration: 25 },
+    { type: 'break', duration: 5 },
+    // ... more blocks
+  ]
+}
+```
+
+### Key Implementation Details
+
+- **Draggable dialogs**: Both cycle list and editor dialogs are draggable via `setupDialogDrag()`
+- **Block type dropdown**: Select box with icons (🎯 Focus, ☕ Break) determines new block type
+- **Per-cycle defaults**: Each cycle stores its own default durations, isolated from other cycles
+- **Backward compatibility**: Cycles without `defaultFocusDuration`/`defaultBreakDuration` default to 25/5
 
 ---
 

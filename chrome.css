@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.3.2
+ * Version: 1.3.3
  * License: MIT
  * 
  * ACCESSIBILITY FIXES:
@@ -12,6 +12,12 @@
  * - Added workspace selection UI styles
  * - Added context menu styles
  * - Added lock screen code display styles
+ * 
+ * NEW IN 1.3.3:
+ * - Fixed code lockout screen alignment (display: flex instead of inline-flex)
+ * - Made Custom Cycles dialogs draggable
+ * - Improved Add Block UI with dropdown selection
+ * - Added per-cycle duration defaults
  * 
  * NEW IN 1.3.2:
  * - Fixed code lockout screen UI alignment with container wrapper
@@ -655,10 +661,10 @@
 }
 
 /* CODE CONTAINER FIX: Wraps code display and input for perfect alignment
-   The container uses inline-flex to size to code content width,
+   The container uses flex (not inline-flex) to properly size based on content,
    then children stretch to fill the container width */
 .zen-pomodoro-code-container {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   width: max-content;
