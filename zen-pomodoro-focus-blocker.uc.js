@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.3
+ * Version: 1.3.4
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.3',
+    MOD_VERSION: '1.3.4',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -1549,6 +1549,33 @@
   }
 
   /**
+   * Helper function to skip the current focus phase with lockout protection.
+   * Used to allow users to skip to break early with anti-cheating protection.
+   *
+   * @param {Function} onSkip - Callback function to execute after lockout verification
+   */
+  function handleSkipFocusWithLockout(onSkip) {
+    if (!window.zenPomodoroApp) return;
+
+    const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+
+    const showSkipConfirmation = () => {
+      window.zenPomodoroApp.showCustomConfirm(
+        'Skip Focus',
+        'Skip current focus phase and start break early? Your focus time will not be counted.',
+        onSkip
+      );
+    };
+
+    // Always require lockout when skipping focus (same as stopping timer)
+    if (timerActive) {
+      window.zenPomodoroApp.security.showLockScreen(true, showSkipConfirmation);
+    } else {
+      showSkipConfirmation();
+    }
+  }
+
+  /**
    * Check if Distraction Dump is currently blocking timer control actions.
    * This helper function provides a centralized check to avoid code duplication.
    *
@@ -2408,6 +2435,105 @@
       }
 
       this.saveState();
+    }
+
+    /**
+     * Skip the current focus phase and move to break.
+     * Works for both regular Pomodoro and custom cycle modes.
+     * @returns {boolean} True if skip was successful
+     */
+    skipFocusToBreak() {
+      if (!this.isActive) {
+        logger.log(LOG_CATEGORIES.TIMER, 'skipFocusToBreak: Timer not active');
+        return false;
+      }
+
+      if (this.currentPhase !== 'focus') {
+        logger.log(LOG_CATEGORIES.TIMER, 'skipFocusToBreak: Not in focus phase');
+        return false;
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Skipping focus phase to break', {
+        mode: this.mode,
+        currentCycle: this.currentCycle,
+      });
+
+      if (this.mode === 'custom') {
+        // Custom cycle mode: advance to next block (which should be a break)
+        return this._skipFocusInCustomMode();
+      }
+
+      if (this.mode === 'simple') {
+        // Simple mode has no break, so complete the timer
+        this.completeTimer();
+        return true;
+      }
+
+      // Regular Pomodoro mode: skip to break phase
+      const isLastCycle = this.currentCycle >= this.totalCycles;
+      if (isLastCycle) {
+        // On last cycle, complete the timer
+        this.completeTimer();
+        return true;
+      }
+
+      // Move to break phase
+      this.currentPhase = 'break';
+      this.remainingTime = this.config.breakDuration * 60;
+
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
+      return true;
+    }
+
+    /**
+     * Skip focus to next break block in custom cycle mode.
+     * @returns {boolean} True if skip was successful
+     * @private
+     */
+    _skipFocusInCustomMode() {
+      if (!this.customCycleBlocks || this.currentBlockIndex >= this.customCycleBlocks.length) {
+        logger.log(LOG_CATEGORIES.TIMER, '_skipFocusInCustomMode: No more blocks');
+        this.completeTimer();
+        return true;
+      }
+
+      // Find next break block
+      let nextIndex = this.currentBlockIndex + 1;
+      while (nextIndex < this.customCycleBlocks.length) {
+        if (this.customCycleBlocks[nextIndex].type === 'break') {
+          break;
+        }
+        nextIndex++;
+      }
+
+      if (nextIndex >= this.customCycleBlocks.length) {
+        // No more break blocks, complete timer
+        logger.log(LOG_CATEGORIES.TIMER, '_skipFocusInCustomMode: No break blocks remaining');
+        this.completeTimer();
+        return true;
+      }
+
+      // Move to the break block
+      this.currentBlockIndex = nextIndex;
+      const block = this.customCycleBlocks[nextIndex];
+      this.currentPhase = 'break';
+      this.remainingTime = block.duration * 60;
+
+      logger.log(LOG_CATEGORIES.TIMER, '_skipFocusInCustomMode: Moved to break block', {
+        blockIndex: nextIndex,
+        duration: block.duration,
+      });
+
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
+      return true;
     }
 
     /**
@@ -4397,6 +4523,27 @@
           });
         }
 
+        // Skip Focus button - only shown during focus phase (not break/transition)
+        // Requires lockscreen verification like stopping timer
+        let skipFocusBtn = null;
+        if (status.currentPhase === 'focus') {
+          skipFocusBtn = document.createElement('button');
+          skipFocusBtn.className = 'zen-pomodoro-dialog-button secondary';
+          skipFocusBtn.textContent = 'Skip Focus';
+          skipFocusBtn.addEventListener('click', () => {
+            this._stopMenuTimerUpdates();
+            dialog.remove();
+            this.menuDialog = null;
+            
+            handleSkipFocusWithLockout(() => {
+              const timer = window.zenPomodoroApp.timer;
+              if (timer.skipFocusToBreak()) {
+                window.zenPomodoroApp.updateOverlayVisibility();
+              }
+            });
+          });
+        }
+
         const stopBtn = document.createElement('button');
         stopBtn.className = 'zen-pomodoro-dialog-button secondary';
         stopBtn.textContent = 'Stop Timer';
@@ -4459,6 +4606,7 @@
         let dumpBtn = null;
         const config = getConfig();
         const dumpManager = window.zenPomodoroApp?.distractionDump;
+        const isDumpActive = dumpManager?.isActive;
         const isDumpAvailable = dumpManager?.isDumpAvailable();
         if (
           config.distractionDumpEnabled &&
@@ -4466,7 +4614,17 @@
         ) {
           dumpBtn = document.createElement('button');
           dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
-          if (isDumpAvailable) {
+          if (isDumpActive) {
+            // Dump is currently running - show End Dump Early option
+            dumpBtn.textContent = '🧠 End Dump Early';
+            dumpBtn.addEventListener('click', () => {
+              this._stopMenuTimerUpdates();
+              dialog.remove();
+              this.menuDialog = null;
+              window.zenPomodoroApp.distractionDump._showEndDumpConfirmation();
+            });
+          } else if (isDumpAvailable) {
+            // Dump is available - show Start Dump option
             dumpBtn.textContent = '🧠 Distraction Dump';
             dumpBtn.addEventListener('click', () => {
               this._stopMenuTimerUpdates();
@@ -4491,6 +4649,9 @@
         }
         if (cutBreakBtn) {
           menuSection.appendChild(cutBreakBtn);
+        }
+        if (skipFocusBtn) {
+          menuSection.appendChild(skipFocusBtn);
         }
         menuSection.appendChild(stopBtn);
         menuSection.appendChild(toggleIndicatorBtn);

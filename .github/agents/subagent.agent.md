@@ -23,7 +23,7 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 
 | File                               | Description                        |
 | ---------------------------------- | ---------------------------------- |
-| `zen-pomodoro-focus-blocker.uc.js` | All JavaScript logic (~8500 lines) |
+| `zen-pomodoro-focus-blocker.uc.js` | All JavaScript logic (~8700 lines) |
 | `chrome.css`                       | All CSS styling (~1600 lines)      |
 | `theme.json`                       | Mod metadata for Zen Browser       |
 | `preferences.json`                 | Settings UI definitions            |
@@ -77,7 +77,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.1'`
+- `MOD_VERSION = '1.3.4'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
