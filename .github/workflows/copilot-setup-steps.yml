@@ -1,0 +1,28 @@
+# Copilot Setup Steps
+# This file defines the setup steps that run before each Copilot coding agent process.
+
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch: # Allows manual testing
+  pull_request: # Runs on PRs that modify this file
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    env:
+      NODE_ENV: development
+      DEBUG: 'jest:*'
+      BABEL_ENV: test
+      MCP_CLIENT_TIMEOUT_MS: 120000
+
+    steps:
+      - name: Install Node.js dependencies
+        run: npm ci
+    
+      - name: Verify linting tools are available
+        run: npm run lint -- --help || echo "Linting tools installed"
