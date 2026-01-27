@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3.4-green.svg)
+![Version](https://img.shields.io/badge/version-1.3.5-green.svg)
 
 ## ✨ Features
 
@@ -333,6 +333,14 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.3.5
+
+- ✅ Fixed Distraction Dump bug - blocked workspaces now properly unblocked during dump
+- ✅ Fixed code lockout screen character alignment (perfect left-padding alignment)
+- ✅ Fixed transition phase pause bug - workspaces now blocked when pausing during transition
+- 🔧 Fixed copilot-setup-steps.yml workflow (added missing checkout and setup-node steps)
+- 📝 Updated documentation with v1.3.5 changes
 
 ### Version 1.3.4
 

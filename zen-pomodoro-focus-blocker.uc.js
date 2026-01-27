@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.4
+ * Version: 1.3.5
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.4',
+    MOD_VERSION: '1.3.5',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -12665,6 +12665,14 @@
         return;
       }
 
+      // Handle distraction dump active - all blocking should be lifted
+      const dumpManager = window.zenPomodoroApp?.distractionDumpManager;
+      if (dumpManager?.isActive) {
+        this.overlay.hide();
+        // Keep dump indicator visible (it's managed by DistractionDumpManager)
+        return;
+      }
+
       // Handle paused during break phase
       if (this._isPausedDuringBreak()) {
         this._handlePausedBreakPhase(isBlocked);
@@ -12674,6 +12682,12 @@
       // Handle active break phase
       if (this._isInActiveBreakPhase()) {
         this._hideOverlayKeepIndicator();
+        return;
+      }
+
+      // Handle paused during transition phase - block workspaces (same as paused break)
+      if (this._isPausedDuringTransition()) {
+        this._handlePausedBreakPhase(isBlocked);
         return;
       }
 
@@ -12703,6 +12717,15 @@
      */
     _isPausedDuringBreak() {
       return this.timer.isPaused && isInBreakPhase();
+    }
+
+    /**
+     * Check if timer is paused during a transition phase.
+     * @returns {boolean} True if paused during transition
+     * @private
+     */
+    _isPausedDuringTransition() {
+      return this.timer.isPaused && this.timer.currentPhase === 'transition';
     }
 
     /**

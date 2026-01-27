@@ -77,7 +77,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.4'`
+- `MOD_VERSION = '1.3.5'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -144,6 +144,23 @@ dialog.className = 'zen-pomodoro-dialog active';
 ### CSS Box Model Alignment
 
 **Pattern:** When aligning text elements, ensure both have matching borders (visible or transparent) for consistent spacing.
+
+### Distraction Dump Blocking Pattern
+
+**Pattern:** When a Distraction Dump is active, ALL blocking (workspace overlay + website blocking) must be lifted. The `updateOverlayVisibility()` method checks `distractionDumpManager?.isActive` early and returns without showing overlay.
+
+**Key locations:**
+- `updateOverlayVisibility()` - checks for dump active before any blocking logic
+- `WebsiteBlocker.distractionDumpActive` - flag to disable website blocking during dump
+
+### Transition Phase Pause Pattern
+
+**Pattern:** Pausing during both break AND transition phases should block workspaces (to prevent infinite pause exploitation).
+
+**Key methods:**
+- `_isPausedDuringBreak()` - returns true if paused during break phase
+- `_isPausedDuringTransition()` - returns true if paused during transition phase  
+- Both cases use `_handlePausedBreakPhase()` to show overlay on blocked workspaces
 
 ## Documentation Reminder
 
