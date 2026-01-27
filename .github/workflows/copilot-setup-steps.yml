@@ -1,28 +1,47 @@
 # Copilot Setup Steps
 # This file defines the setup steps that run before each Copilot coding agent process.
+# Reference: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment
 
 name: Copilot Setup Steps
 
+# Automatically run the setup steps when they are changed to allow for easy validation,
+# and allow manual testing through the repository's "Actions" tab
 on:
-  workflow_dispatch: # Allows manual testing
-  pull_request: # Runs on PRs that modify this file
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+  pull_request:
     paths:
       - '.github/workflows/copilot-setup-steps.yml'
 
 jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
   copilot-setup-steps:
     runs-on: ubuntu-latest
     timeout-minutes: 300
 
-    env:
-      NODE_ENV: development
-      DEBUG: 'jest:*'
-      BABEL_ENV: test
-      MCP_CLIENT_TIMEOUT_MS: 120000
+    # If you don't clone the repository in your setup steps, Copilot will do this for you
+    # automatically after the steps complete.
+    permissions:
+      contents: read
 
     steps:
+      # Checkout the repository first so package.json is available
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Node.js with npm caching for faster dependency installation
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install project dependencies
       - name: Install Node.js dependencies
         run: npm ci
-    
+
+      # Verify linting tools are properly installed
       - name: Verify linting tools are available
         run: npm run lint -- --help || echo "Linting tools installed"

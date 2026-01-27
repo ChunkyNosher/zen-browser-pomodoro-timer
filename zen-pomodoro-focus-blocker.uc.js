@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.4
+ * Version: 1.3.5
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.4',
+    MOD_VERSION: '1.3.5',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -12665,6 +12665,14 @@
         return;
       }
 
+      // Handle distraction dump active - all blocking should be lifted
+      const dumpManager = window.zenPomodoroApp?.distractionDumpManager;
+      if (dumpManager?.isActive) {
+        this.overlay.hide();
+        // Keep dump indicator visible (it's managed by DistractionDumpManager)
+        return;
+      }
+
       // Handle paused during break phase
       if (this._isPausedDuringBreak()) {
         this._handlePausedBreakPhase(isBlocked);
@@ -12698,7 +12706,8 @@
 
     /**
      * Check if timer is paused during a break phase.
-     * @returns {boolean} True if paused during break
+     * Includes transition phase since isInBreakPhase() returns true for transition.
+     * @returns {boolean} True if paused during break/transition
      * @private
      */
     _isPausedDuringBreak() {
@@ -12713,8 +12722,10 @@
     _handlePausedBreakPhase(isBlocked) {
       // SPECIAL CASE: When timer is paused during break/transition, block workspaces
       // This prevents users from indefinitely pausing during break to bypass blocking
+      // BUG FIX v1.3.5: Use isWorkspaceInBlockedList() instead of isCurrentWorkspaceBlocked()
+      // because isCurrentWorkspaceBlocked() returns false during break/transition phases
       const workspaceBlocked =
-        isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
+        isBlocked !== null ? isBlocked : this.workspace.isWorkspaceInBlockedList();
 
       if (workspaceBlocked) {
         // Use _showOverlayWithStatus to display current phase and timer info

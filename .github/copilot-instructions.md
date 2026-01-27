@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.4';                  // Current mod version
+const MOD_VERSION = '1.3.5';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -229,6 +229,54 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
 | `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection        |
+
+---
+
+## Bug Fixes in v1.3.5
+
+### Distraction Dump Workspace Blocking Fix
+
+**Issue:** When a Distraction Dump was active, blocked workspaces were still blocked. Switching to a blocked workspace during dump would show the overlay.
+
+**Root Cause:** In `updateOverlayVisibility()`, there was no check for whether a Distraction Dump was active before deciding to show/hide the overlay.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added check at the top of `updateOverlayVisibility()` to detect active Distraction Dump
+- When dump is active, overlay is hidden and method returns early
+- This properly lifts workspace blocking during dump
+
+### Code Lockout Screen Character Alignment Fix
+
+**Issue:** The first character of the input box didn't align perfectly with the first character of the displayed code.
+
+**Root Cause:** The `.zen-pomodoro-lock-code-input` class had no explicit `margin: 0`, allowing browser defaults to add extra margin.
+
+**Fix:** In `chrome.css`:
+- Added `margin: 0;` to `.zen-pomodoro-lock-code-input` (line 1770)
+- Ensured all code lockout elements have consistent padding and no margins
+
+### Transition Phase Pause Blocking Fix
+
+**Issue:** Pausing during a transition phase while on a blocked workspace wouldn't block the workspace. The overlay would only appear after switching to another workspace and back.
+
+**Root Cause:** In `_handlePausedBreakPhase()`, when `isBlocked` parameter was null, it called `this.workspace.isCurrentWorkspaceBlocked()` to check if the workspace should be blocked. However, `isCurrentWorkspaceBlocked()` has a guard that returns false during break/transition phases (since blocking is disabled during breaks). This caused the overlay to never show when pausing during transition on a blocked workspace.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Changed `_handlePausedBreakPhase()` to use `isWorkspaceInBlockedList()` instead of `isCurrentWorkspaceBlocked()` when `isBlocked` is null
+- `isWorkspaceInBlockedList()` checks raw workspace membership without phase filtering
+- This correctly shows the overlay on blocked workspaces when paused during break/transition phases
+
+### Copilot Setup Steps Workflow Fix
+
+**Issue:** The `copilot-setup-steps.yml` workflow was missing critical steps, causing `npm ci` to fail.
+
+**Root Cause:** The workflow attempted to run `npm ci` without first checking out the repository code.
+
+**Fix:** In `.github/workflows/copilot-setup-steps.yml`:
+- Added `actions/checkout@v4` step to checkout the repository
+- Added `actions/setup-node@v4` step with Node.js 20 and npm caching
+- Added `permissions: contents: read` for proper security
+- Updated trigger to also run on `push` events for validation
 
 ---
 
