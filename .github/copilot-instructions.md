@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.3';                  // Current mod version
+const MOD_VERSION = '1.3.4';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -228,6 +228,41 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                         |
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
+| `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection        |
+
+---
+
+## Bug Fixes in v1.3.4
+
+### Code Lockout Screen Font Size Fix
+
+**Issue:** The input text box font size was smaller than the displayed code above it.
+
+**Root Cause:** Firefox/browser default styles were overriding the `font-size: 17px` rule because it didn't have `!important`.
+
+**Fix:** In `chrome.css`:
+- Added `!important` to `font-size: 17px` for `#zen-pomodoro-lock-code` (line 698)
+- Added `!important` to `font-size: 17px` for `.zen-pomodoro-lock-code-input` (line 1768)
+
+### Distraction Dump UX Improvement
+
+**Issue:** Users could only end the Distraction Dump early by clicking on the small timer indicator in the corner.
+
+**Fix:** The Distraction Dump button in the main menu now supports three states:
+- "🧠 Distraction Dump" → Available (opens config dialog)
+- "🧠 End Dump Early" → Active dump (shows end confirmation)
+- "🧠 Dump Used" → Disabled (already used this focus phase)
+
+### Skip Focus Cycle Feature (New)
+
+**Feature:** Users can now skip a single focus cycle (move to break early) without stopping the entire timer.
+
+**Implementation:**
+- Added "Skip Focus" button that appears only during focus phase
+- Protected by lockscreen verification (same as Stop Timer)
+- Works with all timer modes (regular Pomodoro, simple, custom cycles)
+- Added `handleSkipFocusWithLockout()` helper function
+- Added `skipFocusToBreak()` and `_skipFocusInCustomMode()` methods to PomodoroTimer class
 
 ---
 
