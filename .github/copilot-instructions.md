@@ -259,12 +259,12 @@ Allows users to pause their focus timer and capture distracting thoughts without
 
 **Issue:** Pausing during a transition phase while on a blocked workspace wouldn't block the workspace. The overlay would only appear after switching to another workspace and back.
 
-**Root Cause:** In `updateOverlayVisibility()`, there was a `_isPausedDuringBreak()` check that handled paused break phases, but no equivalent for paused transition phases. The transition phase check just called `_hideOverlayKeepIndicator()` regardless of pause state.
+**Root Cause:** In `_handlePausedBreakPhase()`, when `isBlocked` parameter was null, it called `this.workspace.isCurrentWorkspaceBlocked()` to check if the workspace should be blocked. However, `isCurrentWorkspaceBlocked()` has a guard that returns false during break/transition phases (since blocking is disabled during breaks). This caused the overlay to never show when pausing during transition on a blocked workspace.
 
 **Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
-- Added new `_isPausedDuringTransition()` method to check if timer is paused during transition
-- Added check in `updateOverlayVisibility()` to handle paused transition phase same as paused break
-- When paused during transition, blocked workspaces now show the overlay
+- Changed `_handlePausedBreakPhase()` to use `isWorkspaceInBlockedList()` instead of `isCurrentWorkspaceBlocked()` when `isBlocked` is null
+- `isWorkspaceInBlockedList()` checks raw workspace membership without phase filtering
+- This correctly shows the overlay on blocked workspaces when paused during break/transition phases
 
 ### Copilot Setup Steps Workflow Fix
 

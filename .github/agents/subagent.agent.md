@@ -157,10 +157,9 @@ dialog.className = 'zen-pomodoro-dialog active';
 
 **Pattern:** Pausing during both break AND transition phases should block workspaces (to prevent infinite pause exploitation).
 
-**Key methods:**
-- `_isPausedDuringBreak()` - returns true if paused during break phase
-- `_isPausedDuringTransition()` - returns true if paused during transition phase  
-- Both cases use `_handlePausedBreakPhase()` to show overlay on blocked workspaces
+**Important:** `isInBreakPhase()` returns true for transition phases, so `_isPausedDuringBreak()` already handles both.
+
+**Bug pattern to avoid:** `_handlePausedBreakPhase()` must use `isWorkspaceInBlockedList()` (not `isCurrentWorkspaceBlocked()`) when checking workspace membership, because `isCurrentWorkspaceBlocked()` returns false during break/transition phases.
 
 ## Documentation Reminder
 

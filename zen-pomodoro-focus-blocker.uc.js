@@ -12685,12 +12685,6 @@
         return;
       }
 
-      // Handle paused during transition phase - block workspaces (same as paused break)
-      if (this._isPausedDuringTransition()) {
-        this._handlePausedBreakPhase(isBlocked);
-        return;
-      }
-
       // Handle transition phase
       if (this._isInTransitionPhase()) {
         this._hideOverlayKeepIndicator();
@@ -12712,20 +12706,12 @@
 
     /**
      * Check if timer is paused during a break phase.
-     * @returns {boolean} True if paused during break
+     * Includes transition phase since isInBreakPhase() returns true for transition.
+     * @returns {boolean} True if paused during break/transition
      * @private
      */
     _isPausedDuringBreak() {
       return this.timer.isPaused && isInBreakPhase();
-    }
-
-    /**
-     * Check if timer is paused during a transition phase.
-     * @returns {boolean} True if paused during transition
-     * @private
-     */
-    _isPausedDuringTransition() {
-      return this.timer.isPaused && this.timer.currentPhase === 'transition';
     }
 
     /**
@@ -12736,8 +12722,10 @@
     _handlePausedBreakPhase(isBlocked) {
       // SPECIAL CASE: When timer is paused during break/transition, block workspaces
       // This prevents users from indefinitely pausing during break to bypass blocking
+      // BUG FIX v1.3.5: Use isWorkspaceInBlockedList() instead of isCurrentWorkspaceBlocked()
+      // because isCurrentWorkspaceBlocked() returns false during break/transition phases
       const workspaceBlocked =
-        isBlocked !== null ? isBlocked : this.workspace.isCurrentWorkspaceBlocked();
+        isBlocked !== null ? isBlocked : this.workspace.isWorkspaceInBlockedList();
 
       if (workspaceBlocked) {
         // Use _showOverlayWithStatus to display current phase and timer info
