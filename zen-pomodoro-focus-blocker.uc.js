@@ -4524,6 +4524,14 @@
           skipFocusBtn.className = 'zen-pomodoro-dialog-button secondary';
           skipFocusBtn.textContent = 'Skip Focus';
           skipFocusBtn.addEventListener('click', () => {
+            // Check if Distraction Dump is active - provide user feedback
+            if (isDistractionDumpBlocking()) {
+              window.zenPomodoroApp.showCustomAlert(
+                Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+                Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+              );
+              return;
+            }
             this._stopMenuTimerUpdates();
             dialog.remove();
             this.menuDialog = null;
@@ -6093,122 +6101,113 @@
      * @private
      */
     _saveReminderSettings(dialog, config) {
-      // Get the selected reminder mode from radio buttons
       const selectedMode = dialog.querySelector('input[name="reminder-mode"]:checked')?.value;
       
       if (!selectedMode) {
         logger.log(LOG_CATEGORIES.SETTINGS, 'No reminder mode selected, defaulting to none');
         config.reminderMode = Constants.REMINDER_MODES.NONE;
-        // Also persist to dedicated pref for Zen preferences UI
         setPref('reminderMode', Constants.REMINDER_MODES.NONE);
         return;
       }
 
       config.reminderMode = selectedMode;
-      // Persist to dedicated pref for Zen preferences UI to ensure it survives restart
       setPref('reminderMode', selectedMode);
       logger.log(LOG_CATEGORIES.SETTINGS, 'Saving reminder mode', { mode: selectedMode });
 
-      // Save daily reminder settings if daily mode is selected
       if (selectedMode === Constants.REMINDER_MODES.DAILY) {
-        // Save skip cooldown
-        const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
-        if (cooldownInput) {
-          const cooldownValue = validateIntegerInput(
-            parseInt(cooldownInput.value, 10),
-            1,
-            120,
-            config.dailyReminderSkipCooldown
-          );
-          config.dailyReminderSkipCooldown = cooldownValue;
-        }
+        this._saveDailyReminderSettings(dialog, config);
+      } else if (selectedMode === Constants.REMINDER_MODES.POST_SESSION) {
+        this._savePostSessionReminderSettings(dialog, config);
+      }
+    }
 
-        // Validate and save times (comma-separated HH:MM values)
-        const timesInput = dialog.querySelector('#daily-reminder-times');
-        if (timesInput) {
-          const timesValue = timesInput.value;
-          if (timesValue) {
-            // Split by comma and trim whitespace
-            const times = timesValue.split(',').map((t) => t.trim());
-            // Filter to only valid times
-            const validTimes = times.filter((t) => isValidTimeFormat(t));
-            if (validTimes.length > 0) {
-              config.dailyReminderTimes = validTimes;
-            }
-          }
-        }
-
-        logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
-          times: config.dailyReminderTimes,
-          skipCooldown: config.dailyReminderSkipCooldown,
-        });
+    /**
+     * Save daily reminder settings from dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveDailyReminderSettings(dialog, config) {
+      // Save skip cooldown
+      const cooldownInput = dialog.querySelector('#daily-reminder-skip-cooldown');
+      if (cooldownInput) {
+        config.dailyReminderSkipCooldown = validateIntegerInput(
+          parseInt(cooldownInput.value, 10),
+          1,
+          120,
+          config.dailyReminderSkipCooldown
+        );
       }
 
-      // Save post-session reminder settings if post-session mode is selected
-      if (selectedMode === Constants.REMINDER_MODES.POST_SESSION) {
-        const methodSelect = dialog.querySelector('#post-session-skip-method');
-        if (methodSelect) {
-          config.postSessionSkipMethod = methodSelect.value;
-        }
-
-        // Save integer settings using helper
-        const intSettings = [
-          { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
-          {
-            selector: '#post-session-skip-cooldown',
-            key: 'postSessionSkipCooldown',
-            min: 1,
-            max: 120,
-          },
-          {
-            selector: '#post-session-focus-time-goal',
-            key: 'postSessionFocusTimeGoal',
-            min: 1,
-            max: 600,
-            zenUiPrefKey: 'postSessionFocusTimeGoal',
-          },
-          {
-            selector: '#post-session-hold-duration',
-            key: 'postSessionSkipHoldDuration',
-            min: 5,
-            max: 120,
-          },
-          {
-            selector: '#post-session-code-length',
-            key: 'postSessionSkipCodeLength',
-            min: 16,
-            max: 128,
-          },
-        ];
-
-        intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
-          const value = getValidatedIntFromDialog(dialog, {
-            selector,
-            min,
-            max,
-            defaultValue: config[key],
-          });
-          if (value !== null) {
-            config[key] = value;
-            if (zenUiPrefKey) setPref(zenUiPrefKey, value);
-          }
-        });
-
-        // Save end time (with HH:MM validation)
-        const endTimeInput = dialog.querySelector('#post-session-end-time');
-        if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
-          config.postSessionReminderEndTime = endTimeInput.value;
-          setPref('postSessionReminderEndTime', endTimeInput.value);
-        }
-
-        logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
-          skipMethod: config.postSessionSkipMethod,
-          idleTime: config.postSessionIdleTime,
-          skipCooldown: config.postSessionSkipCooldown,
-          focusTimeGoal: config.postSessionFocusTimeGoal,
-          endTime: config.postSessionReminderEndTime,
-        });
+      // Validate and save times (comma-separated HH:MM values)
+      const validTimes = this._parseValidTimesFromInput(dialog);
+      if (validTimes.length > 0) {
+        config.dailyReminderTimes = validTimes;
       }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved daily reminder settings', {
+        times: config.dailyReminderTimes,
+        skipCooldown: config.dailyReminderSkipCooldown,
+      });
+    }
+
+    /**
+     * Parse and validate times from the daily reminder times input.
+     * @param {HTMLElement} dialog - The dialog element
+     * @returns {string[]} Array of valid HH:MM time strings
+     * @private
+     */
+    _parseValidTimesFromInput(dialog) {
+      const timesInput = dialog.querySelector('#daily-reminder-times');
+      if (!timesInput?.value) return [];
+      
+      const times = timesInput.value.split(',').map((t) => t.trim());
+      return times.filter((t) => isValidTimeFormat(t));
+    }
+
+    /**
+     * Save post-session reminder settings from dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _savePostSessionReminderSettings(dialog, config) {
+      const methodSelect = dialog.querySelector('#post-session-skip-method');
+      if (methodSelect) {
+        config.postSessionSkipMethod = methodSelect.value;
+      }
+
+      // Save integer settings using helper
+      const intSettings = [
+        { selector: '#post-session-idle-time', key: 'postSessionIdleTime', min: 1, max: 240 },
+        { selector: '#post-session-skip-cooldown', key: 'postSessionSkipCooldown', min: 1, max: 120 },
+        { selector: '#post-session-focus-time-goal', key: 'postSessionFocusTimeGoal', min: 1, max: 600, zenUiPrefKey: 'postSessionFocusTimeGoal' },
+        { selector: '#post-session-hold-duration', key: 'postSessionSkipHoldDuration', min: 5, max: 120 },
+        { selector: '#post-session-code-length', key: 'postSessionSkipCodeLength', min: 16, max: 128 },
+      ];
+
+      intSettings.forEach(({ selector, key, min, max, zenUiPrefKey = null }) => {
+        const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
+        if (value !== null) {
+          config[key] = value;
+          if (zenUiPrefKey) setPref(zenUiPrefKey, value);
+        }
+      });
+
+      // Save end time (with HH:MM validation)
+      const endTimeInput = dialog.querySelector('#post-session-end-time');
+      if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
+        config.postSessionReminderEndTime = endTimeInput.value;
+        setPref('postSessionReminderEndTime', endTimeInput.value);
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved post-session reminder settings', {
+        skipMethod: config.postSessionSkipMethod,
+        idleTime: config.postSessionIdleTime,
+        skipCooldown: config.postSessionSkipCooldown,
+        focusTimeGoal: config.postSessionFocusTimeGoal,
+        endTime: config.postSessionReminderEndTime,
+      });
     }
 
     /**
@@ -9089,53 +9088,69 @@
      * @private
      */
     _resetIfNewDay() {
-      const config = getConfig();
-      const today = this._getTodayDateString();
-
-      // Check if we have any reminders shown
+      // Check if we have any reminders shown - exit early if none
       if (this.remindersShownToday.length === 0) {
         return;
       }
 
-      // Get the date of the last shown reminder
+      const today = this._getTodayDateString();
       const lastShownTimestamp = Math.max(...this.remindersShownToday);
       const lastShownDate = new Date(lastShownTimestamp);
       const lastShownDateStr = this._getDateString(lastShownDate);
 
-      // Different day - check if we've passed the first reminder time to reset
-      if (lastShownDateStr !== today) {
-        // Get first reminder time for reset logic
-        let resetTime = '10:00';
-        if (
-          config.dailyReminderTimes &&
-          Array.isArray(config.dailyReminderTimes) &&
-          config.dailyReminderTimes.length > 0
-        ) {
-          const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
-            const [aHours, aMinutes] = a.split(':').map(Number);
-            const [bHours, bMinutes] = b.split(':').map(Number);
-            return aHours - bHours || aMinutes - bMinutes;
-          });
-          resetTime = sortedTimes[0];
-        }
-
-        if (isValidTimeFormat(resetTime)) {
-          const [hours, minutes] = resetTime.split(':').map(Number);
-          const now = new Date();
-          const resetDate = new Date();
-          resetDate.setHours(hours, minutes, 0, 0);
-
-          // Only reset if we're past the reset time on the new day
-          if (now >= resetDate) {
-            logger.log(
-              LOG_CATEGORIES.TIMER,
-              'Daily reminder: Resetting shown reminders for new day'
-            );
-            this.remindersShownToday = [];
-            this._saveState();
-          }
-        }
+      // Same day - no reset needed
+      if (lastShownDateStr === today) {
+        return;
       }
+
+      // Different day - check if we should reset based on first reminder time
+      const resetTime = this._getFirstReminderTime();
+      if (!isValidTimeFormat(resetTime)) {
+        return;
+      }
+
+      const now = new Date();
+      const resetDate = this._createTimeOnToday(resetTime);
+
+      // Only reset if we're past the reset time on the new day
+      if (now >= resetDate) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Resetting shown reminders for new day');
+        this.remindersShownToday = [];
+        this._saveState();
+      }
+    }
+
+    /**
+     * Get the first reminder time from config, or default to '10:00'.
+     * @returns {string} The earliest reminder time in HH:MM format
+     * @private
+     */
+    _getFirstReminderTime() {
+      const config = getConfig();
+      const times = config.dailyReminderTimes;
+      
+      if (!times || !Array.isArray(times) || times.length === 0) {
+        return '10:00';
+      }
+      
+      return times.slice().sort((a, b) => {
+        const [aHours, aMinutes] = a.split(':').map(Number);
+        const [bHours, bMinutes] = b.split(':').map(Number);
+        return aHours - bHours || aMinutes - bMinutes;
+      })[0];
+    }
+
+    /**
+     * Create a Date object for the given time on today's date.
+     * @param {string} timeStr - Time in HH:MM format
+     * @returns {Date} Date object with today's date and the given time
+     * @private
+     */
+    _createTimeOnToday(timeStr) {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      return date;
     }
 
     /**
