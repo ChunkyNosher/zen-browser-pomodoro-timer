@@ -216,6 +216,9 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `distractionDumpEnabled`        | boolean | true               | Enable Distraction Dump feature                      |
 | `distractionDumpDuration`       | number  | 25                 | Default dump duration in minutes                     |
 | `distractionDumpMaxDuration`    | number  | 35                 | Maximum dump duration in minutes                     |
+| `timerRemindersEnabled`         | boolean | true               | Enable timer reminders during sessions               |
+| `focusPhaseReminders`           | array   | [20, 10, 5, 1]     | Minutes before focus phase ends to show reminder     |
+| `breakPhaseReminders`           | array   | [5, 1]             | Minutes before break phase ends to show reminder     |
 
 ---
 
@@ -229,10 +232,40 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
 | `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection        |
+| `loadIntArrayPref(prefName, config, configKey)`       | Load comma-separated integer array preference      |
 
 ---
 
 ## Bug Fixes in v1.3.6
+
+### Timer Reminders Feature (New)
+
+**Feature:** Browser notifications at specified times before focus or break phases end.
+
+**Implementation:**
+- Shows notifications at exact minute boundaries
+- Different messages for focus vs break phases:
+  - Focus: "⏰ X minute(s) left in your focus session!"
+  - Break: "☕ X minute(s) left in your break!"
+- Respects the global `enableNotifications` setting
+- Skips transition phase (already a warning phase)
+- Tracks shown reminders per phase to avoid duplicates
+- Clears tracking when phase changes
+
+**Configuration:**
+- `timerRemindersEnabled` (boolean, default: true) - Enable/disable reminders
+- `focusPhaseReminders` (array, default: [20, 10, 5, 1]) - Minutes before focus ends
+- `breakPhaseReminders` (array, default: [5, 1]) - Minutes before break ends
+
+**Settings UI:**
+- New "Timer Reminders" section in settings dialog
+- Enable/disable checkbox
+- Focus Phase Reminders subsection with list and add/delete controls
+- Break Phase Reminders subsection with list and add/delete controls
+- Input validation (1-120 min focus, 1-60 min break)
+
+**Helper Functions:**
+- `loadIntArrayPref(prefName, config, configKey)` - Load comma-separated integer array preference
 
 ### Cut Break Early Button for Transition Phase
 

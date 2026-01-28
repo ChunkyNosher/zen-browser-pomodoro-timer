@@ -38,6 +38,11 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
   - Persistent corner indicator shows timer status
   - Smooth phase transitions with animations
 
+- ⏰ **Timer Reminders**:
+  - Browser notifications at specified minutes before phase ends
+  - Customizable reminder times for focus and break phases
+  - Default reminders: 20, 10, 5, 1 minutes for focus; 5, 1 minutes for breaks
+
 ## 📦 Installation
 
 ### Via Sine Mod Manager (Recommended)
@@ -153,6 +158,23 @@ The timer will begin immediately, and if you're on a blocked workspace, the full
 
 - **Enable Notifications**: Show phase change alerts
 - **Enable Audio Alerts**: Play sound on phase transitions (requires audio file)
+
+#### Timer Reminders
+
+- **Enable Timer Reminders**: Show browser notifications before phase ends
+  - Default: Enabled
+- **Focus Phase Reminders**: Minutes before focus phase ends to show reminder
+  - Default: 20, 10, 5, 1 minutes
+  - Range: 1-120 minutes per reminder
+  - Notification message: "⏰ X minute(s) left in your focus session!"
+- **Break Phase Reminders**: Minutes before break phase ends to show reminder
+  - Default: 5, 1 minutes
+  - Range: 1-60 minutes per reminder
+  - Notification message: "☕ X minute(s) left in your break!"
+- Reminders are shown at exact minute boundaries
+- Respects the global "Enable Notifications" setting
+- Skips transition phase (already a warning phase)
+- Tracks shown reminders to avoid duplicates
 
 ## 🔧 Advanced Configuration
 
@@ -342,6 +364,7 @@ See [LICENSE](LICENSE) file for full details.
 - ✨ New: Custom Cycles block duplication with Alt+Drag (works with single and multi-selected blocks)
 - ✨ New: Custom Cycles multi-select with Shift+Click (select multiple blocks, blue border highlight)
 - ✨ New: Custom Cycles multi-select operations (move, duplicate, and delete multiple blocks together)
+- ✨ New: Timer Reminders - browser notifications at specified minutes before phase ends (default enabled)
 - 🔧 Removed duplicate settings from preferences.json (now only in internal settings menu)
 
 ### Version 1.3.5
