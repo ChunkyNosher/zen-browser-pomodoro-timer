@@ -2324,31 +2324,27 @@
     _checkTimerReminders() {
       const config = getConfig();
 
-      // Check if feature is enabled
-      if (!config.timerRemindersEnabled) return;
+      // Early exits for disabled states
+      if (!config.timerRemindersEnabled || this.currentPhase === 'transition') return;
 
-      // Skip transition phase (already a warning phase)
-      if (this.currentPhase === 'transition') return;
-
-      // Get the appropriate reminder list based on current phase
       const isFocusPhase = this.currentPhase === 'focus';
       const reminders = isFocusPhase
         ? config.focusPhaseReminders || []
         : config.breakPhaseReminders || [];
 
-      // Convert remaining time to minutes (rounded)
       const remainingMinutes = Math.floor(this.remainingTime / 60);
+      const isExactMinuteBoundary = this.remainingTime % 60 === 0;
+      
+      if (!isExactMinuteBoundary) return;
 
-      // Check if we should show a reminder
-      for (const reminderMinutes of reminders) {
-        // Check if we're exactly at the reminder time
-        if (remainingMinutes === reminderMinutes && this.remainingTime % 60 === 0) {
-          // Check if we haven't shown this reminder for this phase
-          if (!this.shownRemindersForCurrentPhase.has(reminderMinutes)) {
-            this.shownRemindersForCurrentPhase.add(reminderMinutes);
-            this._showTimerReminder(reminderMinutes, isFocusPhase);
-          }
-        }
+      // Check if current time matches a reminder that hasn't been shown
+      const matchingReminder = reminders.find(
+        (minutes) => remainingMinutes === minutes && !this.shownRemindersForCurrentPhase.has(minutes)
+      );
+      
+      if (matchingReminder !== undefined) {
+        this.shownRemindersForCurrentPhase.add(matchingReminder);
+        this._showTimerReminder(matchingReminder, isFocusPhase);
       }
     }
 
@@ -2360,8 +2356,6 @@
      */
     _showTimerReminder(minutes, isFocusPhase) {
       const config = getConfig();
-
-      // Only show if notifications are enabled
       if (!config.enableNotifications) return;
 
       const minuteText = minutes === 1 ? 'minute' : 'minutes';
@@ -12287,6 +12281,35 @@
     }
 
     /**
+     * Handle a block drop operation.
+     * Extracts the complex drop logic into a dedicated method to reduce handler complexity.
+     * @param {number} targetIndex - Target insertion index
+     * @private
+     */
+    _handleBlockDrop(targetIndex) {
+      const isMultiSelect = this.selectedBlockIndices.has(this.draggedBlockIndex);
+      const sourceIndices = isMultiSelect 
+        ? Array.from(this.selectedBlockIndices).sort((a, b) => a - b)
+        : [this.draggedBlockIndex];
+      
+      if (this.isDuplicating) {
+        this._duplicateBlocks(sourceIndices, targetIndex);
+      } else if (this.draggedBlockIndex !== targetIndex) {
+        if (isMultiSelect) {
+          this._moveMultipleBlocks(sourceIndices, targetIndex);
+        } else {
+          this.reorderBlocks(this.draggedBlockIndex, targetIndex);
+        }
+      }
+      
+      // Re-render blocks
+      const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+      if (blocksContainer) {
+        this._renderBlocks(blocksContainer);
+      }
+    }
+
+    /**
      * Render the blocks in the editor.
      * @param {HTMLElement} container - Container element for blocks
      * @private
@@ -12514,61 +12537,18 @@
         
         // Compute target index from current DOM order
         const container = blockDiv.parentElement;
-        if (!container) {
-          return;
-        }
+        if (!container) return;
         
         const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
         const firstDraggingElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
         
-        if (!firstDraggingElement) {
-          return;
-        }
+        if (!firstDraggingElement) return;
         
         const targetIndex = blocks.indexOf(firstDraggingElement);
-        if (targetIndex === -1) {
-          return;
-        }
+        if (targetIndex === -1 || this.draggedBlockIndex === null) return;
         
-        if (this.draggedBlockIndex === null) {
-          return;
-        }
-        
-        // Determine if we're working with multiple blocks
-        const isMultiSelect = this.selectedBlockIndices.has(this.draggedBlockIndex);
-        
-        if (this.isDuplicating) {
-          // Duplication mode
-          if (isMultiSelect) {
-            // Duplicate all selected blocks
-            const sortedIndices = Array.from(this.selectedBlockIndices).sort((a, b) => a - b);
-            this._duplicateBlocks(sortedIndices, targetIndex);
-          } else {
-            // Duplicate single block
-            this._duplicateBlocks([this.draggedBlockIndex], targetIndex);
-          }
-        } else {
-          // Move mode
-          if (isMultiSelect) {
-            // Move all selected blocks
-            const sortedIndices = Array.from(this.selectedBlockIndices).sort((a, b) => a - b);
-            // Don't move if target is within the selection
-            if (this.draggedBlockIndex !== targetIndex) {
-              this._moveMultipleBlocks(sortedIndices, targetIndex);
-            }
-          } else {
-            // Move single block
-            if (this.draggedBlockIndex !== targetIndex) {
-              this.reorderBlocks(this.draggedBlockIndex, targetIndex);
-            }
-          }
-        }
-        
-        // Re-render blocks
-        const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
-        if (blocksContainer) {
-          this._renderBlocks(blocksContainer);
-        }
+        // Delegate to helper method for reduced complexity
+        this._handleBlockDrop(targetIndex);
       });
 
       return blockDiv;
