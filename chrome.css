@@ -227,7 +227,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .zen-pomodoro-button:hover {
     background-color: var(--zen-pomodoro-button-hover-bg) !important;
-    border-color: rgb(255 255 255 / 50%);
+    border-color: rgb(255 255 255 / 50%) !important;
     transform: translateY(-2px);
   }
 
@@ -239,8 +239,8 @@
 /* Fallback for reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .zen-pomodoro-button:hover {
-    background-color: var(--zen-pomodoro-button-hover-bg);
-    border-color: rgb(255 255 255 / 50%);
+    background-color: var(--zen-pomodoro-button-hover-bg) !important;
+    border-color: rgb(255 255 255 / 50%) !important;
   }
 }
 
