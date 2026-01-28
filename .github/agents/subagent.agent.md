@@ -77,7 +77,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.5'`
+- `MOD_VERSION = '1.3.6'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -160,6 +160,27 @@ dialog.className = 'zen-pomodoro-dialog active';
 **Important:** `isInBreakPhase()` returns true for transition phases, so `_isPausedDuringBreak()` already handles both.
 
 **Bug pattern to avoid:** `_handlePausedBreakPhase()` must use `isWorkspaceInBlockedList()` (not `isCurrentWorkspaceBlocked()`) when checking workspace membership, because `isCurrentWorkspaceBlocked()` returns false during break/transition phases.
+
+### Custom Cycles Multi-Select Pattern
+
+**Pattern:** Custom cycles support multi-select operations (shift+click to select, drag to move, alt+drag to duplicate, delete to remove).
+
+**Key implementation details:**
+- Selected blocks have `.selected` CSS class for visual feedback (blue border)
+- Shift+Click toggles selection, regular click clears selection
+- Multi-select drag: moves all selected blocks together, preserving order
+- Multi-select alt+drag: duplicates all selected blocks
+- Multi-select delete: removes all selected blocks (with protection against deleting all)
+- Selection state is managed per cycle and cleared on cycle close
+
+### Cut Break Early Transition Phase Pattern
+
+**Pattern:** "Cut Break Early" button during transition phase must handle both regular Pomodoro and custom cycle modes.
+
+**Key locations:**
+- Button handler checks timer mode
+- Regular mode: calls `startFocusPhase()`
+- Custom mode: calls `skipToNextCustomBlock()` to advance to next block in cycle
 
 ## Documentation Reminder
 

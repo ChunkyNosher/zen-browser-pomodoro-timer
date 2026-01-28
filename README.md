@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3.5-green.svg)
+![Version](https://img.shields.io/badge/version-1.3.6-green.svg)
 
 ## ✨ Features
 
@@ -333,6 +333,16 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.3.6
+
+- ✅ Fixed "Cut Break Early" button not working during transition phase (added custom mode support)
+- ✅ Fixed code lock screen character alignment issue (first character now perfectly aligned)
+- ✅ Fixed Copilot setup workflow (added cache-dependency-path and changed to npm install)
+- ✨ New: Custom Cycles block duplication with Alt+Drag (works with single and multi-selected blocks)
+- ✨ New: Custom Cycles multi-select with Shift+Click (select multiple blocks, blue border highlight)
+- ✨ New: Custom Cycles multi-select operations (move, duplicate, and delete multiple blocks together)
+- 🔧 Removed duplicate settings from preferences.json (now only in internal settings menu)
 
 ### Version 1.3.5
 
