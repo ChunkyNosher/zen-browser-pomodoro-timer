@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.5';                  // Current mod version
+const MOD_VERSION = '1.3.6';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -216,6 +216,9 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `distractionDumpEnabled`        | boolean | true               | Enable Distraction Dump feature                      |
 | `distractionDumpDuration`       | number  | 25                 | Default dump duration in minutes                     |
 | `distractionDumpMaxDuration`    | number  | 35                 | Maximum dump duration in minutes                     |
+| `timerRemindersEnabled`         | boolean | true               | Enable timer reminders during sessions               |
+| `focusPhaseReminders`           | array   | [20, 10, 5, 1]     | Minutes before focus phase ends to show reminder     |
+| `breakPhaseReminders`           | array   | [5, 1]             | Minutes before break phase ends to show reminder     |
 
 ---
 
@@ -229,6 +232,110 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
 | `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection        |
+| `loadIntArrayPref(prefName, config, configKey)`       | Load comma-separated integer array preference      |
+
+---
+
+## Bug Fixes in v1.3.6
+
+### Timer Reminders Feature (New)
+
+**Feature:** Browser notifications at specified times before focus or break phases end.
+
+**Implementation:**
+- Shows notifications at exact minute boundaries
+- Different messages for focus vs break phases:
+  - Focus: "⏰ X minute(s) left in your focus session!"
+  - Break: "☕ X minute(s) left in your break!"
+- Respects the global `enableNotifications` setting
+- Skips transition phase (already a warning phase)
+- Tracks shown reminders per phase to avoid duplicates
+- Clears tracking when phase changes
+
+**Configuration:**
+- `timerRemindersEnabled` (boolean, default: true) - Enable/disable reminders
+- `focusPhaseReminders` (array, default: [20, 10, 5, 1]) - Minutes before focus ends
+- `breakPhaseReminders` (array, default: [5, 1]) - Minutes before break ends
+
+**Settings UI:**
+- New "Timer Reminders" section in settings dialog
+- Enable/disable checkbox
+- Focus Phase Reminders subsection with list and add/delete controls
+- Break Phase Reminders subsection with list and add/delete controls
+- Input validation (1-120 min focus, 1-60 min break)
+
+**Helper Functions:**
+- `loadIntArrayPref(prefName, config, configKey)` - Load comma-separated integer array preference
+
+### Cut Break Early Button for Transition Phase
+
+**Issue:** "Cut Break Early" button didn't work during transition phase - it would appear but clicking it did nothing.
+
+**Root Cause:** The button handler only called `hideTransitionPopup()`, which has a guard that returns early if the popup isn't showing (e.g., on non-blocked workspaces). Additionally, there was no custom mode handling, so custom cycles would not properly advance to the next block.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Modified button handler to directly start focus phase regardless of popup visibility
+- Added custom mode detection and calls `skipToNextCustomBlock()` for custom cycles
+- Regular Pomodoro mode continues to use existing `startFocusPhase()` logic
+
+### Code Lock Screen Character Alignment
+
+**Issue:** The first character in the displayed code was a few pixels to the RIGHT of the first character in the input text box, causing misalignment.
+
+**Root Cause:** Browser differences in text positioning between div and input elements. The input had default padding/appearance styles that caused offset.
+
+**Fix:** In `chrome.css`:
+- Added explicit `padding-inline-start: 2px;` to `.zen-pomodoro-lock-code-display` to match input padding
+- Added explicit `padding-inline-end: 2px;` for consistency
+- Added `text-indent: 0;` to ensure no text indentation
+- Added `appearance: none;` to remove browser default styling
+- This ensures perfect character-by-character alignment between code display and input
+
+### Copilot Setup Steps Workflow
+
+**Issue:** The `copilot-setup-steps.yml` workflow failed because `cache: npm` requires package-lock.json, which is in .gitignore.
+
+**Root Cause:** The workflow used `cache: npm` without a cache-dependency-path, and npm ci requires package-lock.json.
+
+**Fix:** In `.github/workflows/copilot-setup-steps.yml`:
+- Added `cache-dependency-path: './package.json'` to explicitly point to package.json
+- Changed `npm ci` to `npm install` since package-lock.json is not tracked
+
+### Removed Duplicate Settings from preferences.json
+
+**Issue:** Several settings (reminderMode, postSessionIdleTime, etc.) appeared both in preferences.json and in the mod's internal settings menu, causing confusion.
+
+**Fix:**
+- Removed: reminderMode, postSessionIdleTime, postSessionSkipCooldown, postSessionFocusTimeGoal, postSessionReminderEndTime, dailyReminderSkipCooldown
+- These settings are still available in the mod's internal settings menu (accessed via keyboard shortcut)
+- Kept only: keyboard shortcut and notifications settings in preferences.json
+
+### Custom Cycles: Block Duplication (Alt+Drag)
+
+**Feature:** Hold Alt key and drag a block to duplicate it.
+
+**Implementation:**
+- Works with single blocks and multi-selected blocks
+- Duplicates preserve duration and type
+- Visual feedback during drag operation
+
+### Custom Cycles: Multi-Select (Shift+Click)
+
+**Feature:** Hold Shift and click blocks to select multiple blocks at once.
+
+**Implementation:**
+- Selected blocks have distinct visual appearance (blue border, highlighted background)
+- Click without Shift to clear selection
+- Selection state persists during drag/duplicate/delete operations
+
+### Custom Cycles: Multi-Select Operations
+
+**Feature:** Perform operations on multiple selected blocks simultaneously.
+
+**Implementation:**
+- **Multi-select + drag:** Move all selected blocks together, preserving relative order
+- **Multi-select + Alt+drag:** Duplicate all selected blocks at once
+- **Multi-select + delete:** Delete all selected blocks (with protection - cannot delete all blocks in cycle)
 
 ---
 

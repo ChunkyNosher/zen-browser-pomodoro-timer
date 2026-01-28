@@ -678,6 +678,7 @@
   background: #1e1d26;
   border: 2px solid transparent; /* Match input border width for alignment */
   padding: 12px;
+  padding-inline: 12px; /* Explicit inline padding for alignment */
   border-radius: 6px;
   margin: 0 0 8px; /* Adjusted margin for container layout */
   font-family: monospace;
@@ -687,6 +688,7 @@
   box-sizing: border-box;
   width: 100%; /* Fill container width */
   text-align: left; /* Left-aligned for better code readability */
+  text-indent: 0; /* Reset any default indentation */
 }
 
 #zen-pomodoro-lock-code {
@@ -695,12 +697,16 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
+  padding-inline: 12px; /* Explicit inline padding for alignment */
   font-size: 17px !important; /* Match the code display (reduced from 21px) */
   width: 100%; /* Fill container width - matches code display */
   margin: 0; /* No margin to ensure perfect alignment */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
+  text-align: left; /* Match code display alignment */
+  text-indent: 0; /* Reset any default indentation */
+  appearance: none; /* Remove platform-specific styling */
 }
 
 #zen-pomodoro-lock-code:focus {
@@ -1765,12 +1771,16 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
+  padding-inline: 12px; /* Explicit inline padding for alignment */
   font-size: 17px !important; /* Match the code display */
   width: 100%;
   margin: 0; /* No margin to ensure perfect alignment */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
+  text-align: left; /* Match code display alignment */
+  text-indent: 0; /* Reset any default indentation */
+  appearance: none; /* Remove platform-specific styling */
 }
 
 .zen-pomodoro-lock-code-input:focus {
@@ -2038,6 +2048,18 @@
 .zen-pomodoro-cycle-block.dragging {
   opacity: 0.5;
   transform: scale(0.95);
+}
+
+/* Selected block styling */
+.zen-pomodoro-cycle-block.selected {
+  border-color: #4a9eff;
+  background-color: rgb(74 158 255 / 15%);
+  box-shadow: 0 0 0 2px rgb(74 158 255 / 30%);
+}
+
+.zen-pomodoro-cycle-block.selected:hover {
+  background-color: rgb(74 158 255 / 20%);
+  border-color: #4a9eff;
 }
 
 /* Focus block styling */
