@@ -1,7 +1,12 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.3.5
+ * Version: 1.3.6
  * License: MIT
+ * 
+ * ZEN BROWSER 1.18.X COMPATIBILITY:
+ * - Added appearance: none to buttons to override browser defaults
+ * - Added !important to button styling properties for specificity
+ * - Added position: relative to buttons for proper stacking context
  * 
  * ACCESSIBILITY FIXES:
  * - Added prefers-reduced-motion support for animations
@@ -203,9 +208,10 @@
 }
 
 .zen-pomodoro-button {
-  background-color: var(--zen-pomodoro-button-bg);
-  color: var(--zen-pomodoro-button-text);
-  border: 2px solid rgb(255 255 255 / 30%);
+  appearance: none !important;
+  background-color: var(--zen-pomodoro-button-bg) !important;
+  color: var(--zen-pomodoro-button-text) !important;
+  border: 2px solid rgb(255 255 255 / 30%) !important;
   border-radius: 8px;
   padding: 12px 24px;
   font-size: 16px;
@@ -214,12 +220,13 @@
   transition: all 0.2s ease;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  position: relative;
 }
 
 /* ACCESSIBILITY FIX: Wrap button hover/active transitions in prefers-reduced-motion */
 @media (prefers-reduced-motion: no-preference) {
   .zen-pomodoro-button:hover {
-    background-color: var(--zen-pomodoro-button-hover-bg);
+    background-color: var(--zen-pomodoro-button-hover-bg) !important;
     border-color: rgb(255 255 255 / 50%);
     transform: translateY(-2px);
   }
@@ -497,27 +504,29 @@
 }
 
 .zen-pomodoro-dialog-button {
-  background-color: #2180cd;
-  color: #fff;
-  border: none;
+  appearance: none !important;
+  background-color: #2180cd !important;
+  color: #fff !important;
+  border: none !important;
   border-radius: 6px;
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .zen-pomodoro-dialog-button:hover {
-  background-color: #1a6bb3;
+  background-color: #1a6bb3 !important;
 }
 
 .zen-pomodoro-dialog-button.secondary {
-  background-color: #3a3944;
+  background-color: #3a3944 !important;
 }
 
 .zen-pomodoro-dialog-button.secondary:hover {
-  background-color: #4a4954;
+  background-color: #4a4954 !important;
 }
 
 /* ============================================
@@ -1850,10 +1859,12 @@
 
 /* Distraction Dump button in menu */
 .zen-pomodoro-dump-button {
+  appearance: none !important;
   background: linear-gradient(135deg, #6a5acd 0%, #9370db 100%) !important;
   border: none !important;
   color: #fff !important;
   transition: all 0.3s ease !important;
+  position: relative;
 }
 
 .zen-pomodoro-dump-button:hover {

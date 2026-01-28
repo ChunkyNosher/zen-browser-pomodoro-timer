@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.5
+ * Version: 1.3.6
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
