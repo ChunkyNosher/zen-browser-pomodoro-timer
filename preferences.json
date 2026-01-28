@@ -11,56 +11,5 @@
     "label": "Enable Notifications",
     "type": "checkbox",
     "defaultValue": true
-  },
-  {
-    "property": "zen-pomodoro.reminderMode",
-    "label": "Reminder Mode",
-    "type": "dropdown",
-    "defaultValue": "post-session",
-    "options": [
-      {
-        "label": "Off",
-        "value": "none"
-      },
-      {
-        "label": "Daily Reminders",
-        "value": "daily"
-      },
-      {
-        "label": "Post-Session Reminders",
-        "value": "post-session"
-      }
-    ]
-  },
-  {
-    "property": "zen-pomodoro.postSessionIdleTime",
-    "label": "Post-Session Idle Time (minutes)",
-    "type": "number",
-    "defaultValue": 45
-  },
-  {
-    "property": "zen-pomodoro.postSessionSkipCooldown",
-    "label": "Post-Session Skip Cooldown (minutes)",
-    "type": "number",
-    "defaultValue": 30
-  },
-  {
-    "property": "zen-pomodoro.postSessionFocusTimeGoal",
-    "label": "Daily Focus Time Goal (minutes) - reminders stop after goal",
-    "type": "number",
-    "defaultValue": 150
-  },
-  {
-    "property": "zen-pomodoro.postSessionReminderEndTime",
-    "label": "Post-Session Auto-Off Time (24h format, e.g., 00:30 for 12:30 AM)",
-    "type": "string",
-    "defaultValue": "00:30",
-    "placeholder": "00:30"
-  },
-  {
-    "property": "zen-pomodoro.dailyReminderSkipCooldown",
-    "label": "Daily Reminder Skip Cooldown (minutes)",
-    "type": "number",
-    "defaultValue": 10
   }
 ]

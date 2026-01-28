@@ -4490,9 +4490,21 @@
 
             const timer = window.zenPomodoroApp.timer;
 
-            // If in transition phase, hide the popup (which triggers onTransitionComplete callback)
+            // If in transition phase, directly start the focus phase
             if (status.currentPhase === 'transition') {
+              // Hide popup if it exists (don't rely on callback since popup might not be showing)
               window.zenPomodoroApp.transitionManager.hideTransitionPopup();
+              
+              if (timer.mode === 'custom') {
+                // Custom cycle mode: skip to next block (should be a focus block after transition)
+                if (timer.skipToNextCustomBlock()) {
+                  window.zenPomodoroApp.updateOverlayVisibility();
+                }
+              } else {
+                // Non-custom mode: start focus directly
+                timer.startFocusFromTransition();
+                window.zenPomodoroApp.updateOverlayVisibility();
+              }
             } else if (timer.mode === 'custom') {
               // Custom cycle mode: skip to next block
               // Only update overlay if skip was successful (returns true)

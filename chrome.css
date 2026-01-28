@@ -678,6 +678,8 @@
   background: #1e1d26;
   border: 2px solid transparent; /* Match input border width for alignment */
   padding: 12px;
+  padding-inline-start: 12px; /* Explicit inline padding for alignment */
+  padding-inline-end: 12px;
   border-radius: 6px;
   margin: 0 0 8px; /* Adjusted margin for container layout */
   font-family: monospace;
@@ -687,6 +689,7 @@
   box-sizing: border-box;
   width: 100%; /* Fill container width */
   text-align: left; /* Left-aligned for better code readability */
+  text-indent: 0; /* Reset any default indentation */
 }
 
 #zen-pomodoro-lock-code {
@@ -695,12 +698,18 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
+  padding-inline-start: 12px; /* Explicit inline padding for alignment */
+  padding-inline-end: 12px;
   font-size: 17px !important; /* Match the code display (reduced from 21px) */
   width: 100%; /* Fill container width - matches code display */
   margin: 0; /* No margin to ensure perfect alignment */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
+  text-align: left; /* Match code display alignment */
+  text-indent: 0; /* Reset any default indentation */
+  appearance: none; /* Remove platform-specific styling */
+  -webkit-appearance: none;
 }
 
 #zen-pomodoro-lock-code:focus {
@@ -1765,12 +1774,18 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
+  padding-inline-start: 12px; /* Explicit inline padding for alignment */
+  padding-inline-end: 12px;
   font-size: 17px !important; /* Match the code display */
   width: 100%;
   margin: 0; /* No margin to ensure perfect alignment */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
+  text-align: left; /* Match code display alignment */
+  text-indent: 0; /* Reset any default indentation */
+  appearance: none; /* Remove platform-specific styling */
+  -webkit-appearance: none;
 }
 
 .zen-pomodoro-lock-code-input:focus {
