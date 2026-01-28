@@ -11356,6 +11356,8 @@
       this.currentEditingCycle = null;
       this.editingCycleDialog = null;
       this.draggedBlockIndex = null;
+      this.selectedBlockIndices = new Set(); // Track selected block indices
+      this.isDuplicating = false; // Flag for Alt+Drag duplication
     }
 
     /**
@@ -11827,11 +11829,75 @@
     }
 
     /**
+     * Clear all block selections.
+     * @param {HTMLElement} container - Container element for blocks
+     * @private
+     */
+    _clearBlockSelection(container) {
+      this.selectedBlockIndices.clear();
+      if (container) {
+        container.querySelectorAll('.zen-pomodoro-cycle-block.selected')
+          .forEach(el => el.classList.remove('selected'));
+      }
+    }
+
+    /**
+     * Duplicate blocks at specified indices and insert at target position.
+     * @param {Array<number>} sourceIndices - Indices of blocks to duplicate (sorted)
+     * @param {number} targetIndex - Target insertion index
+     * @private
+     */
+    _duplicateBlocks(sourceIndices, targetIndex) {
+      if (sourceIndices.length === 0) return;
+
+      // Create deep copies of the blocks
+      const blocksToDuplicate = sourceIndices.map(idx => ({
+        type: this.currentEditingCycle.blocks[idx].type,
+        duration: this.currentEditingCycle.blocks[idx].duration
+      }));
+
+      // Insert duplicated blocks at target position
+      this.currentEditingCycle.blocks.splice(targetIndex, 0, ...blocksToDuplicate);
+      
+      logger.log(LOG_CATEGORIES.MENU, `Duplicated ${sourceIndices.length} block(s) to index ${targetIndex}`);
+    }
+
+    /**
+     * Move multiple blocks to a target position, preserving their relative order.
+     * @param {Array<number>} sourceIndices - Indices of blocks to move (sorted)
+     * @param {number} targetIndex - Target insertion index
+     * @private
+     */
+    _moveMultipleBlocks(sourceIndices, targetIndex) {
+      if (sourceIndices.length === 0) return;
+
+      // Extract the blocks to move
+      const blocksToMove = sourceIndices.map(idx => this.currentEditingCycle.blocks[idx]);
+      
+      // Remove blocks from the array (in reverse order to maintain indices)
+      for (let i = sourceIndices.length - 1; i >= 0; i--) {
+        this.currentEditingCycle.blocks.splice(sourceIndices[i], 1);
+      }
+
+      // Adjust target index based on how many blocks before it were removed
+      const removedBefore = sourceIndices.filter(idx => idx < targetIndex).length;
+      const adjustedTarget = targetIndex - removedBefore;
+
+      // Insert blocks at adjusted target position
+      this.currentEditingCycle.blocks.splice(adjustedTarget, 0, ...blocksToMove);
+      
+      logger.log(LOG_CATEGORIES.MENU, `Moved ${sourceIndices.length} block(s) to index ${adjustedTarget}`);
+    }
+
+    /**
      * Render the blocks in the editor.
      * @param {HTMLElement} container - Container element for blocks
      * @private
      */
     _renderBlocks(container) {
+      // Clear selection when re-rendering
+      this._clearBlockSelection(container);
+      
       container.innerHTML = '';
 
       if (this.currentEditingCycle.blocks.length === 0) {
@@ -11912,8 +11978,60 @@
       deleteButton.className = 'zen-pomodoro-cycle-block-delete';
       deleteButton.textContent = '✕';
       deleteButton.title = 'Delete block';
-      deleteButton.addEventListener('click', () => {
-        this.removeBlock(index);
+      deleteButton.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent triggering block click
+        
+        // If this block is selected, delete all selected blocks
+        if (this.selectedBlockIndices.has(index)) {
+          const indicesToDelete = Array.from(this.selectedBlockIndices).sort((a, b) => b - a);
+          
+          // Check if we'd delete all blocks
+          if (indicesToDelete.length >= this.currentEditingCycle.blocks.length) {
+            // Show error - must have at least one block
+            const errorDialog = document.createElement('div');
+            errorDialog.className = 'zen-pomodoro-dialog active';
+            errorDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
+
+            const title = document.createElement('h2');
+            title.textContent = 'Cannot Delete';
+
+            const message = document.createElement('p');
+            message.textContent = 'A cycle must have at least one block.';
+            message.style.marginBottom = '20px';
+
+            const okButton = document.createElement('button');
+            okButton.className = 'zen-pomodoro-dialog-button';
+            okButton.textContent = 'OK';
+            okButton.addEventListener('click', () => {
+              errorDialog.remove();
+            });
+
+            errorDialog.appendChild(title);
+            errorDialog.appendChild(message);
+            errorDialog.appendChild(okButton);
+
+            applyLastDialogPosition(errorDialog);
+            document.documentElement.appendChild(errorDialog);
+            return;
+          }
+          
+          // Delete in reverse order to maintain indices
+          for (const idx of indicesToDelete) {
+            this.currentEditingCycle.blocks.splice(idx, 1);
+          }
+          
+          logger.log(LOG_CATEGORIES.MENU, `Deleted ${indicesToDelete.length} selected block(s)`);
+          
+          // Clear selection and re-render
+          this.selectedBlockIndices.clear();
+          const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+          if (blocksContainer) {
+            this._renderBlocks(blocksContainer);
+          }
+        } else {
+          // Single block deletion
+          this.removeBlock(index);
+        }
       });
 
       blockDiv.appendChild(dragHandle);
@@ -11921,56 +12039,138 @@
       blockDiv.appendChild(infoDiv);
       blockDiv.appendChild(deleteButton);
 
+      // Shift+Click handler for multi-select
+      blockDiv.addEventListener('click', (e) => {
+        // Don't handle click if it's on the input or delete button
+        if (e.target === durationInput || e.target === deleteButton) {
+          return;
+        }
+        
+        if (e.shiftKey) {
+          e.preventDefault();
+          if (this.selectedBlockIndices.has(index)) {
+            this.selectedBlockIndices.delete(index);
+            blockDiv.classList.remove('selected');
+          } else {
+            this.selectedBlockIndices.add(index);
+            blockDiv.classList.add('selected');
+          }
+        } else {
+          // Clear all selections on normal click
+          const container = blockDiv.parentElement;
+          this._clearBlockSelection(container);
+        }
+      });
+
       // Drag and drop handlers
       blockDiv.addEventListener('dragstart', (e) => {
         this.draggedBlockIndex = index;
-        blockDiv.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
+        this.isDuplicating = e.altKey;
+        
+        // If dragging a selected block, mark all selected blocks for dragging
+        if (this.selectedBlockIndices.has(index)) {
+          // Get all selected block elements and mark them
+          const container = blockDiv.parentElement;
+          const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+          allBlocks.forEach((block, idx) => {
+            if (this.selectedBlockIndices.has(idx)) {
+              block.classList.add('dragging');
+            }
+          });
+        } else {
+          blockDiv.classList.add('dragging');
+        }
+        
+        e.dataTransfer.effectAllowed = this.isDuplicating ? 'copy' : 'move';
       });
 
       blockDiv.addEventListener('dragend', () => {
-        blockDiv.classList.remove('dragging');
+        // Remove dragging class from all blocks
+        const container = blockDiv.parentElement;
+        if (container) {
+          container.querySelectorAll('.zen-pomodoro-cycle-block.dragging')
+            .forEach(el => el.classList.remove('dragging'));
+        }
         this.draggedBlockIndex = null;
+        this.isDuplicating = false;
       });
 
       blockDiv.addEventListener('dragover', (e) => {
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+        e.dataTransfer.dropEffect = this.isDuplicating ? 'copy' : 'move';
         
         const afterElement = this._getDragAfterElement(blockDiv.parentElement, e.clientY);
-        if (afterElement == null) {
-          blockDiv.parentElement.appendChild(blockDiv.parentElement.querySelector('.dragging'));
-        } else {
-          blockDiv.parentElement.insertBefore(
-            blockDiv.parentElement.querySelector('.dragging'),
-            afterElement
-          );
-        }
+        const draggingElements = Array.from(blockDiv.parentElement.querySelectorAll('.zen-pomodoro-cycle-block.dragging'));
+        
+        // Move all dragging elements together
+        draggingElements.forEach(draggingEl => {
+          if (afterElement == null) {
+            blockDiv.parentElement.appendChild(draggingEl);
+          } else {
+            blockDiv.parentElement.insertBefore(draggingEl, afterElement);
+          }
+        });
       });
 
       blockDiv.addEventListener('drop', (e) => {
         e.preventDefault();
         
-        // Compute target index from current DOM order instead of stale dataset.index
+        // Compute target index from current DOM order
         const container = blockDiv.parentElement;
         if (!container) {
           return;
         }
         
         const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
-        const draggedElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
+        const firstDraggingElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
         
-        if (!draggedElement) {
+        if (!firstDraggingElement) {
           return;
         }
         
-        const targetIndex = blocks.indexOf(draggedElement);
+        const targetIndex = blocks.indexOf(firstDraggingElement);
         if (targetIndex === -1) {
           return;
         }
         
-        if (this.draggedBlockIndex !== null && this.draggedBlockIndex !== targetIndex) {
-          this.reorderBlocks(this.draggedBlockIndex, targetIndex);
+        if (this.draggedBlockIndex === null) {
+          return;
+        }
+        
+        // Determine if we're working with multiple blocks
+        const isMultiSelect = this.selectedBlockIndices.has(this.draggedBlockIndex);
+        
+        if (this.isDuplicating) {
+          // Duplication mode
+          if (isMultiSelect) {
+            // Duplicate all selected blocks
+            const sortedIndices = Array.from(this.selectedBlockIndices).sort((a, b) => a - b);
+            this._duplicateBlocks(sortedIndices, targetIndex);
+          } else {
+            // Duplicate single block
+            this._duplicateBlocks([this.draggedBlockIndex], targetIndex);
+          }
+        } else {
+          // Move mode
+          if (isMultiSelect) {
+            // Move all selected blocks
+            const sortedIndices = Array.from(this.selectedBlockIndices).sort((a, b) => a - b);
+            // Don't move if target is within the selection
+            if (this.draggedBlockIndex !== targetIndex) {
+              this._moveMultipleBlocks(sortedIndices, targetIndex);
+            }
+          } else {
+            // Move single block
+            if (this.draggedBlockIndex !== targetIndex) {
+              this.reorderBlocks(this.draggedBlockIndex, targetIndex);
+            }
+          }
+        }
+        
+        // Re-render blocks
+        const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+        if (blocksContainer) {
+          this._renderBlocks(blocksContainer);
         }
       });
 

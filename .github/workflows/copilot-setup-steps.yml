@@ -31,16 +31,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup Node.js with npm caching for faster dependency installation
+      # Setup Node.js with caching based on package.json (no lock file in repo)
+      # Using package.json as cache key since package-lock.json is gitignored
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: './package.json'
 
-      # Install project dependencies
+      # Install project dependencies using npm install (not npm ci since no lock file)
       - name: Install Node.js dependencies
-        run: npm ci
+        run: npm install
 
       # Verify linting tools are properly installed
       - name: Verify linting tools are available

@@ -2055,6 +2055,18 @@
   transform: scale(0.95);
 }
 
+/* Selected block styling */
+.zen-pomodoro-cycle-block.selected {
+  border-color: #4a9eff;
+  background-color: rgb(74 158 255 / 15%);
+  box-shadow: 0 0 0 2px rgb(74 158 255 / 30%);
+}
+
+.zen-pomodoro-cycle-block.selected:hover {
+  background-color: rgb(74 158 255 / 20%);
+  border-color: #4a9eff;
+}
+
 /* Focus block styling */
 .zen-pomodoro-cycle-block-focus {
   border-left: 4px solid #2180cd;
