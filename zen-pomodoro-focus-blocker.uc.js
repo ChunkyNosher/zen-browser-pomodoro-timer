@@ -231,6 +231,12 @@
       distractionDumpMaxDuration: 35,
       /** Custom Pomodoro Cycles - user-defined custom timer sequences */
       customCycles: [],
+      /** Timer reminders - notify user before phase ends */
+      timerRemindersEnabled: true,
+      /** Minutes before focus phase ends to show reminder (default: 20, 10, 5, 1) */
+      focusPhaseReminders: [20, 10, 5, 1],
+      /** Minutes before break phase ends to show reminder (default: 5, 1) */
+      breakPhaseReminders: [5, 1],
     },
   };
 
@@ -569,6 +575,36 @@
     }
 
     /**
+     * Load a comma-separated integer list preference and set it in config if valid.
+     * Validates each integer as a positive number and filters out invalid values.
+     * Supports empty strings to represent empty arrays.
+     * @param {string} prefName - Preference name (without prefix)
+     * @param {Object} config - Config object to update
+     * @param {string} configKey - Key in config to set
+     * @private
+     */
+    function loadIntArrayPref(prefName, config, configKey) {
+      const value = getPref(prefName, null);
+      if (value !== null) {
+        // Handle empty string as empty array
+        if (value === '') {
+          config[configKey] = [];
+          return;
+        }
+        // Split by comma and trim whitespace
+        const numbers = value
+          .split(',')
+          .map((n) => n.trim())
+          .map((n) => parseInt(n, 10));
+        // Filter to only valid positive integers
+        const validNumbers = numbers.filter((n) => !isNaN(n) && n > 0);
+        if (validNumbers.length > 0) {
+          config[configKey] = validNumbers;
+        }
+      }
+    }
+
+    /**
      * Load and validate reminder mode from preferences.
      * Only accepts valid reminder mode values from REMINDER_MODES constant.
      * @param {string} prefName - Preference name (without prefix)
@@ -616,6 +652,7 @@
       // Override with individual preferences if set
       // Boolean preferences (handles both true and 'true' for legacy support)
       loadBooleanPref('enableNotifications', config, 'enableNotifications');
+      loadBooleanPref('timerRemindersEnabled', config, 'timerRemindersEnabled');
 
       // Positive integer preferences
       loadPositiveIntPref('postSessionIdleTime', config, 'postSessionIdleTime');
@@ -635,6 +672,10 @@
 
       // Time array preferences (comma-separated HH:MM times)
       loadTimeArrayPref('dailyReminderTimes', config, 'dailyReminderTimes');
+
+      // Integer array preferences (comma-separated positive integers)
+      loadIntArrayPref('focusPhaseReminders', config, 'focusPhaseReminders');
+      loadIntArrayPref('breakPhaseReminders', config, 'breakPhaseReminders');
 
       return config;
     }
@@ -2028,6 +2069,8 @@
       this.customCycle = null; // Current custom cycle configuration
       this.customCycleBlocks = null; // Array of blocks from custom cycle
       this.currentBlockIndex = 0; // Current block index in custom cycle
+      /** Track which reminders have been shown for current phase to avoid duplicates */
+      this.shownRemindersForCurrentPhase = new Set();
     }
 
     /**
@@ -2044,6 +2087,9 @@
       this.isActive = true;
       this.isPaused = false;
       this.tickCounter = 0;
+
+      // Clear shown reminders for new session
+      this.shownRemindersForCurrentPhase.clear();
 
       // Get base config from preferences (ensures we start fresh without previous session modifications)
       this.config = getConfig();
@@ -2086,6 +2132,9 @@
       this.isPaused = false;
       this.tickCounter = 0;
 
+      // Clear shown reminders for new session
+      this.shownRemindersForCurrentPhase.clear();
+
       // Get base config from preferences
       this.config = getConfig();
       this.savedConfig = { ...this.config };
@@ -2125,6 +2174,9 @@
           if (this.onTick) {
             this.onTick(this.remainingTime, this.currentPhase, this.currentCycle, this.totalCycles);
           }
+
+          // Check for timer reminders
+          this._checkTimerReminders();
 
           if (this.remainingTime <= 0) {
             this.handlePhaseComplete();
@@ -2260,6 +2312,85 @@
     }
 
     /**
+     * Check if a timer reminder should be shown based on remaining time.
+     * Shows browser notification if all conditions are met:
+     * - Feature is enabled (timerRemindersEnabled)
+     * - Notifications are enabled (enableNotifications)
+     * - Not in transition phase (already a warning phase)
+     * - Remaining time matches a configured reminder time at exact minute boundary
+     * - This reminder hasn't been shown yet for the current phase
+     * @private
+     */
+    _checkTimerReminders() {
+      const config = getConfig();
+
+      // Check if feature is enabled
+      if (!config.timerRemindersEnabled) return;
+
+      // Skip transition phase (already a warning phase)
+      if (this.currentPhase === 'transition') return;
+
+      // Get the appropriate reminder list based on current phase
+      const isFocusPhase = this.currentPhase === 'focus';
+      const reminders = isFocusPhase
+        ? config.focusPhaseReminders || []
+        : config.breakPhaseReminders || [];
+
+      // Convert remaining time to minutes (rounded)
+      const remainingMinutes = Math.floor(this.remainingTime / 60);
+
+      // Check if we should show a reminder
+      for (const reminderMinutes of reminders) {
+        // Check if we're exactly at the reminder time
+        if (remainingMinutes === reminderMinutes && this.remainingTime % 60 === 0) {
+          // Check if we haven't shown this reminder for this phase
+          if (!this.shownRemindersForCurrentPhase.has(reminderMinutes)) {
+            this.shownRemindersForCurrentPhase.add(reminderMinutes);
+            this._showTimerReminder(reminderMinutes, isFocusPhase);
+          }
+        }
+      }
+    }
+
+    /**
+     * Show a timer reminder notification.
+     * @param {number} minutes - Minutes remaining
+     * @param {boolean} isFocusPhase - True if focus phase, false if break phase
+     * @private
+     */
+    _showTimerReminder(minutes, isFocusPhase) {
+      const config = getConfig();
+
+      // Only show if notifications are enabled
+      if (!config.enableNotifications) return;
+
+      const minuteText = minutes === 1 ? 'minute' : 'minutes';
+      const message = isFocusPhase
+        ? `⏰ ${minutes} ${minuteText} left in your focus session!`
+        : `☕ ${minutes} ${minuteText} left in your break!`;
+
+      const title = isFocusPhase ? 'Focus Reminder' : 'Break Reminder';
+
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          new Notification(title, {
+            body: message,
+            icon: 'chrome://branding/content/about-logo.png',
+          });
+        } else {
+          console.log(`${title}: ${message}`);
+        }
+      } catch (e) {
+        console.log(`${title}: ${message}`);
+      }
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Timer reminder shown', {
+        minutes: minutes,
+        phase: isFocusPhase ? 'focus' : 'break',
+      });
+    }
+
+    /**
      * Handle phase completion
      */
     handlePhaseComplete() {
@@ -2334,6 +2465,9 @@
       this.currentPhase = nextBlock.type;
       this.remainingTime = nextBlock.duration * 60;
 
+      // Clear shown reminders for new phase
+      this.shownRemindersForCurrentPhase.clear();
+
       logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
         blockIndex: this.currentBlockIndex,
         blockType: nextBlock.type,
@@ -2389,6 +2523,9 @@
       this.currentPhase = 'break';
       this.remainingTime = this.config.breakDuration * 60;
 
+      // Clear shown reminders for new phase
+      this.shownRemindersForCurrentPhase.clear();
+
       return false;
     }
 
@@ -2412,6 +2549,9 @@
       this.currentPhase = 'transition';
       this.remainingTime = TRANSITION_PHASE_DURATION_SECONDS;
 
+      // Clear shown reminders for new phase
+      this.shownRemindersForCurrentPhase.clear();
+
       // Trigger the transition popup callback if set
       if (this.onTransitionStart) {
         this.onTransitionStart();
@@ -2429,6 +2569,9 @@
 
       this.currentPhase = 'focus';
       this.remainingTime = this.config.focusDuration * 60;
+
+      // Clear shown reminders for new phase
+      this.shownRemindersForCurrentPhase.clear();
 
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
@@ -5868,6 +6011,227 @@
       reminderSection.appendChild(postSessionSubsection);
 
       // ========================================
+      // Timer Reminders Section
+      // ========================================
+      const timerRemindersSection = document.createElement('div');
+      timerRemindersSection.className = 'zen-pomodoro-config-section';
+
+      const timerRemindersTitle = document.createElement('h3');
+      timerRemindersTitle.textContent = 'Timer Reminders';
+
+      const timerRemindersDescription = document.createElement('p');
+      timerRemindersDescription.className = 'zen-pomodoro-help-text';
+      timerRemindersDescription.textContent =
+        'Get notified at specified times before focus or break phases end.';
+
+      // Enable timer reminders checkbox
+      const timerRemindersEnabledRow = document.createElement('div');
+      timerRemindersEnabledRow.className = 'zen-pomodoro-config-row';
+      const timerRemindersEnabledLabel = document.createElement('label');
+      timerRemindersEnabledLabel.textContent = 'Enable timer reminders:';
+      const timerRemindersEnabledCheckbox = document.createElement('input');
+      timerRemindersEnabledCheckbox.type = 'checkbox';
+      timerRemindersEnabledCheckbox.id = 'timer-reminders-enabled';
+      timerRemindersEnabledCheckbox.checked = config.timerRemindersEnabled;
+      timerRemindersEnabledRow.appendChild(timerRemindersEnabledLabel);
+      timerRemindersEnabledRow.appendChild(timerRemindersEnabledCheckbox);
+
+      // Focus Phase Reminders Subsection
+      const focusRemindersSubsection = document.createElement('div');
+      focusRemindersSubsection.className = 'zen-pomodoro-subsection';
+      focusRemindersSubsection.style.marginTop = '16px';
+      focusRemindersSubsection.style.paddingLeft = '24px';
+      focusRemindersSubsection.style.borderLeft = '3px solid #007acc';
+
+      const focusRemindersSubtitle = document.createElement('div');
+      focusRemindersSubtitle.style.fontSize = '14px';
+      focusRemindersSubtitle.style.fontWeight = 'bold';
+      focusRemindersSubtitle.style.marginBottom = '12px';
+      focusRemindersSubtitle.textContent = 'Focus Phase Reminders';
+
+      const focusRemindersHelp = document.createElement('p');
+      focusRemindersHelp.className = 'zen-pomodoro-help-text';
+      focusRemindersHelp.textContent = 'Minutes before focus phase ends to show reminder:';
+
+      // Focus reminders list
+      const focusRemindersList = document.createElement('div');
+      focusRemindersList.id = 'focus-reminders-list';
+      focusRemindersList.style.marginBottom = '12px';
+
+      // Initialize array if missing
+      if (!Array.isArray(config.focusPhaseReminders)) {
+        config.focusPhaseReminders = [];
+      }
+
+      const renderFocusReminders = () => {
+        focusRemindersList.innerHTML = '';
+        const reminders = config.focusPhaseReminders || [];
+        reminders.forEach((minutes) => {
+          const itemRow = document.createElement('div');
+          itemRow.className = 'zen-pomodoro-reminder-item';
+          itemRow.style.display = 'flex';
+          itemRow.style.alignItems = 'center';
+          itemRow.style.marginBottom = '8px';
+
+          const itemText = document.createElement('span');
+          itemText.textContent = `${minutes} minute${minutes === 1 ? '' : 's'}`;
+          itemText.style.flex = '1';
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'zen-pomodoro-dialog-button secondary';
+          deleteBtn.textContent = '×';
+          deleteBtn.style.minWidth = '32px';
+          deleteBtn.style.padding = '4px 8px';
+          deleteBtn.addEventListener('click', () => {
+            // Use filter to avoid stale index issues
+            config.focusPhaseReminders = config.focusPhaseReminders.filter((m) => m !== minutes);
+            renderFocusReminders();
+          });
+
+          itemRow.appendChild(itemText);
+          itemRow.appendChild(deleteBtn);
+          focusRemindersList.appendChild(itemRow);
+        });
+      };
+
+      renderFocusReminders();
+
+      // Add focus reminder input
+      const addFocusReminderRow = document.createElement('div');
+      addFocusReminderRow.className = 'zen-pomodoro-config-row';
+      const addFocusReminderInput = document.createElement('input');
+      addFocusReminderInput.type = 'number';
+      addFocusReminderInput.id = 'add-focus-reminder-input';
+      addFocusReminderInput.placeholder = 'Minutes';
+      addFocusReminderInput.min = 1;
+      addFocusReminderInput.max = 120;
+      addFocusReminderInput.style.flex = '1';
+
+      const addFocusReminderBtn = document.createElement('button');
+      addFocusReminderBtn.className = 'zen-pomodoro-dialog-button secondary';
+      addFocusReminderBtn.textContent = 'Add';
+      addFocusReminderBtn.addEventListener('click', () => {
+        const value = parseInt(addFocusReminderInput.value, 10);
+        if (!isNaN(value) && value > 0 && value <= 120) {
+          if (!config.focusPhaseReminders.includes(value)) {
+            config.focusPhaseReminders.push(value);
+            config.focusPhaseReminders.sort((a, b) => b - a); // Sort descending
+            renderFocusReminders();
+            addFocusReminderInput.value = '';
+          }
+        }
+      });
+
+      addFocusReminderRow.appendChild(addFocusReminderInput);
+      addFocusReminderRow.appendChild(addFocusReminderBtn);
+
+      focusRemindersSubsection.appendChild(focusRemindersSubtitle);
+      focusRemindersSubsection.appendChild(focusRemindersHelp);
+      focusRemindersSubsection.appendChild(focusRemindersList);
+      focusRemindersSubsection.appendChild(addFocusReminderRow);
+
+      // Break Phase Reminders Subsection
+      const breakRemindersSubsection = document.createElement('div');
+      breakRemindersSubsection.className = 'zen-pomodoro-subsection';
+      breakRemindersSubsection.style.marginTop = '16px';
+      breakRemindersSubsection.style.paddingLeft = '24px';
+      breakRemindersSubsection.style.borderLeft = '3px solid #007acc';
+
+      const breakRemindersSubtitle = document.createElement('div');
+      breakRemindersSubtitle.style.fontSize = '14px';
+      breakRemindersSubtitle.style.fontWeight = 'bold';
+      breakRemindersSubtitle.style.marginBottom = '12px';
+      breakRemindersSubtitle.textContent = 'Break Phase Reminders';
+
+      const breakRemindersHelp = document.createElement('p');
+      breakRemindersHelp.className = 'zen-pomodoro-help-text';
+      breakRemindersHelp.textContent = 'Minutes before break phase ends to show reminder:';
+
+      // Break reminders list
+      const breakRemindersList = document.createElement('div');
+      breakRemindersList.id = 'break-reminders-list';
+      breakRemindersList.style.marginBottom = '12px';
+
+      // Initialize array if missing
+      if (!Array.isArray(config.breakPhaseReminders)) {
+        config.breakPhaseReminders = [];
+      }
+
+      const renderBreakReminders = () => {
+        breakRemindersList.innerHTML = '';
+        const reminders = config.breakPhaseReminders || [];
+        reminders.forEach((minutes) => {
+          const itemRow = document.createElement('div');
+          itemRow.className = 'zen-pomodoro-reminder-item';
+          itemRow.style.display = 'flex';
+          itemRow.style.alignItems = 'center';
+          itemRow.style.marginBottom = '8px';
+
+          const itemText = document.createElement('span');
+          itemText.textContent = `${minutes} minute${minutes === 1 ? '' : 's'}`;
+          itemText.style.flex = '1';
+
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'zen-pomodoro-dialog-button secondary';
+          deleteBtn.textContent = '×';
+          deleteBtn.style.minWidth = '32px';
+          deleteBtn.style.padding = '4px 8px';
+          deleteBtn.addEventListener('click', () => {
+            // Use filter to avoid stale index issues
+            config.breakPhaseReminders = config.breakPhaseReminders.filter((m) => m !== minutes);
+            renderBreakReminders();
+          });
+
+          itemRow.appendChild(itemText);
+          itemRow.appendChild(deleteBtn);
+          breakRemindersList.appendChild(itemRow);
+        });
+      };
+
+      renderBreakReminders();
+
+      // Add break reminder input
+      const addBreakReminderRow = document.createElement('div');
+      addBreakReminderRow.className = 'zen-pomodoro-config-row';
+      const addBreakReminderInput = document.createElement('input');
+      addBreakReminderInput.type = 'number';
+      addBreakReminderInput.id = 'add-break-reminder-input';
+      addBreakReminderInput.placeholder = 'Minutes';
+      addBreakReminderInput.min = 1;
+      addBreakReminderInput.max = 60;
+      addBreakReminderInput.style.flex = '1';
+
+      const addBreakReminderBtn = document.createElement('button');
+      addBreakReminderBtn.className = 'zen-pomodoro-dialog-button secondary';
+      addBreakReminderBtn.textContent = 'Add';
+      addBreakReminderBtn.addEventListener('click', () => {
+        const value = parseInt(addBreakReminderInput.value, 10);
+        if (!isNaN(value) && value > 0 && value <= 60) {
+          if (!config.breakPhaseReminders.includes(value)) {
+            config.breakPhaseReminders.push(value);
+            config.breakPhaseReminders.sort((a, b) => b - a); // Sort descending
+            renderBreakReminders();
+            addBreakReminderInput.value = '';
+          }
+        }
+      });
+
+      addBreakReminderRow.appendChild(addBreakReminderInput);
+      addBreakReminderRow.appendChild(addBreakReminderBtn);
+
+      breakRemindersSubsection.appendChild(breakRemindersSubtitle);
+      breakRemindersSubsection.appendChild(breakRemindersHelp);
+      breakRemindersSubsection.appendChild(breakRemindersList);
+      breakRemindersSubsection.appendChild(addBreakReminderRow);
+
+      // Assemble timer reminders section
+      timerRemindersSection.appendChild(timerRemindersTitle);
+      timerRemindersSection.appendChild(timerRemindersDescription);
+      timerRemindersSection.appendChild(timerRemindersEnabledRow);
+      timerRemindersSection.appendChild(focusRemindersSubsection);
+      timerRemindersSection.appendChild(breakRemindersSubsection);
+
+      // ========================================
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
@@ -5880,6 +6244,7 @@
       configSection.appendChild(rulesetsSection);
       configSection.appendChild(lockoutSection);
       configSection.appendChild(reminderSection);
+      configSection.appendChild(timerRemindersSection);
 
       // Buttons
       const buttonDiv = document.createElement('div');
@@ -5902,6 +6267,7 @@
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveReminderSettings(dialog, config);
+        this._saveTimerRemindersSettings(dialog, config);
 
         saveConfig(config);
         this._updateOverlayMessage(config);
@@ -6219,6 +6585,37 @@
         skipCooldown: config.postSessionSkipCooldown,
         focusTimeGoal: config.postSessionFocusTimeGoal,
         endTime: config.postSessionReminderEndTime,
+      });
+    }
+
+    /**
+     * Save timer reminders settings from dialog.
+     * @param {HTMLElement} dialog - The dialog element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveTimerRemindersSettings(dialog, config) {
+      // Save enabled checkbox
+      const enabledCheckbox = dialog.querySelector('#timer-reminders-enabled');
+      if (enabledCheckbox) {
+        config.timerRemindersEnabled = enabledCheckbox.checked;
+        setPref('timerRemindersEnabled', enabledCheckbox.checked);
+      }
+
+      // Save focus phase reminders array
+      if (config.focusPhaseReminders && Array.isArray(config.focusPhaseReminders)) {
+        setPref('focusPhaseReminders', config.focusPhaseReminders.join(','));
+      }
+
+      // Save break phase reminders array
+      if (config.breakPhaseReminders && Array.isArray(config.breakPhaseReminders)) {
+        setPref('breakPhaseReminders', config.breakPhaseReminders.join(','));
+      }
+
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Saved timer reminders settings', {
+        enabled: config.timerRemindersEnabled,
+        focusReminders: config.focusPhaseReminders,
+        breakReminders: config.breakPhaseReminders,
       });
     }
 
