@@ -682,12 +682,13 @@
 }
 
 /* UI/UX FIX: Moved inline styles to CSS class
-   CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment */
+   CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment
+   ZEN BROWSER 1.18.X FIX: Explicit padding-inline to match input alignment */
 .zen-pomodoro-lock-code-display {
   background: #1e1d26;
   border: 2px solid transparent; /* Match input border width for alignment */
   padding: 12px;
-  padding-inline: 12px; /* Explicit inline padding for alignment */
+  padding-inline: 14px 12px; /* Start: 14px to match input, End: 12px */
   border-radius: 6px;
   margin: 0 0 8px; /* Adjusted margin for container layout */
   font-family: monospace;
@@ -698,6 +699,7 @@
   width: 100%; /* Fill container width */
   text-align: left; /* Left-aligned for better code readability */
   text-indent: 0; /* Reset any default indentation */
+  letter-spacing: normal; /* Ensure consistent character spacing */
 }
 
 #zen-pomodoro-lock-code {
@@ -706,7 +708,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  padding-inline: 12px; /* Explicit inline padding for alignment */
+  padding-inline: 14px 12px; /* Start: 14px to match display, End: 12px */
   font-size: 17px !important; /* Match the code display (reduced from 21px) */
   width: 100%; /* Fill container width - matches code display */
   margin: 0; /* No margin to ensure perfect alignment */
@@ -716,6 +718,7 @@
   text-align: left; /* Match code display alignment */
   text-indent: 0; /* Reset any default indentation */
   appearance: none; /* Remove platform-specific styling */
+  letter-spacing: normal; /* Ensure consistent character spacing */
 }
 
 #zen-pomodoro-lock-code:focus {
@@ -1401,12 +1404,13 @@
 }
 
 .zen-pomodoro-transition-ready-btn {
-  background-color: #5a5968;
-  color: #fff;
+  appearance: none !important;
+  background-color: #5a5968 !important;
+  color: #fff !important;
   font-weight: 700;
   padding: 12px 20px;
   font-size: 14px;
-  border: none;
+  border: none !important;
   border-radius: 6px;
   cursor: pointer;
   position: relative;
@@ -1416,13 +1420,13 @@
 }
 
 .zen-pomodoro-transition-ready-btn:hover {
-  background-color: #ff9800;
-  color: #000;
+  background-color: #ff9800 !important;
+  color: #000 !important;
 }
 
 .zen-pomodoro-transition-ready-btn:active {
-  background-color: #f57c00;
-  color: #000;
+  background-color: #f57c00 !important;
+  color: #000 !important;
 }
 
 /* ACCESSIBILITY: Reduce motion animations */
@@ -1523,12 +1527,13 @@
 }
 
 .zen-pomodoro-daily-reminder-start-btn {
-  background-color: #ff9800;
-  color: #000;
+  appearance: none !important;
+  background-color: #ff9800 !important;
+  color: #000 !important;
   font-weight: 700;
   padding: 14px 32px;
   font-size: 16px;
-  border: none;
+  border: none !important;
   border-radius: 8px;
   cursor: pointer;
   position: relative;
@@ -1537,22 +1542,23 @@
 }
 
 .zen-pomodoro-daily-reminder-start-btn:hover {
-  background-color: #f57c00;
+  background-color: #f57c00 !important;
   transform: translateY(-2px);
 }
 
 .zen-pomodoro-daily-reminder-start-btn:active {
-  background-color: #e65100;
+  background-color: #e65100 !important;
   transform: translateY(0);
 }
 
 .zen-pomodoro-daily-reminder-skip-btn {
-  background-color: #5a5968;
-  color: #fff;
+  appearance: none !important;
+  background-color: #5a5968 !important;
+  color: #fff !important;
   font-weight: 600;
   padding: 14px 24px;
   font-size: 14px;
-  border: none;
+  border: none !important;
   border-radius: 8px;
   cursor: pointer;
   position: relative;
@@ -1561,12 +1567,12 @@
 }
 
 .zen-pomodoro-daily-reminder-skip-btn:hover {
-  background-color: #4a4954;
+  background-color: #4a4954 !important;
   transform: translateY(-2px);
 }
 
 .zen-pomodoro-daily-reminder-skip-btn:active {
-  background-color: #3a3944;
+  background-color: #3a3944 !important;
   transform: translateY(0);
 }
 
@@ -1682,12 +1688,13 @@
 }
 
 .zen-pomodoro-post-session-start-btn {
-  background-color: #ff9800;
-  color: #000;
+  appearance: none !important;
+  background-color: #ff9800 !important;
+  color: #000 !important;
   font-weight: 700;
   padding: 14px 32px;
   font-size: 16px;
-  border: none;
+  border: none !important;
   border-radius: 8px;
   cursor: pointer;
   position: relative;
@@ -1696,22 +1703,23 @@
 }
 
 .zen-pomodoro-post-session-start-btn:hover {
-  background-color: #f57c00;
+  background-color: #f57c00 !important;
   transform: translateY(-2px);
 }
 
 .zen-pomodoro-post-session-start-btn:active {
-  background-color: #e65100;
+  background-color: #e65100 !important;
   transform: translateY(0);
 }
 
 .zen-pomodoro-post-session-skip-btn {
-  background-color: #5a5968;
-  color: #fff;
+  appearance: none !important;
+  background-color: #5a5968 !important;
+  color: #fff !important;
   font-weight: 600;
   padding: 14px 24px;
   font-size: 14px;
-  border: none;
+  border: none !important;
   border-radius: 8px;
   cursor: pointer;
   position: relative;
@@ -1720,12 +1728,12 @@
 }
 
 .zen-pomodoro-post-session-skip-btn:hover {
-  background-color: #4a4954;
+  background-color: #4a4954 !important;
   transform: translateY(-2px);
 }
 
 .zen-pomodoro-post-session-skip-btn:active {
-  background-color: #3a3944;
+  background-color: #3a3944 !important;
   transform: translateY(0);
 }
 
@@ -1761,11 +1769,17 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
+  padding-inline: 14px 12px; /* Start: 14px to match display, End: 12px */
   font-size: 17px; /* Match the code display (reduced from 21px) */
   width: 100%;
+  margin: 0; /* No margin to ensure perfect alignment */
   font-family: monospace !important;
   line-height: 1.5;
   box-sizing: border-box;
+  text-align: left; /* Match code display alignment */
+  text-indent: 0; /* Reset any default indentation */
+  appearance: none; /* Remove platform-specific styling */
+  letter-spacing: normal; /* Ensure consistent character spacing */
 }
 
 .zen-pomodoro-post-session-code-input:focus {
@@ -1780,7 +1794,7 @@
   border: 2px solid #3a3944;
   border-radius: 6px;
   padding: 12px;
-  padding-inline: 12px; /* Explicit inline padding for alignment */
+  padding-inline: 14px 12px; /* Start: 14px to match display, End: 12px */
   font-size: 17px !important; /* Match the code display */
   width: 100%;
   margin: 0; /* No margin to ensure perfect alignment */
@@ -1790,6 +1804,7 @@
   text-align: left; /* Match code display alignment */
   text-indent: 0; /* Reset any default indentation */
   appearance: none; /* Remove platform-specific styling */
+  letter-spacing: normal; /* Ensure consistent character spacing */
 }
 
 .zen-pomodoro-lock-code-input:focus {
@@ -2144,9 +2159,10 @@
 
 /* Block delete button */
 .zen-pomodoro-cycle-block-delete {
-  background: none;
-  border: none;
-  color: #888;
+  appearance: none !important;
+  background: none !important;
+  border: none !important;
+  color: #888 !important;
   font-size: 20px;
   cursor: pointer;
   padding: 4px 8px;
@@ -2155,8 +2171,8 @@
 }
 
 .zen-pomodoro-cycle-block-delete:hover {
-  background-color: rgb(231 76 60 / 20%);
-  color: #e74c3c;
+  background-color: rgb(231 76 60 / 20%) !important;
+  color: #e74c3c !important;
 }
 
 /* Add block button */
