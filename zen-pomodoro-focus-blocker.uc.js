@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.6
+ * Version: 1.3.7
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.6',
+    MOD_VERSION: '1.3.7',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -2127,7 +2127,8 @@
       this.customCycleBlocks = [...customCycle.blocks]; // Make a copy
       this.currentBlockIndex = 0;
       this.currentCycle = 1;
-      this.totalCycles = 1; // Custom cycles are single-run sequences
+      // Count focus blocks to determine total cycles
+      this.totalCycles = customCycle.blocks.filter(b => b.type === 'focus').length;
       this.isActive = true;
       this.isPaused = false;
       this.tickCounter = 0;
@@ -2436,6 +2437,93 @@
      * Handle completion of a block in custom cycle mode.
      * @private
      */
+    /**
+     * Count focus blocks up to and including the given index.
+     * @param {number} upToIndex - Index to count up to (inclusive)
+     * @returns {number} Number of focus blocks
+     * @private
+     */
+    _countFocusBlocksUpTo(upToIndex) {
+      let count = 0;
+      for (let i = 0; i <= upToIndex; i++) {
+        if (this.customCycleBlocks[i].type === 'focus') {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    /**
+     * Check if transition to break→focus requires a transition phase.
+     * @param {Object} completedBlock - The block that just completed
+     * @param {Object} nextBlock - The next block to start
+     * @returns {boolean} True if transition phase is needed
+     * @private
+     */
+    _needsTransitionPhase(completedBlock, nextBlock) {
+      return completedBlock.type === 'break' && nextBlock.type === 'focus';
+    }
+
+    /**
+     * Enter the transition phase for custom cycles.
+     * @param {Object} nextBlock - The focus block that will start after transition
+     * @private
+     */
+    _enterCustomCycleTransition(nextBlock) {
+      this.currentCycle = this._countFocusBlocksUpTo(this.currentBlockIndex);
+      this.currentPhase = 'transition';
+      this.remainingTime = Constants.TRANSITION_PHASE_DURATION_SECONDS;
+      this.shownRemindersForCurrentPhase.clear();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle entering transition phase', {
+        blockIndex: this.currentBlockIndex,
+        nextBlockType: nextBlock.type,
+        currentCycle: this.currentCycle,
+      });
+
+      if (this.onTransitionStart) {
+        this.onTransitionStart();
+      }
+      this.saveState();
+    }
+
+    /**
+     * Start the next block directly (no transition phase).
+     * @param {Object} nextBlock - The block to start
+     * @private
+     */
+    _startNextCustomBlock(nextBlock) {
+      this.currentPhase = nextBlock.type;
+      this.remainingTime = nextBlock.duration * 60;
+
+      if (nextBlock.type === 'focus') {
+        this.currentCycle = this._countFocusBlocksUpTo(this.currentBlockIndex);
+      }
+
+      this.shownRemindersForCurrentPhase.clear();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
+        blockIndex: this.currentBlockIndex,
+        blockType: nextBlock.type,
+        duration: nextBlock.duration,
+        currentCycle: this.currentCycle,
+      });
+
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
+        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
+      }
+
+      this.saveState();
+    }
+
+    /**
+     * Handle completion of a block in custom cycle mode.
+     * @private
+     */
     _handleCustomCycleBlockComplete() {
       const completedBlock = this.customCycleBlocks[this.currentBlockIndex];
       logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle block complete', {
@@ -2444,41 +2532,22 @@
         blocksRemaining: this.customCycleBlocks.length - this.currentBlockIndex - 1,
       });
 
-      // Move to next block
       this.currentBlockIndex++;
 
-      // Check if cycle is complete
       if (this.currentBlockIndex >= this.customCycleBlocks.length) {
         logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete');
         this.completeTimer();
         return;
       }
 
-      // Set up next block
       const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
-      this.currentPhase = nextBlock.type;
-      this.remainingTime = nextBlock.duration * 60;
 
-      // Clear shown reminders for new phase
-      this.shownRemindersForCurrentPhase.clear();
-
-      logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
-        blockIndex: this.currentBlockIndex,
-        blockType: nextBlock.type,
-        duration: nextBlock.duration,
-      });
-
-      // Notify phase change
-      if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      if (this._needsTransitionPhase(completedBlock, nextBlock)) {
+        this._enterCustomCycleTransition(nextBlock);
+        return;
       }
 
-      // Reset distraction dump for new focus phase
-      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
-        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
-      }
-
-      this.saveState();
+      this._startNextCustomBlock(nextBlock);
     }
 
     /**
@@ -2555,6 +2624,27 @@
     }
 
     /**
+     * Check if currently in a custom cycle with valid block.
+     * @returns {boolean} True if in custom cycle mode with valid block index
+     * @private
+     */
+    _isValidCustomCycleState() {
+      return this.mode === 'custom' && 
+             this.customCycleBlocks && 
+             this.currentBlockIndex < this.customCycleBlocks.length;
+    }
+
+    /**
+     * Get the current custom cycle block's duration.
+     * @returns {number|null} Duration in minutes, or null if not in custom cycle
+     * @private
+     */
+    _getCurrentCustomBlockDuration() {
+      if (!this._isValidCustomCycleState()) return null;
+      return this.customCycleBlocks[this.currentBlockIndex].duration;
+    }
+
+    /**
      * Called when the transition phase ends (either by timer or user action).
      * Starts the actual focus phase.
      */
@@ -2562,9 +2652,18 @@
       logger.log(LOG_CATEGORIES.TIMER, 'Starting focus from transition phase');
 
       this.currentPhase = 'focus';
-      this.remainingTime = this.config.focusDuration * 60;
+      const customDuration = this._getCurrentCustomBlockDuration();
 
-      // Clear shown reminders for new phase
+      if (customDuration !== null) {
+        this.remainingTime = customDuration * 60;
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle: Using block duration', {
+          blockIndex: this.currentBlockIndex,
+          duration: customDuration,
+        });
+      } else {
+        this.remainingTime = this.config.focusDuration * 60;
+      }
+
       this.shownRemindersForCurrentPhase.clear();
 
       if (this.onPhaseChange) {
@@ -4068,9 +4167,9 @@
       const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
       if (!cycleProgress) return;
 
-      // Only show cycle progress for pomodoro mode during focus phase
+      // Only show cycle progress for pomodoro and custom modes during focus phase
       const timerMode = window.zenPomodoroApp?.timer?.mode;
-      const shouldShow = phase === 'focus' && timerMode === 'pomodoro';
+      const shouldShow = phase === 'focus' && (timerMode === 'pomodoro' || timerMode === 'custom');
       cycleProgress.classList.toggle('zen-pomodoro-hidden', !shouldShow);
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;

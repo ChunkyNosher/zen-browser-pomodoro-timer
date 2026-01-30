@@ -77,7 +77,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.6'`
+- `MOD_VERSION = '1.3.7'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
