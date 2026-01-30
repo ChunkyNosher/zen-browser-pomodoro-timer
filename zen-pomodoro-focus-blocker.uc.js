@@ -2434,10 +2434,6 @@
     }
 
     /**
-     * Handle completion of a block in custom cycle mode.
-     * @private
-     */
-    /**
      * Count focus blocks up to and including the given index.
      * @param {number} upToIndex - Index to count up to (inclusive)
      * @returns {number} Number of focus blocks
@@ -2511,10 +2507,6 @@
 
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
-      }
-
-      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
-        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
       }
 
       this.saveState();
@@ -2846,11 +2838,6 @@
       // Notify phase change
       if (this.onPhaseChange) {
         this.onPhaseChange(this.currentPhase, this.currentCycle);
-      }
-
-      // Reset distraction dump for new focus phase
-      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
-        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
       }
 
       this.saveState();
