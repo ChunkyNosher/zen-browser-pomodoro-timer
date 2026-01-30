@@ -239,6 +239,11 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_startNextCustomBlock(nextBlock)`                    | Start next block in custom cycle directly                   |
 | `_isValidCustomCycleState()`                          | Check if in valid custom cycle state with valid block index |
 | `_getCurrentCustomBlockDuration()`                    | Get current custom block duration for custom cycles         |
+| `_handleCutBreakEarly(currentPhase)`                  | Handle Cut Break Early button action                        |
+| `_startNextFocusPhase(timer)`                         | Start next focus phase (custom or regular mode)             |
+| `_shouldBlockDailyReminder()`                         | Check if daily reminder should be blocked                   |
+| `_canShowReminderCountdown()`                         | Check if post-session reminder countdown can be shown       |
+| `_getEarliestReminderTime(config)`                    | Get earliest daily reminder time from config                |
 
 ---
 
@@ -293,6 +298,34 @@ Allows users to pause their focus timer and capture distracting thoughts without
 - `_startNextCustomBlock(nextBlock)` - Start the next block directly
 - `_isValidCustomCycleState()` - Check if in valid custom cycle state
 - `_getCurrentCustomBlockDuration()` - Get current custom block duration
+
+### Distraction Dump Indicator Click Fix
+
+**Issue:** Clicking on the draggable timer indicator during Distraction Dump would trigger the "End Dump" confirmation dialog even when the user was just dragging the indicator.
+
+**Root Cause:** The click event fires after mouseup, so any click on the indicator would trigger the end dump dialog regardless of whether the user dragged.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `indicatorDidDrag` flag to `OverlayManager` to track when drag occurred
+- Flag is set when mouse moves more than 5 pixels during drag
+- Flag is reset 100ms after mouseup to allow click handlers to check it
+- Distraction Dump indicator click handler checks flag and skips dialog if drag occurred
+
+### Cut Break Early Improvements
+
+**Enhancement:** Refactored "Cut Break Early" button handling for better code organization.
+
+**Changes:**
+- Added `_handleCutBreakEarly(currentPhase)` helper method
+- Added `_startNextFocusPhase(timer)` helper method for consistent phase transitions
+- Properly handles all scenarios: transition phase, custom mode, and regular pomodoro mode
+- Skips transition popup when cutting transition phase early
+
+### Custom Cycle Empty Blocks Validation
+
+**Enhancement:** Added validation for empty custom cycle blocks.
+
+**Fix:** `startCustomCycle()` now validates that `customCycleBlocks.length > 0` before attempting to access the first block, preventing potential undefined errors.
 
 ---
 
