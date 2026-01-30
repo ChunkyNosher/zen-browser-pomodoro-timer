@@ -2126,9 +2126,12 @@
       this.customCycle = customCycle;
       this.customCycleBlocks = [...customCycle.blocks]; // Make a copy
       this.currentBlockIndex = 0;
-      this.currentCycle = 1;
       // Count focus blocks to determine total cycles
       this.totalCycles = customCycle.blocks.filter(b => b.type === 'focus').length;
+      // Set initial cycle based on first block type - if first block is focus, we're on cycle 1
+      // If first block is a break, we haven't started any focus cycle yet (0)
+      const firstBlock = this.customCycleBlocks[0];
+      this.currentCycle = firstBlock?.type === 'focus' ? 1 : 0;
       this.isActive = true;
       this.isPaused = false;
       this.tickCounter = 0;
@@ -2140,8 +2143,7 @@
       this.config = getConfig();
       this.savedConfig = { ...this.config };
 
-      // Set up first block
-      const firstBlock = this.customCycleBlocks[0];
+      // Set up first block (firstBlock already declared above)
       this.currentPhase = firstBlock.type;
       this.remainingTime = firstBlock.duration * 60;
 
@@ -2441,7 +2443,7 @@
      */
     _countFocusBlocksUpTo(upToIndex) {
       let count = 0;
-      for (let i = 0; i <= upToIndex; i++) {
+      for (let i = 0; i <= upToIndex && i < this.customCycleBlocks.length; i++) {
         if (this.customCycleBlocks[i].type === 'focus') {
           count++;
         }
@@ -2943,52 +2945,65 @@
     }
 
     /**
+     * Restore basic timer state from saved state object.
+     * @param {Object} state - Saved state object
+     * @private
+     */
+    _restoreBasicState(state) {
+      this.isActive = state.isActive;
+      // AUTO-PAUSE FIX: Always pause timer on restoration (user requirement)
+      this.isPaused = true;
+      this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
+      this.remainingTime = state.remainingTime;
+      // Backwards compatibility: treat 'long-break' as 'break'
+      this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
+      this.currentCycle = state.currentCycle;
+      this.totalCycles = state.totalCycles;
+      this.mode = state.mode;
+    }
+
+    /**
+     * Restore custom cycle specific state.
+     * @param {Object} state - Saved state object
+     * @private
+     */
+    _restoreCustomCycleState(state) {
+      if (state.mode === 'custom') {
+        this.customCycle = state.customCycle;
+        this.customCycleBlocks = state.customCycleBlocks;
+        this.currentBlockIndex = state.currentBlockIndex || 0;
+      }
+    }
+
+    /**
      * Load timer state from preferences
      * LOGIC FIX: Restore config from saved state
      * AUTO-PAUSE FIX: Timer is paused on browser restart
      */
     loadState() {
       const stateStr = getPref('timer-state', null);
-      if (stateStr) {
-        try {
-          const state = JSON.parse(stateStr);
-          if (state.isActive) {
-            this.isActive = state.isActive;
-            // AUTO-PAUSE FIX: Always pause timer on restoration (user requirement)
-            // This overrides the saved pause state to prevent timer from auto-continuing on restart
-            this.isPaused = true;
-            this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
-            this.remainingTime = state.remainingTime;
-            // Backwards compatibility: treat 'long-break' as 'break'
-            this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
-            this.currentCycle = state.currentCycle;
-            this.totalCycles = state.totalCycles;
-            this.mode = state.mode;
+      if (!stateStr) return false;
 
-            // Restore custom cycle state if present
-            if (state.mode === 'custom') {
-              this.customCycle = state.customCycle;
-              this.customCycleBlocks = state.customCycleBlocks;
-              this.currentBlockIndex = state.currentBlockIndex || 0;
-            }
+      try {
+        const state = JSON.parse(stateStr);
+        if (!state.isActive) return false;
 
-            // Restore saved config
-            if (state.savedConfig) {
-              this.savedConfig = state.savedConfig;
-              this.config = state.savedConfig;
-            }
+        this._restoreBasicState(state);
+        this._restoreCustomCycleState(state);
 
-            // AUTO-PAUSE FIX: Don't start interval, timer is paused
-            // Set flag to indicate this was restored from restart
-            this.restoredFromRestart = true;
-
-            return true;
-          }
-        } catch (e) {
-          console.error('Failed to load timer state:', e);
+        // Restore saved config
+        if (state.savedConfig) {
+          this.savedConfig = state.savedConfig;
+          this.config = state.savedConfig;
         }
+
+        // Set flag to indicate this was restored from restart
+        this.restoredFromRestart = true;
+        return true;
+      } catch (e) {
+        console.error('Failed to load timer state:', e);
+        return false;
       }
-      return false;
     }
 
     /**
@@ -3502,6 +3517,7 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.indicatorDidDrag = false; // Track if indicator was dragged (to suppress click events)
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
@@ -3885,6 +3901,7 @@
 
         e.preventDefault();
         isDragging = true;
+        this.indicatorDidDrag = false; // Reset drag state on new mousedown
 
         const rect = this.indicator.getBoundingClientRect();
         startX = e.clientX;
@@ -3910,6 +3927,11 @@
 
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
+
+        // Mark as dragged if movement exceeds threshold (5 pixels)
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          this.indicatorDidDrag = true;
+        }
 
         let newLeft = startLeft + deltaX;
         let newTop = startTop + deltaY;
@@ -3944,6 +3966,11 @@
 
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+
+        // Reset drag flag after a short delay to allow click event to check it
+        setTimeout(() => {
+          this.indicatorDidDrag = false;
+        }, 50);
       };
 
       // Store reference for cleanup
@@ -4621,6 +4648,55 @@
     }
 
     /**
+     * Handle "Cut Break Early" action - skip break/transition phase and go to focus.
+     * Extracted from showPomodoroMenu to reduce complexity.
+     * @param {string} currentPhase - Current timer phase
+     * @private
+     */
+    _handleCutBreakEarly(currentPhase) {
+      const timer = window.zenPomodoroApp.timer;
+
+      // If in transition phase, directly start the focus phase (skip transition popup)
+      if (currentPhase === 'transition') {
+        window.zenPomodoroApp.transitionManager.hideTransitionPopup();
+        this._startNextFocusPhase(timer);
+        return;
+      }
+
+      // In break or long-break phase
+      if (timer.mode === 'custom') {
+        if (timer.skipToNextCustomBlock()) {
+          window.zenPomodoroApp.updateOverlayVisibility();
+        }
+      } else {
+        // Regular Pomodoro mode: increment cycle and start focus
+        timer.currentCycle++;
+        logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
+          currentCycle: timer.currentCycle,
+          totalCycles: timer.totalCycles,
+        });
+        timer.startFocusFromTransition();
+        window.zenPomodoroApp.updateOverlayVisibility();
+      }
+    }
+
+    /**
+     * Start the next focus phase, handling both custom and regular modes.
+     * @param {Object} timer - The timer instance
+     * @private
+     */
+    _startNextFocusPhase(timer) {
+      if (timer.mode === 'custom') {
+        if (timer.skipToNextCustomBlock()) {
+          window.zenPomodoroApp.updateOverlayVisibility();
+        }
+      } else {
+        timer.startFocusFromTransition();
+        window.zenPomodoroApp.updateOverlayVisibility();
+      }
+    }
+
+    /**
      * Show the main Pomodoro menu dialog
      * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
      */
@@ -4710,44 +4786,7 @@
             this._stopMenuTimerUpdates();
             dialog.remove();
             this.menuDialog = null;
-
-            const timer = window.zenPomodoroApp.timer;
-
-            // If in transition phase, directly start the focus phase
-            if (status.currentPhase === 'transition') {
-              // Hide popup if it exists (don't rely on callback since popup might not be showing)
-              window.zenPomodoroApp.transitionManager.hideTransitionPopup();
-              
-              if (timer.mode === 'custom') {
-                // Custom cycle mode: skip to next block (should be a focus block after transition)
-                if (timer.skipToNextCustomBlock()) {
-                  window.zenPomodoroApp.updateOverlayVisibility();
-                }
-              } else {
-                // Non-custom mode: start focus directly
-                timer.startFocusFromTransition();
-                window.zenPomodoroApp.updateOverlayVisibility();
-              }
-            } else if (timer.mode === 'custom') {
-              // Custom cycle mode: skip to next block
-              // Only update overlay if skip was successful (returns true)
-              // Returns false if timer completed or not in break phase
-              if (timer.skipToNextCustomBlock()) {
-                window.zenPomodoroApp.updateOverlayVisibility();
-              }
-            } else {
-              // In regular break or long-break phase, start focus phase directly
-              // BUG FIX: Increment cycle count since we're skipping the break phase
-              // (normally incremented in _handleBreakPhaseComplete when break → transition)
-              timer.currentCycle++;
-              logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
-                currentCycle: timer.currentCycle,
-                totalCycles: timer.totalCycles
-              });
-              // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
-              timer.startFocusFromTransition();
-              window.zenPomodoroApp.updateOverlayVisibility();
-            }
+            this._handleCutBreakEarly(status.currentPhase);
           });
         }
 
@@ -6891,6 +6930,34 @@
     }
 
     /**
+     * Update workspace blocked status in a ruleset.
+     * @param {Object} config - Configuration object
+     * @param {string} rulesetId - Ruleset ID
+     * @param {string} workspaceId - Workspace ID
+     * @param {boolean} isBlocked - Whether workspace should be blocked
+     * @private
+     */
+    _updateRulesetWorkspace(config, rulesetId, workspaceId, isBlocked) {
+      const rulesetIndex = config.rulesets.findIndex((r) => r.id === rulesetId);
+      if (rulesetIndex === -1) return;
+
+      const currentRuleset = config.rulesets[rulesetIndex];
+      if (!currentRuleset.blockedWorkspaces) {
+        currentRuleset.blockedWorkspaces = [];
+      }
+
+      if (isBlocked) {
+        if (!currentRuleset.blockedWorkspaces.includes(workspaceId)) {
+          currentRuleset.blockedWorkspaces.push(workspaceId);
+        }
+      } else {
+        currentRuleset.blockedWorkspaces = currentRuleset.blockedWorkspaces.filter(
+          (wsId) => wsId !== workspaceId
+        );
+      }
+    }
+
+    /**
      * Create a ruleset item element
      * @param {Object} ruleset - Ruleset data
      * @param {number} index - Ruleset index
@@ -7050,23 +7117,7 @@
           checkbox.value = workspace.id;
           checkbox.checked = ruleset.blockedWorkspaces.includes(workspace.id);
           checkbox.addEventListener('change', () => {
-            // Find ruleset by ID to avoid stale reference
-            const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-            if (rulesetIndex !== -1) {
-              const currentRuleset = config.rulesets[rulesetIndex];
-              if (!currentRuleset.blockedWorkspaces) {
-                currentRuleset.blockedWorkspaces = [];
-              }
-              if (checkbox.checked) {
-                if (!currentRuleset.blockedWorkspaces.includes(workspace.id)) {
-                  currentRuleset.blockedWorkspaces.push(workspace.id);
-                }
-              } else {
-                currentRuleset.blockedWorkspaces = currentRuleset.blockedWorkspaces.filter(
-                  (wsId) => wsId !== workspace.id
-                );
-              }
-            }
+            this._updateRulesetWorkspace(config, ruleset.id, workspace.id, checkbox.checked);
           });
 
           const label = document.createElement('label');
@@ -9888,25 +9939,29 @@
     }
 
     /**
+     * Check if daily reminder should be blocked from showing.
+     * @returns {boolean} True if reminder should not be shown
+     * @private
+     */
+    _shouldBlockDailyReminder() {
+      // Don't show if already showing
+      if (this.reminderOverlay || this.isShowing) return true;
+      // Don't show if timer is already active
+      if (window.zenPomodoroApp?.timer?.isActive) return true;
+      // Don't show if post-session reminder is showing (mutual exclusion)
+      if (window.zenPomodoroApp?.postSessionReminder?.isShowing) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Post-session reminder is showing');
+        return true;
+      }
+      return false;
+    }
+
+    /**
      * Show the daily reminder overlay.
      * This blocks browser interaction until user starts a timer or skips.
      */
     showReminder() {
-      // Don't show if already showing
-      if (this.reminderOverlay || this.isShowing) {
-        return;
-      }
-
-      // Don't show if timer is already active
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        return;
-      }
-
-      // Don't show if post-session reminder is showing (mutual exclusion)
-      if (window.zenPomodoroApp?.postSessionReminder?.isShowing) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Post-session reminder is showing');
-        return;
-      }
+      if (this._shouldBlockDailyReminder()) return;
 
       logger.log(LOG_CATEGORIES.TIMER, 'Showing daily reminder overlay');
       this.isShowing = true;
@@ -10975,34 +11030,12 @@
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
     getTimeUntilNextReminder() {
+      if (!this._canShowReminderCountdown()) {
+        return null;
+      }
+
       const config = getConfig();
-
-      // Only return null if feature is disabled
-      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) {
-        return null;
-      }
-
-      // Don't show countdown while reminder is displaying
-      if (this.isShowing) {
-        return null;
-      }
-
-      // Don't show countdown if focus time goal is reached
-      if (this._checkFocusTimeGoalReached()) {
-        return null;
-      }
-
       const now = Date.now();
-
-      // Don't show countdown while timer is active (reminder is only for post-session)
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        return null;
-      }
-
-      // Don't show countdown if no session has completed yet (no idle tracking started)
-      if (!this.idleStartTime) {
-        return null;
-      }
 
       // If in cooldown, calculate time until cooldown ends
       if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
@@ -11703,11 +11736,15 @@
       // Show dump indicator
       overlay.showDumpIndicator(this.dumpTimeRemaining);
 
-      // Set up click handler to end dump
+      // Set up click handler to end dump (but not if indicator was dragged)
       const indicator = overlay.indicator;
       if (indicator) {
         // Store handler for cleanup
         this.dumpIndicatorClickHandler = () => {
+          // Skip if the indicator was just dragged (to prevent accidental end dump)
+          if (overlay.indicatorDidDrag) {
+            return;
+          }
           this.showEndDumpConfirmation();
         };
         indicator.addEventListener('click', this.dumpIndicatorClickHandler);
@@ -11838,6 +11875,40 @@
     }
 
     /**
+     * Create empty message element for cycles list.
+     * @returns {HTMLElement} The empty message element
+     * @private
+     */
+    _createEmptyMessage() {
+      const emptyMessage = document.createElement('p');
+      emptyMessage.style.color = '#888';
+      emptyMessage.style.fontSize = '13px';
+      emptyMessage.style.textAlign = 'center';
+      emptyMessage.style.padding = '20px';
+      emptyMessage.textContent = 'No custom cycles yet. Create one to get started!';
+      return emptyMessage;
+    }
+
+    /**
+     * Render cycles list into container.
+     * @param {HTMLElement} container - Container element
+     * @param {Array} cycles - Array of cycle objects
+     * @param {Object} config - Configuration object
+     * @param {HTMLElement} dialog - Parent dialog element
+     * @private
+     */
+    _renderCyclesList(container, cycles, config, dialog) {
+      if (cycles.length === 0) {
+        container.appendChild(this._createEmptyMessage());
+      } else {
+        cycles.forEach((cycle) => {
+          const cycleItem = this._createCycleListItem(cycle, config, dialog);
+          container.appendChild(cycleItem);
+        });
+      }
+    }
+
+    /**
      * Show the main custom cycles menu listing all saved cycles.
      */
     showCustomCyclesMenu() {
@@ -11882,20 +11953,7 @@
       cyclesContainer.className = 'zen-pomodoro-cycles-list';
       cyclesContainer.style.marginBottom = '16px';
 
-      if (savedCycles.length === 0) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.style.color = '#888';
-        emptyMessage.style.fontSize = '13px';
-        emptyMessage.style.textAlign = 'center';
-        emptyMessage.style.padding = '20px';
-        emptyMessage.textContent = 'No custom cycles yet. Create one to get started!';
-        cyclesContainer.appendChild(emptyMessage);
-      } else {
-        savedCycles.forEach((cycle) => {
-          const cycleItem = this._createCycleListItem(cycle, config, dialog);
-          cyclesContainer.appendChild(cycleItem);
-        });
-      }
+      this._renderCyclesList(cyclesContainer, savedCycles, config, dialog);
 
       // Create New button
       const createButton = document.createElement('button');
