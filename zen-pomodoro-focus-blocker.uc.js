@@ -2128,10 +2128,17 @@
       this.currentBlockIndex = 0;
       // Count focus blocks to determine total cycles
       this.totalCycles = customCycle.blocks.filter(b => b.type === 'focus').length;
+
+      // Validate that cycle has at least one block
+      if (this.customCycleBlocks.length === 0) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle has no blocks, cannot start');
+        return;
+      }
+
       // Set initial cycle based on first block type - if first block is focus, we're on cycle 1
       // If first block is a break, we haven't started any focus cycle yet (0)
       const firstBlock = this.customCycleBlocks[0];
-      this.currentCycle = firstBlock?.type === 'focus' ? 1 : 0;
+      this.currentCycle = firstBlock.type === 'focus' ? 1 : 0;
       this.isActive = true;
       this.isPaused = false;
       this.tickCounter = 0;
@@ -2143,7 +2150,7 @@
       this.config = getConfig();
       this.savedConfig = { ...this.config };
 
-      // Set up first block (firstBlock already declared above)
+      // Set up first block
       this.currentPhase = firstBlock.type;
       this.remainingTime = firstBlock.duration * 60;
 
@@ -2245,21 +2252,7 @@
       }
 
       // Different day - check if we're past the first reminder time
-      // Use first daily reminder time if available, otherwise default to 10:00
-      let reminderTime = '10:00';
-      if (
-        config.dailyReminderTimes &&
-        Array.isArray(config.dailyReminderTimes) &&
-        config.dailyReminderTimes.length > 0
-      ) {
-        // Sort times numerically by hours and minutes and use the first one
-        const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
-          const [aHours, aMinutes] = a.split(':').map(Number);
-          const [bHours, bMinutes] = b.split(':').map(Number);
-          return aHours - bHours || aMinutes - bMinutes;
-        });
-        reminderTime = sortedTimes[0];
-      }
+      const reminderTime = this._getEarliestReminderTime(config);
 
       // Use shared validation function
       if (!isValidTimeFormat(reminderTime)) {
@@ -2272,6 +2265,27 @@
       reminderDate.setHours(hours, minutes, 0, 0);
 
       return now >= reminderDate;
+    }
+
+    /**
+     * Get the earliest daily reminder time from config.
+     * @param {Object} config - Configuration object
+     * @returns {string} Earliest reminder time in HH:MM format
+     * @private
+     */
+    _getEarliestReminderTime(config) {
+      const times = config.dailyReminderTimes;
+      if (!times || !Array.isArray(times) || times.length === 0) {
+        return '10:00';
+      }
+
+      // Sort times numerically by hours and minutes
+      const sortedTimes = times.slice().sort((a, b) => {
+        const [aHours, aMinutes] = a.split(':').map(Number);
+        const [bHours, bMinutes] = b.split(':').map(Number);
+        return aHours - bHours || aMinutes - bMinutes;
+      });
+      return sortedTimes[0];
     }
 
     /**
@@ -3967,10 +3981,11 @@
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
 
-        // Reset drag flag after a short delay to allow click event to check it
+        // Reset drag flag after a delay to allow click event to check it
+        // 100ms is sufficient since click events fire immediately after mouseup
         setTimeout(() => {
           this.indicatorDidDrag = false;
-        }, 50);
+        }, 100);
       };
 
       // Store reference for cleanup
@@ -4665,9 +4680,8 @@
 
       // In break or long-break phase
       if (timer.mode === 'custom') {
-        if (timer.skipToNextCustomBlock()) {
-          window.zenPomodoroApp.updateOverlayVisibility();
-        }
+        // Custom cycle mode: use helper for consistent handling
+        this._startNextFocusPhase(timer);
       } else {
         // Regular Pomodoro mode: increment cycle and start focus
         timer.currentCycle++;
@@ -9939,17 +9953,41 @@
     }
 
     /**
+     * Check if daily reminder overlay is currently visible.
+     * @returns {boolean} True if reminder is visible
+     * @private
+     */
+    _isDailyReminderVisible() {
+      return this.reminderOverlay || this.isShowing;
+    }
+
+    /**
+     * Check if timer is currently active.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _isTimerActive() {
+      return window.zenPomodoroApp?.timer?.isActive ?? false;
+    }
+
+    /**
+     * Check if post-session reminder is visible.
+     * @returns {boolean} True if post-session reminder is visible
+     * @private
+     */
+    _isPostSessionReminderVisible() {
+      return window.zenPomodoroApp?.postSessionReminder?.isShowing ?? false;
+    }
+
+    /**
      * Check if daily reminder should be blocked from showing.
      * @returns {boolean} True if reminder should not be shown
      * @private
      */
     _shouldBlockDailyReminder() {
-      // Don't show if already showing
-      if (this.reminderOverlay || this.isShowing) return true;
-      // Don't show if timer is already active
-      if (window.zenPomodoroApp?.timer?.isActive) return true;
-      // Don't show if post-session reminder is showing (mutual exclusion)
-      if (window.zenPomodoroApp?.postSessionReminder?.isShowing) {
+      if (this._isDailyReminderVisible()) return true;
+      if (this._isTimerActive()) return true;
+      if (this._isPostSessionReminderVisible()) {
         logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Post-session reminder is showing');
         return true;
       }
