@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.7
+ * Version: 1.3.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.7',
+    MOD_VERSION: '1.3.8',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -237,6 +237,8 @@
       focusPhaseReminders: [20, 10, 5, 1],
       /** Minutes before break phase ends to show reminder (default: 5, 1) */
       breakPhaseReminders: [5, 1],
+      /** Keyboard shortcut to toggle timer indicator visibility (hide/show) */
+      toggleIndicatorShortcut: 'Alt+Shift+H',
     },
   };
 
@@ -663,6 +665,7 @@
 
       // String preferences (requires non-empty validation)
       loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
+      loadNonEmptyStringPref('toggleIndicatorShortcut', config, 'toggleIndicatorShortcut');
 
       // Reminder mode preference (enum validation)
       loadReminderModePref('reminderMode', config, 'reminderMode');
@@ -1118,6 +1121,38 @@
   // ============================================
   // Remaining Helper Functions
   // ============================================
+
+  /**
+   * Check if current window is a popup window (not the main browser window).
+   * In Firefox/Zen Browser, popup windows have the 'chromehidden' attribute set
+   * on the document element. This includes auth popups, sign-in dialogs, etc.
+   *
+   * This is used to prevent showing certain notifications (like timer restoration)
+   * in popup windows where they would be inappropriate and confusing.
+   *
+   * @returns {boolean} True if this is a popup window, false if main browser window
+   */
+  function isPopupWindow() {
+    try {
+      // Check for chromehidden attribute (set on popup windows)
+      const chromehidden = document.documentElement.getAttribute('chromehidden');
+      if (chromehidden) {
+        return true;
+      }
+
+      // Additional check: popup windows typically lack certain UI elements
+      // gBrowser is the tab browser and is only present in main browser windows
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.tabContainer) {
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      // If we can't determine, assume it's not a popup to be safe
+      return false;
+    }
+  }
 
   /**
    * Issue 8: Setup drag functionality for dialogs
@@ -3531,6 +3566,7 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.indicatorContextMenuHandler = null; // Store for cleanup (right-click pause/unpause)
       this.indicatorDidDrag = false; // Track if indicator was dragged (to suppress click events)
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
@@ -3991,6 +4027,40 @@
       // Store reference for cleanup
       this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
+
+      // RIGHT-CLICK TO PAUSE/UNPAUSE: Add contextmenu event handler
+      // This allows users to quickly pause/resume timer without opening menu
+      const onContextMenu = (e) => {
+        // Prevent the default context menu from showing
+        e.preventDefault();
+        // Stop propagation to prevent affecting the webpage below
+        e.stopPropagation();
+
+        // Check if timer is active
+        if (!window.zenPomodoroApp?.timer?.isActive) {
+          return;
+        }
+
+        // Check if Distraction Dump is active - don't allow pause during dump
+        if (isDistractionDumpBlocking()) {
+          window.zenPomodoroApp.showCustomAlert(
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+          );
+          return;
+        }
+
+        // Toggle pause/resume
+        handlePauseResumeTimer();
+
+        logger.log(LOG_CATEGORIES.TIMER, 'Timer toggled via indicator right-click', {
+          isPaused: window.zenPomodoroApp.timer.isPaused,
+        });
+      };
+
+      // Store reference for cleanup
+      this.indicatorContextMenuHandler = onContextMenu;
+      this.indicator.addEventListener('contextmenu', onContextMenu);
     }
 
     /**
@@ -4404,6 +4474,11 @@
         this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
         this.indicatorMouseDownHandler = null;
       }
+      // Clean up contextmenu handler for right-click pause/unpause
+      if (this.indicator && this.indicatorContextMenuHandler) {
+        this.indicator.removeEventListener('contextmenu', this.indicatorContextMenuHandler);
+        this.indicatorContextMenuHandler = null;
+      }
     }
 
     /**
@@ -4455,6 +4530,7 @@
   class KeyboardShortcutHandler {
     constructor() {
       this.keydownHandler = null;
+      this.toggleIndicatorHandler = null; // Handler for toggle indicator visibility shortcut
       this.menuDialog = null;
       this.menuTimerUpdateInterval = null;
       this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
@@ -4591,6 +4667,10 @@
       const config = getConfig();
       this.setupKeyboardShortcut(config.keyboardShortcut);
       console.log(`Zen Pomodoro: Keyboard shortcut registered: ${config.keyboardShortcut}`);
+
+      // Setup toggle indicator shortcut
+      this.setupToggleIndicatorShortcut(config.toggleIndicatorShortcut);
+      console.log(`Zen Pomodoro: Toggle indicator shortcut registered: ${config.toggleIndicatorShortcut}`);
     }
 
     /**
@@ -4660,6 +4740,62 @@
         event.metaKey === parsed.metaKey;
 
       return modifiersMatch && event.key.toUpperCase() === parsed.key;
+    }
+
+    /**
+     * Setup keyboard shortcut for toggling indicator visibility.
+     * @param {string} shortcut - Keyboard shortcut string
+     */
+    setupToggleIndicatorShortcut(shortcut) {
+      // Clean up existing handler
+      if (this.toggleIndicatorHandler) {
+        document.removeEventListener('keydown', this.toggleIndicatorHandler);
+      }
+
+      // Don't set up handler if shortcut is empty
+      if (!shortcut || shortcut.trim() === '') {
+        return;
+      }
+
+      const parsed = this.parseShortcut(shortcut);
+
+      this.toggleIndicatorHandler = (event) => {
+        // Check if all modifier keys match using helper function
+        if (this._isShortcutMatch(event, parsed)) {
+          event.preventDefault();
+          event.stopPropagation();
+          this._toggleIndicatorVisibility();
+        }
+      };
+
+      document.addEventListener('keydown', this.toggleIndicatorHandler, true);
+    }
+
+    /**
+     * Toggle the timer indicator visibility.
+     * @private
+     */
+    _toggleIndicatorVisibility() {
+      // Only toggle if timer is active
+      if (!window.zenPomodoroApp?.timer?.isActive) {
+        return;
+      }
+
+      const overlay = window.zenPomodoroApp?.overlay;
+      if (!overlay) return;
+
+      // Toggle visibility - indicator visibility is controlled by 'active' class
+      if (overlay.indicator) {
+        const isCurrentlyHidden = !overlay.indicator.classList.contains('active');
+
+        if (isCurrentlyHidden) {
+          overlay.showIndicator();
+          logger.log(LOG_CATEGORIES.TIMER, 'Indicator shown via shortcut');
+        } else {
+          overlay.hideIndicator();
+          logger.log(LOG_CATEGORIES.TIMER, 'Indicator hidden via shortcut');
+        }
+      }
     }
 
     /**
@@ -5072,6 +5208,10 @@
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
         this.keydownHandler = null;
+      }
+      if (this.toggleIndicatorHandler) {
+        document.removeEventListener('keydown', this.toggleIndicatorHandler, true);
+        this.toggleIndicatorHandler = null;
       }
       if (this.menuDialog) {
         this.menuDialog.remove();
@@ -5603,6 +5743,70 @@
 
       shortcutRow.appendChild(shortcutLabel);
       shortcutRow.appendChild(shortcutInput);
+
+      // ========================================
+      // Toggle Indicator Shortcut Recorder
+      // ========================================
+      const toggleIndicatorRow = document.createElement('div');
+      toggleIndicatorRow.className = 'zen-pomodoro-config-row';
+      const toggleIndicatorLabel = document.createElement('label');
+      toggleIndicatorLabel.textContent = 'Hide/Show Indicator Shortcut:';
+      const toggleIndicatorInput = document.createElement('div');
+      toggleIndicatorInput.className = 'zen-pomodoro-shortcut-recorder';
+      toggleIndicatorInput.id = 'toggle-indicator-shortcut';
+      toggleIndicatorInput.tabIndex = 0;
+      toggleIndicatorInput.textContent = config.toggleIndicatorShortcut;
+      toggleIndicatorInput.setAttribute('data-shortcut', config.toggleIndicatorShortcut);
+
+      let isRecordingToggle = false;
+
+      toggleIndicatorInput.addEventListener('click', () => {
+        if (!isRecordingToggle) {
+          isRecordingToggle = true;
+          toggleIndicatorInput.textContent = 'Press keys...';
+          toggleIndicatorInput.classList.add('recording');
+        }
+      });
+
+      toggleIndicatorInput.addEventListener('keydown', (e) => {
+        if (!isRecordingToggle) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Build shortcut string from modifier keys + regular key
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Meta');
+
+        // Get the key (ignore modifier keys alone)
+        // Normalize key: single characters to uppercase, special keys keep their natural casing
+        const key = e.key;
+        if (!MODIFIER_KEYS.includes(key)) {
+          // Only uppercase single character keys, keep special keys like ArrowUp, Enter as-is
+          const normalizedKey = key.length === 1 ? key.toUpperCase() : key;
+          parts.push(normalizedKey);
+
+          const shortcutStr = parts.join('+');
+          toggleIndicatorInput.textContent = shortcutStr;
+          toggleIndicatorInput.setAttribute('data-shortcut', shortcutStr);
+          toggleIndicatorInput.classList.remove('recording');
+          isRecordingToggle = false;
+        }
+      });
+
+      toggleIndicatorInput.addEventListener('blur', () => {
+        if (isRecordingToggle) {
+          toggleIndicatorInput.textContent = toggleIndicatorInput.getAttribute('data-shortcut');
+          toggleIndicatorInput.classList.remove('recording');
+          isRecordingToggle = false;
+        }
+      });
+
+      toggleIndicatorRow.appendChild(toggleIndicatorLabel);
+      toggleIndicatorRow.appendChild(toggleIndicatorInput);
 
       // ========================================
       // Timer Mode Selection
@@ -6368,6 +6572,7 @@
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
+      configSection.appendChild(toggleIndicatorRow);
       configSection.appendChild(timerModeRow);
       configSection.appendChild(simpleDurationRow);
       configSection.appendChild(focusRow);
@@ -6397,6 +6602,7 @@
       const saveAllSettings = () => {
         logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
         this._saveKeyboardShortcut(shortcutInput, config);
+        this._saveToggleIndicatorShortcut(toggleIndicatorInput, config);
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveReminderSettings(dialog, config);
@@ -6485,6 +6691,30 @@
         window.zenPomodoroApp.keyboardShortcut.setupKeyboardShortcut(newShortcut);
       }
       setPref('keyboardShortcut', newShortcut);
+    }
+
+    /**
+     * Save toggle indicator shortcut from settings dialog.
+     * @param {HTMLElement} shortcutInput - The shortcut input element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveToggleIndicatorShortcut(shortcutInput, config) {
+      const newShortcut = shortcutInput.getAttribute('data-shortcut');
+      if (!newShortcut || newShortcut === config.toggleIndicatorShortcut) return;
+
+      const shortcutParts = newShortcut.split('+');
+      const hasNonModifierKey = shortcutParts.some(
+        (part) => !['Ctrl', 'Alt', 'Shift', 'Meta'].includes(part)
+      );
+
+      if (!hasNonModifierKey) return;
+
+      config.toggleIndicatorShortcut = newShortcut;
+      if (window.zenPomodoroApp?.keyboardShortcut) {
+        window.zenPomodoroApp.keyboardShortcut.setupToggleIndicatorShortcut(newShortcut);
+      }
+      setPref('toggleIndicatorShortcut', newShortcut);
     }
 
     /**
@@ -13147,12 +13377,18 @@
         }
 
         // AUTO-PAUSE FIX: Show notification that timer was paused
-        if (this.timer.restoredFromRestart) {
+        // POPUP FIX: Only show restoration notification in main browser window, not popups
+        // This prevents confusing notifications in auth popups (Google sign-in, etc.)
+        if (this.timer.restoredFromRestart && !isPopupWindow()) {
           // Show a non-blocking notification after a short delay to ensure DOM is ready
           setTimeout(() => {
             this.showRestorationNotification();
           }, RESTORATION_NOTIFICATION_DELAY_MS);
           // Clear flag after scheduling notification to prevent duplicate notifications
+          this.timer.restoredFromRestart = false;
+        } else if (this.timer.restoredFromRestart) {
+          // Clear flag even in popup windows to prevent duplicate notifications when returning
+          logger.log(LOG_CATEGORIES.INIT, 'Skipping restoration notification in popup window');
           this.timer.restoredFromRestart = false;
         }
       }

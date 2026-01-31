@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.7';                  // Current mod version
+const MOD_VERSION = '1.3.8';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -244,6 +244,50 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_shouldBlockDailyReminder()`                         | Check if daily reminder should be blocked                   |
 | `_canShowReminderCountdown()`                         | Check if post-session reminder countdown can be shown       |
 | `_getEarliestReminderTime(config)`                    | Get earliest daily reminder time from config                |
+| `isPopupWindow()`                                     | Detect if current window is a popup (not main browser)      |
+
+---
+
+## Bug Fixes in v1.3.8
+
+### Timer Restored Notification in Popup Windows
+
+**Issue:** The "Timer Restored" notification would incorrectly appear when a Google sign-in popup (or other auth popup) opened, even though the browser didn't actually restart.
+
+**Root Cause:** The mod initializes in all browser windows, including popup windows. When `loadState()` restored timer state, it always set `restoredFromRestart = true`, triggering the notification even in popup windows.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `isPopupWindow()` utility function to detect popup windows
+- Checks for `chromehidden` attribute (set on popup windows)
+- Checks for absence of `gBrowser.tabContainer` (not present in popups)
+- Modified `onReady()` to skip restoration notification in popup windows
+
+### Right-Click to Pause/Unpause Timer Indicator
+
+**Feature:** Users can now right-click the draggable timer indicator to quickly pause/unpause the timer without opening the menu.
+
+**Implementation:**
+- Added `contextmenu` event handler to timer indicator
+- `e.preventDefault()` and `e.stopPropagation()` prevent context menu and event propagation
+- Calls `handlePauseResumeTimer()` for consistent pause/resume behavior
+- Checks for Distraction Dump active state and shows appropriate alert
+- Handler stored in `indicatorContextMenuHandler` for proper cleanup
+
+### Hide/Show Timer Indicator Keyboard Shortcut
+
+**Feature:** Users can now assign a keyboard shortcut to toggle the timer indicator visibility.
+
+**Implementation:**
+- Added `toggleIndicatorShortcut` config option (default: `Alt+Shift+H`)
+- Added `setupToggleIndicatorShortcut()` method to `KeyboardShortcutHandler`
+- Added `_toggleIndicatorVisibility()` helper method
+- Added shortcut recorder UI in settings dialog
+- Added `_saveToggleIndicatorShortcut()` to save settings
+- Proper cleanup in `destroy()` method
+
+**New Configuration Options:**
+| Option | Type | Default | Description |
+| `toggleIndicatorShortcut` | string | 'Alt+Shift+H' | Keyboard shortcut to hide/show timer indicator |
 
 ---
 
