@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3.6-green.svg)
+![Version](https://img.shields.io/badge/version-1.3.8-green.svg)
 
 ## ✨ Features
 
@@ -37,6 +37,8 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
   - Different colors for focus, break, and long break phases
   - Persistent corner indicator shows timer status
   - Smooth phase transitions with animations
+  - **Right-click indicator to pause/unpause** timer quickly
+  - **Keyboard shortcut to hide/show indicator** (default: Alt+Shift+H)
 
 - ⏰ **Timer Reminders**:
   - Browser notifications at specified minutes before phase ends

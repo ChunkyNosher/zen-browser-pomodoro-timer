@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.6
+ * Version: 1.3.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.6',
+    MOD_VERSION: '1.3.8',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -237,6 +237,8 @@
       focusPhaseReminders: [20, 10, 5, 1],
       /** Minutes before break phase ends to show reminder (default: 5, 1) */
       breakPhaseReminders: [5, 1],
+      /** Keyboard shortcut to toggle timer indicator visibility (hide/show) */
+      toggleIndicatorShortcut: 'Alt+Shift+H',
     },
   };
 
@@ -663,6 +665,7 @@
 
       // String preferences (requires non-empty validation)
       loadNonEmptyStringPref('keyboardShortcut', config, 'keyboardShortcut');
+      loadNonEmptyStringPref('toggleIndicatorShortcut', config, 'toggleIndicatorShortcut');
 
       // Reminder mode preference (enum validation)
       loadReminderModePref('reminderMode', config, 'reminderMode');
@@ -1118,6 +1121,38 @@
   // ============================================
   // Remaining Helper Functions
   // ============================================
+
+  /**
+   * Check if current window is a popup window (not the main browser window).
+   * In Firefox/Zen Browser, popup windows have the 'chromehidden' attribute set
+   * on the document element. This includes auth popups, sign-in dialogs, etc.
+   *
+   * This is used to prevent showing certain notifications (like timer restoration)
+   * in popup windows where they would be inappropriate and confusing.
+   *
+   * @returns {boolean} True if this is a popup window, false if main browser window
+   */
+  function isPopupWindow() {
+    try {
+      // Check for chromehidden attribute (set on popup windows)
+      const chromehidden = document.documentElement.getAttribute('chromehidden');
+      if (chromehidden) {
+        return true;
+      }
+
+      // Additional check: popup windows typically lack certain UI elements
+      // gBrowser is the tab browser and is only present in main browser windows
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.tabContainer) {
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      // If we can't determine, assume it's not a popup to be safe
+      return false;
+    }
+  }
 
   /**
    * Issue 8: Setup drag functionality for dialogs
@@ -2126,8 +2161,19 @@
       this.customCycle = customCycle;
       this.customCycleBlocks = [...customCycle.blocks]; // Make a copy
       this.currentBlockIndex = 0;
-      this.currentCycle = 1;
-      this.totalCycles = 1; // Custom cycles are single-run sequences
+      // Count focus blocks to determine total cycles
+      this.totalCycles = customCycle.blocks.filter(b => b.type === 'focus').length;
+
+      // Validate that cycle has at least one block
+      if (this.customCycleBlocks.length === 0) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle has no blocks, cannot start');
+        return;
+      }
+
+      // Set initial cycle based on first block type - if first block is focus, we're on cycle 1
+      // If first block is a break, we haven't started any focus cycle yet (0)
+      const firstBlock = this.customCycleBlocks[0];
+      this.currentCycle = firstBlock.type === 'focus' ? 1 : 0;
       this.isActive = true;
       this.isPaused = false;
       this.tickCounter = 0;
@@ -2140,7 +2186,6 @@
       this.savedConfig = { ...this.config };
 
       // Set up first block
-      const firstBlock = this.customCycleBlocks[0];
       this.currentPhase = firstBlock.type;
       this.remainingTime = firstBlock.duration * 60;
 
@@ -2242,21 +2287,7 @@
       }
 
       // Different day - check if we're past the first reminder time
-      // Use first daily reminder time if available, otherwise default to 10:00
-      let reminderTime = '10:00';
-      if (
-        config.dailyReminderTimes &&
-        Array.isArray(config.dailyReminderTimes) &&
-        config.dailyReminderTimes.length > 0
-      ) {
-        // Sort times numerically by hours and minutes and use the first one
-        const sortedTimes = config.dailyReminderTimes.slice().sort((a, b) => {
-          const [aHours, aMinutes] = a.split(':').map(Number);
-          const [bHours, bMinutes] = b.split(':').map(Number);
-          return aHours - bHours || aMinutes - bMinutes;
-        });
-        reminderTime = sortedTimes[0];
-      }
+      const reminderTime = this._getEarliestReminderTime(config);
 
       // Use shared validation function
       if (!isValidTimeFormat(reminderTime)) {
@@ -2269,6 +2300,27 @@
       reminderDate.setHours(hours, minutes, 0, 0);
 
       return now >= reminderDate;
+    }
+
+    /**
+     * Get the earliest daily reminder time from config.
+     * @param {Object} config - Configuration object
+     * @returns {string} Earliest reminder time in HH:MM format
+     * @private
+     */
+    _getEarliestReminderTime(config) {
+      const times = config.dailyReminderTimes;
+      if (!times || !Array.isArray(times) || times.length === 0) {
+        return '10:00';
+      }
+
+      // Sort times numerically by hours and minutes
+      const sortedTimes = times.slice().sort((a, b) => {
+        const [aHours, aMinutes] = a.split(':').map(Number);
+        const [bHours, bMinutes] = b.split(':').map(Number);
+        return aHours - bHours || aMinutes - bMinutes;
+      });
+      return sortedTimes[0];
     }
 
     /**
@@ -2433,6 +2485,85 @@
     }
 
     /**
+     * Count focus blocks up to and including the given index.
+     * @param {number} upToIndex - Index to count up to (inclusive)
+     * @returns {number} Number of focus blocks
+     * @private
+     */
+    _countFocusBlocksUpTo(upToIndex) {
+      let count = 0;
+      for (let i = 0; i <= upToIndex && i < this.customCycleBlocks.length; i++) {
+        if (this.customCycleBlocks[i].type === 'focus') {
+          count++;
+        }
+      }
+      return count;
+    }
+
+    /**
+     * Check if transition to break→focus requires a transition phase.
+     * @param {Object} completedBlock - The block that just completed
+     * @param {Object} nextBlock - The next block to start
+     * @returns {boolean} True if transition phase is needed
+     * @private
+     */
+    _needsTransitionPhase(completedBlock, nextBlock) {
+      return completedBlock.type === 'break' && nextBlock.type === 'focus';
+    }
+
+    /**
+     * Enter the transition phase for custom cycles.
+     * @param {Object} nextBlock - The focus block that will start after transition
+     * @private
+     */
+    _enterCustomCycleTransition(nextBlock) {
+      this.currentCycle = this._countFocusBlocksUpTo(this.currentBlockIndex);
+      this.currentPhase = 'transition';
+      this.remainingTime = Constants.TRANSITION_PHASE_DURATION_SECONDS;
+      this.shownRemindersForCurrentPhase.clear();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle entering transition phase', {
+        blockIndex: this.currentBlockIndex,
+        nextBlockType: nextBlock.type,
+        currentCycle: this.currentCycle,
+      });
+
+      if (this.onTransitionStart) {
+        this.onTransitionStart();
+      }
+      this.saveState();
+    }
+
+    /**
+     * Start the next block directly (no transition phase).
+     * @param {Object} nextBlock - The block to start
+     * @private
+     */
+    _startNextCustomBlock(nextBlock) {
+      this.currentPhase = nextBlock.type;
+      this.remainingTime = nextBlock.duration * 60;
+
+      if (nextBlock.type === 'focus') {
+        this.currentCycle = this._countFocusBlocksUpTo(this.currentBlockIndex);
+      }
+
+      this.shownRemindersForCurrentPhase.clear();
+
+      logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
+        blockIndex: this.currentBlockIndex,
+        blockType: nextBlock.type,
+        duration: nextBlock.duration,
+        currentCycle: this.currentCycle,
+      });
+
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
+    }
+
+    /**
      * Handle completion of a block in custom cycle mode.
      * @private
      */
@@ -2444,41 +2575,22 @@
         blocksRemaining: this.customCycleBlocks.length - this.currentBlockIndex - 1,
       });
 
-      // Move to next block
       this.currentBlockIndex++;
 
-      // Check if cycle is complete
       if (this.currentBlockIndex >= this.customCycleBlocks.length) {
         logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle complete');
         this.completeTimer();
         return;
       }
 
-      // Set up next block
       const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
-      this.currentPhase = nextBlock.type;
-      this.remainingTime = nextBlock.duration * 60;
 
-      // Clear shown reminders for new phase
-      this.shownRemindersForCurrentPhase.clear();
-
-      logger.log(LOG_CATEGORIES.TIMER, 'Starting next custom cycle block', {
-        blockIndex: this.currentBlockIndex,
-        blockType: nextBlock.type,
-        duration: nextBlock.duration,
-      });
-
-      // Notify phase change
-      if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      if (this._needsTransitionPhase(completedBlock, nextBlock)) {
+        this._enterCustomCycleTransition(nextBlock);
+        return;
       }
 
-      // Reset distraction dump for new focus phase
-      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
-        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
-      }
-
-      this.saveState();
+      this._startNextCustomBlock(nextBlock);
     }
 
     /**
@@ -2555,6 +2667,27 @@
     }
 
     /**
+     * Check if currently in a custom cycle with valid block.
+     * @returns {boolean} True if in custom cycle mode with valid block index
+     * @private
+     */
+    _isValidCustomCycleState() {
+      return this.mode === 'custom' && 
+             this.customCycleBlocks && 
+             this.currentBlockIndex < this.customCycleBlocks.length;
+    }
+
+    /**
+     * Get the current custom cycle block's duration.
+     * @returns {number|null} Duration in minutes, or null if not in custom cycle
+     * @private
+     */
+    _getCurrentCustomBlockDuration() {
+      if (!this._isValidCustomCycleState()) return null;
+      return this.customCycleBlocks[this.currentBlockIndex].duration;
+    }
+
+    /**
      * Called when the transition phase ends (either by timer or user action).
      * Starts the actual focus phase.
      */
@@ -2562,9 +2695,18 @@
       logger.log(LOG_CATEGORIES.TIMER, 'Starting focus from transition phase');
 
       this.currentPhase = 'focus';
-      this.remainingTime = this.config.focusDuration * 60;
+      const customDuration = this._getCurrentCustomBlockDuration();
 
-      // Clear shown reminders for new phase
+      if (customDuration !== null) {
+        this.remainingTime = customDuration * 60;
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle: Using block duration', {
+          blockIndex: this.currentBlockIndex,
+          duration: customDuration,
+        });
+      } else {
+        this.remainingTime = this.config.focusDuration * 60;
+      }
+
       this.shownRemindersForCurrentPhase.clear();
 
       if (this.onPhaseChange) {
@@ -2749,11 +2891,6 @@
         this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
 
-      // Reset distraction dump for new focus phase
-      if (this.currentPhase === 'focus' && window.zenPomodoroApp?.distractionDump) {
-        window.zenPomodoroApp.distractionDump.resetForNewFocusPhase();
-      }
-
       this.saveState();
       return true;
     }
@@ -2857,52 +2994,65 @@
     }
 
     /**
+     * Restore basic timer state from saved state object.
+     * @param {Object} state - Saved state object
+     * @private
+     */
+    _restoreBasicState(state) {
+      this.isActive = state.isActive;
+      // AUTO-PAUSE FIX: Always pause timer on restoration (user requirement)
+      this.isPaused = true;
+      this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
+      this.remainingTime = state.remainingTime;
+      // Backwards compatibility: treat 'long-break' as 'break'
+      this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
+      this.currentCycle = state.currentCycle;
+      this.totalCycles = state.totalCycles;
+      this.mode = state.mode;
+    }
+
+    /**
+     * Restore custom cycle specific state.
+     * @param {Object} state - Saved state object
+     * @private
+     */
+    _restoreCustomCycleState(state) {
+      if (state.mode === 'custom') {
+        this.customCycle = state.customCycle;
+        this.customCycleBlocks = state.customCycleBlocks;
+        this.currentBlockIndex = state.currentBlockIndex || 0;
+      }
+    }
+
+    /**
      * Load timer state from preferences
      * LOGIC FIX: Restore config from saved state
      * AUTO-PAUSE FIX: Timer is paused on browser restart
      */
     loadState() {
       const stateStr = getPref('timer-state', null);
-      if (stateStr) {
-        try {
-          const state = JSON.parse(stateStr);
-          if (state.isActive) {
-            this.isActive = state.isActive;
-            // AUTO-PAUSE FIX: Always pause timer on restoration (user requirement)
-            // This overrides the saved pause state to prevent timer from auto-continuing on restart
-            this.isPaused = true;
-            this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false; // Restore pause workspace state
-            this.remainingTime = state.remainingTime;
-            // Backwards compatibility: treat 'long-break' as 'break'
-            this.currentPhase = state.currentPhase === 'long-break' ? 'break' : state.currentPhase;
-            this.currentCycle = state.currentCycle;
-            this.totalCycles = state.totalCycles;
-            this.mode = state.mode;
+      if (!stateStr) return false;
 
-            // Restore custom cycle state if present
-            if (state.mode === 'custom') {
-              this.customCycle = state.customCycle;
-              this.customCycleBlocks = state.customCycleBlocks;
-              this.currentBlockIndex = state.currentBlockIndex || 0;
-            }
+      try {
+        const state = JSON.parse(stateStr);
+        if (!state.isActive) return false;
 
-            // Restore saved config
-            if (state.savedConfig) {
-              this.savedConfig = state.savedConfig;
-              this.config = state.savedConfig;
-            }
+        this._restoreBasicState(state);
+        this._restoreCustomCycleState(state);
 
-            // AUTO-PAUSE FIX: Don't start interval, timer is paused
-            // Set flag to indicate this was restored from restart
-            this.restoredFromRestart = true;
-
-            return true;
-          }
-        } catch (e) {
-          console.error('Failed to load timer state:', e);
+        // Restore saved config
+        if (state.savedConfig) {
+          this.savedConfig = state.savedConfig;
+          this.config = state.savedConfig;
         }
+
+        // Set flag to indicate this was restored from restart
+        this.restoredFromRestart = true;
+        return true;
+      } catch (e) {
+        console.error('Failed to load timer state:', e);
+        return false;
       }
-      return false;
     }
 
     /**
@@ -3416,6 +3566,8 @@
       this.indicatorWidth = 0; // Cached indicator width for drag operations
       this.indicatorHeight = 0; // Cached indicator height for drag operations
       this.indicatorMouseDownHandler = null; // Store for cleanup
+      this.indicatorContextMenuHandler = null; // Store for cleanup (right-click pause/unpause)
+      this.indicatorDidDrag = false; // Track if indicator was dragged (to suppress click events)
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
     }
@@ -3799,6 +3951,7 @@
 
         e.preventDefault();
         isDragging = true;
+        this.indicatorDidDrag = false; // Reset drag state on new mousedown
 
         const rect = this.indicator.getBoundingClientRect();
         startX = e.clientX;
@@ -3824,6 +3977,11 @@
 
         const deltaX = e.clientX - startX;
         const deltaY = e.clientY - startY;
+
+        // Mark as dragged if movement exceeds threshold (5 pixels)
+        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+          this.indicatorDidDrag = true;
+        }
 
         let newLeft = startLeft + deltaX;
         let newTop = startTop + deltaY;
@@ -3858,11 +4016,51 @@
 
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
+
+        // Reset drag flag after a delay to allow click event to check it
+        // 100ms is sufficient since click events fire immediately after mouseup
+        setTimeout(() => {
+          this.indicatorDidDrag = false;
+        }, 100);
       };
 
       // Store reference for cleanup
       this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
+
+      // RIGHT-CLICK TO PAUSE/UNPAUSE: Add contextmenu event handler
+      // This allows users to quickly pause/resume timer without opening menu
+      const onContextMenu = (e) => {
+        // Prevent the default context menu from showing
+        e.preventDefault();
+        // Stop propagation to prevent affecting the webpage below
+        e.stopPropagation();
+
+        // Check if timer is active
+        if (!window.zenPomodoroApp?.timer?.isActive) {
+          return;
+        }
+
+        // Check if Distraction Dump is active - don't allow pause during dump
+        if (isDistractionDumpBlocking()) {
+          window.zenPomodoroApp.showCustomAlert(
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+          );
+          return;
+        }
+
+        // Toggle pause/resume
+        handlePauseResumeTimer();
+
+        logger.log(LOG_CATEGORIES.TIMER, 'Timer toggled via indicator right-click', {
+          isPaused: window.zenPomodoroApp.timer.isPaused,
+        });
+      };
+
+      // Store reference for cleanup
+      this.indicatorContextMenuHandler = onContextMenu;
+      this.indicator.addEventListener('contextmenu', onContextMenu);
     }
 
     /**
@@ -4068,9 +4266,9 @@
       const cycleProgress = this.overlay.querySelector('#zen-pomodoro-cycle-progress');
       if (!cycleProgress) return;
 
-      // Only show cycle progress for pomodoro mode during focus phase
+      // Only show cycle progress for pomodoro and custom modes during focus phase
       const timerMode = window.zenPomodoroApp?.timer?.mode;
-      const shouldShow = phase === 'focus' && timerMode === 'pomodoro';
+      const shouldShow = phase === 'focus' && (timerMode === 'pomodoro' || timerMode === 'custom');
       cycleProgress.classList.toggle('zen-pomodoro-hidden', !shouldShow);
       if (shouldShow) {
         cycleProgress.textContent = `Cycle ${currentCycle} of ${totalCycles}`;
@@ -4276,6 +4474,11 @@
         this.indicator.removeEventListener('mousedown', this.indicatorMouseDownHandler);
         this.indicatorMouseDownHandler = null;
       }
+      // Clean up contextmenu handler for right-click pause/unpause
+      if (this.indicator && this.indicatorContextMenuHandler) {
+        this.indicator.removeEventListener('contextmenu', this.indicatorContextMenuHandler);
+        this.indicatorContextMenuHandler = null;
+      }
     }
 
     /**
@@ -4327,6 +4530,7 @@
   class KeyboardShortcutHandler {
     constructor() {
       this.keydownHandler = null;
+      this.toggleIndicatorHandler = null; // Handler for toggle indicator visibility shortcut
       this.menuDialog = null;
       this.menuTimerUpdateInterval = null;
       this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
@@ -4463,6 +4667,10 @@
       const config = getConfig();
       this.setupKeyboardShortcut(config.keyboardShortcut);
       console.log(`Zen Pomodoro: Keyboard shortcut registered: ${config.keyboardShortcut}`);
+
+      // Setup toggle indicator shortcut
+      this.setupToggleIndicatorShortcut(config.toggleIndicatorShortcut);
+      console.log(`Zen Pomodoro: Toggle indicator shortcut registered: ${config.toggleIndicatorShortcut}`);
     }
 
     /**
@@ -4532,6 +4740,110 @@
         event.metaKey === parsed.metaKey;
 
       return modifiersMatch && event.key.toUpperCase() === parsed.key;
+    }
+
+    /**
+     * Setup keyboard shortcut for toggling indicator visibility.
+     * @param {string} shortcut - Keyboard shortcut string
+     */
+    setupToggleIndicatorShortcut(shortcut) {
+      // Clean up existing handler
+      if (this.toggleIndicatorHandler) {
+        document.removeEventListener('keydown', this.toggleIndicatorHandler);
+      }
+
+      // Don't set up handler if shortcut is empty
+      if (!shortcut || shortcut.trim() === '') {
+        return;
+      }
+
+      const parsed = this.parseShortcut(shortcut);
+
+      this.toggleIndicatorHandler = (event) => {
+        // Check if all modifier keys match using helper function
+        if (this._isShortcutMatch(event, parsed)) {
+          event.preventDefault();
+          event.stopPropagation();
+          this._toggleIndicatorVisibility();
+        }
+      };
+
+      document.addEventListener('keydown', this.toggleIndicatorHandler, true);
+    }
+
+    /**
+     * Toggle the timer indicator visibility.
+     * @private
+     */
+    _toggleIndicatorVisibility() {
+      // Only toggle if timer is active
+      if (!window.zenPomodoroApp?.timer?.isActive) {
+        return;
+      }
+
+      const overlay = window.zenPomodoroApp?.overlay;
+      if (!overlay) return;
+
+      // Toggle visibility - indicator visibility is controlled by 'active' class
+      if (overlay.indicator) {
+        const isCurrentlyHidden = !overlay.indicator.classList.contains('active');
+
+        if (isCurrentlyHidden) {
+          overlay.showIndicator();
+          logger.log(LOG_CATEGORIES.TIMER, 'Indicator shown via shortcut');
+        } else {
+          overlay.hideIndicator();
+          logger.log(LOG_CATEGORIES.TIMER, 'Indicator hidden via shortcut');
+        }
+      }
+    }
+
+    /**
+     * Handle "Cut Break Early" action - skip break/transition phase and go to focus.
+     * Extracted from showPomodoroMenu to reduce complexity.
+     * @param {string} currentPhase - Current timer phase
+     * @private
+     */
+    _handleCutBreakEarly(currentPhase) {
+      const timer = window.zenPomodoroApp.timer;
+
+      // If in transition phase, directly start the focus phase (skip transition popup)
+      if (currentPhase === 'transition') {
+        window.zenPomodoroApp.transitionManager.hideTransitionPopup();
+        this._startNextFocusPhase(timer);
+        return;
+      }
+
+      // In break or long-break phase
+      if (timer.mode === 'custom') {
+        // Custom cycle mode: use helper for consistent handling
+        this._startNextFocusPhase(timer);
+      } else {
+        // Regular Pomodoro mode: increment cycle and start focus
+        timer.currentCycle++;
+        logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
+          currentCycle: timer.currentCycle,
+          totalCycles: timer.totalCycles,
+        });
+        timer.startFocusFromTransition();
+        window.zenPomodoroApp.updateOverlayVisibility();
+      }
+    }
+
+    /**
+     * Start the next focus phase, handling both custom and regular modes.
+     * @param {Object} timer - The timer instance
+     * @private
+     */
+    _startNextFocusPhase(timer) {
+      if (timer.mode === 'custom') {
+        if (timer.skipToNextCustomBlock()) {
+          window.zenPomodoroApp.updateOverlayVisibility();
+        }
+      } else {
+        timer.startFocusFromTransition();
+        window.zenPomodoroApp.updateOverlayVisibility();
+      }
     }
 
     /**
@@ -4624,44 +4936,7 @@
             this._stopMenuTimerUpdates();
             dialog.remove();
             this.menuDialog = null;
-
-            const timer = window.zenPomodoroApp.timer;
-
-            // If in transition phase, directly start the focus phase
-            if (status.currentPhase === 'transition') {
-              // Hide popup if it exists (don't rely on callback since popup might not be showing)
-              window.zenPomodoroApp.transitionManager.hideTransitionPopup();
-              
-              if (timer.mode === 'custom') {
-                // Custom cycle mode: skip to next block (should be a focus block after transition)
-                if (timer.skipToNextCustomBlock()) {
-                  window.zenPomodoroApp.updateOverlayVisibility();
-                }
-              } else {
-                // Non-custom mode: start focus directly
-                timer.startFocusFromTransition();
-                window.zenPomodoroApp.updateOverlayVisibility();
-              }
-            } else if (timer.mode === 'custom') {
-              // Custom cycle mode: skip to next block
-              // Only update overlay if skip was successful (returns true)
-              // Returns false if timer completed or not in break phase
-              if (timer.skipToNextCustomBlock()) {
-                window.zenPomodoroApp.updateOverlayVisibility();
-              }
-            } else {
-              // In regular break or long-break phase, start focus phase directly
-              // BUG FIX: Increment cycle count since we're skipping the break phase
-              // (normally incremented in _handleBreakPhaseComplete when break → transition)
-              timer.currentCycle++;
-              logger.log(LOG_CATEGORIES.TIMER, 'Cut break early: Incremented cycle count', {
-                currentCycle: timer.currentCycle,
-                totalCycles: timer.totalCycles
-              });
-              // Note: startFocusFromTransition() is reused here as it sets up a new focus phase
-              timer.startFocusFromTransition();
-              window.zenPomodoroApp.updateOverlayVisibility();
-            }
+            this._handleCutBreakEarly(status.currentPhase);
           });
         }
 
@@ -4933,6 +5208,10 @@
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
         this.keydownHandler = null;
+      }
+      if (this.toggleIndicatorHandler) {
+        document.removeEventListener('keydown', this.toggleIndicatorHandler, true);
+        this.toggleIndicatorHandler = null;
       }
       if (this.menuDialog) {
         this.menuDialog.remove();
@@ -5464,6 +5743,70 @@
 
       shortcutRow.appendChild(shortcutLabel);
       shortcutRow.appendChild(shortcutInput);
+
+      // ========================================
+      // Toggle Indicator Shortcut Recorder
+      // ========================================
+      const toggleIndicatorRow = document.createElement('div');
+      toggleIndicatorRow.className = 'zen-pomodoro-config-row';
+      const toggleIndicatorLabel = document.createElement('label');
+      toggleIndicatorLabel.textContent = 'Hide/Show Indicator Shortcut:';
+      const toggleIndicatorInput = document.createElement('div');
+      toggleIndicatorInput.className = 'zen-pomodoro-shortcut-recorder';
+      toggleIndicatorInput.id = 'toggle-indicator-shortcut';
+      toggleIndicatorInput.tabIndex = 0;
+      toggleIndicatorInput.textContent = config.toggleIndicatorShortcut;
+      toggleIndicatorInput.setAttribute('data-shortcut', config.toggleIndicatorShortcut);
+
+      let isRecordingToggle = false;
+
+      toggleIndicatorInput.addEventListener('click', () => {
+        if (!isRecordingToggle) {
+          isRecordingToggle = true;
+          toggleIndicatorInput.textContent = 'Press keys...';
+          toggleIndicatorInput.classList.add('recording');
+        }
+      });
+
+      toggleIndicatorInput.addEventListener('keydown', (e) => {
+        if (!isRecordingToggle) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Build shortcut string from modifier keys + regular key
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Meta');
+
+        // Get the key (ignore modifier keys alone)
+        // Normalize key: single characters to uppercase, special keys keep their natural casing
+        const key = e.key;
+        if (!MODIFIER_KEYS.includes(key)) {
+          // Only uppercase single character keys, keep special keys like ArrowUp, Enter as-is
+          const normalizedKey = key.length === 1 ? key.toUpperCase() : key;
+          parts.push(normalizedKey);
+
+          const shortcutStr = parts.join('+');
+          toggleIndicatorInput.textContent = shortcutStr;
+          toggleIndicatorInput.setAttribute('data-shortcut', shortcutStr);
+          toggleIndicatorInput.classList.remove('recording');
+          isRecordingToggle = false;
+        }
+      });
+
+      toggleIndicatorInput.addEventListener('blur', () => {
+        if (isRecordingToggle) {
+          toggleIndicatorInput.textContent = toggleIndicatorInput.getAttribute('data-shortcut');
+          toggleIndicatorInput.classList.remove('recording');
+          isRecordingToggle = false;
+        }
+      });
+
+      toggleIndicatorRow.appendChild(toggleIndicatorLabel);
+      toggleIndicatorRow.appendChild(toggleIndicatorInput);
 
       // ========================================
       // Timer Mode Selection
@@ -6229,6 +6572,7 @@
       // Assemble config section
       // ========================================
       configSection.appendChild(shortcutRow);
+      configSection.appendChild(toggleIndicatorRow);
       configSection.appendChild(timerModeRow);
       configSection.appendChild(simpleDurationRow);
       configSection.appendChild(focusRow);
@@ -6258,6 +6602,7 @@
       const saveAllSettings = () => {
         logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
         this._saveKeyboardShortcut(shortcutInput, config);
+        this._saveToggleIndicatorShortcut(toggleIndicatorInput, config);
         this._saveTimerSettings(dialog, config, timerModeSelect);
         this._saveLockoutSettings(dialog, config, idleMethodSelect, activeMethodSelect);
         this._saveReminderSettings(dialog, config);
@@ -6346,6 +6691,30 @@
         window.zenPomodoroApp.keyboardShortcut.setupKeyboardShortcut(newShortcut);
       }
       setPref('keyboardShortcut', newShortcut);
+    }
+
+    /**
+     * Save toggle indicator shortcut from settings dialog.
+     * @param {HTMLElement} shortcutInput - The shortcut input element
+     * @param {Object} config - Configuration object to update
+     * @private
+     */
+    _saveToggleIndicatorShortcut(shortcutInput, config) {
+      const newShortcut = shortcutInput.getAttribute('data-shortcut');
+      if (!newShortcut || newShortcut === config.toggleIndicatorShortcut) return;
+
+      const shortcutParts = newShortcut.split('+');
+      const hasNonModifierKey = shortcutParts.some(
+        (part) => !['Ctrl', 'Alt', 'Shift', 'Meta'].includes(part)
+      );
+
+      if (!hasNonModifierKey) return;
+
+      config.toggleIndicatorShortcut = newShortcut;
+      if (window.zenPomodoroApp?.keyboardShortcut) {
+        window.zenPomodoroApp.keyboardShortcut.setupToggleIndicatorShortcut(newShortcut);
+      }
+      setPref('toggleIndicatorShortcut', newShortcut);
     }
 
     /**
@@ -6805,6 +7174,34 @@
     }
 
     /**
+     * Update workspace blocked status in a ruleset.
+     * @param {Object} config - Configuration object
+     * @param {string} rulesetId - Ruleset ID
+     * @param {string} workspaceId - Workspace ID
+     * @param {boolean} isBlocked - Whether workspace should be blocked
+     * @private
+     */
+    _updateRulesetWorkspace(config, rulesetId, workspaceId, isBlocked) {
+      const rulesetIndex = config.rulesets.findIndex((r) => r.id === rulesetId);
+      if (rulesetIndex === -1) return;
+
+      const currentRuleset = config.rulesets[rulesetIndex];
+      if (!currentRuleset.blockedWorkspaces) {
+        currentRuleset.blockedWorkspaces = [];
+      }
+
+      if (isBlocked) {
+        if (!currentRuleset.blockedWorkspaces.includes(workspaceId)) {
+          currentRuleset.blockedWorkspaces.push(workspaceId);
+        }
+      } else {
+        currentRuleset.blockedWorkspaces = currentRuleset.blockedWorkspaces.filter(
+          (wsId) => wsId !== workspaceId
+        );
+      }
+    }
+
+    /**
      * Create a ruleset item element
      * @param {Object} ruleset - Ruleset data
      * @param {number} index - Ruleset index
@@ -6964,23 +7361,7 @@
           checkbox.value = workspace.id;
           checkbox.checked = ruleset.blockedWorkspaces.includes(workspace.id);
           checkbox.addEventListener('change', () => {
-            // Find ruleset by ID to avoid stale reference
-            const rulesetIndex = config.rulesets.findIndex((r) => r.id === ruleset.id);
-            if (rulesetIndex !== -1) {
-              const currentRuleset = config.rulesets[rulesetIndex];
-              if (!currentRuleset.blockedWorkspaces) {
-                currentRuleset.blockedWorkspaces = [];
-              }
-              if (checkbox.checked) {
-                if (!currentRuleset.blockedWorkspaces.includes(workspace.id)) {
-                  currentRuleset.blockedWorkspaces.push(workspace.id);
-                }
-              } else {
-                currentRuleset.blockedWorkspaces = currentRuleset.blockedWorkspaces.filter(
-                  (wsId) => wsId !== workspace.id
-                );
-              }
-            }
+            this._updateRulesetWorkspace(config, ruleset.id, workspace.id, checkbox.checked);
           });
 
           const label = document.createElement('label');
@@ -9802,25 +10183,53 @@
     }
 
     /**
+     * Check if daily reminder overlay is currently visible.
+     * @returns {boolean} True if reminder is visible
+     * @private
+     */
+    _isDailyReminderVisible() {
+      return this.reminderOverlay || this.isShowing;
+    }
+
+    /**
+     * Check if timer is currently active.
+     * @returns {boolean} True if timer is active
+     * @private
+     */
+    _isTimerActive() {
+      return window.zenPomodoroApp?.timer?.isActive ?? false;
+    }
+
+    /**
+     * Check if post-session reminder is visible.
+     * @returns {boolean} True if post-session reminder is visible
+     * @private
+     */
+    _isPostSessionReminderVisible() {
+      return window.zenPomodoroApp?.postSessionReminder?.isShowing ?? false;
+    }
+
+    /**
+     * Check if daily reminder should be blocked from showing.
+     * @returns {boolean} True if reminder should not be shown
+     * @private
+     */
+    _shouldBlockDailyReminder() {
+      if (this._isDailyReminderVisible()) return true;
+      if (this._isTimerActive()) return true;
+      if (this._isPostSessionReminderVisible()) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Post-session reminder is showing');
+        return true;
+      }
+      return false;
+    }
+
+    /**
      * Show the daily reminder overlay.
      * This blocks browser interaction until user starts a timer or skips.
      */
     showReminder() {
-      // Don't show if already showing
-      if (this.reminderOverlay || this.isShowing) {
-        return;
-      }
-
-      // Don't show if timer is already active
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        return;
-      }
-
-      // Don't show if post-session reminder is showing (mutual exclusion)
-      if (window.zenPomodoroApp?.postSessionReminder?.isShowing) {
-        logger.log(LOG_CATEGORIES.TIMER, 'Daily reminder: Post-session reminder is showing');
-        return;
-      }
+      if (this._shouldBlockDailyReminder()) return;
 
       logger.log(LOG_CATEGORIES.TIMER, 'Showing daily reminder overlay');
       this.isShowing = true;
@@ -10889,34 +11298,12 @@
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
     getTimeUntilNextReminder() {
+      if (!this._canShowReminderCountdown()) {
+        return null;
+      }
+
       const config = getConfig();
-
-      // Only return null if feature is disabled
-      if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) {
-        return null;
-      }
-
-      // Don't show countdown while reminder is displaying
-      if (this.isShowing) {
-        return null;
-      }
-
-      // Don't show countdown if focus time goal is reached
-      if (this._checkFocusTimeGoalReached()) {
-        return null;
-      }
-
       const now = Date.now();
-
-      // Don't show countdown while timer is active (reminder is only for post-session)
-      if (window.zenPomodoroApp?.timer?.isActive) {
-        return null;
-      }
-
-      // Don't show countdown if no session has completed yet (no idle tracking started)
-      if (!this.idleStartTime) {
-        return null;
-      }
 
       // If in cooldown, calculate time until cooldown ends
       if (this._isInCooldownPeriod(config.postSessionSkipCooldown)) {
@@ -11617,11 +12004,15 @@
       // Show dump indicator
       overlay.showDumpIndicator(this.dumpTimeRemaining);
 
-      // Set up click handler to end dump
+      // Set up click handler to end dump (but not if indicator was dragged)
       const indicator = overlay.indicator;
       if (indicator) {
         // Store handler for cleanup
         this.dumpIndicatorClickHandler = () => {
+          // Skip if the indicator was just dragged (to prevent accidental end dump)
+          if (overlay.indicatorDidDrag) {
+            return;
+          }
           this.showEndDumpConfirmation();
         };
         indicator.addEventListener('click', this.dumpIndicatorClickHandler);
@@ -11752,6 +12143,40 @@
     }
 
     /**
+     * Create empty message element for cycles list.
+     * @returns {HTMLElement} The empty message element
+     * @private
+     */
+    _createEmptyMessage() {
+      const emptyMessage = document.createElement('p');
+      emptyMessage.style.color = '#888';
+      emptyMessage.style.fontSize = '13px';
+      emptyMessage.style.textAlign = 'center';
+      emptyMessage.style.padding = '20px';
+      emptyMessage.textContent = 'No custom cycles yet. Create one to get started!';
+      return emptyMessage;
+    }
+
+    /**
+     * Render cycles list into container.
+     * @param {HTMLElement} container - Container element
+     * @param {Array} cycles - Array of cycle objects
+     * @param {Object} config - Configuration object
+     * @param {HTMLElement} dialog - Parent dialog element
+     * @private
+     */
+    _renderCyclesList(container, cycles, config, dialog) {
+      if (cycles.length === 0) {
+        container.appendChild(this._createEmptyMessage());
+      } else {
+        cycles.forEach((cycle) => {
+          const cycleItem = this._createCycleListItem(cycle, config, dialog);
+          container.appendChild(cycleItem);
+        });
+      }
+    }
+
+    /**
      * Show the main custom cycles menu listing all saved cycles.
      */
     showCustomCyclesMenu() {
@@ -11796,20 +12221,7 @@
       cyclesContainer.className = 'zen-pomodoro-cycles-list';
       cyclesContainer.style.marginBottom = '16px';
 
-      if (savedCycles.length === 0) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.style.color = '#888';
-        emptyMessage.style.fontSize = '13px';
-        emptyMessage.style.textAlign = 'center';
-        emptyMessage.style.padding = '20px';
-        emptyMessage.textContent = 'No custom cycles yet. Create one to get started!';
-        cyclesContainer.appendChild(emptyMessage);
-      } else {
-        savedCycles.forEach((cycle) => {
-          const cycleItem = this._createCycleListItem(cycle, config, dialog);
-          cyclesContainer.appendChild(cycleItem);
-        });
-      }
+      this._renderCyclesList(cyclesContainer, savedCycles, config, dialog);
 
       // Create New button
       const createButton = document.createElement('button');
@@ -12965,12 +13377,18 @@
         }
 
         // AUTO-PAUSE FIX: Show notification that timer was paused
-        if (this.timer.restoredFromRestart) {
+        // POPUP FIX: Only show restoration notification in main browser window, not popups
+        // This prevents confusing notifications in auth popups (Google sign-in, etc.)
+        if (this.timer.restoredFromRestart && !isPopupWindow()) {
           // Show a non-blocking notification after a short delay to ensure DOM is ready
           setTimeout(() => {
             this.showRestorationNotification();
           }, RESTORATION_NOTIFICATION_DELAY_MS);
           // Clear flag after scheduling notification to prevent duplicate notifications
+          this.timer.restoredFromRestart = false;
+        } else if (this.timer.restoredFromRestart) {
+          // Clear flag even in popup windows to prevent duplicate notifications when returning
+          logger.log(LOG_CATEGORIES.INIT, 'Skipping restoration notification in popup window');
           this.timer.restoredFromRestart = false;
         }
       }

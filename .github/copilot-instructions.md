@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.6';                  // Current mod version
+const MOD_VERSION = '1.3.8';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -224,15 +224,152 @@ Allows users to pause their focus timer and capture distracting thoughts without
 
 ## Helper Functions
 
-| Function                                              | Purpose                                            |
-| ----------------------------------------------------- | -------------------------------------------------- |
-| `loadBooleanPref(prefName, config, configKey)`        | Load a boolean preference with validation          |
-| `loadPositiveIntPref(prefName, config, configKey)`    | Load a positive integer preference with validation |
-| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                         |
-| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                   |
-| `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI           |
-| `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection        |
-| `loadIntArrayPref(prefName, config, configKey)`       | Load comma-separated integer array preference      |
+| Function                                              | Purpose                                                     |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
+| `loadBooleanPref(prefName, config, configKey)`        | Load a boolean preference with validation                   |
+| `loadPositiveIntPref(prefName, config, configKey)`    | Load a positive integer preference with validation          |
+| `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format                                  |
+| `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input                            |
+| `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI                    |
+| `handleSkipFocusWithLockout(onSkip)`                  | Skip focus to break with lockout protection                 |
+| `loadIntArrayPref(prefName, config, configKey)`       | Load comma-separated integer array preference               |
+| `_countFocusBlocksUpTo(upToIndex)`                    | Count focus blocks in custom cycle up to given index        |
+| `_needsTransitionPhase(completedBlock, nextBlock)`    | Check if transition phase is needed (break → focus)         |
+| `_enterCustomCycleTransition(nextBlock)`              | Enter transition phase for custom cycles                    |
+| `_startNextCustomBlock(nextBlock)`                    | Start next block in custom cycle directly                   |
+| `_isValidCustomCycleState()`                          | Check if in valid custom cycle state with valid block index |
+| `_getCurrentCustomBlockDuration()`                    | Get current custom block duration for custom cycles         |
+| `_handleCutBreakEarly(currentPhase)`                  | Handle Cut Break Early button action                        |
+| `_startNextFocusPhase(timer)`                         | Start next focus phase (custom or regular mode)             |
+| `_shouldBlockDailyReminder()`                         | Check if daily reminder should be blocked                   |
+| `_canShowReminderCountdown()`                         | Check if post-session reminder countdown can be shown       |
+| `_getEarliestReminderTime(config)`                    | Get earliest daily reminder time from config                |
+| `isPopupWindow()`                                     | Detect if current window is a popup (not main browser)      |
+
+---
+
+## Bug Fixes in v1.3.8
+
+### Timer Restored Notification in Popup Windows
+
+**Issue:** The "Timer Restored" notification would incorrectly appear when a Google sign-in popup (or other auth popup) opened, even though the browser didn't actually restart.
+
+**Root Cause:** The mod initializes in all browser windows, including popup windows. When `loadState()` restored timer state, it always set `restoredFromRestart = true`, triggering the notification even in popup windows.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `isPopupWindow()` utility function to detect popup windows
+- Checks for `chromehidden` attribute (set on popup windows)
+- Checks for absence of `gBrowser.tabContainer` (not present in popups)
+- Modified `onReady()` to skip restoration notification in popup windows
+
+### Right-Click to Pause/Unpause Timer Indicator
+
+**Feature:** Users can now right-click the draggable timer indicator to quickly pause/unpause the timer without opening the menu.
+
+**Implementation:**
+- Added `contextmenu` event handler to timer indicator
+- `e.preventDefault()` and `e.stopPropagation()` prevent context menu and event propagation
+- Calls `handlePauseResumeTimer()` for consistent pause/resume behavior
+- Checks for Distraction Dump active state and shows appropriate alert
+- Handler stored in `indicatorContextMenuHandler` for proper cleanup
+
+### Hide/Show Timer Indicator Keyboard Shortcut
+
+**Feature:** Users can now assign a keyboard shortcut to toggle the timer indicator visibility.
+
+**Implementation:**
+- Added `toggleIndicatorShortcut` config option (default: `Alt+Shift+H`)
+- Added `setupToggleIndicatorShortcut()` method to `KeyboardShortcutHandler`
+- Added `_toggleIndicatorVisibility()` helper method
+- Added shortcut recorder UI in settings dialog
+- Added `_saveToggleIndicatorShortcut()` to save settings
+- Proper cleanup in `destroy()` method
+
+**New Configuration Options:**
+| Option | Type | Default | Description |
+| `toggleIndicatorShortcut` | string | 'Alt+Shift+H' | Keyboard shortcut to hide/show timer indicator |
+
+---
+
+## Bug Fixes in v1.3.7
+
+### Code Lock Screen Character Alignment (Improved)
+
+**Issue:** The "J" in the input text box was shifted to the RIGHT compared to the "J" in the displayed code above it.
+
+**Root Cause:** Asymmetric padding-inline values (`14px 12px`) caused misalignment between the code display and input elements.
+
+**Fix:** In `chrome.css`:
+- Changed `.zen-pomodoro-lock-code-display` padding-inline from `14px 12px` to `12px`
+- Changed `#zen-pomodoro-lock-code` padding-inline from `14px 12px` to `12px`
+- Equal padding on both sides ensures perfect character alignment
+
+### Transition Phases Not Working in Custom Cycles
+
+**Issue:** When a break ends in a custom cycle, it would go directly to the next focus session without showing the transition phase popup.
+
+**Root Cause:** The `_handleCustomCycleBlockComplete()` method directly set the next block's phase without checking if a transition phase should occur (break → focus transition).
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `_needsTransitionPhase()` helper to check if transition is needed
+- Added `_enterCustomCycleTransition()` to handle entering transition phase
+- Added `_startNextCustomBlock()` to start blocks directly
+- Modified `startFocusFromTransition()` to support custom cycle block durations
+- Refactored to reduce code complexity and improve maintainability
+
+### Custom Cycles Show Wrong Cycle Count (1/1)
+
+**Issue:** The main menu always showed "Cycle 1 of 1" for custom cycles, even when there were multiple focus phases.
+
+**Root Cause:** 
+1. `totalCycles` was hardcoded to 1 for custom cycles
+2. Display logic only showed cycle progress for pomodoro mode, not custom mode
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Changed `startCustomCycle()` to calculate `totalCycles` as the count of focus blocks
+- Added `_countFocusBlocksUpTo()` helper to track which focus cycle we're on
+- Updated cycle tracking logic in `_enterCustomCycleTransition()` and `_startNextCustomBlock()`
+- Modified `_updateCycleProgress()` to show progress for custom mode (`timerMode === 'custom'`)
+
+### Code Quality Refactoring
+
+**Improvement:** Refactored `_handleCustomCycleBlockComplete()` from cc=14 to cc=4 (cyclomatic complexity reduced by 10).
+
+**New Helper Methods:**
+- `_countFocusBlocksUpTo(upToIndex)` - Count focus blocks up to a given index
+- `_needsTransitionPhase(completedBlock, nextBlock)` - Check if transition phase is needed
+- `_enterCustomCycleTransition(nextBlock)` - Enter transition phase for custom cycles
+- `_startNextCustomBlock(nextBlock)` - Start the next block directly
+- `_isValidCustomCycleState()` - Check if in valid custom cycle state
+- `_getCurrentCustomBlockDuration()` - Get current custom block duration
+
+### Distraction Dump Indicator Click Fix
+
+**Issue:** Clicking on the draggable timer indicator during Distraction Dump would trigger the "End Dump" confirmation dialog even when the user was just dragging the indicator.
+
+**Root Cause:** The click event fires after mouseup, so any click on the indicator would trigger the end dump dialog regardless of whether the user dragged.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `indicatorDidDrag` flag to `OverlayManager` to track when drag occurred
+- Flag is set when mouse moves more than 5 pixels during drag
+- Flag is reset 100ms after mouseup to allow click handlers to check it
+- Distraction Dump indicator click handler checks flag and skips dialog if drag occurred
+
+### Cut Break Early Improvements
+
+**Enhancement:** Refactored "Cut Break Early" button handling for better code organization.
+
+**Changes:**
+- Added `_handleCutBreakEarly(currentPhase)` helper method
+- Added `_startNextFocusPhase(timer)` helper method for consistent phase transitions
+- Properly handles all scenarios: transition phase, custom mode, and regular pomodoro mode
+- Skips transition popup when cutting transition phase early
+
+### Custom Cycle Empty Blocks Validation
+
+**Enhancement:** Added validation for empty custom cycle blocks.
+
+**Fix:** `startCustomCycle()` now validates that `customCycleBlocks.length > 0` before attempting to access the first block, preventing potential undefined errors.
 
 ---
 
