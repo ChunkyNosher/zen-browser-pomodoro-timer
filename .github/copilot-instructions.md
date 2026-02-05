@@ -56,7 +56,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.8';                  // Current mod version
+const MOD_VERSION = '1.3.9';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -245,6 +245,40 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_canShowReminderCountdown()`                         | Check if post-session reminder countdown can be shown       |
 | `_getEarliestReminderTime(config)`                    | Get earliest daily reminder time from config                |
 | `isPopupWindow()`                                     | Detect if current window is a popup (not main browser)      |
+
+---
+
+## Bug Fixes in v1.3.9
+
+### End Break Early Not Working During Transition Phase in Custom Cycles
+
+**Issue:** When clicking "Cut Break Early" during a transition phase in custom cycles, nothing happened. The timer stayed in transition phase.
+
+**Root Cause:** The `_canSkipCustomBlock()` method only allowed skipping when `currentPhase === 'break'`, but transition phase was not included.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Modified `_canSkipCustomBlock()` to allow skipping during both break and transition phases
+- Changed condition from `if (this.currentPhase !== 'break')` to `if (this.currentPhase !== 'break' && this.currentPhase !== 'transition')`
+
+### Distraction Dump Workspace Blocking Fix
+
+**Issue:** When activating a Distraction Dump while on a blocked workspace, the workspace was unblocked, but switching to another blocked workspace showed it as blocked. Returning to the original workspace also showed it as blocked again.
+
+**Root Cause:** The `updateOverlayVisibility()` method referenced `distractionDumpManager` but the actual property name is `distractionDump`. This caused the check for active dump to always fail, so workspace blocking was not properly lifted when switching workspaces during a dump.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Changed line 13676 from `window.zenPomodoroApp?.distractionDumpManager` to `window.zenPomodoroApp?.distractionDump`
+- This ensures the active dump state is properly checked when determining overlay visibility
+
+### Code Lockout Screen Character Alignment Fix
+
+**Issue:** The first character in the input text box was still not aligned with the first character in the displayed code, despite previous alignment fixes.
+
+**Root Cause:** The `.zen-pomodoro-lock-code-input` class had asymmetric padding-inline values (`14px 12px`) while the other code display elements used `12px`.
+
+**Fix:** In `chrome.css`:
+- Changed `.zen-pomodoro-lock-code-input` padding-inline from `14px 12px` to `12px`
+- Now matches `.zen-pomodoro-lock-code-display` and `#zen-pomodoro-lock-code` for perfect alignment
 
 ---
 
