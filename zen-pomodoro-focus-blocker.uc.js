@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.8
+ * Version: 1.3.9
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.8',
+    MOD_VERSION: '1.3.9',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -2819,8 +2819,8 @@
         return false;
       }
 
-      if (this.currentPhase !== 'break') {
-        logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in break phase, cannot skip');
+      if (this.currentPhase !== 'break' && this.currentPhase !== 'transition') {
+        logger.log(LOG_CATEGORIES.TIMER, 'skipToNextCustomBlock: Not in break or transition phase, cannot skip');
         return false;
       }
 
@@ -13673,7 +13673,7 @@
       }
 
       // Handle distraction dump active - all blocking should be lifted
-      const dumpManager = window.zenPomodoroApp?.distractionDumpManager;
+      const dumpManager = window.zenPomodoroApp?.distractionDump;
       if (dumpManager?.isActive) {
         this.overlay.hide();
         // Keep dump indicator visible (it's managed by DistractionDumpManager)

@@ -147,11 +147,13 @@ dialog.className = 'zen-pomodoro-dialog active';
 
 ### Distraction Dump Blocking Pattern
 
-**Pattern:** When a Distraction Dump is active, ALL blocking (workspace overlay + website blocking) must be lifted. The `updateOverlayVisibility()` method checks `distractionDumpManager?.isActive` early and returns without showing overlay.
+**Pattern:** When a Distraction Dump is active, ALL blocking (workspace overlay + website blocking) must be lifted. The `updateOverlayVisibility()` method checks `distractionDump?.isActive` early and returns without showing overlay.
 
 **Key locations:**
-- `updateOverlayVisibility()` - checks for dump active before any blocking logic
+- `updateOverlayVisibility()` - checks for `window.zenPomodoroApp?.distractionDump?.isActive` before any blocking logic
 - `WebsiteBlocker.distractionDumpActive` - flag to disable website blocking during dump
+
+**Important:** The property is `this.distractionDump` (NOT `distractionDumpManager`). Using the wrong property name will cause workspace blocking to persist during dumps.
 
 ### Transition Phase Pause Pattern
 
@@ -175,10 +177,12 @@ dialog.className = 'zen-pomodoro-dialog active';
 
 ### Cut Break Early Transition Phase Pattern
 
-**Pattern:** "Cut Break Early" button during transition phase must handle both regular Pomodoro and custom cycle modes.
+**Pattern:** "Cut Break Early" button during break or transition phase must handle both regular Pomodoro and custom cycle modes.
 
 **Key locations:**
-- Button handler checks timer mode
+- `_handleCutBreakEarly()` - main handler for cut break early button
+- `_canSkipCustomBlock()` - allows skipping during both `break` and `transition` phases
+- `skipToNextCustomBlock()` - advances to next block in custom cycle
 - Regular mode: calls `startFocusPhase()`
 - Custom mode: calls `skipToNextCustomBlock()` to advance to next block in cycle
 
