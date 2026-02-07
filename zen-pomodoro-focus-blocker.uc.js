@@ -13252,7 +13252,7 @@
      * @private
      */
     _startBlockDrag(e, blockDiv, index) {
-      // Bug fix #3: Safety check - cleanup any existing drag state
+      // Safety: cleanup any existing drag state before starting new drag
       if (this.isDragging) {
         if (this.dragCleanup) {
           this.dragCleanup();
@@ -13320,14 +13320,15 @@
       let lastTargetIndex = -1;
       let rafId = null;
       
-      // Bug fix #2: Cache indicator position to prevent flickering
+     
       let lastIndicatorRef = null;
       
-      // Bug fix #5: Auto-scroll variables
-      const scrollContainer = container; // The blocks container is the scrollable element
-      const SCROLL_ZONE = 40; // px from edge
+      // Auto-scroll variables for dragging near container edges
+      const scrollContainer = container;
+      const SCROLL_ZONE = 40; // px from edge to trigger auto-scroll
       const SCROLL_SPEED = 4; // px per frame
       let scrollRafId = null;
+      let scrollDirection = null; // 'up', 'down', or null
 
       const onPointerMove = (pointerMoveEvent) => {
         if (rafId) return; // Throttle with rAF
@@ -13344,7 +13345,7 @@
 
           this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef);
           
-          // Bug fix #2: Update cached reference
+         
           if (targetIndex < nonDraggedBlocks.length) {
             lastIndicatorRef = nonDraggedBlocks[targetIndex];
           } else {
@@ -13365,34 +13366,30 @@
           });
         });
         
-        // Bug fix #5: Auto-scroll when near edges
+        // Auto-scroll when pointer is near container edges
         const containerRect = scrollContainer.getBoundingClientRect();
+        let newScrollDir = null;
         if (pointerMoveEvent.clientY < containerRect.top + SCROLL_ZONE) {
-          // Near top - scroll up
-          if (!scrollRafId) {
-            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll activated (up)');
-            const scrollUp = () => {
-              scrollContainer.scrollTop -= SCROLL_SPEED;
-              scrollRafId = requestAnimationFrame(scrollUp);
-            };
-            scrollRafId = requestAnimationFrame(scrollUp);
-          }
+          newScrollDir = 'up';
         } else if (pointerMoveEvent.clientY > containerRect.bottom - SCROLL_ZONE) {
-          // Near bottom - scroll down
-          if (!scrollRafId) {
-            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll activated (down)');
-            const scrollDown = () => {
-              scrollContainer.scrollTop += SCROLL_SPEED;
-              scrollRafId = requestAnimationFrame(scrollDown);
-            };
-            scrollRafId = requestAnimationFrame(scrollDown);
-          }
-        } else {
-          // Not near edge - stop scrolling
+          newScrollDir = 'down';
+        }
+
+        if (newScrollDir !== scrollDirection) {
+          // Stop any existing scroll
           if (scrollRafId) {
-            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll deactivated');
             cancelAnimationFrame(scrollRafId);
             scrollRafId = null;
+          }
+          scrollDirection = newScrollDir;
+          if (scrollDirection) {
+            logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollDirection})`);
+            const speed = scrollDirection === 'up' ? -SCROLL_SPEED : SCROLL_SPEED;
+            const doScroll = () => {
+              scrollContainer.scrollTop += speed;
+              scrollRafId = requestAnimationFrame(doScroll);
+            };
+            scrollRafId = requestAnimationFrame(doScroll);
           }
         }
       };
@@ -13400,14 +13397,14 @@
       const cleanup = () => {
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', cleanup);
-        document.removeEventListener('pointercancel', cleanup); // Bug fix #3
+        document.removeEventListener('pointercancel', cleanup);
         
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
         }
         
-        // Bug fix #5: Stop auto-scroll
+       
         if (scrollRafId) {
           cancelAnimationFrame(scrollRafId);
           scrollRafId = null;
@@ -13433,15 +13430,15 @@
         this.isDragging = false;
         this.draggedBlockIndex = null;
         this.isDuplicating = false;
-        this.dragCleanup = null; // Bug fix #3
+        this.dragCleanup = null;
       };
 
-      // Bug fix #3: Store cleanup function for safety check
+     
       this.dragCleanup = cleanup;
 
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', cleanup);
-      document.addEventListener('pointercancel', cleanup); // Bug fix #3
+      document.addEventListener('pointercancel', cleanup);
     }
 
     /**
@@ -13465,7 +13462,7 @@
         ? this.currentEditingCycle.blocks.length
         : nonDraggedIndices[lastTargetIndex];
 
-      // Bug fix #4: Check if block would stay in place (no-op move)
+     
       if (!this.isDuplicating && !isMultiSelect) {
         const from = this.draggedBlockIndex;
         // Block stays in place if target equals from or from+1
@@ -13499,7 +13496,7 @@
         if (g && g.parentElement) g.remove();
       });
       
-      // Bug fix #3: Remove any orphaned indicators or ghosts from container
+     
       const container = allBlocks[0]?.parentElement;
       if (container) {
         container.querySelectorAll('.zen-pomodoro-cycle-drop-indicator').forEach(el => el.remove());
@@ -13524,7 +13521,7 @@
     _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef) {
       dropIndicator.style.display = 'block';
       
-      // Bug fix #2: Calculate new reference element
+     
       let newRef = null;
       if (targetIndex < nonDraggedBlocks.length) {
         newRef = nonDraggedBlocks[targetIndex];
@@ -13535,7 +13532,7 @@
         }
       }
       
-      // Bug fix #2: Only update DOM if position changed
+     
       if (newRef !== lastIndicatorRef) {
         if (newRef) {
           container.insertBefore(dropIndicator, newRef);
