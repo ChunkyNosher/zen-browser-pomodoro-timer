@@ -5247,6 +5247,12 @@
       // Create dialog structure
       const backButton = this._createBackButton(dialog);
       const h2 = this._createDialogTitle('Start Timer');
+
+      // Undo/Redo for start timer config
+      const configUndoRedo = new UndoRedoManager();
+      configUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = configUndoRedo.createButtons();
+
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
 
@@ -5281,8 +5287,21 @@
       const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
 
       // Assemble dialog
-      [backButton, h2, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
+      [backButton, h2, undoRedoButtons, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        configUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      configUndoRedo.onStateRestore = (state) => {
+        saveConfig(state);
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.showConfigDialog();
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -5681,6 +5700,11 @@
 
       const h2 = document.createElement('h2');
       h2.textContent = 'Pomodoro Timer Settings';
+
+      // Undo/Redo for settings
+      const settingsUndoRedo = new UndoRedoManager();
+      settingsUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = settingsUndoRedo.createButtons();
 
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
@@ -6634,10 +6658,26 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        settingsUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      settingsUndoRedo.onStateRestore = (state) => {
+        // Save the restored state to config
+        saveConfig(state);
+        // Re-create the dialog to reflect changes
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.createSettingsDialog();
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -7034,6 +7074,11 @@
       const h2 = document.createElement('h2');
       h2.textContent = 'Ruleset Settings';
 
+      // Undo/Redo for rulesets
+      const rulesetUndoRedo = new UndoRedoManager();
+      rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = rulesetUndoRedo.createButtons();
+
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
 
@@ -7120,10 +7165,24 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      rulesetUndoRedo.onStateRestore = (state) => {
+        saveConfig(state);
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.showRulesetSettingsDialog(onClose);
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -12157,6 +12216,135 @@
   }
 
   // ============================================
+  // Undo/Redo Manager Module
+  // ============================================
+
+  /**
+   * UndoRedoManager - Generic undo/redo state management for dialog menus.
+   * Tracks state snapshots and provides undo/redo navigation.
+   * Uses JSON serialization for deep state comparison and cloning.
+   */
+  class UndoRedoManager {
+    constructor() {
+      this.undoStack = [];
+      this.redoStack = [];
+      this.buttonContainer = null;
+      this.undoButton = null;
+      this.redoButton = null;
+      this.onStateRestore = null; // Callback when state is restored
+    }
+
+    /**
+     * Push a new state snapshot onto the undo stack.
+     * Clears the redo stack since a new action invalidates future states.
+     * @param {Object} state - The state to save (will be deep-cloned)
+     */
+    pushState(state) {
+      this.undoStack.push(JSON.stringify(state));
+      this.redoStack = [];
+      this._updateButtons();
+    }
+
+    /**
+     * Undo the last action and return the previous state.
+     * @returns {Object|null} The restored state, or null if nothing to undo
+     */
+    undo() {
+      if (this.undoStack.length <= 1) return null; // Keep at least initial state
+      const current = this.undoStack.pop();
+      this.redoStack.push(current);
+      const previousState = JSON.parse(this.undoStack[this.undoStack.length - 1]);
+      this._updateButtons();
+      if (this.onStateRestore) this.onStateRestore(previousState);
+      return previousState;
+    }
+
+    /**
+     * Redo the last undone action and return the next state.
+     * @returns {Object|null} The restored state, or null if nothing to redo
+     */
+    redo() {
+      if (this.redoStack.length === 0) return null;
+      const nextStateStr = this.redoStack.pop();
+      this.undoStack.push(nextStateStr);
+      const nextState = JSON.parse(nextStateStr);
+      this._updateButtons();
+      if (this.onStateRestore) this.onStateRestore(nextState);
+      return nextState;
+    }
+
+    /**
+     * Check if undo is available.
+     * @returns {boolean}
+     */
+    canUndo() {
+      return this.undoStack.length > 1;
+    }
+
+    /**
+     * Check if redo is available.
+     * @returns {boolean}
+     */
+    canRedo() {
+      return this.redoStack.length > 0;
+    }
+
+    /**
+     * Create the undo/redo button container UI element.
+     * @returns {HTMLElement} Container with undo and redo buttons
+     */
+    createButtons() {
+      this.buttonContainer = document.createElement('div');
+      this.buttonContainer.className = 'zen-pomodoro-undo-redo-container';
+
+      this.undoButton = document.createElement('button');
+      this.undoButton.className = 'zen-pomodoro-undo-redo-button';
+      this.undoButton.textContent = '↩ Undo';
+      this.undoButton.title = 'Undo last change';
+      this.undoButton.disabled = true;
+      this.undoButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.undo();
+      });
+
+      this.redoButton = document.createElement('button');
+      this.redoButton.className = 'zen-pomodoro-undo-redo-button';
+      this.redoButton.textContent = 'Redo ↪';
+      this.redoButton.title = 'Redo last undone change';
+      this.redoButton.disabled = true;
+      this.redoButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.redo();
+      });
+
+      this.buttonContainer.appendChild(this.undoButton);
+      this.buttonContainer.appendChild(this.redoButton);
+
+      return this.buttonContainer;
+    }
+
+    /**
+     * Update button disabled states based on stack contents.
+     * @private
+     */
+    _updateButtons() {
+      if (this.undoButton) this.undoButton.disabled = !this.canUndo();
+      if (this.redoButton) this.redoButton.disabled = !this.canRedo();
+    }
+
+    /**
+     * Reset the undo/redo stacks.
+     */
+    reset() {
+      this.undoStack = [];
+      this.redoStack = [];
+      this._updateButtons();
+    }
+  }
+
+  // ============================================
   // Custom Cycle Manager
   // ============================================
 
@@ -12469,6 +12657,12 @@
       title.className = 'zen-pomodoro-dialog-title';
       title.textContent = cycleId ? 'Edit Custom Cycle' : 'Create Custom Cycle';
 
+      // Undo/Redo for cycle editing
+      const cycleUndoRedo = new UndoRedoManager();
+      cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      const undoRedoButtons = cycleUndoRedo.createButtons();
+      this.currentUndoRedo = cycleUndoRedo;
+
       // Cycle name input
       const nameRow = document.createElement('div');
       nameRow.className = 'zen-pomodoro-config-row';
@@ -12481,6 +12675,10 @@
       nameInput.placeholder = 'e.g., Deep Work Session';
       nameInput.addEventListener('input', () => {
         this.currentEditingCycle.name = nameInput.value;
+      });
+      nameInput.addEventListener('change', () => {
+        // Push undo state after name change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       nameRow.appendChild(nameLabel);
       nameRow.appendChild(nameInput);
@@ -12520,6 +12718,8 @@
         );
         this.currentEditingCycle.defaultFocusDuration = validated;
         focusDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       
       focusDurationContainer.appendChild(focusDurationLabel);
@@ -12552,6 +12752,8 @@
         );
         this.currentEditingCycle.defaultBreakDuration = validated;
         breakDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       
       breakDurationContainer.appendChild(breakDurationLabel);
@@ -12584,6 +12786,8 @@
         );
         this.currentEditingCycle.defaultTransitionDuration = validated;
         transitionDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
 
       transitionDurationContainer.appendChild(transitionDurationLabel);
@@ -12652,6 +12856,8 @@
         }
         this.addBlock(selectedType, duration);
         this._renderBlocks(blocksContainer);
+        // Push undo state after adding block
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
 
       addBlockRow.appendChild(blockTypeSelect);
@@ -12689,12 +12895,29 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(title);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(nameRow);
       dialog.appendChild(durationRow);
       dialog.appendChild(blocksLabel);
       dialog.appendChild(blocksContainer);
       dialog.appendChild(addBlockRow);
       dialog.appendChild(buttonDiv);
+
+      // Track changes for undo/redo
+      blocksContainer.addEventListener('change', () => {
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      });
+
+      // Set restore callback for undo/redo
+      cycleUndoRedo.onStateRestore = (state) => {
+        this.currentEditingCycle = state;
+        // Update inputs
+        if (nameInput) nameInput.value = state.name;
+        if (focusDurationInput) focusDurationInput.value = state.defaultFocusDuration;
+        if (breakDurationInput) breakDurationInput.value = state.defaultBreakDuration;
+        if (transitionDurationInput) transitionDurationInput.value = state.defaultTransitionDuration || 5;
+        this._renderBlocks(blocksContainer);
+      };
 
       applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
@@ -12929,9 +13152,17 @@
           if (blocksContainer) {
             this._renderBlocks(blocksContainer);
           }
+          // Push undo state after delete
+          if (this.currentUndoRedo) {
+            this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+          }
         } else {
           // Single block deletion
           this.removeBlock(index);
+          // Push undo state after delete
+          if (this.currentUndoRedo) {
+            this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+          }
         }
       });
 
@@ -13142,6 +13373,11 @@
         const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
         if (blocksContainer) {
           this._renderBlocks(blocksContainer);
+        }
+
+        // Push undo state after drag operation
+        if (this.currentUndoRedo) {
+          this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
         }
 
         this.isDragging = false;
