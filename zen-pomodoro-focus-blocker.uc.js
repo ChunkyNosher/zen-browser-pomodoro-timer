@@ -12474,6 +12474,7 @@
       this.isDuplicating = false; // Flag for Alt+Drag duplication
       this.isDragging = false;
       this.dragCleanup = null;
+      this._lastIndicatorRef = null; // Cached drop indicator position
     }
 
     /**
@@ -13412,15 +13413,14 @@
       let lastTargetIndex = -1;
       let rafId = null;
       
-     
-      let lastIndicatorRef = null;
+      // Reset cached indicator position for new drag
+      this._lastIndicatorRef = null;
       
       // Auto-scroll variables for dragging near container edges
       const scrollContainer = container;
       const SCROLL_ZONE = 40; // px from edge to trigger auto-scroll
       const SCROLL_SPEED = 4; // px per frame
-      let scrollRafId = null;
-      let scrollDirection = null; // 'up', 'down', or null
+      const scrollState = { rafId: null, direction: null };
 
       const onPointerMove = (pointerMoveEvent) => {
         if (rafId) return; // Throttle with rAF
@@ -13435,14 +13435,7 @@
           
           if (targetIndex < 0) return;
 
-          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef);
-          
-         
-          if (targetIndex < nonDraggedBlocks.length) {
-            lastIndicatorRef = nonDraggedBlocks[targetIndex];
-          } else {
-            lastIndicatorRef = null;
-          }
+          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
 
           if (this.isDuplicating && ghostBlocks.length > 0) {
             this._showGhostBlocks(container, dropIndicator, ghostBlocks);
@@ -13458,32 +13451,8 @@
           });
         });
         
-        // Auto-scroll when pointer is near container edges
-        const containerRect = scrollContainer.getBoundingClientRect();
-        let newScrollDir = null;
-        if (pointerMoveEvent.clientY < containerRect.top + SCROLL_ZONE) {
-          newScrollDir = 'up';
-        } else if (pointerMoveEvent.clientY > containerRect.bottom - SCROLL_ZONE) {
-          newScrollDir = 'down';
-        }
-
-        if (newScrollDir !== scrollDirection) {
-          // Stop any existing scroll
-          if (scrollRafId) {
-            cancelAnimationFrame(scrollRafId);
-            scrollRafId = null;
-          }
-          scrollDirection = newScrollDir;
-          if (scrollDirection) {
-            logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollDirection})`);
-            const speed = scrollDirection === 'up' ? -SCROLL_SPEED : SCROLL_SPEED;
-            const doScroll = () => {
-              scrollContainer.scrollTop += speed;
-              scrollRafId = requestAnimationFrame(doScroll);
-            };
-            scrollRafId = requestAnimationFrame(doScroll);
-          }
-        }
+        // Handle auto-scroll near container edges
+        this._updateAutoScroll(pointerMoveEvent.clientY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState);
       };
 
       const cleanup = () => {
@@ -13496,10 +13465,10 @@
           rafId = null;
         }
         
-       
-        if (scrollRafId) {
-          cancelAnimationFrame(scrollRafId);
-          scrollRafId = null;
+        // Stop auto-scroll
+        if (scrollState.rafId) {
+          cancelAnimationFrame(scrollState.rafId);
+          scrollState.rafId = null;
         }
 
         this._cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks);
@@ -13543,26 +13512,10 @@
     _applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect) {
       if (lastTargetIndex < 0) return;
 
-      const nonDraggedIndices = [];
-      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
-        if (!dragIndices.includes(i)) {
-          nonDraggedIndices.push(i);
-        }
-      }
+      const absoluteTarget = this._computeAbsoluteTarget(lastTargetIndex, dragIndices);
 
-      const absoluteTarget = lastTargetIndex >= nonDraggedIndices.length
-        ? this.currentEditingCycle.blocks.length
-        : nonDraggedIndices[lastTargetIndex];
-
-     
-      if (!this.isDuplicating && !isMultiSelect) {
-        const from = this.draggedBlockIndex;
-        // Block stays in place if target equals from or from+1
-        // (because splice removes from first, then inserts at target)
-        if (absoluteTarget === from || absoluteTarget === from + 1) {
-          return;
-        }
-      }
+      // Check if single-block move would result in no change
+      if (this._isSamePositionMove(absoluteTarget, isMultiSelect)) return;
 
       if (this.isDuplicating) {
         this._duplicateBlocks(dragIndices, absoluteTarget);
@@ -13571,6 +13524,38 @@
       } else {
         this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
       }
+    }
+
+    /**
+     * Compute the absolute target index from a relative drop position.
+     * @param {number} relativeTarget - Target index among non-dragged blocks
+     * @param {Array<number>} dragIndices - Indices of blocks being dragged
+     * @returns {number} Absolute target index in the full blocks array
+     * @private
+     */
+    _computeAbsoluteTarget(relativeTarget, dragIndices) {
+      const nonDraggedIndices = [];
+      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
+        if (!dragIndices.includes(i)) {
+          nonDraggedIndices.push(i);
+        }
+      }
+      return relativeTarget >= nonDraggedIndices.length
+        ? this.currentEditingCycle.blocks.length
+        : nonDraggedIndices[relativeTarget];
+    }
+
+    /**
+     * Check if a single-block drag would result in no position change.
+     * @param {number} absoluteTarget - Target index in the full blocks array
+     * @param {boolean} isMultiSelect - Whether multiple blocks are selected
+     * @returns {boolean} True if the move is a no-op
+     * @private
+     */
+    _isSamePositionMove(absoluteTarget, isMultiSelect) {
+      if (this.isDuplicating || isMultiSelect) return false;
+      const from = this.draggedBlockIndex;
+      return absoluteTarget === from || absoluteTarget === from + 1;
     }
 
     /**
@@ -13602,30 +13587,35 @@
     }
 
     /**
+     * Compute the reference element for drop indicator positioning.
+     * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
+     * @param {number} targetIndex - Target insertion index
+     * @returns {HTMLElement|null} Reference element to insert before, or null to append
+     * @private
+     */
+    _getDropIndicatorRef(nonDraggedBlocks, targetIndex) {
+      if (targetIndex < nonDraggedBlocks.length) {
+        return nonDraggedBlocks[targetIndex];
+      }
+      const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
+      return (lastNonDragged && lastNonDragged.nextSibling) || null;
+    }
+
+    /**
      * Position the drop indicator at the correct location in the container.
      * @param {HTMLElement} container - Blocks container element
      * @param {HTMLElement} dropIndicator - Drop indicator element
      * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
      * @param {number} targetIndex - Target insertion index
-     * @param {HTMLElement|null} lastIndicatorRef - Previous reference element (for caching)
      * @private
      */
-    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef) {
+    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex) {
       dropIndicator.style.display = 'block';
-      
-     
-      let newRef = null;
-      if (targetIndex < nonDraggedBlocks.length) {
-        newRef = nonDraggedBlocks[targetIndex];
-      } else {
-        const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
-        if (lastNonDragged && lastNonDragged.nextSibling) {
-          newRef = lastNonDragged.nextSibling;
-        }
-      }
-      
-     
-      if (newRef !== lastIndicatorRef) {
+      const newRef = this._getDropIndicatorRef(nonDraggedBlocks, targetIndex);
+
+      // Only update DOM if position changed (prevents flickering)
+      if (newRef !== this._lastIndicatorRef) {
+        this._lastIndicatorRef = newRef;
         if (newRef) {
           container.insertBefore(dropIndicator, newRef);
         } else {
@@ -13647,6 +13637,43 @@
         ghost.style.display = '';
         container.insertBefore(ghost, dropIndicator);
       });
+    }
+
+    /**
+     * Update auto-scroll state based on pointer position relative to container edges.
+     * @param {number} clientY - Current pointer Y position
+     * @param {HTMLElement} scrollContainer - Scrollable container element
+     * @param {number} scrollZone - Distance from edge to trigger scrolling (px)
+     * @param {number} scrollSpeed - Scroll speed per animation frame (px)
+     * @param {Object} scrollState - Mutable state object with rafId and direction
+     * @private
+     */
+    _updateAutoScroll(clientY, scrollContainer, scrollZone, scrollSpeed, scrollState) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      let newScrollDir = null;
+      if (clientY < containerRect.top + scrollZone) {
+        newScrollDir = 'up';
+      } else if (clientY > containerRect.bottom - scrollZone) {
+        newScrollDir = 'down';
+      }
+
+      if (newScrollDir === scrollState.direction) return;
+
+      // Stop any existing scroll
+      if (scrollState.rafId) {
+        cancelAnimationFrame(scrollState.rafId);
+        scrollState.rafId = null;
+      }
+      scrollState.direction = newScrollDir;
+      if (scrollState.direction) {
+        logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollState.direction})`);
+        const speed = scrollState.direction === 'up' ? -scrollSpeed : scrollSpeed;
+        const doScroll = () => {
+          scrollContainer.scrollTop += speed;
+          scrollState.rafId = requestAnimationFrame(doScroll);
+        };
+        scrollState.rafId = requestAnimationFrame(doScroll);
+      }
     }
 
     /**
