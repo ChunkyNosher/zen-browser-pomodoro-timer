@@ -1,0 +1,1038 @@
+{
+  "exportedAt": "2026-02-07T18:38:36.773Z",
+  "totalEntries": 156,
+  "logs": [
+    {
+      "timestamp": "2026-02-07T18:28:21.416Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.616Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.616Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.616Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "WORKSPACE",
+      "message": "Starting workspace monitoring",
+      "data": {
+        "initialWorkspace": null
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "WORKSPACE",
+      "message": "Workspace observer configured",
+      "data": {
+        "container": "#tabbrowser-arrowscrollbox",
+        "observingAttributes": [
+          "active",
+          "selected",
+          "zen-workspace-id"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 2,
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "remindersShownCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "idleStartTime": null
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:21.617Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.689Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.689Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.706Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.706Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.706Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.824Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:25.824Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "timerActive": false,
+        "timerPaused": false,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:26.000Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:27.777Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:27.777Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:28.444Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:28.878Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:29.080Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:28:30.654Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:38.358Z",
+      "category": "MENU",
+      "message": "Creating new custom cycle"
+    },
+    {
+      "timestamp": "2026-02-07T18:28:59.943Z",
+      "category": "MENU",
+      "message": "Removed block at index 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:04.313Z",
+      "category": "MENU",
+      "message": "Added focus block (45 min)"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:08.239Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:11.607Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:13.055Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:15.721Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:21.272Z",
+      "category": "MENU",
+      "message": "Added focus block (45 min)"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:21.644Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:21.644Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:22.722Z",
+      "category": "MENU",
+      "message": "Removed block at index 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:30.620Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:31.321Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:33.661Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:33.661Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:33.661Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:35.294Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:35.294Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:37.167Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:37.167Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 51
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:41.454Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:45.100Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:46.282Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:29:50.692Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:50.693Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:50.790Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:52.922Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:53.738Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:53.738Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:29:53.833Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:04.090Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.517Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.518Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.518Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.791Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.818Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:05.841Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:18.755Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:18.782Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:18.797Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:20.542Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:21.656Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:21.656Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:21.898Z",
+      "category": "MENU",
+      "message": "Opening ruleset settings dialog"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:26.957Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:30:26.961Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:27.572Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:28.382Z",
+      "category": "MENU",
+      "message": "Editing custom cycle"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:38.066Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:30:38.602Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:31:22.005Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:31:22.006Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:10.070Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:12.401Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:15.443Z",
+      "category": "MENU",
+      "message": "Creating new custom cycle"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:19.786Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:22.069Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:32:22.069Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:23.838Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:26.390Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:28.164Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:29.866Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:31.335Z",
+      "category": "MENU",
+      "message": "Added focus block (25 min)"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:32.829Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:34.403Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:32:38.086Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 3"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:22.089Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:33:22.089Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:36.251Z",
+      "category": "MENU",
+      "message": "Duplicated 1 block(s) to index 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:45.594Z",
+      "category": "MENU",
+      "message": "Removed block at index 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:47.559Z",
+      "category": "MENU",
+      "message": "Removed block at index 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:50.705Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:54.320Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:55.768Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:33:57.304Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:34:22.098Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:34:22.098Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:22.322Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:35:22.322Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:31.975Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:50.025Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:53.305Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:57.623Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:35:59.128Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:36:22.629Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:36:22.629Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:36:39.508Z",
+      "category": "MENU",
+      "message": "Added transition block (5 min)"
+    },
+    {
+      "timestamp": "2026-02-07T18:36:44.695Z",
+      "category": "MENU",
+      "message": "Duplicated 3 block(s) to index 3"
+    },
+    {
+      "timestamp": "2026-02-07T18:36:59.857Z",
+      "category": "MENU",
+      "message": "Duplicated 1 block(s) to index 6"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:07.832Z",
+      "category": "MENU",
+      "message": "Duplicated 1 block(s) to index 4"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:12.736Z",
+      "category": "MENU",
+      "message": "Removed block at index 4"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:16.792Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:22.707Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:37:22.707Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:26.209Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:28.519Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:32.509Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:35.119Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:43.186Z",
+      "category": "MENU",
+      "message": "Reordered block from 3 to 4"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:45.742Z",
+      "category": "MENU",
+      "message": "Reordered block from 4 to 3"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:54.011Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:37:55.671Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:06.397Z",
+      "category": "MENU",
+      "message": "Created new custom cycle: 45, 35, 30"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:06.398Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:38:06.399Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:07.928Z",
+      "category": "MENU",
+      "message": "Editing custom cycle"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:12.413Z",
+      "category": "MENU",
+      "message": "Reordered block from 6 to 7"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:14.136Z",
+      "category": "MENU",
+      "message": "Reordered block from 6 to 7"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:17.118Z",
+      "category": "MENU",
+      "message": "Reordered block from 6 to 7"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:19.430Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:22.326Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:22.758Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-07T18:24:11.398Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:38:22.758Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:24.016Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 2"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:26.296Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 0"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:30.441Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:31.529Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:33.186Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:33.186Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:38:33.186Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-02-07T18:38:35.224Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:35.225Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:36.773Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-02-07T18:38:36.773Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 155
+      }
+    }
+  ]
+}
