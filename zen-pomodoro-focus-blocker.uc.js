@@ -2989,6 +2989,8 @@
         customCycle: this.customCycle,
         customCycleBlocks: this.customCycleBlocks,
         currentBlockIndex: this.currentBlockIndex,
+        // Distraction dump state
+        distractionDump: window.zenPomodoroApp?.distractionDump?.getStateForPersistence() || null,
       };
       setPref('timer-state', JSON.stringify(state));
     }
@@ -3045,6 +3047,9 @@
           this.savedConfig = state.savedConfig;
           this.config = state.savedConfig;
         }
+
+        // Store dump state for later restoration
+        this.pendingDumpState = state.distractionDump || null;
 
         // Set flag to indicate this was restored from restart
         this.restoredFromRestart = true;
@@ -11763,6 +11768,33 @@
     }
 
     /**
+     * Export dump state for persistence across browser restarts.
+     * @returns {Object} Dump state object
+     */
+    getStateForPersistence() {
+      return {
+        isActive: this.isActive,
+        dumpTimeRemaining: this.dumpTimeRemaining,
+        savedTimerState: this.savedTimerState,
+        dumpUsedThisFocusPhase: this.dumpUsedThisFocusPhase,
+      };
+    }
+
+    /**
+     * Restore dump state from persistence.
+     * @param {Object} state - Saved dump state
+     * @returns {boolean} True if dump was active and restored
+     */
+    restoreState(state) {
+      if (!state) return false;
+      this.isActive = state.isActive || false;
+      this.dumpTimeRemaining = state.dumpTimeRemaining || 0;
+      this.savedTimerState = state.savedTimerState || null;
+      this.dumpUsedThisFocusPhase = state.dumpUsedThisFocusPhase || false;
+      return this.isActive;
+    }
+
+    /**
      * Check if distraction dump is available for the current focus phase.
      * @returns {boolean} True if dump is available
      */
@@ -13311,6 +13343,9 @@
       logger.log(LOG_CATEGORIES.INIT, 'Application ready');
       console.log('Zen Pomodoro Focus Blocker ready');
 
+      // Expose app globally early so restoration code can access it
+      window.zenPomodoroApp = this;
+
       // Migrate global blockedWorkspaces to default ruleset if needed
       this._migrateBlockedWorkspacesToRulesets();
 
@@ -13369,7 +13404,29 @@
 
         // INDICATOR FIX: Show indicator after state restoration
         this.overlay.showIndicator();
+        // Ensure paused state is reflected on the indicator since timer is paused on restore
+        this.overlay.updateIndicatorPausedState(true);
         this.updateOverlayVisibility();
+
+        // Restore distraction dump state if it was active
+        if (this.timer.pendingDumpState) {
+          const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
+          if (dumpRestored) {
+            logger.log(LOG_CATEGORIES.INIT, 'Distraction dump state restored');
+            // Re-enable dump mode (pause timer, lift blocks)
+            this.distractionDump._enableDumpMode();
+            this.distractionDump._setupDumpIndicator();
+            // Restart the dump countdown
+            this.distractionDump.dumpInterval = setInterval(() => {
+              this.distractionDump.dumpTimeRemaining--;
+              this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
+              if (this.distractionDump.dumpTimeRemaining <= 0) {
+                this.distractionDump.endDump();
+              }
+            }, 1000);
+          }
+          this.timer.pendingDumpState = null;
+        }
 
         // If restored into transition phase, show the popup
         if (this.timer.currentPhase === 'transition') {
@@ -13395,9 +13452,6 @@
 
       // MISSING FEATURE: Request notification permission
       this.requestNotificationPermission();
-
-      // Expose app globally for debugging and keyboard shortcut
-      window.zenPomodoroApp = this;
 
       // Initialize Daily Reminder Manager (after app is globally exposed)
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Daily Reminder Manager');

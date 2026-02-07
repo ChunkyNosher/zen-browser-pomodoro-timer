@@ -679,14 +679,16 @@
   width: max-content;
   min-width: 300px;
   margin: 16px 0 0;
+  padding: 0; /* Explicit zero padding */
 }
 
 /* UI/UX FIX: Moved inline styles to CSS class
    CODE DISPLAY FIX: Dynamic container sizing, smaller font, proper alignment
-   ZEN BROWSER 1.18.X FIX: Explicit padding-inline to match input alignment */
+   ZEN BROWSER 1.18.X FIX: Explicit padding-inline to match input alignment
+   ALIGNMENT FIX: Border color matches background to occupy same box model space as input */
 .zen-pomodoro-lock-code-display {
   background: #1e1d26;
-  border: 2px solid transparent; /* Match input border width for alignment */
+  border: 2px solid #1e1d26; /* Match input border width with same-color border (invisible but occupies space) */
   padding: 12px;
   padding-inline: 12px; /* Equal padding on both sides for perfect alignment */
   border-radius: 6px;
@@ -700,6 +702,7 @@
   text-align: left; /* Left-aligned for better code readability */
   text-indent: 0; /* Reset any default indentation */
   letter-spacing: normal; /* Ensure consistent character spacing */
+  color: #fff; /* Explicit text color to match input */
 }
 
 #zen-pomodoro-lock-code {
@@ -719,6 +722,8 @@
   text-indent: 0; /* Reset any default indentation */
   appearance: none; /* Remove platform-specific styling */
   letter-spacing: normal; /* Ensure consistent character spacing */
+  -moz-padding-start: 12px !important; /* Firefox-specific padding override */
+  -moz-padding-end: 12px !important; /* Firefox-specific padding override */
 }
 
 #zen-pomodoro-lock-code:focus {
