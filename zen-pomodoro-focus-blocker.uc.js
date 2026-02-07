@@ -12430,6 +12430,9 @@
         if (!this.currentEditingCycle.defaultBreakDuration) {
           this.currentEditingCycle.defaultBreakDuration = 5;
         }
+        if (!this.currentEditingCycle.defaultTransitionDuration) {
+          this.currentEditingCycle.defaultTransitionDuration = 5;
+        }
       } else {
         // Create new cycle with default values
         this.currentEditingCycle = {
@@ -12437,6 +12440,7 @@
           name: 'New Custom Cycle',
           defaultFocusDuration: 25,
           defaultBreakDuration: 5,
+          defaultTransitionDuration: 5,
           blocks: [
             { type: 'focus', duration: 25 },
             { type: 'break', duration: 5 },
@@ -12553,8 +12557,41 @@
       breakDurationContainer.appendChild(breakDurationLabel);
       breakDurationContainer.appendChild(breakDurationInput);
 
+      // Transition block duration
+      const transitionDurationContainer = document.createElement('div');
+      transitionDurationContainer.style.display = 'flex';
+      transitionDurationContainer.style.flexDirection = 'column';
+      transitionDurationContainer.style.flex = '1';
+
+      const transitionDurationLabel = document.createElement('label');
+      transitionDurationLabel.textContent = 'Transition Duration (min):';
+      transitionDurationLabel.style.fontSize = '12px';
+      transitionDurationLabel.style.marginBottom = '4px';
+
+      const transitionDurationInput = document.createElement('input');
+      transitionDurationInput.type = 'number';
+      transitionDurationInput.className = 'zen-pomodoro-dialog-input';
+      transitionDurationInput.min = '1';
+      transitionDurationInput.max = '15';
+      transitionDurationInput.value = this.currentEditingCycle.defaultTransitionDuration;
+      transitionDurationInput.style.width = '100%';
+      transitionDurationInput.addEventListener('change', () => {
+        const validated = validateIntegerInput(
+          transitionDurationInput.value,
+          1,
+          15,
+          this.currentEditingCycle.defaultTransitionDuration
+        );
+        this.currentEditingCycle.defaultTransitionDuration = validated;
+        transitionDurationInput.value = validated;
+      });
+
+      transitionDurationContainer.appendChild(transitionDurationLabel);
+      transitionDurationContainer.appendChild(transitionDurationInput);
+
       durationRow.appendChild(focusDurationContainer);
       durationRow.appendChild(breakDurationContainer);
+      durationRow.appendChild(transitionDurationContainer);
 
       // Blocks container
       const blocksLabel = document.createElement('label');
@@ -12580,7 +12617,6 @@
 
       const blockTypeSelect = document.createElement('select');
       blockTypeSelect.className = 'zen-pomodoro-dialog-input';
-      blockTypeSelect.style.flex = '1';
       
       const focusOption = document.createElement('option');
       focusOption.value = 'focus';
@@ -12611,8 +12647,8 @@
         } else if (selectedType === 'break') {
           duration = this.currentEditingCycle.defaultBreakDuration;
         } else {
-          // Transition: default to 5 minutes
-          duration = 5;
+          // Transition: use the cycle's default transition duration
+          duration = this.currentEditingCycle.defaultTransitionDuration;
         }
         this.addBlock(selectedType, duration);
         this._renderBlocks(blocksContainer);
