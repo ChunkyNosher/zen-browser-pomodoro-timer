@@ -1209,6 +1209,21 @@
   }
 
   /**
+   * Initialize dialog position for drag by converting from CSS centering to absolute pixels.
+   * @param {HTMLElement} dialog - The dialog element
+   * @param {DOMRect} rect - The dialog's bounding client rect
+   */
+  function initializeDialogDragPosition(dialog, rect) {
+    const computedStyle = window.getComputedStyle(dialog);
+    if (computedStyle.transform !== 'none') {
+      dialog.style.transform = 'none';
+    }
+    dialog.style.position = 'fixed';
+    dialog.style.left = `${rect.left}px`;
+    dialog.style.top = `${rect.top}px`;
+  }
+
+  /**
    * Issue 8: Setup drag functionality for dialogs
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
@@ -1284,24 +1299,11 @@
       startX = coords.x;
       startY = coords.y;
 
-      // Convert from CSS centering (transform + percentage top/left) to absolute pixel positioning
-      // Store the actual position from getBoundingClientRect before making changes
-      const actualLeft = rect.left;
-      const actualTop = rect.top;
+      // Convert from CSS centering to absolute pixel positioning
+      initializeDialogDragPosition(dialog, rect);
 
-      // Clear transform-based centering if present
-      const computedStyle = window.getComputedStyle(dialog);
-      if (computedStyle.transform !== 'none') {
-        dialog.style.transform = 'none';
-      }
-
-      // Always set position to fixed and use pixel values to override CSS percentage positioning
-      dialog.style.position = 'fixed';
-      dialog.style.left = `${actualLeft}px`;
-      dialog.style.top = `${actualTop}px`;
-
-      startLeft = actualLeft;
-      startTop = actualTop;
+      startLeft = rect.left;
+      startTop = rect.top;
       dialogWidth = rect.width;
       dialogHeight = rect.height;
 
@@ -2427,21 +2429,30 @@
      * - This reminder hasn't been shown yet for the current phase
      * @private
      */
-    _checkTimerReminders() {
-      const config = getConfig();
-
-      // Early exits for disabled states
-      if (!config.timerRemindersEnabled || this.currentPhase === 'transition') return;
-
+    /**
+     * Get the appropriate reminder list for the current phase.
+     * @param {Object} config - Configuration object
+     * @returns {{reminders: Array<number>, isFocusPhase: boolean}} Reminder list and phase flag
+     * @private
+     */
+    _getPhaseReminders(config) {
       const isFocusPhase = this.currentPhase === 'focus';
       const reminders = isFocusPhase
         ? config.focusPhaseReminders || []
         : config.breakPhaseReminders || [];
+      return { reminders, isFocusPhase };
+    }
 
+    _checkTimerReminders() {
+      const config = getConfig();
+
+      // Early exits for disabled states
+      if (!config.timerRemindersEnabled) return;
+      if (this.currentPhase === 'transition') return;
+      if (this.remainingTime % 60 !== 0) return;
+
+      const { reminders, isFocusPhase } = this._getPhaseReminders(config);
       const remainingMinutes = Math.floor(this.remainingTime / 60);
-      const isExactMinuteBoundary = this.remainingTime % 60 === 0;
-      
-      if (!isExactMinuteBoundary) return;
 
       // Check if current time matches a reminder that hasn't been shown
       const matchingReminder = reminders.find(
@@ -10861,73 +10872,67 @@
      * Returns null if reminder shouldn't show or conditions aren't met.
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
+    /**
+     * Convert a time string (HH:MM) to minutes since midnight.
+     * @param {string} timeStr - Time string in HH:MM format
+     * @returns {number} Minutes since midnight
+     * @private
+     */
+    _timeToMinutes(timeStr) {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    }
+
+    /**
+     * Find the next unshown reminder from sorted times.
+     * @param {Array<string>} sortedTimes - Sorted time strings
+     * @param {number} currentTimeMinutes - Current time in minutes since midnight
+     * @returns {{hours: number, minutes: number}|null} Next reminder time, or null
+     * @private
+     */
+    _findNextUnshownReminder(sortedTimes, currentTimeMinutes) {
+      for (const timeStr of sortedTimes) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const reminderTimeMinutes = hours * 60 + minutes;
+        const wasShown = this._wasReminderShownToday(hours, minutes);
+
+        if (wasShown) continue;
+
+        if (reminderTimeMinutes > currentTimeMinutes) {
+          return { hours, minutes };
+        }
+        if (reminderTimeMinutes === currentTimeMinutes) {
+          return { hours: -1, minutes: 0 }; // Signal: show now
+        }
+      }
+      return null;
+    }
+
     getTimeUntilDailyReminder() {
       const config = getConfig();
 
-      // Return null if feature is disabled
-      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) {
-        return null;
-      }
+      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) return null;
 
-      // Get reminder times array
       const reminderTimes = config.dailyReminderTimes;
-      if (!Array.isArray(reminderTimes) || reminderTimes.length === 0) {
-        return null;
-      }
+      if (!isNonEmptyArray(reminderTimes)) return null;
 
-      // Find the next reminder that hasn't been shown yet
-      const now = new Date();
-      const currentHours = now.getHours();
-      const currentMinutes = now.getMinutes();
-      const currentTimeMinutes = currentHours * 60 + currentMinutes;
-
-      // Reset reminders if new day
       this._resetIfNewDay();
 
-      let nextReminderMinutes = null;
-      let nextReminderHours = null;
+      const now = new Date();
+      const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
 
-      // Sort reminder times by actual time of day (minutes since midnight)
-      const sortedReminderTimes = reminderTimes
+      const sortedTimes = reminderTimes
         .filter((timeStr) => isValidTimeFormat(timeStr))
         .slice()
-        .sort((a, b) => {
-          const [aHours, aMinutes] = a.split(':').map(Number);
-          const [bHours, bMinutes] = b.split(':').map(Number);
-          return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
-        });
+        .sort((a, b) => this._timeToMinutes(a) - this._timeToMinutes(b));
 
-      for (const timeStr of sortedReminderTimes) {
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        const reminderTimeMinutes = hours * 60 + minutes;
+      const nextReminder = this._findNextUnshownReminder(sortedTimes, currentTimeMinutes);
+      if (!nextReminder) return null;
+      if (nextReminder.hours === -1) return 0; // Show now
 
-        // Check if this reminder hasn't been shown yet
-        const wasShown = this._wasReminderShownToday(hours, minutes);
-
-        if (!wasShown) {
-          // Check if this reminder time is in the future
-          if (reminderTimeMinutes > currentTimeMinutes) {
-            nextReminderMinutes = minutes;
-            nextReminderHours = hours;
-            break;
-          } else if (reminderTimeMinutes === currentTimeMinutes) {
-            // Reminder should be showing now
-            return 0;
-          }
-        }
-      }
-
-      // If no future reminder found, return null
-      if (nextReminderMinutes === null) {
-        return null;
-      }
-
-      // Calculate seconds until next reminder
       const reminderDate = new Date();
-      reminderDate.setHours(nextReminderHours, nextReminderMinutes, 0, 0);
-
-      const remainingMs = reminderDate - now;
-      return Math.ceil(remainingMs / 1000);
+      reminderDate.setHours(nextReminder.hours, nextReminder.minutes, 0, 0);
+      return Math.ceil((reminderDate - now) / 1000);
     }
 
     /**
@@ -14580,8 +14585,8 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // All modules with destroy() methods
-      const modulesToDestroy = [
+      // All modules with destroy() methods - wrapped for null safety
+      const modules = [
         this.sineModBlocker,
         this.websiteBlocker,
         this.transitionManager,
@@ -14591,19 +14596,43 @@
         this.keyboardShortcut,
         this.overlay,
       ];
-      modulesToDestroy.forEach((module) => module?.destroy?.());
+      this._destroyModules(modules);
 
-      // All modules with specific cleanup methods
-      const cleanupActions = [
-        () => this.workspace?.stopMonitoring?.(),
-        () => this.timer?.stop?.(),
-        () => this.security?.cleanupLockScreen?.(),
-      ];
-      cleanupActions.forEach((action) => action());
+      // Additional cleanup
+      this._runCleanupActions();
 
       this.initialized = false;
 
       logger.log(LOG_CATEGORIES.INIT, 'Application cleanup complete');
+    }
+
+    /**
+     * Safely destroy a list of modules that may have a destroy() method.
+     * @param {Array} modules - Array of module instances (may contain nulls)
+     * @private
+     */
+    _destroyModules(modules) {
+      for (const module of modules) {
+        if (module && typeof module.destroy === 'function') {
+          module.destroy();
+        }
+      }
+    }
+
+    /**
+     * Run additional cleanup actions for modules with non-standard cleanup methods.
+     * @private
+     */
+    _runCleanupActions() {
+      if (this.workspace && typeof this.workspace.stopMonitoring === 'function') {
+        this.workspace.stopMonitoring();
+      }
+      if (this.timer && typeof this.timer.stop === 'function') {
+        this.timer.stop();
+      }
+      if (this.security && typeof this.security.cleanupLockScreen === 'function') {
+        this.security.cleanupLockScreen();
+      }
     }
   }
 
