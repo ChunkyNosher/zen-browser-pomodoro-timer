@@ -5347,8 +5347,17 @@
       // Buttons
       const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
 
-      // Assemble dialog
-      [backButton, h2, undoRedoButtons, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      [headerRow, h2, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
       document.documentElement.appendChild(dialog);
 
       // Track changes for undo/redo
@@ -6729,9 +6738,18 @@
       buttonDiv.appendChild(saveButton);
       buttonDiv.appendChild(saveCloseButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(h2);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
@@ -7236,9 +7254,18 @@
       buttonDiv.appendChild(saveButton);
       buttonDiv.appendChild(saveCloseButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(h2);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
@@ -12978,9 +13005,18 @@
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(saveButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(title);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(nameRow);
       dialog.appendChild(durationRow);
       dialog.appendChild(blocksLabel);

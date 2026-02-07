@@ -532,6 +532,31 @@ select.zen-pomodoro-dialog-input {
   padding-right: 28px;
 }
 
+/* Option styling for dropdown popups */
+.zen-pomodoro-config-row select option,
+.zen-pomodoro-dialog select option,
+.zen-pomodoro-cycle-editor-dialog select option,
+select.zen-pomodoro-dialog-input option {
+  background-color: #1e1d26;
+  color: #e0e0e0;
+  padding: 6px 10px;
+}
+
+.zen-pomodoro-config-row select option:hover,
+.zen-pomodoro-dialog select option:hover,
+.zen-pomodoro-cycle-editor-dialog select option:hover,
+select.zen-pomodoro-dialog-input option:hover {
+  background-color: #2a2940;
+}
+
+.zen-pomodoro-config-row select option:checked,
+.zen-pomodoro-dialog select option:checked,
+.zen-pomodoro-cycle-editor-dialog select option:checked,
+select.zen-pomodoro-dialog-input option:checked {
+  background-color: #2180cd;
+  color: #fff;
+}
+
 /* Motivational message input with wider width */
 .zen-pomodoro-config-row .zen-pomodoro-message-input {
   width: 250px;
@@ -1365,6 +1390,17 @@ select.zen-pomodoro-dialog-input {
   outline: none;
   border-color: #4a9eff;
   box-shadow: 0 0 0 2px rgb(74 158 255 / 20%);
+}
+
+.zen-pomodoro-rule-select option {
+  background-color: #1e1d26;
+  color: #e0e0e0;
+  padding: 6px 10px;
+}
+
+.zen-pomodoro-rule-select option:checked {
+  background-color: #2180cd;
+  color: #fff;
 }
 
 /* ============================================
@@ -2308,7 +2344,6 @@ select.zen-pomodoro-dialog-input {
 .zen-pomodoro-undo-redo-container {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
   justify-content: flex-end;
 }
 
