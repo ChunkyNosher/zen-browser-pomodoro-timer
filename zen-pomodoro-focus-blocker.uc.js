@@ -12851,8 +12851,8 @@
         } else if (selectedType === 'break') {
           duration = this.currentEditingCycle.defaultBreakDuration;
         } else {
-          // Transition: use the cycle's default transition duration
-          duration = this.currentEditingCycle.defaultTransitionDuration;
+          // Transition: use the cycle's default transition duration with fallback
+          duration = this.currentEditingCycle.defaultTransitionDuration || 5;
         }
         this.addBlock(selectedType, duration);
         this._renderBlocks(blocksContainer);
@@ -13306,14 +13306,14 @@
             }
 
             // Shift non-dragged blocks to show preview of final positions
-            nonDraggedBlocks.forEach((block, idx) => {
+            nonDraggedBlocks.forEach((block) => {
               block.classList.remove('shift-down', 'shift-up');
               block.style.removeProperty('--block-shift-distance');
             });
             
             if (!this.isDuplicating) {
               // For move operations, shift blocks to show where the gap will be
-              nonDraggedBlocks.forEach((block, idx) => {
+              nonDraggedBlocks.forEach((block) => {
                 block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
               });
             }
@@ -13321,7 +13321,7 @@
         });
       };
 
-      const onPointerUp = (pointerUpEvent) => {
+      const onPointerUp = () => {
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', onPointerUp);
         if (rafId) {

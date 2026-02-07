@@ -363,7 +363,7 @@ See [LICENSE](LICENSE) file for full details.
 - ✨ **Undo/Redo System**: All settings menus now have undo/redo buttons for easy change reversal
 - 🎨 **Improved Drag & Drop**: Custom cycle block dragging now has smooth visual preview with drop indicator lines
 - 🎨 **Enhanced Dropdowns**: All dropdown/select elements now have distinct custom styling with visible borders
-- ⚙️ **Configurable Transition Duration**: Custom cycles can now set default transition duration (5-15 minutes)
+- ⚙️ **Configurable Transition Duration**: Custom cycles can now set default transition duration (1-15 minutes)
 - ✅ **Full State Persistence**: Timer now properly saves and restores Distraction Dump state across browser restarts
 - ✅ **Fixed Timer Indicator Display**: Timer indicator now shows correct remaining time after browser restart
 - ✅ **Final Character Alignment Fix**: Code lockout screen input now perfectly aligns with displayed code
