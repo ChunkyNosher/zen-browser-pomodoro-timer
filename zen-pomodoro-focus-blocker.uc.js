@@ -13228,8 +13228,12 @@
         }
       });
 
-      // Custom pointer-based drag on handle (supports mouse and touch)
-      dragHandle.addEventListener('pointerdown', (e) => {
+      // Custom pointer-based drag on entire block (supports mouse and touch)
+      blockDiv.addEventListener('pointerdown', (e) => {
+        // Don't start drag if clicking on input or delete button
+        if (e.target === durationInput || e.target === deleteButton) {
+          return;
+        }
         // Allow left mouse button (button 0) or touch/pen input
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault();
@@ -13248,7 +13252,15 @@
      * @private
      */
     _startBlockDrag(e, blockDiv, index) {
-      if (this.isDragging) return;
+      // Bug fix #3: Safety check - cleanup any existing drag state
+      if (this.isDragging) {
+        if (this.dragCleanup) {
+          this.dragCleanup();
+          this.dragCleanup = null;
+        }
+        this.isDragging = false;
+      }
+      
       this.isDragging = true;
       this.draggedBlockIndex = index;
       this.isDuplicating = e.altKey;
@@ -13261,6 +13273,13 @@
       const dragIndices = isMultiSelect
         ? Array.from(this.selectedBlockIndices).sort((a, b) => a - b)
         : [index];
+
+      logger.log(Constants.LOG_CATEGORIES.MENU, 'Block drag started', {
+        index,
+        isMultiSelect,
+        isDuplicating: this.isDuplicating,
+        dragIndices
+      });
 
       // Mark all dragged blocks
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
@@ -13300,6 +13319,15 @@
       
       let lastTargetIndex = -1;
       let rafId = null;
+      
+      // Bug fix #2: Cache indicator position to prevent flickering
+      let lastIndicatorRef = null;
+      
+      // Bug fix #5: Auto-scroll variables
+      const scrollContainer = container; // The blocks container is the scrollable element
+      const SCROLL_ZONE = 40; // px from edge
+      const SCROLL_SPEED = 4; // px per frame
+      let scrollRafId = null;
 
       const onPointerMove = (pointerMoveEvent) => {
         if (rafId) return; // Throttle with rAF
@@ -13314,7 +13342,14 @@
           
           if (targetIndex < 0) return;
 
-          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef);
+          
+          // Bug fix #2: Update cached reference
+          if (targetIndex < nonDraggedBlocks.length) {
+            lastIndicatorRef = nonDraggedBlocks[targetIndex];
+          } else {
+            lastIndicatorRef = null;
+          }
 
           if (this.isDuplicating && ghostBlocks.length > 0) {
             this._showGhostBlocks(container, dropIndicator, ghostBlocks);
@@ -13329,18 +13364,62 @@
             }
           });
         });
+        
+        // Bug fix #5: Auto-scroll when near edges
+        const containerRect = scrollContainer.getBoundingClientRect();
+        if (pointerMoveEvent.clientY < containerRect.top + SCROLL_ZONE) {
+          // Near top - scroll up
+          if (!scrollRafId) {
+            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll activated (up)');
+            const scrollUp = () => {
+              scrollContainer.scrollTop -= SCROLL_SPEED;
+              scrollRafId = requestAnimationFrame(scrollUp);
+            };
+            scrollRafId = requestAnimationFrame(scrollUp);
+          }
+        } else if (pointerMoveEvent.clientY > containerRect.bottom - SCROLL_ZONE) {
+          // Near bottom - scroll down
+          if (!scrollRafId) {
+            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll activated (down)');
+            const scrollDown = () => {
+              scrollContainer.scrollTop += SCROLL_SPEED;
+              scrollRafId = requestAnimationFrame(scrollDown);
+            };
+            scrollRafId = requestAnimationFrame(scrollDown);
+          }
+        } else {
+          // Not near edge - stop scrolling
+          if (scrollRafId) {
+            logger.log(Constants.LOG_CATEGORIES.MENU, 'Auto-scroll deactivated');
+            cancelAnimationFrame(scrollRafId);
+            scrollRafId = null;
+          }
+        }
       };
 
-      const onPointerUp = () => {
+      const cleanup = () => {
         document.removeEventListener('pointermove', onPointerMove);
-        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointerup', cleanup);
+        document.removeEventListener('pointercancel', cleanup); // Bug fix #3
+        
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
         }
+        
+        // Bug fix #5: Stop auto-scroll
+        if (scrollRafId) {
+          cancelAnimationFrame(scrollRafId);
+          scrollRafId = null;
+        }
 
         this._cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks);
         this._applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect);
+
+        logger.log(Constants.LOG_CATEGORIES.MENU, 'Block drag completed', {
+          from: dragIndices,
+          to: lastTargetIndex
+        });
 
         // Re-render and push undo state
         const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
@@ -13354,10 +13433,15 @@
         this.isDragging = false;
         this.draggedBlockIndex = null;
         this.isDuplicating = false;
+        this.dragCleanup = null; // Bug fix #3
       };
 
+      // Bug fix #3: Store cleanup function for safety check
+      this.dragCleanup = cleanup;
+
       document.addEventListener('pointermove', onPointerMove);
-      document.addEventListener('pointerup', onPointerUp);
+      document.addEventListener('pointerup', cleanup);
+      document.addEventListener('pointercancel', cleanup); // Bug fix #3
     }
 
     /**
@@ -13381,6 +13465,16 @@
         ? this.currentEditingCycle.blocks.length
         : nonDraggedIndices[lastTargetIndex];
 
+      // Bug fix #4: Check if block would stay in place (no-op move)
+      if (!this.isDuplicating && !isMultiSelect) {
+        const from = this.draggedBlockIndex;
+        // Block stays in place if target equals from or from+1
+        // (because splice removes from first, then inserts at target)
+        if (absoluteTarget === from || absoluteTarget === from + 1) {
+          return;
+        }
+      }
+
       if (this.isDuplicating) {
         this._duplicateBlocks(dragIndices, absoluteTarget);
       } else if (isMultiSelect) {
@@ -13398,8 +13492,20 @@
      * @private
      */
     _cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
-      dropIndicator.remove();
-      ghostBlocks.forEach(g => g.remove());
+      if (dropIndicator && dropIndicator.parentElement) {
+        dropIndicator.remove();
+      }
+      ghostBlocks.forEach(g => {
+        if (g && g.parentElement) g.remove();
+      });
+      
+      // Bug fix #3: Remove any orphaned indicators or ghosts from container
+      const container = allBlocks[0]?.parentElement;
+      if (container) {
+        container.querySelectorAll('.zen-pomodoro-cycle-drop-indicator').forEach(el => el.remove());
+        container.querySelectorAll('.zen-pomodoro-cycle-block-ghost').forEach(el => el.remove());
+      }
+      
       allBlocks.forEach(block => {
         block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
         block.style.removeProperty('--block-shift-distance');
@@ -13412,16 +13518,27 @@
      * @param {HTMLElement} dropIndicator - Drop indicator element
      * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
      * @param {number} targetIndex - Target insertion index
+     * @param {HTMLElement|null} lastIndicatorRef - Previous reference element (for caching)
      * @private
      */
-    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex) {
+    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex, lastIndicatorRef) {
       dropIndicator.style.display = 'block';
+      
+      // Bug fix #2: Calculate new reference element
+      let newRef = null;
       if (targetIndex < nonDraggedBlocks.length) {
-        container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
+        newRef = nonDraggedBlocks[targetIndex];
       } else {
         const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
         if (lastNonDragged && lastNonDragged.nextSibling) {
-          container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
+          newRef = lastNonDragged.nextSibling;
+        }
+      }
+      
+      // Bug fix #2: Only update DOM if position changed
+      if (newRef !== lastIndicatorRef) {
+        if (newRef) {
+          container.insertBefore(dropIndicator, newRef);
         } else {
           container.appendChild(dropIndicator);
         }
