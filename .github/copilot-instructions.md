@@ -49,6 +49,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 | `LogManager`                 | Comprehensive logging with export functionality                                                       |
 | `DistractionDumpManager`     | Manages "Distraction Dump" feature - pauses timer, unblocks everything for thought capture            |
 | `CustomCycleManager`         | Manages custom Pomodoro cycles with drag-and-drop block editing and per-cycle duration defaults       |
+| `UndoRedoManager`            | Generic undo/redo state management for dialog menus with UI buttons                                   |
 
 ---
 
@@ -56,7 +57,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.3.9';                  // Current mod version
+const MOD_VERSION = '1.4.0';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -216,6 +217,7 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `distractionDumpEnabled`        | boolean | true               | Enable Distraction Dump feature                      |
 | `distractionDumpDuration`       | number  | 25                 | Default dump duration in minutes                     |
 | `distractionDumpMaxDuration`    | number  | 35                 | Maximum dump duration in minutes                     |
+| `defaultTransitionDuration`     | number  | 5                  | Default transition block duration in custom cycles (minutes) |
 | `timerRemindersEnabled`         | boolean | true               | Enable timer reminders during sessions               |
 | `focusPhaseReminders`           | array   | [20, 10, 5, 1]     | Minutes before focus phase ends to show reminder     |
 | `breakPhaseReminders`           | array   | [5, 1]             | Minutes before break phase ends to show reminder     |
@@ -245,6 +247,105 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_canShowReminderCountdown()`                         | Check if post-session reminder countdown can be shown       |
 | `_getEarliestReminderTime(config)`                    | Get earliest daily reminder time from config                |
 | `isPopupWindow()`                                     | Detect if current window is a popup (not main browser)      |
+| `UndoRedoManager.pushState(state)`                    | Save state snapshot to undo stack                           |
+| `UndoRedoManager.undo()`                              | Restore previous state from undo stack                      |
+| `UndoRedoManager.redo()`                              | Restore next state from redo stack                          |
+| `UndoRedoManager.createButtons()`                     | Create undo/redo UI button container                        |
+| `DistractionDumpManager.getStateForPersistence()`     | Export dump state for browser restart persistence           |
+| `DistractionDumpManager.restoreState(state)`          | Restore dump state from persistence                         |
+| `_startBlockDrag(e, blockDiv, index)`                 | Start custom pointer-based block drag operation             |
+| `_getDropTargetIndex(container, clientY, dragIndices)` | Calculate drop position among non-dragged blocks           |
+
+---
+
+## Bug Fixes and Features in v1.4.0
+
+### Timer State Persistence for Distraction Dump
+
+**Issue:** If the browser closes or crashes during a Distraction Dump, the dump state was lost and the timer didn't persist correctly.
+
+**Root Cause:** The `saveState()` method only saved basic timer fields but didn't include any Distraction Dump state (isActive, dumpTimeRemaining, savedTimerState, dumpUsedThisFocusPhase).
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added `getStateForPersistence()` method to `DistractionDumpManager` to export dump state
+- Added `restoreState()` method to `DistractionDumpManager` to restore dump state
+- Modified `saveState()` to include dump state via `getStateForPersistence()`
+- Modified `loadState()` to store dump state in `pendingDumpState`
+- Modified `onReady()` to restore dump state, re-enable dump mode, and restart countdown
+
+### Timer Indicator Visual Bug on Restore
+
+**Issue:** After browser restart, the timer indicator showed the initial configured duration (e.g., 30 minutes) instead of the actual remaining time (e.g., 10 minutes).
+
+**Root Cause:** In `_resetIndicatorDisplay()`, it accessed `window.zenPomodoroApp?.timer` but the global variable wasn't assigned yet when `showIndicator()` was called during restoration.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Moved `window.zenPomodoroApp = this;` assignment to early in `onReady()`, before timer restoration code
+- Added `updateIndicatorPausedState(true)` call after showing indicator during restore
+
+### Code Lockout Screen Character Alignment (Final Fix)
+
+**Issue:** Characters in the code display and input text box were still misaligned.
+
+**Root Cause:** Firefox's internal input padding didn't match the div element's padding even with identical CSS.
+
+**Fix:** In `chrome.css`:
+- Changed `.zen-pomodoro-lock-code-display` border from `transparent` to background-matching `#1e1d26`
+- Added `-moz-padding-start` and `-moz-padding-end` overrides with `!important` to `#zen-pomodoro-lock-code`
+- Added explicit `padding: 0` to `.zen-pomodoro-code-container`
+
+### Custom Cycle Drag/Drop UX Overhaul
+
+**Issue:** Drag and drop for custom cycle blocks was janky with cursor flickering, no visual preview for where blocks would end up, and poor feedback during Alt+drag duplication.
+
+**Root Cause:** The HTML5 native drag API's ghost image conflicted with DOM manipulation during `dragover`, causing cursor flickering and rapid reflows.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js` and `chrome.css`:
+- Replaced HTML5 drag API with custom pointer-based drag system using `pointerdown`/`pointermove`/`pointerup`
+- Added `_startBlockDrag()` method with `requestAnimationFrame` throttling for smooth 60fps updates
+- Added `_getDropTargetIndex()` for precise drop position calculation
+- Added blue pulsing drop indicator line (`.zen-pomodoro-cycle-drop-indicator`)
+- Added ghost blocks for duplication preview (`.zen-pomodoro-cycle-block-ghost`)
+- Added smooth CSS transitions for block shifting during drag (`.drag-transition`)
+- Removed `draggable` attribute from block elements
+
+### Dropdown Styling Improvements
+
+**Enhancement:** All dropdown/select elements across the mod now have distinct visual styling.
+
+**Changes:** In `chrome.css`:
+- Added custom background color (#252430) distinct from dialog background
+- Added visible border (#4a4960) with hover state (#5a59a0)
+- Added custom SVG dropdown arrow replacing native appearance
+- Added focus state with blue glow
+- Applied to all select elements: `.zen-pomodoro-config-row select`, `.zen-pomodoro-dialog select`, `.zen-pomodoro-rule-select`, `select.zen-pomodoro-dialog-input`
+
+### Default Transition Duration Config
+
+**Feature:** Custom cycle editor now has a configurable default transition duration.
+
+**Changes:**
+- Added `defaultTransitionDuration` property to cycle objects (default: 5 minutes, max: 15 minutes)
+- Added transition duration input field in cycle editor alongside focus and break duration inputs
+- "Add Block" handler uses configured transition duration instead of hardcoded 5 minutes
+- Backward compatibility: existing cycles without this field default to 5 minutes
+
+### Undo/Redo System for All Menus
+
+**Feature:** All mod menus now have undo and redo buttons for reverting changes.
+
+**Implementation:**
+- Added `UndoRedoManager` class with stack-based undo/redo state management
+- JSON serialization for deep state cloning and comparison
+- Auto-enabling/disabling buttons based on stack state
+- Integrated into 4 dialogs: Settings, Rulesets, Start Timer, Custom Cycle Editor
+- CSS styling with `.zen-pomodoro-undo-redo-container` and `.zen-pomodoro-undo-redo-button`
+
+**New Class:** `UndoRedoManager`
+- `pushState(state)` - Save state snapshot
+- `undo()` / `redo()` - Navigate state history
+- `createButtons()` - Create UI button container
+- `onStateRestore` callback for dialog refresh
 
 ---
 

@@ -39,6 +39,8 @@ This is a **Zen Browser mod** (NOT a Firefox extension) that implements a Pomodo
 - `DailyReminderManager` - Daily startup reminders (periodic check every 60s)
 - `PostSessionReminderManager` - Idle time reminder with escalating skips
 - `DistractionDumpManager` - Pause timer and lift blocks for thought capture
+- `CustomCycleManager` - Custom cycle editor with drag-and-drop block management
+- `UndoRedoManager` - Generic undo/redo state management for dialog menus
 
 ## Module Architecture
 
@@ -77,7 +79,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.3.7'`
+- `MOD_VERSION = '1.4.0'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 
@@ -94,6 +96,7 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 | `distractionDumpEnabled`     | boolean | true    | Enable Distraction Dump feature         |
 | `distractionDumpDuration`    | number  | 25      | Default dump duration in minutes        |
 | `distractionDumpMaxDuration` | number  | 35      | Maximum dump duration in minutes        |
+| `defaultTransitionDuration`  | number  | 5       | Default transition block duration in custom cycles (minutes) |
 
 ## Helper Functions
 
@@ -104,6 +107,14 @@ The codebase uses IIFE (Immediately Invoked Function Expression) pattern:
 | `isValidTimeFormat(timeStr)`                          | Validate HH:MM time format               |
 | `validateIntegerInput(value, min, max, defaultValue)` | Validate and clamp integer input         |
 | `handlePauseResumeTimer()`                            | Handle pause/resume timer action from UI |
+| `UndoRedoManager.pushState(state)`                    | Save state snapshot to undo stack        |
+| `UndoRedoManager.undo()`                              | Restore previous state from undo stack   |
+| `UndoRedoManager.redo()`                              | Restore next state from redo stack       |
+| `UndoRedoManager.createButtons()`                     | Create undo/redo UI button container     |
+| `DistractionDumpManager.getStateForPersistence()`     | Export dump state for browser restart persistence |
+| `DistractionDumpManager.restoreState(state)`          | Restore dump state from persistence      |
+| `_startBlockDrag(e, blockDiv, index)`                 | Start custom pointer-based block drag operation |
+| `_getDropTargetIndex(container, clientY, dragIndices)` | Calculate drop position among non-dragged blocks |
 
 ## Development Guidelines
 
@@ -185,6 +196,45 @@ dialog.className = 'zen-pomodoro-dialog active';
 - `skipToNextCustomBlock()` - advances to next block in custom cycle
 - Regular mode: calls `startFocusPhase()`
 - Custom mode: calls `skipToNextCustomBlock()` to advance to next block in cycle
+
+### Custom Cycle Drag and Drop System
+
+**Pattern:** Custom cycles use a custom pointer-based drag system (not HTML5 drag API) for smooth UX with visual preview.
+
+**Key implementation details:**
+- Replaced HTML5 `draggable` attribute with pointer events (`pointerdown`, `pointermove`, `pointerup`)
+- `_startBlockDrag()` handles drag initiation with `requestAnimationFrame` throttling for 60fps
+- `_getDropTargetIndex()` calculates precise drop position based on cursor Y position
+- Visual indicators: blue pulsing drop line (`.zen-pomodoro-cycle-drop-indicator`)
+- Ghost blocks for duplication preview (`.zen-pomodoro-cycle-block-ghost`)
+- Smooth transitions for block shifting (`.drag-transition` CSS class)
+- Supports both move (normal drag) and duplicate (alt+drag) operations
+- Works with multi-select: all selected blocks move/duplicate together
+
+### Undo/Redo System Pattern
+
+**Pattern:** All mod dialogs (Settings, Rulesets, Start Timer, Custom Cycle Editor) have undo/redo functionality.
+
+**Key implementation details:**
+- `UndoRedoManager` class manages state history with separate undo and redo stacks
+- State snapshots are deep-cloned via JSON serialization
+- Buttons auto-enable/disable based on stack availability
+- `pushState()` clears redo stack when new changes are made
+- `onStateRestore` callback allows dialogs to refresh UI after undo/redo
+- Creates button container with `createButtons()` method
+- CSS styling: `.zen-pomodoro-undo-redo-container` and `.zen-pomodoro-undo-redo-button`
+
+### Distraction Dump State Persistence Pattern
+
+**Pattern:** Distraction Dump state must be saved and restored across browser restarts to maintain timer accuracy.
+
+**Key implementation details:**
+- `getStateForPersistence()` exports dump state (isActive, dumpTimeRemaining, savedTimerState, dumpUsedThisFocusPhase)
+- `restoreState()` accepts saved dump state and restores all fields
+- `saveState()` in PomodoroTimer includes dump state via `getStateForPersistence()`
+- `loadState()` stores dump state in `pendingDumpState` variable
+- `onReady()` restores dump state after initialization, re-enables dump mode, and restarts countdown
+- Ensures timer indicator shows correct time after restart
 
 ## Documentation Reminder
 

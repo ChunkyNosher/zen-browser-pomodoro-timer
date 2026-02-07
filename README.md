@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.3.9-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.0-green.svg)
 
 ## ✨ Features
 
@@ -357,6 +357,16 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.0
+
+- ✨ **Undo/Redo System**: All settings menus now have undo/redo buttons for easy change reversal
+- 🎨 **Improved Drag & Drop**: Custom cycle block dragging now has smooth visual preview with drop indicator lines
+- 🎨 **Enhanced Dropdowns**: All dropdown/select elements now have distinct custom styling with visible borders
+- ⚙️ **Configurable Transition Duration**: Custom cycles can now set default transition duration (5-15 minutes)
+- ✅ **Full State Persistence**: Timer now properly saves and restores Distraction Dump state across browser restarts
+- ✅ **Fixed Timer Indicator Display**: Timer indicator now shows correct remaining time after browser restart
+- ✅ **Final Character Alignment Fix**: Code lockout screen input now perfectly aligns with displayed code
 
 ### Version 1.3.9
 
