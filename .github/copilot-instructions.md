@@ -258,6 +258,10 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_reorderCycle(config, fromIndex, toIndex, dialog)`   | Reorder a cycle in the saved cycles list                    |
 | `_applyDragOperation(targetIndex, dragIndices, multi)` | Apply drag/drop move or duplicate operation                |
 | `_cleanupDragVisuals(allBlocks, indicator, ghosts)`   | Clean up all drag visual state and orphaned elements        |
+| `_computeAbsoluteTarget(relativeTarget, dragIndices)` | Calculate absolute insertion index from relative drag index |
+| `_getDropIndicatorRef(nonDraggedBlocks, targetIndex)` | Compute reference element for drop indicator positioning    |
+| `_isSamePositionMove(absoluteTarget, isMultiSelect)`  | Detect no-op moves where source and target are identical    |
+| `_updateAutoScroll(clientY, container, zone, speed, state, onScroll)` | Manage auto-scroll during drag near container edges |
 
 ---
 

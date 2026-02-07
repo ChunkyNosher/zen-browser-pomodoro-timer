@@ -547,13 +547,6 @@ select.zen-pomodoro-dialog-input option {
   padding: 6px 10px;
 }
 
-.zen-pomodoro-config-row select option:hover,
-.zen-pomodoro-dialog select option:hover,
-.zen-pomodoro-cycle-editor-dialog select option:hover,
-select.zen-pomodoro-dialog-input option:hover {
-  background-color: #2a2940;
-}
-
 .zen-pomodoro-config-row select option:checked,
 .zen-pomodoro-dialog select option:checked,
 .zen-pomodoro-cycle-editor-dialog select option:checked,
