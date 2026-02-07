@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.4.0
+ * Version: 1.4.1
  * License: MIT
  * 
  * ZEN BROWSER 1.18.X COMPATIBILITY:
@@ -17,6 +17,11 @@
  * - Added workspace selection UI styles
  * - Added context menu styles
  * - Added lock screen code display styles
+ * 
+ * NEW IN 1.4.1:
+ * - Fixed dropdown option styling with distinct backgrounds
+ * - Added cycle reorder button disabled state styling
+ * - Removed undo/redo container margin for inline layout
  * 
  * NEW IN 1.3.3:
  * - Fixed code lockout screen alignment (display: flex instead of inline-flex)

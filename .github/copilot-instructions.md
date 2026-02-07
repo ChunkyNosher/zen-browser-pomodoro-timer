@@ -57,7 +57,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.0';                  // Current mod version
+const MOD_VERSION = '1.4.1';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -255,6 +255,77 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `DistractionDumpManager.restoreState(state)`          | Restore dump state from persistence                         |
 | `_startBlockDrag(e, blockDiv, index)`                 | Start custom pointer-based block drag operation             |
 | `_getDropTargetIndex(container, clientY, dragIndices)` | Calculate drop position among non-dragged blocks           |
+| `_reorderCycle(config, fromIndex, toIndex, dialog)`   | Reorder a cycle in the saved cycles list                    |
+| `_applyDragOperation(targetIndex, dragIndices, multi)` | Apply drag/drop move or duplicate operation                |
+| `_cleanupDragVisuals(allBlocks, indicator, ghosts)`   | Clean up all drag visual state and orphaned elements        |
+
+---
+
+## Bug Fixes and Features in v1.4.1
+
+### Custom Cycle Drag System Overhaul
+
+**Issue:** Several drag-related bugs in the custom cycle editor: blocks could only be dragged from the handle, blue drop indicator flickered, UI broke after many drags, blocks swapped when dragged back to original position.
+
+**Fixes:**
+- **Full-block drag**: Moved `pointerdown` listener from drag handle to entire block element with guards for input/delete button clicks
+- **Flickering fix**: Added position caching to `_positionDropIndicator()` - only calls `insertBefore()` when reference element actually changes
+- **Stability fix**: Added `pointercancel` event support, safety cleanup on drag start if previous drag wasn't cleaned up, enhanced `_cleanupDragVisuals()` to remove orphaned indicators/ghosts
+- **Snap-back fix**: Added no-op detection in `_applyDragOperation()` - returns early when `absoluteTarget === from || absoluteTarget === from + 1`
+- **Auto-scroll**: Added auto-scroll when dragging near top/bottom edges (40px zone, 4px/frame speed) with proper direction change handling
+
+### Auto-scroll for Block Drag
+
+**Feature:** When the block list is long enough to require scrolling, dragging a block near the top or bottom of the visible area auto-scrolls the container.
+
+**Implementation:**
+- 40px edge detection zones at top and bottom of scrollable container
+- Smooth 4px/frame scrolling via `requestAnimationFrame`
+- Proper direction switching (up ↔ down) without stopping/restarting
+- Cleanup on pointer release or cancel
+
+### Dropdown Option Styling Fix
+
+**Issue:** Dropdown menu option backgrounds matched the dialog background, making them hard to see. Selecting the first option was particularly difficult.
+
+**Fix:** In `chrome.css`:
+- Added `option` element styling for all select elements with dark background (#1e1d26)
+- Added hover state (#2a2940) and checked/selected state (#2180cd blue)
+- Applied to all dropdown selectors including `.zen-pomodoro-rule-select`
+
+### Undo/Redo Buttons Layout
+
+**Issue:** Undo/redo buttons were on a separate line below the back button instead of the same line.
+
+**Fix:**
+- Created `headerRow` flex container in all 4 dialogs (Start Timer, Settings, Rulesets, Cycle Editor)
+- Back button on left, undo/redo on right in same row
+- Removed `margin-bottom` from `.zen-pomodoro-undo-redo-container`
+
+### Custom Cycle Reordering
+
+**Feature:** Users can now reorder custom cycles in the cycles list using up/down arrow buttons.
+
+**Implementation:**
+- Added ▲/▼ buttons to each cycle list item
+- Buttons disabled at list boundaries (can't move first up or last down)
+- Added `_reorderCycle()` method to `CustomCycleManager`
+- Order persists to config immediately
+- Added disabled button styling (opacity 0.3)
+
+### Comprehensive Logging
+
+**Enhancement:** Added detailed logging for all custom cycle and ruleset operations.
+
+**Custom Cycle Logs:**
+- Block duration changes, selection/deselection, drag start/complete
+- Cycle name changes, default duration changes
+- Block deletion (single and multi-select), cycle validation failures
+- Cycle deletion confirmation, auto-scroll activation
+
+**Ruleset Logs:**
+- Ruleset creation, deletion, renaming, enable/disable toggling
+- Rule pattern changes, rule deletion
 
 ---
 
