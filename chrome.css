@@ -2077,8 +2077,59 @@
 }
 
 .zen-pomodoro-cycle-block.dragging {
-  opacity: 0.5;
+  opacity: 0.4;
   transform: scale(0.95);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+/* Drop indicator line - shows where blocks will be inserted */
+.zen-pomodoro-cycle-drop-indicator {
+  height: 3px;
+  background: #4a9eff;
+  border-radius: 2px;
+  margin: 2px 0;
+  box-shadow: 0 0 8px rgb(74 158 255 / 50%);
+  pointer-events: none;
+  animation: drop-indicator-pulse 1s ease-in-out infinite;
+}
+
+@keyframes drop-indicator-pulse {
+  0%, 100% { 
+    opacity: 1; 
+    box-shadow: 0 0 8px rgb(74 158 255 / 50%); 
+  }
+
+  50% { 
+    opacity: 0.7; 
+    box-shadow: 0 0 12px rgb(74 158 255 / 80%); 
+  }
+}
+
+/* Ghost blocks shown during Alt+drag duplication */
+.zen-pomodoro-cycle-block-ghost {
+  opacity: 0.5;
+  border: 2px dashed #4a9eff !important;
+  background-color: rgb(74 158 255 / 10%) !important;
+  pointer-events: none;
+  animation: ghost-fade-in 0.2s ease;
+}
+
+@keyframes ghost-fade-in {
+  from { 
+    opacity: 0; 
+    transform: scale(0.9); 
+  }
+
+  to { 
+    opacity: 0.5; 
+    transform: scale(1); 
+  }
+}
+
+/* Smooth transition for blocks during drag reorder preview */
+.zen-pomodoro-cycle-block.drag-transition {
+  transition: transform 0.2s ease;
 }
 
 /* Selected block styling */

@@ -12172,6 +12172,8 @@
       this.draggedBlockIndex = null;
       this.selectedBlockIndices = new Set(); // Track selected block indices
       this.isDuplicating = false; // Flag for Alt+Drag duplication
+      this.isDragging = false;
+      this.dragCleanup = null;
     }
 
     /**
@@ -12791,7 +12793,6 @@
     _createBlockElement(block, index) {
       const blockDiv = document.createElement('div');
       blockDiv.className = `zen-pomodoro-cycle-block zen-pomodoro-cycle-block-${block.type}`;
-      blockDiv.draggable = true;
       blockDiv.dataset.index = index;
 
       // Drag handle
@@ -12926,76 +12927,219 @@
         }
       });
 
-      // Drag and drop handlers
-      blockDiv.addEventListener('dragstart', (e) => {
-        this.draggedBlockIndex = index;
-        this.isDuplicating = e.altKey;
-        
-        // If dragging a selected block, mark all selected blocks for dragging
-        if (this.selectedBlockIndices.has(index)) {
-          // Get all selected block elements and mark them
-          const container = blockDiv.parentElement;
-          const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
-          allBlocks.forEach((block, idx) => {
-            if (this.selectedBlockIndices.has(idx)) {
-              block.classList.add('dragging');
-            }
-          });
-        } else {
-          blockDiv.classList.add('dragging');
-        }
-        
-        e.dataTransfer.effectAllowed = this.isDuplicating ? 'copy' : 'move';
-      });
-
-      blockDiv.addEventListener('dragend', () => {
-        // Remove dragging class from all blocks
-        const container = blockDiv.parentElement;
-        if (container) {
-          container.querySelectorAll('.zen-pomodoro-cycle-block.dragging')
-            .forEach(el => el.classList.remove('dragging'));
-        }
-        this.draggedBlockIndex = null;
-        this.isDuplicating = false;
-      });
-
-      blockDiv.addEventListener('dragover', (e) => {
+      // Custom pointer-based drag on handle (supports mouse and touch)
+      dragHandle.addEventListener('pointerdown', (e) => {
+        // Allow left mouse button (button 0) or touch/pen input
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = this.isDuplicating ? 'copy' : 'move';
-        
-        const afterElement = this._getDragAfterElement(blockDiv.parentElement, e.clientY);
-        const draggingElements = Array.from(blockDiv.parentElement.querySelectorAll('.zen-pomodoro-cycle-block.dragging'));
-        
-        // Move all dragging elements together
-        draggingElements.forEach(draggingEl => {
-          if (afterElement == null) {
-            blockDiv.parentElement.appendChild(draggingEl);
-          } else {
-            blockDiv.parentElement.insertBefore(draggingEl, afterElement);
-          }
-        });
-      });
-
-      blockDiv.addEventListener('drop', (e) => {
-        e.preventDefault();
-        
-        // Compute target index from current DOM order
-        const container = blockDiv.parentElement;
-        if (!container) return;
-        
-        const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
-        const firstDraggingElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
-        
-        if (!firstDraggingElement) return;
-        
-        const targetIndex = blocks.indexOf(firstDraggingElement);
-        if (targetIndex === -1 || this.draggedBlockIndex === null) return;
-        
-        // Delegate to helper method for reduced complexity
-        this._handleBlockDrop(targetIndex);
+        e.stopPropagation();
+        this._startBlockDrag(e, blockDiv, index);
       });
 
       return blockDiv;
+    }
+
+    /**
+     * Start a custom pointer-based block drag operation.
+     * @param {MouseEvent} e - The mousedown event
+     * @param {HTMLElement} blockDiv - The block element being dragged
+     * @param {number} index - The index of the block being dragged
+     * @private
+     */
+    _startBlockDrag(e, blockDiv, index) {
+      if (this.isDragging) return;
+      this.isDragging = true;
+      this.draggedBlockIndex = index;
+      this.isDuplicating = e.altKey;
+
+      const container = blockDiv.parentElement;
+      if (!container) return;
+
+      // Determine which indices are being dragged
+      const isMultiSelect = this.selectedBlockIndices.has(index);
+      const dragIndices = isMultiSelect
+        ? Array.from(this.selectedBlockIndices).sort((a, b) => a - b)
+        : [index];
+
+      // Mark all dragged blocks
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      dragIndices.forEach(idx => {
+        if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
+      });
+
+      // Add transition class to non-dragged blocks for smooth shifting
+      allBlocks.forEach((block, idx) => {
+        if (!dragIndices.includes(idx)) {
+          block.classList.add('drag-transition');
+        }
+      });
+
+      // Create drop indicator
+      const dropIndicator = document.createElement('div');
+      dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
+      dropIndicator.style.display = 'none';
+      container.appendChild(dropIndicator);
+
+      // Create ghost blocks for duplication mode
+      let ghostBlocks = [];
+      if (this.isDuplicating) {
+        ghostBlocks = dragIndices.map(idx => {
+          const ghost = allBlocks[idx].cloneNode(true);
+          ghost.className = allBlocks[idx].className.replace('dragging', '').trim() + ' zen-pomodoro-cycle-block-ghost';
+          ghost.style.display = 'none';
+          return ghost;
+        });
+      }
+
+      // Calculate block height for shift animations
+      const BLOCK_GAP_PX = 8; // Gap between blocks in container
+      const DEFAULT_BLOCK_HEIGHT_PX = 60; // Default fallback height
+      const blockHeight = allBlocks[0] ? allBlocks[0].offsetHeight + BLOCK_GAP_PX : DEFAULT_BLOCK_HEIGHT_PX;
+      const totalDragHeight = blockHeight * dragIndices.length;
+      
+      let lastTargetIndex = -1;
+      let rafId = null;
+
+      const onPointerMove = (pointerMoveEvent) => {
+        if (rafId) return; // Throttle with rAF
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          const targetIndex = this._getDropTargetIndex(container, pointerMoveEvent.clientY, dragIndices);
+          
+          if (targetIndex === lastTargetIndex) return;
+          lastTargetIndex = targetIndex;
+
+          // Position drop indicator
+          const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
+          
+          if (targetIndex >= 0) {
+            dropIndicator.style.display = 'block';
+            
+            if (targetIndex < nonDraggedBlocks.length) {
+              container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
+            } else {
+              // After all non-dragged blocks
+              const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
+              if (lastNonDragged && lastNonDragged.nextSibling) {
+                container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
+              } else {
+                container.appendChild(dropIndicator);
+              }
+            }
+
+            // Show ghost blocks for duplication
+            if (this.isDuplicating && ghostBlocks.length > 0) {
+              // Remove existing ghosts
+              ghostBlocks.forEach(g => g.remove());
+              // Insert ghosts at drop position
+              ghostBlocks.forEach(ghost => {
+                ghost.style.display = '';
+                container.insertBefore(ghost, dropIndicator);
+              });
+            }
+
+            // Shift non-dragged blocks to show preview of final positions
+            nonDraggedBlocks.forEach((block, idx) => {
+              block.classList.remove('shift-down', 'shift-up');
+              block.style.removeProperty('--block-shift-distance');
+            });
+            
+            if (!this.isDuplicating) {
+              // For move operations, shift blocks to show where the gap will be
+              nonDraggedBlocks.forEach((block, idx) => {
+                block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
+              });
+            }
+          }
+        });
+      };
+
+      const onPointerUp = (pointerUpEvent) => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+
+        // Remove visual elements
+        dropIndicator.remove();
+        ghostBlocks.forEach(g => g.remove());
+
+        // Remove drag classes
+        allBlocks.forEach(block => {
+          block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
+          block.style.removeProperty('--block-shift-distance');
+        });
+
+        // Apply the operation using the last target index
+        if (lastTargetIndex >= 0 && lastTargetIndex !== -1) {
+          // Convert the target index (relative to non-dragged blocks) back to absolute index
+          const nonDraggedIndices = [];
+          for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
+            if (!dragIndices.includes(i)) {
+              nonDraggedIndices.push(i);
+            }
+          }
+          
+          // The absolute target index: insert before nonDraggedIndices[lastTargetIndex],
+          // or at end if lastTargetIndex >= nonDraggedIndices.length
+          let absoluteTarget;
+          if (lastTargetIndex >= nonDraggedIndices.length) {
+            absoluteTarget = this.currentEditingCycle.blocks.length;
+          } else {
+            absoluteTarget = nonDraggedIndices[lastTargetIndex];
+          }
+
+          if (this.isDuplicating) {
+            this._duplicateBlocks(dragIndices, absoluteTarget);
+          } else {
+            if (isMultiSelect) {
+              this._moveMultipleBlocks(dragIndices, absoluteTarget);
+            } else {
+              this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
+            }
+          }
+        }
+
+        // Re-render
+        const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+        if (blocksContainer) {
+          this._renderBlocks(blocksContainer);
+        }
+
+        this.isDragging = false;
+        this.draggedBlockIndex = null;
+        this.isDuplicating = false;
+      };
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    }
+
+    /**
+     * Calculate the drop target index based on mouse Y position.
+     * Returns the index among non-dragged blocks where the drop should occur.
+     * @param {HTMLElement} container - The blocks container
+     * @param {number} clientY - Mouse Y position
+     * @param {Array<number>} dragIndices - Indices of blocks being dragged
+     * @returns {number} Target insertion index among non-dragged blocks
+     * @private
+     */
+    _getDropTargetIndex(container, clientY, dragIndices) {
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
+
+      // Find the position among non-dragged blocks
+      for (let i = 0; i < nonDraggedBlocks.length; i++) {
+        const rect = nonDraggedBlocks[i].getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) {
+          return i;
+        }
+      }
+      
+      return nonDraggedBlocks.length; // After all blocks
     }
 
     /**
