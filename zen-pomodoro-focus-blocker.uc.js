@@ -12503,8 +12503,8 @@
       if (cycles.length === 0) {
         container.appendChild(this._createEmptyMessage());
       } else {
-        cycles.forEach((cycle) => {
-          const cycleItem = this._createCycleListItem(cycle, config, dialog);
+        cycles.forEach((cycle, index) => {
+          const cycleItem = this._createCycleListItem(cycle, config, dialog, index, cycles.length);
           container.appendChild(cycleItem);
         });
       }
@@ -12597,10 +12597,12 @@
      * @param {Object} cycle - The cycle object
      * @param {Object} config - Current configuration
      * @param {HTMLElement} parentDialog - Parent dialog element
+     * @param {number} index - Index of the cycle in the list
+     * @param {number} totalCount - Total number of cycles
      * @returns {HTMLElement} The cycle list item element
      * @private
      */
-    _createCycleListItem(cycle, config, parentDialog) {
+    _createCycleListItem(cycle, config, parentDialog, index, totalCount) {
       const item = document.createElement('div');
       item.className = 'zen-pomodoro-cycle-list-item';
 
@@ -12624,6 +12626,30 @@
       const buttonsDiv = document.createElement('div');
       buttonsDiv.className = 'zen-pomodoro-cycle-buttons';
 
+      // Move Up button
+      const moveUpButton = document.createElement('button');
+      moveUpButton.className = 'zen-pomodoro-dialog-button secondary small';
+      moveUpButton.textContent = '▲';
+      moveUpButton.title = 'Move up';
+      moveUpButton.disabled = index === 0;
+      moveUpButton.style.padding = '4px 8px';
+      moveUpButton.style.minWidth = 'auto';
+      moveUpButton.addEventListener('click', () => {
+        this._reorderCycle(config, index, index - 1, parentDialog);
+      });
+
+      // Move Down button
+      const moveDownButton = document.createElement('button');
+      moveDownButton.className = 'zen-pomodoro-dialog-button secondary small';
+      moveDownButton.textContent = '▼';
+      moveDownButton.title = 'Move down';
+      moveDownButton.disabled = index >= totalCount - 1;
+      moveDownButton.style.padding = '4px 8px';
+      moveDownButton.style.minWidth = 'auto';
+      moveDownButton.addEventListener('click', () => {
+        this._reorderCycle(config, index, index + 1, parentDialog);
+      });
+
       // Edit button
       const editButton = document.createElement('button');
       editButton.className = 'zen-pomodoro-dialog-button secondary small';
@@ -12642,6 +12668,8 @@
         this._confirmDeleteCycle(cycle, config, parentDialog);
       });
 
+      buttonsDiv.appendChild(moveUpButton);
+      buttonsDiv.appendChild(moveDownButton);
       buttonsDiv.appendChild(editButton);
       buttonsDiv.appendChild(deleteButton);
 
@@ -12702,6 +12730,34 @@
 
       applyLastDialogPosition(confirmDialog);
       document.documentElement.appendChild(confirmDialog);
+    }
+
+    /**
+     * Reorder a cycle in the saved cycles list.
+     * @param {Object} config - Current configuration
+     * @param {number} fromIndex - Current index
+     * @param {number} toIndex - Target index
+     * @param {HTMLElement} parentDialog - Parent dialog to refresh
+     * @private
+     */
+    _reorderCycle(config, fromIndex, toIndex, parentDialog) {
+      const savedCycles = config.customCycles || [];
+      if (fromIndex < 0 || fromIndex >= savedCycles.length) return;
+      if (toIndex < 0 || toIndex >= savedCycles.length) return;
+
+      const cycle = savedCycles[fromIndex];
+      savedCycles.splice(fromIndex, 1);
+      savedCycles.splice(toIndex, 0, cycle);
+
+      config.customCycles = savedCycles;
+      saveConfig(config);
+
+      logger.log(LOG_CATEGORIES.MENU, `Reordered cycle from position ${fromIndex} to ${toIndex}`, { cycleName: cycle.name });
+
+      // Refresh the dialog
+      saveDialogPosition(parentDialog);
+      parentDialog.remove();
+      this.showCustomCyclesMenu();
     }
 
     /**

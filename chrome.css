@@ -2135,6 +2135,11 @@ select.zen-pomodoro-dialog-input option:checked {
   margin-left: auto;
 }
 
+.zen-pomodoro-cycle-buttons button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* Custom Cycle Editor Dialog */
 .zen-pomodoro-cycle-editor-dialog {
   min-width: 500px;
