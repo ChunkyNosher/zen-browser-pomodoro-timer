@@ -13353,7 +13353,7 @@
         }
         this.isDragging = false;
       }
-      
+
       this.isDragging = true;
       this.draggedBlockIndex = index;
       this.isDuplicating = e.altKey;
@@ -13494,7 +13494,7 @@
         this.dragCleanup = null;
       };
 
-     
+
       this.dragCleanup = cleanup;
 
       document.addEventListener('pointermove', onPointerMove);
