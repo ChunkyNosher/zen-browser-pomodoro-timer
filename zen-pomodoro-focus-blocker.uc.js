@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.3.9
+ * Version: 1.4.0
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.3.9',
+    MOD_VERSION: '1.4.0',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -71,8 +71,8 @@
     /** Save state interval in seconds (every 10 seconds for performance) */
     SAVE_STATE_INTERVAL_SECONDS: 10,
 
-    /** Delay for DOM settling after timer start (in milliseconds) */
-    DOM_SETTLE_DELAY_MS: 100,
+    /** Delay for DOM settling after timer start (in milliseconds) - 200ms provides more reliable settling */
+    DOM_SETTLE_DELAY_MS: 200,
 
     /** Delay for showing restoration notification after DOM is ready (in milliseconds) */
     RESTORATION_NOTIFICATION_DELAY_MS: 500,
@@ -167,6 +167,9 @@
       'aria-label',
       'title',
     ],
+
+    /** Maximum length for page title in log messages */
+    MAX_TITLE_LOG_LENGTH: 50,
 
     /** Default configuration object */
     DEFAULT_CONFIG: {
@@ -335,7 +338,9 @@
     }
 
     /**
-     * Sanitize data to remove sensitive information.
+     * Recursively sanitize data to remove sensitive information.
+     * Handles null, undefined, primitives, arrays, and objects, filtering
+     * keys matching sensitive patterns.
      * @param {*} data - Data to sanitize
      * @returns {*} Sanitized data
      * @private
@@ -823,6 +828,26 @@
     }
 
     /**
+     * Check if a value is a non-empty array.
+     * @param {*} value - Value to check
+     * @returns {boolean} True if value is a non-empty array
+     */
+    function isNonEmptyArray(value) {
+      return Array.isArray(value) && value.length > 0;
+    }
+
+    /**
+     * Validate that a value is a valid positive integer within a range.
+     * @param {number} value - Value to validate
+     * @param {number} min - Minimum value (inclusive)
+     * @param {number} max - Maximum value (inclusive)
+     * @returns {boolean} True if value is valid
+     */
+    function isValidRangeValue(value, min, max) {
+      return !isNaN(value) && value >= min && value <= max;
+    }
+
+    /**
      * Extract and validate integer input from a dialog.
      * This function is null-safe: returns null if element not found, returns defaultValue
      * if the input is empty or invalid.
@@ -1019,6 +1044,8 @@
       extractWorkspaceNameFromButton,
       getActiveBlockedWorkspaces,
       findRuleAndExecute,
+      isNonEmptyArray,
+      isValidRangeValue,
     };
   })();
 
@@ -1067,6 +1094,12 @@
   function getValidatedIntFromDialog(dialog, options) {
     return Utils.getValidatedIntFromDialog(dialog, options);
   }
+  function isNonEmptyArray(value) {
+    return Utils.isNonEmptyArray(value);
+  }
+  function isValidRangeValue(value, min, max) {
+    return Utils.isValidRangeValue(value, min, max);
+  }
   function generateRandomCode(length, charset) {
     return Utils.generateRandomCode(length, charset);
   }
@@ -1087,6 +1120,26 @@
   }
   function findRuleAndExecute(config, rulesetId, ruleId, callback) {
     return Utils.findRuleAndExecute(config, rulesetId, ruleId, callback);
+  }
+
+  /**
+   * Send a browser notification with fallback to console.log.
+   * @param {string} title - Notification title
+   * @param {string} body - Notification body text
+   */
+  function sendBrowserNotification(title, body) {
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: 'chrome://branding/content/about-logo.png',
+        });
+      } else {
+        console.log(`${title}: ${body}`);
+      }
+    } catch (e) {
+      console.log(`${title}: ${body}`);
+    }
   }
 
   // Constants legacy accessors (for backward compatibility)
@@ -1152,6 +1205,21 @@
       // If we can't determine, assume it's not a popup to be safe
       return false;
     }
+  }
+
+  /**
+   * Initialize dialog position for drag by converting from CSS centering to absolute pixels.
+   * @param {HTMLElement} dialog - The dialog element
+   * @param {DOMRect} rect - The dialog's bounding client rect
+   */
+  function initializeDialogDragPosition(dialog, rect) {
+    const computedStyle = window.getComputedStyle(dialog);
+    if (computedStyle.transform !== 'none') {
+      dialog.style.transform = 'none';
+    }
+    dialog.style.position = 'fixed';
+    dialog.style.left = `${rect.left}px`;
+    dialog.style.top = `${rect.top}px`;
   }
 
   /**
@@ -1230,24 +1298,11 @@
       startX = coords.x;
       startY = coords.y;
 
-      // Convert from CSS centering (transform + percentage top/left) to absolute pixel positioning
-      // Store the actual position from getBoundingClientRect before making changes
-      const actualLeft = rect.left;
-      const actualTop = rect.top;
+      // Convert from CSS centering to absolute pixel positioning
+      initializeDialogDragPosition(dialog, rect);
 
-      // Clear transform-based centering if present
-      const computedStyle = window.getComputedStyle(dialog);
-      if (computedStyle.transform !== 'none') {
-        dialog.style.transform = 'none';
-      }
-
-      // Always set position to fixed and use pixel values to override CSS percentage positioning
-      dialog.style.position = 'fixed';
-      dialog.style.left = `${actualLeft}px`;
-      dialog.style.top = `${actualTop}px`;
-
-      startLeft = actualLeft;
-      startTop = actualTop;
+      startLeft = rect.left;
+      startTop = rect.top;
       dialogWidth = rect.width;
       dialogHeight = rect.height;
 
@@ -2310,7 +2365,7 @@
      */
     _getEarliestReminderTime(config) {
       const times = config.dailyReminderTimes;
-      if (!times || !Array.isArray(times) || times.length === 0) {
+      if (!isNonEmptyArray(times)) {
         return '10:00';
       }
 
@@ -2373,21 +2428,30 @@
      * - This reminder hasn't been shown yet for the current phase
      * @private
      */
-    _checkTimerReminders() {
-      const config = getConfig();
-
-      // Early exits for disabled states
-      if (!config.timerRemindersEnabled || this.currentPhase === 'transition') return;
-
+    /**
+     * Get the appropriate reminder list for the current phase.
+     * @param {Object} config - Configuration object
+     * @returns {{reminders: Array<number>, isFocusPhase: boolean}} Reminder list and phase flag
+     * @private
+     */
+    _getPhaseReminders(config) {
       const isFocusPhase = this.currentPhase === 'focus';
       const reminders = isFocusPhase
         ? config.focusPhaseReminders || []
         : config.breakPhaseReminders || [];
+      return { reminders, isFocusPhase };
+    }
 
+    _checkTimerReminders() {
+      const config = getConfig();
+
+      // Early exits for disabled states
+      if (!config.timerRemindersEnabled) return;
+      if (this.currentPhase === 'transition') return;
+      if (this.remainingTime % 60 !== 0) return;
+
+      const { reminders, isFocusPhase } = this._getPhaseReminders(config);
       const remainingMinutes = Math.floor(this.remainingTime / 60);
-      const isExactMinuteBoundary = this.remainingTime % 60 === 0;
-      
-      if (!isExactMinuteBoundary) return;
 
       // Check if current time matches a reminder that hasn't been shown
       const matchingReminder = reminders.find(
@@ -2414,21 +2478,9 @@
       const message = isFocusPhase
         ? `⏰ ${minutes} ${minuteText} left in your focus session!`
         : `☕ ${minutes} ${minuteText} left in your break!`;
-
       const title = isFocusPhase ? 'Focus Reminder' : 'Break Reminder';
 
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification(title, {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log(`${title}: ${message}`);
-        }
-      } catch (e) {
-        console.log(`${title}: ${message}`);
-      }
+      sendBrowserNotification(title, message);
 
       logger.log(LOG_CATEGORIES.TIMER, 'Timer reminder shown', {
         minutes: minutes,
@@ -2989,6 +3041,8 @@
         customCycle: this.customCycle,
         customCycleBlocks: this.customCycleBlocks,
         currentBlockIndex: this.currentBlockIndex,
+        // Distraction dump state
+        distractionDump: window.zenPomodoroApp?.distractionDump?.getStateForPersistence() || null,
       };
       setPref('timer-state', JSON.stringify(state));
     }
@@ -3045,6 +3099,9 @@
           this.savedConfig = state.savedConfig;
           this.config = state.savedConfig;
         }
+
+        // Store dump state for later restoration
+        this.pendingDumpState = state.distractionDump || null;
 
         // Set flag to indicate this was restored from restart
         this.restoredFromRestart = true;
@@ -3323,6 +3380,9 @@
           attributes: true,
           attributeFilter: ['active', 'selected', 'zen-workspace-id'],
           subtree: true,
+          // Observes childList changes to detect when workspace buttons/elements
+          // are added or removed (e.g., new workspaces created), ensuring
+          // _handleWorkspaceMutation() keeps the active workspace state in sync.
           childList: true,
         });
         logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace observer configured', {
@@ -4072,21 +4132,7 @@
       const stopButton = this.overlay?.querySelector('#zen-pomodoro-stop-button');
 
       if (pauseButton) {
-        pauseButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
-            // Check if Distraction Dump is active - provide user feedback
-            if (isDistractionDumpBlocking()) {
-              window.zenPomodoroApp.showCustomAlert(
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
-              );
-              return;
-            }
-            handlePauseResumeTimer();
-            // Update button text based on new state
-            pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
-          }
-        });
+        pauseButton.addEventListener('click', () => this._handlePauseClick(pauseButton));
       }
 
       if (stopButton) {
@@ -4097,6 +4143,26 @@
           });
         });
       }
+    }
+
+    /**
+     * Handle pause button click on overlay.
+     * @param {HTMLElement} pauseButton - The pause button element
+     * @private
+     */
+    _handlePauseClick(pauseButton) {
+      if (!window.zenPomodoroApp || !window.zenPomodoroApp.timer) return;
+
+      // Check if Distraction Dump is active - provide user feedback
+      if (isDistractionDumpBlocking()) {
+        window.zenPomodoroApp.showCustomAlert(
+          Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+          Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+        );
+        return;
+      }
+      handlePauseResumeTimer();
+      pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
     }
 
     /**
@@ -5242,6 +5308,12 @@
       // Create dialog structure
       const backButton = this._createBackButton(dialog);
       const h2 = this._createDialogTitle('Start Timer');
+
+      // Undo/Redo for start timer config
+      const configUndoRedo = new UndoRedoManager();
+      configUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = configUndoRedo.createButtons();
+
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
 
@@ -5276,8 +5348,21 @@
       const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
 
       // Assemble dialog
-      [backButton, h2, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
+      [backButton, h2, undoRedoButtons, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        configUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      configUndoRedo.onStateRestore = (state) => {
+        saveConfig(state);
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.showConfigDialog();
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -5562,34 +5647,7 @@
         dialog.remove();
 
         if (window.zenPomodoroApp) {
-          if (mode === 'custom') {
-            // Get selected custom cycle
-            const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
-            const savedCycles = config.customCycles || [];
-            
-            // Validate that a custom cycle is selected
-            if (!cycleSelect || !cycleSelect.value) {
-              window.zenPomodoroApp.showCustomAlert(
-                'No Cycle Selected',
-                'Please select a custom cycle or create one first.'
-              );
-              return;
-            }
-            
-            const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
-            if (selectedCycle) {
-              window.zenPomodoroApp.startCustomCycle(selectedCycle);
-            } else {
-              logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
-              window.zenPomodoroApp.showCustomAlert(
-                'Cycle Not Found',
-                'The selected custom cycle could not be found. Please select another cycle.'
-              );
-              return;
-            }
-          } else {
-            window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
-          }
+          this._startTimerForMode({ mode, dialog, config, cycles, sessionOverrides });
         }
       };
 
@@ -5626,6 +5684,45 @@
       // Custom mode doesn't need overrides as cycle config contains all durations
 
       return sessionOverrides;
+    }
+
+    /**
+     * Start timer based on selected mode.
+     * @param {Object} options - Start options
+     * @param {string} options.mode - Timer mode (simple, pomodoro, custom)
+     * @param {HTMLElement} options.dialog - Dialog element for querying custom cycle select
+     * @param {Object} options.config - Config object
+     * @param {number} options.cycles - Number of cycles
+     * @param {Object} options.sessionOverrides - Session duration overrides
+     * @private
+     */
+    _startTimerForMode({ mode, dialog, config, cycles, sessionOverrides }) {
+      if (mode !== 'custom') {
+        window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+        return;
+      }
+
+      const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
+      const savedCycles = config.customCycles || [];
+
+      if (!cycleSelect || !cycleSelect.value) {
+        window.zenPomodoroApp.showCustomAlert(
+          'No Cycle Selected',
+          'Please select a custom cycle or create one first.'
+        );
+        return;
+      }
+
+      const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
+      if (selectedCycle) {
+        window.zenPomodoroApp.startCustomCycle(selectedCycle);
+      } else {
+        logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
+        window.zenPomodoroApp.showCustomAlert(
+          'Cycle Not Found',
+          'The selected custom cycle could not be found. Please select another cycle.'
+        );
+      }
     }
 
     /**
@@ -5676,6 +5773,11 @@
 
       const h2 = document.createElement('h2');
       h2.textContent = 'Pomodoro Timer Settings';
+
+      // Undo/Redo for settings
+      const settingsUndoRedo = new UndoRedoManager();
+      settingsUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = settingsUndoRedo.createButtons();
 
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
@@ -6449,7 +6551,7 @@
       addFocusReminderBtn.textContent = 'Add';
       addFocusReminderBtn.addEventListener('click', () => {
         const value = parseInt(addFocusReminderInput.value, 10);
-        if (!isNaN(value) && value > 0 && value <= 120) {
+        if (isValidRangeValue(value, 1, 120)) {
           if (!config.focusPhaseReminders.includes(value)) {
             config.focusPhaseReminders.push(value);
             config.focusPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -6543,7 +6645,7 @@
       addBreakReminderBtn.textContent = 'Add';
       addBreakReminderBtn.addEventListener('click', () => {
         const value = parseInt(addBreakReminderInput.value, 10);
-        if (!isNaN(value) && value > 0 && value <= 60) {
+        if (isValidRangeValue(value, 1, 60)) {
           if (!config.breakPhaseReminders.includes(value)) {
             config.breakPhaseReminders.push(value);
             config.breakPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -6629,10 +6731,26 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        settingsUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      settingsUndoRedo.onStateRestore = (state) => {
+        // Save the restored state to config
+        saveConfig(state);
+        // Re-create the dialog to reflect changes
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.createSettingsDialog();
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -7029,6 +7147,11 @@
       const h2 = document.createElement('h2');
       h2.textContent = 'Ruleset Settings';
 
+      // Undo/Redo for rulesets
+      const rulesetUndoRedo = new UndoRedoManager();
+      rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(config)));
+      const undoRedoButtons = rulesetUndoRedo.createButtons();
+
       const configSection = document.createElement('div');
       configSection.className = 'zen-pomodoro-config-section';
 
@@ -7115,10 +7238,24 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(h2);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
       document.documentElement.appendChild(dialog);
+
+      // Track changes for undo/redo
+      configSection.addEventListener('change', () => {
+        rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig())));
+      });
+
+      // Set restore callback for undo/redo
+      rulesetUndoRedo.onStateRestore = (state) => {
+        saveConfig(state);
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.showRulesetSettingsDialog(onClose);
+      };
 
       // Apply saved position from parent dialog before setting up drag
       applyLastDialogPosition(dialog);
@@ -8839,18 +8976,27 @@
 
       // Schedule a delayed re-check for keyword blocking
       // This handles cases where tab title updates after the initial check
-      if (this._hasActiveKeywordRules()) {
-        if (this._keywordRecheckTimeout) {
-          clearTimeout(this._keywordRecheckTimeout);
-        }
-        this._keywordRecheckTimeout = setTimeout(() => {
-          if (!this._shouldShowBlocker()) return;
-          const url = this._getCurrentUrl();
-          if (url && !this._isInternalBrowserPage(url)) {
-            this._evaluateUrlAndUpdateBlocker(url);
-          }
-        }, 500); // 500ms delay for title updates
+      this._scheduleKeywordRecheck();
+    }
+
+    /**
+     * Schedule a delayed re-check for keyword blocking.
+     * Handles cases where tab title updates after the initial page check.
+     * @private
+     */
+    _scheduleKeywordRecheck() {
+      if (!this._hasActiveKeywordRules()) return;
+
+      if (this._keywordRecheckTimeout) {
+        clearTimeout(this._keywordRecheckTimeout);
       }
+      this._keywordRecheckTimeout = setTimeout(() => {
+        if (!this._shouldShowBlocker()) return;
+        const url = this._getCurrentUrl();
+        if (url && !this._isInternalBrowserPage(url)) {
+          this._evaluateUrlAndUpdateBlocker(url);
+        }
+      }, 500);
     }
 
     /**
@@ -9197,14 +9343,23 @@
     }
 
     /**
-     * Get page title for keyword matching.
-     * NOTE: Due to browser security restrictions (cross-origin), Zen Browser mods
-     * running in the chrome context cannot access webpage body content (innerText).
-     * Only the tab title is accessible, so keywords are matched against titles only.
-     * @param {boolean} _titleOnly - Ignored; always returns title only due to security restrictions
-     * @returns {string} Page title text
+     * Get the current tab title from available browser sources.
+     * Due to cross-origin security restrictions, we cannot access contentDocument.body.
+     * Only the tab title is accessible from the browser chrome context.
+     * @returns {string} The current tab title, or empty string if unavailable
      * @private
      */
+    _getTabTitle() {
+      /* eslint-disable no-undef */
+      return (
+        gBrowser.selectedTab?.label ||
+        gBrowser.selectedBrowser?.contentTitle ||
+        gBrowser.contentTitle ||
+        ''
+      );
+      /* eslint-enable no-undef */
+    }
+
     // eslint-disable-next-line no-unused-vars
     _getPageText(_titleOnly = true) {
       try {
@@ -9214,21 +9369,12 @@
           return '';
         }
 
-        // Get tab title from multiple sources for reliability
-        // Due to cross-origin security restrictions, we cannot access contentDocument.body
-        // Only the tab title is accessible from the browser chrome context
-        /* eslint-disable no-undef */
-        const title =
-          gBrowser.selectedTab?.label ||
-          gBrowser.selectedBrowser?.contentTitle ||
-          gBrowser.contentTitle ||
-          '';
-        /* eslint-enable no-undef */
-
-        // Log for debugging
+        const title = this._getTabTitle();
         if (title) {
+          const maxLen = Constants.MAX_TITLE_LOG_LENGTH;
+          const truncatedTitle = title.length > maxLen ? title.substring(0, maxLen) + '...' : title;
           logger.log(LOG_CATEGORIES.SECURITY, 'Page title retrieved for keyword check', {
-            title: title.substring(0, 50) + (title.length > 50 ? '...' : ''),
+            title: truncatedTitle,
           });
         }
 
@@ -9720,6 +9866,23 @@
     }
 
     /**
+     * Check if the popup has been detached from the DOM.
+     * Cleans up the timer interval if popup is gone.
+     * @returns {boolean} True if popup is detached and timer was cleaned up
+     * @private
+     */
+    _isPopupDetached() {
+      if (!this.popup || !document.documentElement.contains(this.popup)) {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    /**
      * Start the countdown timer.
      * Updates the display every second and closes popup when timer reaches zero.
      * Includes DOM detachment check to stop timer if popup is removed externally.
@@ -9731,19 +9894,10 @@
       });
 
       this.timerInterval = setInterval(() => {
-        // If the popup has been removed or detached externally, stop the timer
-        if (!this.popup || !document.documentElement.contains(this.popup)) {
-          if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-          }
-          return;
-        }
+        if (this._isPopupDetached()) return;
 
         // Respect main timer's pause state - do not decrement if paused
-        if (window.zenPomodoroApp?.timer?.isPaused) {
-          return;
-        }
+        if (window.zenPomodoroApp?.timer?.isPaused) return;
 
         this.remainingTime--;
 
@@ -9913,7 +10067,7 @@
       const config = getConfig();
       const times = config.dailyReminderTimes;
       
-      if (!times || !Array.isArray(times) || times.length === 0) {
+      if (!isNonEmptyArray(times)) {
         return '10:00';
       }
       
@@ -10715,73 +10869,68 @@
      * Returns null if reminder shouldn't show or conditions aren't met.
      * @returns {number|null} Seconds until reminder, or null if not applicable
      */
+    /**
+     * Convert a time string (HH:MM) to minutes since midnight.
+     * Expects pre-validated input from isValidTimeFormat() filter.
+     * @param {string} timeStr - Time string in HH:MM format
+     * @returns {number} Minutes since midnight
+     * @private
+     */
+    _timeToMinutes(timeStr) {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    }
+
+    /**
+     * Find the next unshown reminder from sorted times.
+     * @param {Array<string>} sortedTimes - Sorted time strings
+     * @param {number} currentTimeMinutes - Current time in minutes since midnight
+     * @returns {{hours: number, minutes: number}|null} Next reminder time, or null
+     * @private
+     */
+    _findNextUnshownReminder(sortedTimes, currentTimeMinutes) {
+      for (const timeStr of sortedTimes) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const reminderTimeMinutes = hours * 60 + minutes;
+        const wasShown = this._wasReminderShownToday(hours, minutes);
+
+        if (wasShown) continue;
+
+        if (reminderTimeMinutes > currentTimeMinutes) {
+          return { hours, minutes };
+        }
+        if (reminderTimeMinutes === currentTimeMinutes) {
+          return { hours: -1, minutes: 0 }; // Signal: show now
+        }
+      }
+      return null;
+    }
+
     getTimeUntilDailyReminder() {
       const config = getConfig();
 
-      // Return null if feature is disabled
-      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) {
-        return null;
-      }
+      if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) return null;
 
-      // Get reminder times array
       const reminderTimes = config.dailyReminderTimes;
-      if (!Array.isArray(reminderTimes) || reminderTimes.length === 0) {
-        return null;
-      }
+      if (!isNonEmptyArray(reminderTimes)) return null;
 
-      // Find the next reminder that hasn't been shown yet
-      const now = new Date();
-      const currentHours = now.getHours();
-      const currentMinutes = now.getMinutes();
-      const currentTimeMinutes = currentHours * 60 + currentMinutes;
-
-      // Reset reminders if new day
       this._resetIfNewDay();
 
-      let nextReminderMinutes = null;
-      let nextReminderHours = null;
+      const now = new Date();
+      const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
 
-      // Sort reminder times by actual time of day (minutes since midnight)
-      const sortedReminderTimes = reminderTimes
+      const sortedTimes = reminderTimes
         .filter((timeStr) => isValidTimeFormat(timeStr))
         .slice()
-        .sort((a, b) => {
-          const [aHours, aMinutes] = a.split(':').map(Number);
-          const [bHours, bMinutes] = b.split(':').map(Number);
-          return aHours * 60 + aMinutes - (bHours * 60 + bMinutes);
-        });
+        .sort((a, b) => this._timeToMinutes(a) - this._timeToMinutes(b));
 
-      for (const timeStr of sortedReminderTimes) {
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        const reminderTimeMinutes = hours * 60 + minutes;
+      const nextReminder = this._findNextUnshownReminder(sortedTimes, currentTimeMinutes);
+      if (!nextReminder) return null;
+      if (nextReminder.hours === -1) return 0; // Show now
 
-        // Check if this reminder hasn't been shown yet
-        const wasShown = this._wasReminderShownToday(hours, minutes);
-
-        if (!wasShown) {
-          // Check if this reminder time is in the future
-          if (reminderTimeMinutes > currentTimeMinutes) {
-            nextReminderMinutes = minutes;
-            nextReminderHours = hours;
-            break;
-          } else if (reminderTimeMinutes === currentTimeMinutes) {
-            // Reminder should be showing now
-            return 0;
-          }
-        }
-      }
-
-      // If no future reminder found, return null
-      if (nextReminderMinutes === null) {
-        return null;
-      }
-
-      // Calculate seconds until next reminder
       const reminderDate = new Date();
-      reminderDate.setHours(nextReminderHours, nextReminderMinutes, 0, 0);
-
-      const remainingMs = reminderDate - now;
-      return Math.ceil(remainingMs / 1000);
+      reminderDate.setHours(nextReminder.hours, nextReminder.minutes, 0, 0);
+      return Math.ceil((reminderDate - now) / 1000);
     }
 
     /**
@@ -11763,6 +11912,33 @@
     }
 
     /**
+     * Export dump state for persistence across browser restarts.
+     * @returns {Object} Dump state object
+     */
+    getStateForPersistence() {
+      return {
+        isActive: this.isActive,
+        dumpTimeRemaining: this.dumpTimeRemaining,
+        savedTimerState: this.savedTimerState,
+        dumpUsedThisFocusPhase: this.dumpUsedThisFocusPhase,
+      };
+    }
+
+    /**
+     * Restore dump state from persistence.
+     * @param {Object} state - Saved dump state
+     * @returns {boolean} True if dump was active and restored
+     */
+    restoreState(state) {
+      if (!state) return false;
+      this.isActive = state.isActive || false;
+      this.dumpTimeRemaining = state.dumpTimeRemaining || 0;
+      this.savedTimerState = state.savedTimerState || null;
+      this.dumpUsedThisFocusPhase = state.dumpUsedThisFocusPhase || false;
+      return this.isActive;
+    }
+
+    /**
      * Check if distraction dump is available for the current focus phase.
      * @returns {boolean} True if dump is available
      */
@@ -12125,6 +12301,135 @@
   }
 
   // ============================================
+  // Undo/Redo Manager Module
+  // ============================================
+
+  /**
+   * UndoRedoManager - Generic undo/redo state management for dialog menus.
+   * Tracks state snapshots and provides undo/redo navigation.
+   * Uses JSON serialization for deep state comparison and cloning.
+   */
+  class UndoRedoManager {
+    constructor() {
+      this.undoStack = [];
+      this.redoStack = [];
+      this.buttonContainer = null;
+      this.undoButton = null;
+      this.redoButton = null;
+      this.onStateRestore = null; // Callback when state is restored
+    }
+
+    /**
+     * Push a new state snapshot onto the undo stack.
+     * Clears the redo stack since a new action invalidates future states.
+     * @param {Object} state - The state to save (will be deep-cloned)
+     */
+    pushState(state) {
+      this.undoStack.push(JSON.stringify(state));
+      this.redoStack = [];
+      this._updateButtons();
+    }
+
+    /**
+     * Undo the last action and return the previous state.
+     * @returns {Object|null} The restored state, or null if nothing to undo
+     */
+    undo() {
+      if (this.undoStack.length <= 1) return null; // Keep at least initial state
+      const current = this.undoStack.pop();
+      this.redoStack.push(current);
+      const previousState = JSON.parse(this.undoStack[this.undoStack.length - 1]);
+      this._updateButtons();
+      if (this.onStateRestore) this.onStateRestore(previousState);
+      return previousState;
+    }
+
+    /**
+     * Redo the last undone action and return the next state.
+     * @returns {Object|null} The restored state, or null if nothing to redo
+     */
+    redo() {
+      if (this.redoStack.length === 0) return null;
+      const nextStateStr = this.redoStack.pop();
+      this.undoStack.push(nextStateStr);
+      const nextState = JSON.parse(nextStateStr);
+      this._updateButtons();
+      if (this.onStateRestore) this.onStateRestore(nextState);
+      return nextState;
+    }
+
+    /**
+     * Check if undo is available.
+     * @returns {boolean}
+     */
+    canUndo() {
+      return this.undoStack.length > 1;
+    }
+
+    /**
+     * Check if redo is available.
+     * @returns {boolean}
+     */
+    canRedo() {
+      return this.redoStack.length > 0;
+    }
+
+    /**
+     * Create the undo/redo button container UI element.
+     * @returns {HTMLElement} Container with undo and redo buttons
+     */
+    createButtons() {
+      this.buttonContainer = document.createElement('div');
+      this.buttonContainer.className = 'zen-pomodoro-undo-redo-container';
+
+      this.undoButton = document.createElement('button');
+      this.undoButton.className = 'zen-pomodoro-undo-redo-button';
+      this.undoButton.textContent = '↩ Undo';
+      this.undoButton.title = 'Undo last change';
+      this.undoButton.disabled = true;
+      this.undoButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.undo();
+      });
+
+      this.redoButton = document.createElement('button');
+      this.redoButton.className = 'zen-pomodoro-undo-redo-button';
+      this.redoButton.textContent = 'Redo ↪';
+      this.redoButton.title = 'Redo last undone change';
+      this.redoButton.disabled = true;
+      this.redoButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.redo();
+      });
+
+      this.buttonContainer.appendChild(this.undoButton);
+      this.buttonContainer.appendChild(this.redoButton);
+
+      return this.buttonContainer;
+    }
+
+    /**
+     * Update button disabled states based on stack contents.
+     * @private
+     */
+    _updateButtons() {
+      if (this.undoButton) this.undoButton.disabled = !this.canUndo();
+      if (this.redoButton) this.redoButton.disabled = !this.canRedo();
+    }
+
+    /**
+     * Reset the undo/redo stacks.
+     */
+    reset() {
+      this.undoStack = [];
+      this.redoStack = [];
+      this._updateButtons();
+    }
+  }
+
+  // ============================================
   // Custom Cycle Manager
   // ============================================
 
@@ -12140,6 +12445,8 @@
       this.draggedBlockIndex = null;
       this.selectedBlockIndices = new Set(); // Track selected block indices
       this.isDuplicating = false; // Flag for Alt+Drag duplication
+      this.isDragging = false;
+      this.dragCleanup = null;
     }
 
     /**
@@ -12396,6 +12703,9 @@
         if (!this.currentEditingCycle.defaultBreakDuration) {
           this.currentEditingCycle.defaultBreakDuration = 5;
         }
+        if (!this.currentEditingCycle.defaultTransitionDuration) {
+          this.currentEditingCycle.defaultTransitionDuration = 5;
+        }
       } else {
         // Create new cycle with default values
         this.currentEditingCycle = {
@@ -12403,6 +12713,7 @@
           name: 'New Custom Cycle',
           defaultFocusDuration: 25,
           defaultBreakDuration: 5,
+          defaultTransitionDuration: 5,
           blocks: [
             { type: 'focus', duration: 25 },
             { type: 'break', duration: 5 },
@@ -12431,6 +12742,12 @@
       title.className = 'zen-pomodoro-dialog-title';
       title.textContent = cycleId ? 'Edit Custom Cycle' : 'Create Custom Cycle';
 
+      // Undo/Redo for cycle editing
+      const cycleUndoRedo = new UndoRedoManager();
+      cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      const undoRedoButtons = cycleUndoRedo.createButtons();
+      this.currentUndoRedo = cycleUndoRedo;
+
       // Cycle name input
       const nameRow = document.createElement('div');
       nameRow.className = 'zen-pomodoro-config-row';
@@ -12443,6 +12760,10 @@
       nameInput.placeholder = 'e.g., Deep Work Session';
       nameInput.addEventListener('input', () => {
         this.currentEditingCycle.name = nameInput.value;
+      });
+      nameInput.addEventListener('change', () => {
+        // Push undo state after name change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       nameRow.appendChild(nameLabel);
       nameRow.appendChild(nameInput);
@@ -12482,6 +12803,8 @@
         );
         this.currentEditingCycle.defaultFocusDuration = validated;
         focusDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       
       focusDurationContainer.appendChild(focusDurationLabel);
@@ -12514,13 +12837,50 @@
         );
         this.currentEditingCycle.defaultBreakDuration = validated;
         breakDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
       
       breakDurationContainer.appendChild(breakDurationLabel);
       breakDurationContainer.appendChild(breakDurationInput);
 
+      // Transition block duration
+      const transitionDurationContainer = document.createElement('div');
+      transitionDurationContainer.style.display = 'flex';
+      transitionDurationContainer.style.flexDirection = 'column';
+      transitionDurationContainer.style.flex = '1';
+
+      const transitionDurationLabel = document.createElement('label');
+      transitionDurationLabel.textContent = 'Transition Duration (min):';
+      transitionDurationLabel.style.fontSize = '12px';
+      transitionDurationLabel.style.marginBottom = '4px';
+
+      const transitionDurationInput = document.createElement('input');
+      transitionDurationInput.type = 'number';
+      transitionDurationInput.className = 'zen-pomodoro-dialog-input';
+      transitionDurationInput.min = '1';
+      transitionDurationInput.max = '15';
+      transitionDurationInput.value = this.currentEditingCycle.defaultTransitionDuration;
+      transitionDurationInput.style.width = '100%';
+      transitionDurationInput.addEventListener('change', () => {
+        const validated = validateIntegerInput(
+          transitionDurationInput.value,
+          1,
+          15,
+          this.currentEditingCycle.defaultTransitionDuration
+        );
+        this.currentEditingCycle.defaultTransitionDuration = validated;
+        transitionDurationInput.value = validated;
+        // Push undo state after duration change
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      });
+
+      transitionDurationContainer.appendChild(transitionDurationLabel);
+      transitionDurationContainer.appendChild(transitionDurationInput);
+
       durationRow.appendChild(focusDurationContainer);
       durationRow.appendChild(breakDurationContainer);
+      durationRow.appendChild(transitionDurationContainer);
 
       // Blocks container
       const blocksLabel = document.createElement('label');
@@ -12546,7 +12906,6 @@
 
       const blockTypeSelect = document.createElement('select');
       blockTypeSelect.className = 'zen-pomodoro-dialog-input';
-      blockTypeSelect.style.flex = '1';
       
       const focusOption = document.createElement('option');
       focusOption.value = 'focus';
@@ -12577,11 +12936,13 @@
         } else if (selectedType === 'break') {
           duration = this.currentEditingCycle.defaultBreakDuration;
         } else {
-          // Transition: default to 5 minutes
-          duration = 5;
+          // Transition: use the cycle's default transition duration with fallback
+          duration = this.currentEditingCycle.defaultTransitionDuration || 5;
         }
         this.addBlock(selectedType, duration);
         this._renderBlocks(blocksContainer);
+        // Push undo state after adding block
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
       });
 
       addBlockRow.appendChild(blockTypeSelect);
@@ -12619,12 +12980,29 @@
 
       dialog.appendChild(backButton);
       dialog.appendChild(title);
+      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(nameRow);
       dialog.appendChild(durationRow);
       dialog.appendChild(blocksLabel);
       dialog.appendChild(blocksContainer);
       dialog.appendChild(addBlockRow);
       dialog.appendChild(buttonDiv);
+
+      // Track changes for undo/redo
+      blocksContainer.addEventListener('change', () => {
+        cycleUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      });
+
+      // Set restore callback for undo/redo
+      cycleUndoRedo.onStateRestore = (state) => {
+        this.currentEditingCycle = state;
+        // Update inputs
+        if (nameInput) nameInput.value = state.name;
+        if (focusDurationInput) focusDurationInput.value = state.defaultFocusDuration;
+        if (breakDurationInput) breakDurationInput.value = state.defaultBreakDuration;
+        if (transitionDurationInput) transitionDurationInput.value = state.defaultTransitionDuration || 5;
+        this._renderBlocks(blocksContainer);
+      };
 
       applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
@@ -12759,7 +13137,6 @@
     _createBlockElement(block, index) {
       const blockDiv = document.createElement('div');
       blockDiv.className = `zen-pomodoro-cycle-block zen-pomodoro-cycle-block-${block.type}`;
-      blockDiv.draggable = true;
       blockDiv.dataset.index = index;
 
       // Drag handle
@@ -12815,54 +13192,11 @@
         
         // If this block is selected, delete all selected blocks
         if (this.selectedBlockIndices.has(index)) {
-          const indicesToDelete = Array.from(this.selectedBlockIndices).sort((a, b) => b - a);
-          
-          // Check if we'd delete all blocks
-          if (indicesToDelete.length >= this.currentEditingCycle.blocks.length) {
-            // Show error - must have at least one block
-            const errorDialog = document.createElement('div');
-            errorDialog.className = 'zen-pomodoro-dialog active';
-            errorDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
-
-            const title = document.createElement('h2');
-            title.textContent = 'Cannot Delete';
-
-            const message = document.createElement('p');
-            message.textContent = 'A cycle must have at least one block.';
-            message.style.marginBottom = '20px';
-
-            const okButton = document.createElement('button');
-            okButton.className = 'zen-pomodoro-dialog-button';
-            okButton.textContent = 'OK';
-            okButton.addEventListener('click', () => {
-              errorDialog.remove();
-            });
-
-            errorDialog.appendChild(title);
-            errorDialog.appendChild(message);
-            errorDialog.appendChild(okButton);
-
-            applyLastDialogPosition(errorDialog);
-            document.documentElement.appendChild(errorDialog);
-            return;
-          }
-          
-          // Delete in reverse order to maintain indices
-          for (const idx of indicesToDelete) {
-            this.currentEditingCycle.blocks.splice(idx, 1);
-          }
-          
-          logger.log(LOG_CATEGORIES.MENU, `Deleted ${indicesToDelete.length} selected block(s)`);
-          
-          // Clear selection and re-render
-          this.selectedBlockIndices.clear();
-          const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
-          if (blocksContainer) {
-            this._renderBlocks(blocksContainer);
-          }
+          this._deleteSelectedBlocks();
         } else {
           // Single block deletion
           this.removeBlock(index);
+          this._pushUndoState();
         }
       });
 
@@ -12894,76 +13228,284 @@
         }
       });
 
-      // Drag and drop handlers
-      blockDiv.addEventListener('dragstart', (e) => {
-        this.draggedBlockIndex = index;
-        this.isDuplicating = e.altKey;
-        
-        // If dragging a selected block, mark all selected blocks for dragging
-        if (this.selectedBlockIndices.has(index)) {
-          // Get all selected block elements and mark them
-          const container = blockDiv.parentElement;
-          const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
-          allBlocks.forEach((block, idx) => {
-            if (this.selectedBlockIndices.has(idx)) {
-              block.classList.add('dragging');
-            }
-          });
-        } else {
-          blockDiv.classList.add('dragging');
-        }
-        
-        e.dataTransfer.effectAllowed = this.isDuplicating ? 'copy' : 'move';
-      });
-
-      blockDiv.addEventListener('dragend', () => {
-        // Remove dragging class from all blocks
-        const container = blockDiv.parentElement;
-        if (container) {
-          container.querySelectorAll('.zen-pomodoro-cycle-block.dragging')
-            .forEach(el => el.classList.remove('dragging'));
-        }
-        this.draggedBlockIndex = null;
-        this.isDuplicating = false;
-      });
-
-      blockDiv.addEventListener('dragover', (e) => {
+      // Custom pointer-based drag on handle (supports mouse and touch)
+      dragHandle.addEventListener('pointerdown', (e) => {
+        // Allow left mouse button (button 0) or touch/pen input
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = this.isDuplicating ? 'copy' : 'move';
-        
-        const afterElement = this._getDragAfterElement(blockDiv.parentElement, e.clientY);
-        const draggingElements = Array.from(blockDiv.parentElement.querySelectorAll('.zen-pomodoro-cycle-block.dragging'));
-        
-        // Move all dragging elements together
-        draggingElements.forEach(draggingEl => {
-          if (afterElement == null) {
-            blockDiv.parentElement.appendChild(draggingEl);
-          } else {
-            blockDiv.parentElement.insertBefore(draggingEl, afterElement);
-          }
-        });
-      });
-
-      blockDiv.addEventListener('drop', (e) => {
-        e.preventDefault();
-        
-        // Compute target index from current DOM order
-        const container = blockDiv.parentElement;
-        if (!container) return;
-        
-        const blocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
-        const firstDraggingElement = container.querySelector('.zen-pomodoro-cycle-block.dragging');
-        
-        if (!firstDraggingElement) return;
-        
-        const targetIndex = blocks.indexOf(firstDraggingElement);
-        if (targetIndex === -1 || this.draggedBlockIndex === null) return;
-        
-        // Delegate to helper method for reduced complexity
-        this._handleBlockDrop(targetIndex);
+        e.stopPropagation();
+        this._startBlockDrag(e, blockDiv, index);
       });
 
       return blockDiv;
+    }
+
+    /**
+     * Start a custom pointer-based block drag operation.
+     * @param {MouseEvent} e - The mousedown event
+     * @param {HTMLElement} blockDiv - The block element being dragged
+     * @param {number} index - The index of the block being dragged
+     * @private
+     */
+    _startBlockDrag(e, blockDiv, index) {
+      if (this.isDragging) return;
+      this.isDragging = true;
+      this.draggedBlockIndex = index;
+      this.isDuplicating = e.altKey;
+
+      const container = blockDiv.parentElement;
+      if (!container) return;
+
+      // Determine which indices are being dragged
+      const isMultiSelect = this.selectedBlockIndices.has(index);
+      const dragIndices = isMultiSelect
+        ? Array.from(this.selectedBlockIndices).sort((a, b) => a - b)
+        : [index];
+
+      // Mark all dragged blocks
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      dragIndices.forEach(idx => {
+        if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
+      });
+
+      // Add transition class to non-dragged blocks for smooth shifting
+      allBlocks.forEach((block, idx) => {
+        if (!dragIndices.includes(idx)) {
+          block.classList.add('drag-transition');
+        }
+      });
+
+      // Create drop indicator
+      const dropIndicator = document.createElement('div');
+      dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
+      dropIndicator.style.display = 'none';
+      container.appendChild(dropIndicator);
+
+      // Create ghost blocks for duplication mode
+      let ghostBlocks = [];
+      if (this.isDuplicating) {
+        ghostBlocks = dragIndices.map(idx => {
+          const ghost = allBlocks[idx].cloneNode(true);
+          ghost.className = allBlocks[idx].className.replace('dragging', '').trim() + ' zen-pomodoro-cycle-block-ghost';
+          ghost.style.display = 'none';
+          return ghost;
+        });
+      }
+
+      // Calculate block height for shift animations
+      const BLOCK_GAP_PX = 8; // Gap between blocks in container
+      const DEFAULT_BLOCK_HEIGHT_PX = 60; // Default fallback height
+      const blockHeight = allBlocks[0] ? allBlocks[0].offsetHeight + BLOCK_GAP_PX : DEFAULT_BLOCK_HEIGHT_PX;
+      const totalDragHeight = blockHeight * dragIndices.length;
+      
+      let lastTargetIndex = -1;
+      let rafId = null;
+
+      const onPointerMove = (pointerMoveEvent) => {
+        if (rafId) return; // Throttle with rAF
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          const targetIndex = this._getDropTargetIndex(container, pointerMoveEvent.clientY, dragIndices);
+          
+          if (targetIndex === lastTargetIndex) return;
+          lastTargetIndex = targetIndex;
+
+          const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
+          
+          if (targetIndex < 0) return;
+
+          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+
+          if (this.isDuplicating && ghostBlocks.length > 0) {
+            this._showGhostBlocks(container, dropIndicator, ghostBlocks);
+          }
+
+          // Reset and apply shift preview for move operations
+          nonDraggedBlocks.forEach((block) => {
+            block.classList.remove('shift-down', 'shift-up');
+            block.style.removeProperty('--block-shift-distance');
+            if (!this.isDuplicating) {
+              block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
+            }
+          });
+        });
+      };
+
+      const onPointerUp = () => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+
+        this._cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks);
+        this._applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect);
+
+        // Re-render and push undo state
+        const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+        if (blocksContainer) {
+          this._renderBlocks(blocksContainer);
+        }
+        if (this.currentUndoRedo) {
+          this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+        }
+
+        this.isDragging = false;
+        this.draggedBlockIndex = null;
+        this.isDuplicating = false;
+      };
+
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    }
+
+    /**
+     * Apply the drag/drop operation (move or duplicate) based on target index.
+     * @param {number} lastTargetIndex - Drop target index relative to non-dragged blocks
+     * @param {Array<number>} dragIndices - Indices of dragged blocks
+     * @param {boolean} isMultiSelect - Whether multiple blocks were selected
+     * @private
+     */
+    _applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect) {
+      if (lastTargetIndex < 0) return;
+
+      const nonDraggedIndices = [];
+      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
+        if (!dragIndices.includes(i)) {
+          nonDraggedIndices.push(i);
+        }
+      }
+
+      const absoluteTarget = lastTargetIndex >= nonDraggedIndices.length
+        ? this.currentEditingCycle.blocks.length
+        : nonDraggedIndices[lastTargetIndex];
+
+      if (this.isDuplicating) {
+        this._duplicateBlocks(dragIndices, absoluteTarget);
+      } else if (isMultiSelect) {
+        this._moveMultipleBlocks(dragIndices, absoluteTarget);
+      } else {
+        this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
+      }
+    }
+
+    /**
+     * Clean up visual state after a drag operation ends.
+     * @param {Array<HTMLElement>} allBlocks - All block DOM elements
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @private
+     */
+    _cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
+      dropIndicator.remove();
+      ghostBlocks.forEach(g => g.remove());
+      allBlocks.forEach(block => {
+        block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
+        block.style.removeProperty('--block-shift-distance');
+      });
+    }
+
+    /**
+     * Position the drop indicator at the correct location in the container.
+     * @param {HTMLElement} container - Blocks container element
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
+     * @param {number} targetIndex - Target insertion index
+     * @private
+     */
+    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex) {
+      dropIndicator.style.display = 'block';
+      if (targetIndex < nonDraggedBlocks.length) {
+        container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
+      } else {
+        const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
+        if (lastNonDragged && lastNonDragged.nextSibling) {
+          container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
+        } else {
+          container.appendChild(dropIndicator);
+        }
+      }
+    }
+
+    /**
+     * Show ghost blocks at the drop indicator position for duplication preview.
+     * @param {HTMLElement} container - Blocks container
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @private
+     */
+    _showGhostBlocks(container, dropIndicator, ghostBlocks) {
+      ghostBlocks.forEach(g => g.remove());
+      ghostBlocks.forEach(ghost => {
+        ghost.style.display = '';
+        container.insertBefore(ghost, dropIndicator);
+      });
+    }
+
+    /**
+     * Push current cycle state to undo stack.
+     * @private
+     */
+    _pushUndoState() {
+      if (this.currentUndoRedo) {
+        this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      }
+    }
+
+    /**
+     * Delete all currently selected blocks, with validation.
+     * Shows an error dialog if all blocks would be deleted.
+     * @private
+     */
+    _deleteSelectedBlocks() {
+      const indicesToDelete = Array.from(this.selectedBlockIndices).sort((a, b) => b - a);
+
+      // Check if we'd delete all blocks
+      if (indicesToDelete.length >= this.currentEditingCycle.blocks.length) {
+        this._showValidationError('A cycle must have at least one block.');
+        return;
+      }
+
+      // Delete in reverse order to maintain indices
+      for (const idx of indicesToDelete) {
+        this.currentEditingCycle.blocks.splice(idx, 1);
+      }
+
+      logger.log(LOG_CATEGORIES.MENU, `Deleted ${indicesToDelete.length} selected block(s)`);
+
+      // Clear selection and re-render
+      this.selectedBlockIndices.clear();
+      const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+      if (blocksContainer) {
+        this._renderBlocks(blocksContainer);
+      }
+      this._pushUndoState();
+    }
+
+    /**
+     * Calculate the drop target index based on mouse Y position.
+     * Returns the index among non-dragged blocks where the drop should occur.
+     * @param {HTMLElement} container - The blocks container
+     * @param {number} clientY - Mouse Y position
+     * @param {Array<number>} dragIndices - Indices of blocks being dragged
+     * @returns {number} Target insertion index among non-dragged blocks
+     * @private
+     */
+    _getDropTargetIndex(container, clientY, dragIndices) {
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
+
+      // Find the position among non-dragged blocks
+      for (let i = 0; i < nonDraggedBlocks.length; i++) {
+        const rect = nonDraggedBlocks[i].getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) {
+          return i;
+        }
+      }
+      
+      return nonDraggedBlocks.length; // After all blocks
     }
 
     /**
@@ -13147,7 +13689,7 @@
 
       // Check that all blocks have valid durations
       for (const block of this.currentEditingCycle.blocks) {
-        if (!block.duration || block.duration < 1 || block.duration > 120) {
+        if (!isValidRangeValue(block.duration, 1, 120)) {
           this._showValidationError('All blocks must have a duration between 1 and 120 minutes.');
           return false;
         }
@@ -13311,6 +13853,9 @@
       logger.log(LOG_CATEGORIES.INIT, 'Application ready');
       console.log('Zen Pomodoro Focus Blocker ready');
 
+      // Expose app globally early so restoration code can access it
+      window.zenPomodoroApp = this;
+
       // Migrate global blockedWorkspaces to default ruleset if needed
       this._migrateBlockedWorkspacesToRulesets();
 
@@ -13369,7 +13914,29 @@
 
         // INDICATOR FIX: Show indicator after state restoration
         this.overlay.showIndicator();
+        // Ensure paused state is reflected on the indicator since timer is paused on restore
+        this.overlay.updateIndicatorPausedState(true);
         this.updateOverlayVisibility();
+
+        // Restore distraction dump state if it was active
+        if (this.timer.pendingDumpState) {
+          const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
+          if (dumpRestored) {
+            logger.log(LOG_CATEGORIES.INIT, 'Distraction dump state restored');
+            // Re-enable dump mode (pause timer, lift blocks)
+            this.distractionDump._enableDumpMode();
+            this.distractionDump._setupDumpIndicator();
+            // Restart the dump countdown
+            this.distractionDump.dumpInterval = setInterval(() => {
+              this.distractionDump.dumpTimeRemaining--;
+              this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
+              if (this.distractionDump.dumpTimeRemaining <= 0) {
+                this.distractionDump.endDump();
+              }
+            }, 1000);
+          }
+          this.timer.pendingDumpState = null;
+        }
 
         // If restored into transition phase, show the popup
         if (this.timer.currentPhase === 'transition') {
@@ -13395,9 +13962,6 @@
 
       // MISSING FEATURE: Request notification permission
       this.requestNotificationPermission();
-
-      // Expose app globally for debugging and keyboard shortcut
-      window.zenPomodoroApp = this;
 
       // Initialize Daily Reminder Manager (after app is globally exposed)
       logger.log(LOG_CATEGORIES.INIT, 'Initializing Daily Reminder Manager');
@@ -13855,21 +14419,7 @@
 
       const message = messages[phase] || 'Pomodoro timer';
 
-      // Browser notification with permission check
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          // Use chrome:// URI for icon (internal browser resource)
-          // Falls back gracefully if path doesn't exist in some Zen Browser versions
-          new Notification('Zen Pomodoro Timer', {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log('Notification:', message);
-        }
-      } catch (e) {
-        console.log('Notification:', message);
-      }
+      sendBrowserNotification('Zen Pomodoro Timer', message);
     }
 
     /**
@@ -13884,19 +14434,7 @@
 
       const message = `Your ${phaseLabel} timer (${timeStr} remaining) has been paused. Click the indicator to resume.`;
 
-      // Browser notification with permission check
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('Timer Restored', {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log('Timer Restored:', message);
-        }
-      } catch (e) {
-        console.log('Timer Restored:', message);
-      }
+      sendBrowserNotification('Timer Restored', message);
     }
 
     /**
@@ -14045,8 +14583,8 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // All modules with destroy() methods
-      const modulesToDestroy = [
+      // All modules with destroy() methods (null-checked in _destroyModules)
+      const modules = [
         this.sineModBlocker,
         this.websiteBlocker,
         this.transitionManager,
@@ -14056,19 +14594,43 @@
         this.keyboardShortcut,
         this.overlay,
       ];
-      modulesToDestroy.forEach((module) => module?.destroy?.());
+      this._destroyModules(modules);
 
-      // All modules with specific cleanup methods
-      const cleanupActions = [
-        () => this.workspace?.stopMonitoring?.(),
-        () => this.timer?.stop?.(),
-        () => this.security?.cleanupLockScreen?.(),
-      ];
-      cleanupActions.forEach((action) => action());
+      // Additional cleanup
+      this._runCleanupActions();
 
       this.initialized = false;
 
       logger.log(LOG_CATEGORIES.INIT, 'Application cleanup complete');
+    }
+
+    /**
+     * Safely destroy a list of modules that may have a destroy() method.
+     * @param {Array} modules - Array of module instances (may contain nulls)
+     * @private
+     */
+    _destroyModules(modules) {
+      for (const module of modules) {
+        if (module && typeof module.destroy === 'function') {
+          module.destroy();
+        }
+      }
+    }
+
+    /**
+     * Run additional cleanup actions for modules with non-standard cleanup methods.
+     * @private
+     */
+    _runCleanupActions() {
+      if (this.workspace && typeof this.workspace.stopMonitoring === 'function') {
+        this.workspace.stopMonitoring();
+      }
+      if (this.timer && typeof this.timer.stop === 'function') {
+        this.timer.stop();
+      }
+      if (this.security && typeof this.security.cleanupLockScreen === 'function') {
+        this.security.cleanupLockScreen();
+      }
     }
   }
 
