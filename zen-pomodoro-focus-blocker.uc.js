@@ -71,8 +71,8 @@
     /** Save state interval in seconds (every 10 seconds for performance) */
     SAVE_STATE_INTERVAL_SECONDS: 10,
 
-    /** Delay for DOM settling after timer start (in milliseconds) */
-    DOM_SETTLE_DELAY_MS: 100,
+    /** Delay for DOM settling after timer start (in milliseconds) - 200ms provides more reliable settling */
+    DOM_SETTLE_DELAY_MS: 200,
 
     /** Delay for showing restoration notification after DOM is ready (in milliseconds) */
     RESTORATION_NOTIFICATION_DELAY_MS: 500,
@@ -167,6 +167,9 @@
       'aria-label',
       'title',
     ],
+
+    /** Maximum length for page title in log messages */
+    MAX_TITLE_LOG_LENGTH: 50,
 
     /** Default configuration object */
     DEFAULT_CONFIG: {
@@ -336,6 +339,9 @@
 
     /**
      * Sanitize data to remove sensitive information.
+     * NOTE: Cyclomatic complexity is acceptable for this recursive sanitization logic
+     * that handles multiple data types (null, undefined, primitive, array, object)
+     * and sensitive key filtering.
      * @param {*} data - Data to sanitize
      * @returns {*} Sanitized data
      * @private
@@ -823,6 +829,26 @@
     }
 
     /**
+     * Check if a value is a non-empty array.
+     * @param {*} value - Value to check
+     * @returns {boolean} True if value is a non-empty array
+     */
+    function isNonEmptyArray(value) {
+      return Array.isArray(value) && value.length > 0;
+    }
+
+    /**
+     * Validate that a value is a valid positive integer within a range.
+     * @param {number} value - Value to validate
+     * @param {number} min - Minimum value (inclusive)
+     * @param {number} max - Maximum value (inclusive)
+     * @returns {boolean} True if value is valid
+     */
+    function isValidRangeValue(value, min, max) {
+      return !isNaN(value) && value >= min && value <= max;
+    }
+
+    /**
      * Extract and validate integer input from a dialog.
      * This function is null-safe: returns null if element not found, returns defaultValue
      * if the input is empty or invalid.
@@ -1019,6 +1045,8 @@
       extractWorkspaceNameFromButton,
       getActiveBlockedWorkspaces,
       findRuleAndExecute,
+      isNonEmptyArray,
+      isValidRangeValue,
     };
   })();
 
@@ -1067,6 +1095,12 @@
   function getValidatedIntFromDialog(dialog, options) {
     return Utils.getValidatedIntFromDialog(dialog, options);
   }
+  function isNonEmptyArray(value) {
+    return Utils.isNonEmptyArray(value);
+  }
+  function isValidRangeValue(value, min, max) {
+    return Utils.isValidRangeValue(value, min, max);
+  }
   function generateRandomCode(length, charset) {
     return Utils.generateRandomCode(length, charset);
   }
@@ -1087,6 +1121,26 @@
   }
   function findRuleAndExecute(config, rulesetId, ruleId, callback) {
     return Utils.findRuleAndExecute(config, rulesetId, ruleId, callback);
+  }
+
+  /**
+   * Send a browser notification with fallback to console.log.
+   * @param {string} title - Notification title
+   * @param {string} body - Notification body text
+   */
+  function sendBrowserNotification(title, body) {
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(title, {
+          body: body,
+          icon: 'chrome://branding/content/about-logo.png',
+        });
+      } else {
+        console.log(`${title}: ${body}`);
+      }
+    } catch (e) {
+      console.log(`${title}: ${body}`);
+    }
   }
 
   // Constants legacy accessors (for backward compatibility)
@@ -2310,7 +2364,7 @@
      */
     _getEarliestReminderTime(config) {
       const times = config.dailyReminderTimes;
-      if (!times || !Array.isArray(times) || times.length === 0) {
+      if (!isNonEmptyArray(times)) {
         return '10:00';
       }
 
@@ -2414,21 +2468,9 @@
       const message = isFocusPhase
         ? `⏰ ${minutes} ${minuteText} left in your focus session!`
         : `☕ ${minutes} ${minuteText} left in your break!`;
-
       const title = isFocusPhase ? 'Focus Reminder' : 'Break Reminder';
 
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification(title, {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log(`${title}: ${message}`);
-        }
-      } catch (e) {
-        console.log(`${title}: ${message}`);
-      }
+      sendBrowserNotification(title, message);
 
       logger.log(LOG_CATEGORIES.TIMER, 'Timer reminder shown', {
         minutes: minutes,
@@ -3328,6 +3370,11 @@
           attributes: true,
           attributeFilter: ['active', 'selected', 'zen-workspace-id'],
           subtree: true,
+          // NOTE: We also observe childList changes so we can detect when workspace
+          // buttons/elements are added or removed (e.g., new workspaces created).
+          // This is intentional: _handleWorkspaceMutation() needs to run in those
+          // cases to keep the active workspace state in sync, even though the
+          // primary trigger is attribute changes.
           childList: true,
         });
         logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace observer configured', {
@@ -4077,21 +4124,7 @@
       const stopButton = this.overlay?.querySelector('#zen-pomodoro-stop-button');
 
       if (pauseButton) {
-        pauseButton.addEventListener('click', () => {
-          if (window.zenPomodoroApp && window.zenPomodoroApp.timer) {
-            // Check if Distraction Dump is active - provide user feedback
-            if (isDistractionDumpBlocking()) {
-              window.zenPomodoroApp.showCustomAlert(
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
-              );
-              return;
-            }
-            handlePauseResumeTimer();
-            // Update button text based on new state
-            pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
-          }
-        });
+        pauseButton.addEventListener('click', () => this._handlePauseClick(pauseButton));
       }
 
       if (stopButton) {
@@ -4102,6 +4135,26 @@
           });
         });
       }
+    }
+
+    /**
+     * Handle pause button click on overlay.
+     * @param {HTMLElement} pauseButton - The pause button element
+     * @private
+     */
+    _handlePauseClick(pauseButton) {
+      if (!window.zenPomodoroApp || !window.zenPomodoroApp.timer) return;
+
+      // Check if Distraction Dump is active - provide user feedback
+      if (isDistractionDumpBlocking()) {
+        window.zenPomodoroApp.showCustomAlert(
+          Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+          Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+        );
+        return;
+      }
+      handlePauseResumeTimer();
+      pauseButton.textContent = window.zenPomodoroApp.timer.isPaused ? 'Resume' : 'Pause';
     }
 
     /**
@@ -5586,34 +5639,7 @@
         dialog.remove();
 
         if (window.zenPomodoroApp) {
-          if (mode === 'custom') {
-            // Get selected custom cycle
-            const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
-            const savedCycles = config.customCycles || [];
-            
-            // Validate that a custom cycle is selected
-            if (!cycleSelect || !cycleSelect.value) {
-              window.zenPomodoroApp.showCustomAlert(
-                'No Cycle Selected',
-                'Please select a custom cycle or create one first.'
-              );
-              return;
-            }
-            
-            const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
-            if (selectedCycle) {
-              window.zenPomodoroApp.startCustomCycle(selectedCycle);
-            } else {
-              logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
-              window.zenPomodoroApp.showCustomAlert(
-                'Cycle Not Found',
-                'The selected custom cycle could not be found. Please select another cycle.'
-              );
-              return;
-            }
-          } else {
-            window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
-          }
+          this._startTimerForMode({ mode, dialog, config, cycles, sessionOverrides });
         }
       };
 
@@ -5650,6 +5676,45 @@
       // Custom mode doesn't need overrides as cycle config contains all durations
 
       return sessionOverrides;
+    }
+
+    /**
+     * Start timer based on selected mode.
+     * @param {Object} options - Start options
+     * @param {string} options.mode - Timer mode (simple, pomodoro, custom)
+     * @param {HTMLElement} options.dialog - Dialog element for querying custom cycle select
+     * @param {Object} options.config - Config object
+     * @param {number} options.cycles - Number of cycles
+     * @param {Object} options.sessionOverrides - Session duration overrides
+     * @private
+     */
+    _startTimerForMode({ mode, dialog, config, cycles, sessionOverrides }) {
+      if (mode !== 'custom') {
+        window.zenPomodoroApp.startTimer(mode, cycles, sessionOverrides);
+        return;
+      }
+
+      const cycleSelect = dialog.querySelector('#zen-pomodoro-custom-cycle-select');
+      const savedCycles = config.customCycles || [];
+
+      if (!cycleSelect || !cycleSelect.value) {
+        window.zenPomodoroApp.showCustomAlert(
+          'No Cycle Selected',
+          'Please select a custom cycle or create one first.'
+        );
+        return;
+      }
+
+      const selectedCycle = savedCycles.find((c) => c.id === cycleSelect.value);
+      if (selectedCycle) {
+        window.zenPomodoroApp.startCustomCycle(selectedCycle);
+      } else {
+        logger.log(LOG_CATEGORIES.MENU, 'Selected custom cycle not found');
+        window.zenPomodoroApp.showCustomAlert(
+          'Cycle Not Found',
+          'The selected custom cycle could not be found. Please select another cycle.'
+        );
+      }
     }
 
     /**
@@ -6478,7 +6543,7 @@
       addFocusReminderBtn.textContent = 'Add';
       addFocusReminderBtn.addEventListener('click', () => {
         const value = parseInt(addFocusReminderInput.value, 10);
-        if (!isNaN(value) && value > 0 && value <= 120) {
+        if (isValidRangeValue(value, 1, 120)) {
           if (!config.focusPhaseReminders.includes(value)) {
             config.focusPhaseReminders.push(value);
             config.focusPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -6572,7 +6637,7 @@
       addBreakReminderBtn.textContent = 'Add';
       addBreakReminderBtn.addEventListener('click', () => {
         const value = parseInt(addBreakReminderInput.value, 10);
-        if (!isNaN(value) && value > 0 && value <= 60) {
+        if (isValidRangeValue(value, 1, 60)) {
           if (!config.breakPhaseReminders.includes(value)) {
             config.breakPhaseReminders.push(value);
             config.breakPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -8903,18 +8968,27 @@
 
       // Schedule a delayed re-check for keyword blocking
       // This handles cases where tab title updates after the initial check
-      if (this._hasActiveKeywordRules()) {
-        if (this._keywordRecheckTimeout) {
-          clearTimeout(this._keywordRecheckTimeout);
-        }
-        this._keywordRecheckTimeout = setTimeout(() => {
-          if (!this._shouldShowBlocker()) return;
-          const url = this._getCurrentUrl();
-          if (url && !this._isInternalBrowserPage(url)) {
-            this._evaluateUrlAndUpdateBlocker(url);
-          }
-        }, 500); // 500ms delay for title updates
+      this._scheduleKeywordRecheck();
+    }
+
+    /**
+     * Schedule a delayed re-check for keyword blocking.
+     * Handles cases where tab title updates after the initial page check.
+     * @private
+     */
+    _scheduleKeywordRecheck() {
+      if (!this._hasActiveKeywordRules()) return;
+
+      if (this._keywordRecheckTimeout) {
+        clearTimeout(this._keywordRecheckTimeout);
       }
+      this._keywordRecheckTimeout = setTimeout(() => {
+        if (!this._shouldShowBlocker()) return;
+        const url = this._getCurrentUrl();
+        if (url && !this._isInternalBrowserPage(url)) {
+          this._evaluateUrlAndUpdateBlocker(url);
+        }
+      }, 500);
     }
 
     /**
@@ -9261,14 +9335,23 @@
     }
 
     /**
-     * Get page title for keyword matching.
-     * NOTE: Due to browser security restrictions (cross-origin), Zen Browser mods
-     * running in the chrome context cannot access webpage body content (innerText).
-     * Only the tab title is accessible, so keywords are matched against titles only.
-     * @param {boolean} _titleOnly - Ignored; always returns title only due to security restrictions
-     * @returns {string} Page title text
+     * Get the current tab title from available browser sources.
+     * Due to cross-origin security restrictions, we cannot access contentDocument.body.
+     * Only the tab title is accessible from the browser chrome context.
+     * @returns {string} The current tab title, or empty string if unavailable
      * @private
      */
+    _getTabTitle() {
+      /* eslint-disable no-undef */
+      return (
+        gBrowser.selectedTab?.label ||
+        gBrowser.selectedBrowser?.contentTitle ||
+        gBrowser.contentTitle ||
+        ''
+      );
+      /* eslint-enable no-undef */
+    }
+
     // eslint-disable-next-line no-unused-vars
     _getPageText(_titleOnly = true) {
       try {
@@ -9278,21 +9361,12 @@
           return '';
         }
 
-        // Get tab title from multiple sources for reliability
-        // Due to cross-origin security restrictions, we cannot access contentDocument.body
-        // Only the tab title is accessible from the browser chrome context
-        /* eslint-disable no-undef */
-        const title =
-          gBrowser.selectedTab?.label ||
-          gBrowser.selectedBrowser?.contentTitle ||
-          gBrowser.contentTitle ||
-          '';
-        /* eslint-enable no-undef */
-
-        // Log for debugging
+        const title = this._getTabTitle();
         if (title) {
+          const maxLen = Constants.MAX_TITLE_LOG_LENGTH;
+          const truncatedTitle = title.length > maxLen ? title.substring(0, maxLen) + '...' : title;
           logger.log(LOG_CATEGORIES.SECURITY, 'Page title retrieved for keyword check', {
-            title: title.substring(0, 50) + (title.length > 50 ? '...' : ''),
+            title: truncatedTitle,
           });
         }
 
@@ -9784,6 +9858,23 @@
     }
 
     /**
+     * Check if the popup has been detached from the DOM.
+     * Cleans up the timer interval if popup is gone.
+     * @returns {boolean} True if popup is detached and timer was cleaned up
+     * @private
+     */
+    _isPopupDetached() {
+      if (!this.popup || !document.documentElement.contains(this.popup)) {
+        if (this.timerInterval) {
+          clearInterval(this.timerInterval);
+          this.timerInterval = null;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    /**
      * Start the countdown timer.
      * Updates the display every second and closes popup when timer reaches zero.
      * Includes DOM detachment check to stop timer if popup is removed externally.
@@ -9795,19 +9886,10 @@
       });
 
       this.timerInterval = setInterval(() => {
-        // If the popup has been removed or detached externally, stop the timer
-        if (!this.popup || !document.documentElement.contains(this.popup)) {
-          if (this.timerInterval) {
-            clearInterval(this.timerInterval);
-            this.timerInterval = null;
-          }
-          return;
-        }
+        if (this._isPopupDetached()) return;
 
         // Respect main timer's pause state - do not decrement if paused
-        if (window.zenPomodoroApp?.timer?.isPaused) {
-          return;
-        }
+        if (window.zenPomodoroApp?.timer?.isPaused) return;
 
         this.remainingTime--;
 
@@ -9977,7 +10059,7 @@
       const config = getConfig();
       const times = config.dailyReminderTimes;
       
-      if (!times || !Array.isArray(times) || times.length === 0) {
+      if (!isNonEmptyArray(times)) {
         return '10:00';
       }
       
@@ -13107,62 +13189,11 @@
         
         // If this block is selected, delete all selected blocks
         if (this.selectedBlockIndices.has(index)) {
-          const indicesToDelete = Array.from(this.selectedBlockIndices).sort((a, b) => b - a);
-          
-          // Check if we'd delete all blocks
-          if (indicesToDelete.length >= this.currentEditingCycle.blocks.length) {
-            // Show error - must have at least one block
-            const errorDialog = document.createElement('div');
-            errorDialog.className = 'zen-pomodoro-dialog active';
-            errorDialog.setAttribute(DATA_NO_POSITION_SAVE, 'true');
-
-            const title = document.createElement('h2');
-            title.textContent = 'Cannot Delete';
-
-            const message = document.createElement('p');
-            message.textContent = 'A cycle must have at least one block.';
-            message.style.marginBottom = '20px';
-
-            const okButton = document.createElement('button');
-            okButton.className = 'zen-pomodoro-dialog-button';
-            okButton.textContent = 'OK';
-            okButton.addEventListener('click', () => {
-              errorDialog.remove();
-            });
-
-            errorDialog.appendChild(title);
-            errorDialog.appendChild(message);
-            errorDialog.appendChild(okButton);
-
-            applyLastDialogPosition(errorDialog);
-            document.documentElement.appendChild(errorDialog);
-            return;
-          }
-          
-          // Delete in reverse order to maintain indices
-          for (const idx of indicesToDelete) {
-            this.currentEditingCycle.blocks.splice(idx, 1);
-          }
-          
-          logger.log(LOG_CATEGORIES.MENU, `Deleted ${indicesToDelete.length} selected block(s)`);
-          
-          // Clear selection and re-render
-          this.selectedBlockIndices.clear();
-          const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
-          if (blocksContainer) {
-            this._renderBlocks(blocksContainer);
-          }
-          // Push undo state after delete
-          if (this.currentUndoRedo) {
-            this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
-          }
+          this._deleteSelectedBlocks();
         } else {
           // Single block deletion
           this.removeBlock(index);
-          // Push undo state after delete
-          if (this.currentUndoRedo) {
-            this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
-          }
+          this._pushUndoState();
         }
       });
 
@@ -13276,48 +13307,24 @@
           if (targetIndex === lastTargetIndex) return;
           lastTargetIndex = targetIndex;
 
-          // Position drop indicator
           const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
           
-          if (targetIndex >= 0) {
-            dropIndicator.style.display = 'block';
-            
-            if (targetIndex < nonDraggedBlocks.length) {
-              container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
-            } else {
-              // After all non-dragged blocks
-              const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
-              if (lastNonDragged && lastNonDragged.nextSibling) {
-                container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
-              } else {
-                container.appendChild(dropIndicator);
-              }
-            }
+          if (targetIndex < 0) return;
 
-            // Show ghost blocks for duplication
-            if (this.isDuplicating && ghostBlocks.length > 0) {
-              // Remove existing ghosts
-              ghostBlocks.forEach(g => g.remove());
-              // Insert ghosts at drop position
-              ghostBlocks.forEach(ghost => {
-                ghost.style.display = '';
-                container.insertBefore(ghost, dropIndicator);
-              });
-            }
+          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
 
-            // Shift non-dragged blocks to show preview of final positions
-            nonDraggedBlocks.forEach((block) => {
-              block.classList.remove('shift-down', 'shift-up');
-              block.style.removeProperty('--block-shift-distance');
-            });
-            
-            if (!this.isDuplicating) {
-              // For move operations, shift blocks to show where the gap will be
-              nonDraggedBlocks.forEach((block) => {
-                block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
-              });
-            }
+          if (this.isDuplicating && ghostBlocks.length > 0) {
+            this._showGhostBlocks(container, dropIndicator, ghostBlocks);
           }
+
+          // Reset and apply shift preview for move operations
+          nonDraggedBlocks.forEach((block) => {
+            block.classList.remove('shift-down', 'shift-up');
+            block.style.removeProperty('--block-shift-distance');
+            if (!this.isDuplicating) {
+              block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
+            }
+          });
         });
       };
 
@@ -13329,53 +13336,14 @@
           rafId = null;
         }
 
-        // Remove visual elements
-        dropIndicator.remove();
-        ghostBlocks.forEach(g => g.remove());
+        this._cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks);
+        this._applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect);
 
-        // Remove drag classes
-        allBlocks.forEach(block => {
-          block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
-          block.style.removeProperty('--block-shift-distance');
-        });
-
-        // Apply the operation using the last target index
-        if (lastTargetIndex >= 0 && lastTargetIndex !== -1) {
-          // Convert the target index (relative to non-dragged blocks) back to absolute index
-          const nonDraggedIndices = [];
-          for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
-            if (!dragIndices.includes(i)) {
-              nonDraggedIndices.push(i);
-            }
-          }
-          
-          // The absolute target index: insert before nonDraggedIndices[lastTargetIndex],
-          // or at end if lastTargetIndex >= nonDraggedIndices.length
-          let absoluteTarget;
-          if (lastTargetIndex >= nonDraggedIndices.length) {
-            absoluteTarget = this.currentEditingCycle.blocks.length;
-          } else {
-            absoluteTarget = nonDraggedIndices[lastTargetIndex];
-          }
-
-          if (this.isDuplicating) {
-            this._duplicateBlocks(dragIndices, absoluteTarget);
-          } else {
-            if (isMultiSelect) {
-              this._moveMultipleBlocks(dragIndices, absoluteTarget);
-            } else {
-              this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
-            }
-          }
-        }
-
-        // Re-render
+        // Re-render and push undo state
         const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
         if (blocksContainer) {
           this._renderBlocks(blocksContainer);
         }
-
-        // Push undo state after drag operation
         if (this.currentUndoRedo) {
           this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
         }
@@ -13387,6 +13355,129 @@
 
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', onPointerUp);
+    }
+
+    /**
+     * Apply the drag/drop operation (move or duplicate) based on target index.
+     * @param {number} lastTargetIndex - Drop target index relative to non-dragged blocks
+     * @param {Array<number>} dragIndices - Indices of dragged blocks
+     * @param {boolean} isMultiSelect - Whether multiple blocks were selected
+     * @private
+     */
+    _applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect) {
+      if (lastTargetIndex < 0) return;
+
+      const nonDraggedIndices = [];
+      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
+        if (!dragIndices.includes(i)) {
+          nonDraggedIndices.push(i);
+        }
+      }
+
+      const absoluteTarget = lastTargetIndex >= nonDraggedIndices.length
+        ? this.currentEditingCycle.blocks.length
+        : nonDraggedIndices[lastTargetIndex];
+
+      if (this.isDuplicating) {
+        this._duplicateBlocks(dragIndices, absoluteTarget);
+      } else if (isMultiSelect) {
+        this._moveMultipleBlocks(dragIndices, absoluteTarget);
+      } else {
+        this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
+      }
+    }
+
+    /**
+     * Clean up visual state after a drag operation ends.
+     * @param {Array<HTMLElement>} allBlocks - All block DOM elements
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @private
+     */
+    _cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
+      dropIndicator.remove();
+      ghostBlocks.forEach(g => g.remove());
+      allBlocks.forEach(block => {
+        block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
+        block.style.removeProperty('--block-shift-distance');
+      });
+    }
+
+    /**
+     * Position the drop indicator at the correct location in the container.
+     * @param {HTMLElement} container - Blocks container element
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
+     * @param {number} targetIndex - Target insertion index
+     * @private
+     */
+    _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex) {
+      dropIndicator.style.display = 'block';
+      if (targetIndex < nonDraggedBlocks.length) {
+        container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
+      } else {
+        const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
+        if (lastNonDragged && lastNonDragged.nextSibling) {
+          container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
+        } else {
+          container.appendChild(dropIndicator);
+        }
+      }
+    }
+
+    /**
+     * Show ghost blocks at the drop indicator position for duplication preview.
+     * @param {HTMLElement} container - Blocks container
+     * @param {HTMLElement} dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @private
+     */
+    _showGhostBlocks(container, dropIndicator, ghostBlocks) {
+      ghostBlocks.forEach(g => g.remove());
+      ghostBlocks.forEach(ghost => {
+        ghost.style.display = '';
+        container.insertBefore(ghost, dropIndicator);
+      });
+    }
+
+    /**
+     * Push current cycle state to undo stack.
+     * @private
+     */
+    _pushUndoState() {
+      if (this.currentUndoRedo) {
+        this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+      }
+    }
+
+    /**
+     * Delete all currently selected blocks, with validation.
+     * Shows an error dialog if all blocks would be deleted.
+     * @private
+     */
+    _deleteSelectedBlocks() {
+      const indicesToDelete = Array.from(this.selectedBlockIndices).sort((a, b) => b - a);
+
+      // Check if we'd delete all blocks
+      if (indicesToDelete.length >= this.currentEditingCycle.blocks.length) {
+        this._showValidationError('A cycle must have at least one block.');
+        return;
+      }
+
+      // Delete in reverse order to maintain indices
+      for (const idx of indicesToDelete) {
+        this.currentEditingCycle.blocks.splice(idx, 1);
+      }
+
+      logger.log(LOG_CATEGORIES.MENU, `Deleted ${indicesToDelete.length} selected block(s)`);
+
+      // Clear selection and re-render
+      this.selectedBlockIndices.clear();
+      const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+      if (blocksContainer) {
+        this._renderBlocks(blocksContainer);
+      }
+      this._pushUndoState();
     }
 
     /**
@@ -13595,7 +13686,7 @@
 
       // Check that all blocks have valid durations
       for (const block of this.currentEditingCycle.blocks) {
-        if (!block.duration || block.duration < 1 || block.duration > 120) {
+        if (!isValidRangeValue(block.duration, 1, 120)) {
           this._showValidationError('All blocks must have a duration between 1 and 120 minutes.');
           return false;
         }
@@ -14325,21 +14416,7 @@
 
       const message = messages[phase] || 'Pomodoro timer';
 
-      // Browser notification with permission check
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          // Use chrome:// URI for icon (internal browser resource)
-          // Falls back gracefully if path doesn't exist in some Zen Browser versions
-          new Notification('Zen Pomodoro Timer', {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log('Notification:', message);
-        }
-      } catch (e) {
-        console.log('Notification:', message);
-      }
+      sendBrowserNotification('Zen Pomodoro Timer', message);
     }
 
     /**
@@ -14354,19 +14431,7 @@
 
       const message = `Your ${phaseLabel} timer (${timeStr} remaining) has been paused. Click the indicator to resume.`;
 
-      // Browser notification with permission check
-      try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('Timer Restored', {
-            body: message,
-            icon: 'chrome://branding/content/about-logo.png',
-          });
-        } else {
-          console.log('Timer Restored:', message);
-        }
-      } catch (e) {
-        console.log('Timer Restored:', message);
-      }
+      sendBrowserNotification('Timer Restored', message);
     }
 
     /**
