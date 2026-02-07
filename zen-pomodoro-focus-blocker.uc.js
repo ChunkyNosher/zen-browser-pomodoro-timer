@@ -338,10 +338,9 @@
     }
 
     /**
-     * Sanitize data to remove sensitive information.
-     * NOTE: Cyclomatic complexity is acceptable for this recursive sanitization logic
-     * that handles multiple data types (null, undefined, primitive, array, object)
-     * and sensitive key filtering.
+     * Recursively sanitize data to remove sensitive information.
+     * Handles null, undefined, primitives, arrays, and objects, filtering
+     * keys matching sensitive patterns.
      * @param {*} data - Data to sanitize
      * @returns {*} Sanitized data
      * @private
@@ -3381,11 +3380,9 @@
           attributes: true,
           attributeFilter: ['active', 'selected', 'zen-workspace-id'],
           subtree: true,
-          // NOTE: We also observe childList changes so we can detect when workspace
-          // buttons/elements are added or removed (e.g., new workspaces created).
-          // This is intentional: _handleWorkspaceMutation() needs to run in those
-          // cases to keep the active workspace state in sync, even though the
-          // primary trigger is attribute changes.
+          // Observes childList changes to detect when workspace buttons/elements
+          // are added or removed (e.g., new workspaces created), ensuring
+          // _handleWorkspaceMutation() keeps the active workspace state in sync.
           childList: true,
         });
         logger.log(LOG_CATEGORIES.WORKSPACE, 'Workspace observer configured', {
@@ -10874,6 +10871,7 @@
      */
     /**
      * Convert a time string (HH:MM) to minutes since midnight.
+     * Expects pre-validated input from isValidTimeFormat() filter.
      * @param {string} timeStr - Time string in HH:MM format
      * @returns {number} Minutes since midnight
      * @private
@@ -14585,7 +14583,7 @@
     destroy() {
       logger.log(LOG_CATEGORIES.INIT, 'Application shutting down, cleaning up resources');
 
-      // All modules with destroy() methods - wrapped for null safety
+      // All modules with destroy() methods (null-checked in _destroyModules)
       const modules = [
         this.sineModBlocker,
         this.websiteBlocker,
