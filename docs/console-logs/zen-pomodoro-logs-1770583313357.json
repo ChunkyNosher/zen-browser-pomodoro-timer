@@ -1,0 +1,2852 @@
+{
+  "exportedAt": "2026-02-08T20:41:53.356Z",
+  "totalEntries": 327,
+  "logs": [
+    {
+      "timestamp": "2026-02-08T20:25:40.291Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "WORKSPACE",
+      "message": "Starting workspace monitoring",
+      "data": {
+        "initialWorkspace": null
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "WORKSPACE",
+      "message": "Workspace observer configured",
+      "data": {
+        "container": "#tabbrowser-arrowscrollbox",
+        "observingAttributes": [
+          "active",
+          "selected",
+          "zen-workspace-id"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "idleStartTime": null
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:40.603Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.460Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Showing reminder",
+      "data": {
+        "reminderTime": "11:15",
+        "wasShownToday": false,
+        "showingAfterSkip": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.461Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.461Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.461Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 3
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.587Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.587Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.587Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.742Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.742Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "timerActive": false,
+        "timerPaused": false,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:44.743Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": true,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:46.022Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:46.022Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:46.713Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:47.402Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:25:47.560Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Start Timer button clicked"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:47.560Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-02-08T20:25:47.560Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:01.323Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:02.946Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:02.946Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:02.946Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:04.877Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:04.877Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:20.293Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:29.589Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:29.590Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:29.591Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:29.951Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:30.810Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:30.810Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:30.810Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:40.631Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Showing reminder",
+      "data": {
+        "reminderTime": "11:15",
+        "wasShownToday": false,
+        "showingAfterSkip": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:40.631Z",
+      "category": "TIMER",
+      "message": "Showing daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:40.631Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:40.631Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 4
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:57.780Z",
+      "category": "TIMER",
+      "message": "Daily reminder hold-to-skip completed"
+    },
+    {
+      "timestamp": "2026-02-08T20:26:57.780Z",
+      "category": "TIMER",
+      "message": "Daily reminder skipped",
+      "data": {
+        "skipCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:57.780Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:57.780Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Saved state",
+      "data": {
+        "skipCount": 1,
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "remindersShownCount": 4
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:26:57.781Z",
+      "category": "TIMER",
+      "message": "Hiding daily reminder overlay"
+    },
+    {
+      "timestamp": "2026-02-08T20:27:40.742Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:27:40.742Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:28:40.862Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:28:40.862Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:29:40.967Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:29:40.967Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:30:40.982Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:30:40.982Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:31:40.994Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:31:40.994Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:32:30.746Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:30.746Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:30.994Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:30.995Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:32.297Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:32.323Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:33.184Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:40.994Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:40.994Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:32:54.652Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:54.679Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:32:55.918Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:33:27.324Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:33:27.558Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:33:40.994Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:33:40.995Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:34:05.375Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:06.335Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:08.094Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:15.283Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:15.704Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:19.653Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:19.826Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:23.723Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:23.746Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:23.882Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:25.085Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:34.942Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:34.942Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:35.122Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:37.350Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:37.360Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:39.113Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:40.996Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:40.997Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:34:50.634Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:51.648Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:34:52.230Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:30.775Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:32.418Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:39.942Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:40.646Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:40.997Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:35:40.997Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:36:18.364Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:36:20.501Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:20.537Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:20.537Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:21.278Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:23.383Z",
+      "category": "MENU",
+      "message": "Opening start timer dialog"
+    },
+    {
+      "timestamp": "2026-02-08T20:36:34.754Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:34.755Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:34.755Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:35.058Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:35.546Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:36.060Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:37.444Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:37.713Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:37.713Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:37.728Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:37.796Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:38.380Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:38.850Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:40.047Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:36:41.001Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:41.001Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:36:43.605Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:43.731Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:54.629Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:54.630Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:54.814Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:55.606Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:55.606Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:55.607Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:57.049Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:36:57.123Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:41.057Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:41.057Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:43.986Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:45.404Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:49.189Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:49.189Z",
+      "category": "MENU",
+      "message": "Reordered cycle from position 0 to 1",
+      "data": {
+        "cycleName": "40, 35, 30"
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:49.189Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:50.755Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:50.755Z",
+      "category": "MENU",
+      "message": "Reordered cycle from position 1 to 0",
+      "data": {
+        "cycleName": "40, 35, 30"
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:50.756Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:55.719Z",
+      "category": "MENU",
+      "message": "Editing custom cycle"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:56.618Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:57.176Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:58.857Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 6"
+    },
+    {
+      "timestamp": "2026-02-08T20:37:58.884Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 5
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:37:59.939Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 6,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          6
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:00.708Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:02.226Z",
+      "category": "MENU",
+      "message": "Reordered block from 6 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:02.257Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          6
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:02.938Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:04.757Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:05.900Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:06.714Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:07.315Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:08.153Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:08.182Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:08.727Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:09.238Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 3"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:09.271Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:10.343Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 3,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          3
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:10.738Z",
+      "category": "MENU",
+      "message": "Reordered block from 3 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:10.769Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          3
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:12.837Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:13.844Z",
+      "category": "MENU",
+      "message": "Creating new custom cycle"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:14.741Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:15.052Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:15.325Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:15.357Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:16.056Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:16.371Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:17.748Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:17.778Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:18.238Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:18.287Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:20.675Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:20.703Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:21.117Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:21.367Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:25.129Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:25.748Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:28.347Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:29.656Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:31.469Z",
+      "category": "MENU",
+      "message": "Editing custom cycle"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:32.021Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:39.566Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:41.143Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:41.143Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:42.155Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:48.382Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:48.411Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:48.412Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:51.462Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:51.941Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:51.941Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:51.941Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:52.012Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:56.140Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:56.982Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:38:58.495Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:38:59.354Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:00.079Z",
+      "category": "MENU",
+      "message": "Creating new custom cycle"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:00.706Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:01.104Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:01.556Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:01.588Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:03.251Z",
+      "category": "MENU",
+      "message": "Added focus block (25 min)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:03.802Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:03.829Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:04.689Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:04.723Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:05.406Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:05.898Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:06.780Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 3"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:06.810Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:07.388Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:08.020Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:08.052Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:08.343Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:09.052Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:09.083Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:10.042Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:10.585Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:10.616Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:11.317Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:11.629Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:11.826Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 3"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:11.859Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:12.657Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:13.158Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:13.368Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 3"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:13.398Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:14.382Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:14.702Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:14.864Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:14.894Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:15.386Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:15.967Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:15.998Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:16.458Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:16.549Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": -1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:17.677Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:17.703Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:18.265Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:18.297Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:18.753Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:19.393Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 3"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:19.424Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 2
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:19.868Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:19.914Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (down)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:20.341Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 1"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:20.370Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:21.173Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 1,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:21.489Z",
+      "category": "MENU",
+      "message": "Reordered block from 1 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:21.519Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:22.011Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:22.643Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:22.673Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:23.658Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:23.915Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:24.105Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:24.134Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:24.627Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:25.099Z",
+      "category": "MENU",
+      "message": "Reordered block from 0 to 2"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:25.130Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:25.888Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 2,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          2
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:26.193Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:26.374Z",
+      "category": "MENU",
+      "message": "Reordered block from 2 to 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:26.406Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          2
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:30.155Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:31.062Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:33.920Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:34.461Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:38.668Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:38.755Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:41.153Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:41.153Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:39:46.843Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:46.843Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:47.445Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:47.447Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:47.447Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:49.628Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:39:49.899Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:40:41.234Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:40:41.234Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:40:56.039Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:40:57.533Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:40:58.673Z",
+      "category": "MENU",
+      "message": "Editing custom cycle"
+    },
+    {
+      "timestamp": "2026-02-08T20:40:59.245Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:00.925Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:01.463Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:03.046Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:03.724Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": false,
+        "isDuplicating": false,
+        "dragIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:03.792Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0
+        ],
+        "to": -1
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:05.590Z",
+      "category": "MENU",
+      "message": "Block drag started",
+      "data": {
+        "index": 0,
+        "isMultiSelect": true,
+        "isDuplicating": false,
+        "dragIndices": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:09.122Z",
+      "category": "MENU",
+      "message": "Auto-scroll activated (up)"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:09.413Z",
+      "category": "MENU",
+      "message": "Moved 2 block(s) to index 0"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:09.413Z",
+      "category": "MENU",
+      "message": "Block drag completed",
+      "data": {
+        "from": [
+          0,
+          1
+        ],
+        "to": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:12.332Z",
+      "category": "MENU",
+      "message": "Opening custom cycles menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:13.033Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:41.290Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Skip cooldown active",
+      "data": {
+        "reminderTime": "11:15",
+        "lastSkipTime": "2026-02-08T20:26:57.780Z",
+        "cooldownMinutes": 30
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:41.290Z",
+      "category": "TIMER",
+      "message": "Daily reminder: No reminder to show at current time"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:46.741Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:48.040Z",
+      "category": "MENU",
+      "message": "Opening ruleset settings dialog"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:49.137Z",
+      "category": "SETTINGS",
+      "message": "Configuration saved",
+      "data": {
+        "timerMode": "pomodoro",
+        "focusDuration": 30,
+        "breakDuration": 30,
+        "cycles": 3,
+        "blockedWorkspacesCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:49.140Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:50.557Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:50.557Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:50.557Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-02-08T20:41:52.335Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:52.335Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:53.356Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-02-08T20:41:53.356Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 326
+      }
+    }
+  ]
+}
