@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.0-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.1-green.svg)
 
 ## ✨ Features
 
@@ -357,6 +357,19 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.1
+
+- ✅ **Custom Cycle Drag Overhaul**: Blocks draggable from entire surface (not just handle), Shift+Click guard for multi-select
+- ✅ **Drop Indicator Fix**: Position caching prevents flickering during drag; indicator updates during auto-scroll
+- ✅ **Drag Stability**: Added `pointercancel` support, safety cleanup for stale drag state, orphaned element removal
+- ✅ **Snap-back Fix**: Dragging block back to original position no longer causes swap (no-op detection)
+- ✅ **No-op Drag Safety**: Undo stack and block selection preserved when drag results in no change
+- ✅ **Auto-scroll**: Dragging blocks near container edges auto-scrolls the list with live target updates
+- 🎨 **Dropdown Option Styling**: Added dark backgrounds for dropdown options for visibility in Zen Browser
+- ✨ **Cycle Reordering**: Up/down arrows to reorder saved custom cycles in the list
+- ✨ **Undo/Redo Layout**: Buttons now on same line as back button across all dialogs
+- 📝 **Comprehensive Logging**: 18 new log statements for cycle, ruleset, and drag operations
 
 ### Version 1.4.0
 

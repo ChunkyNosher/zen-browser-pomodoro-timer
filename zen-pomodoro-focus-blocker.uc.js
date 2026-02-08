@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.0
+ * Version: 1.4.1
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.0',
+    MOD_VERSION: '1.4.1',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -5347,8 +5347,19 @@
       // Buttons
       const { buttonDiv, cancelButton, startButton } = this._createStartDialogButtons();
 
-      // Assemble dialog
-      [backButton, h2, undoRedoButtons, configSection, buttonDiv].forEach((el) => dialog.appendChild(el));
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      [headerRow, h2, configSection, buttonDiv].forEach((el) => {
+        dialog.appendChild(el);
+      });
       document.documentElement.appendChild(dialog);
 
       // Track changes for undo/redo
@@ -6729,9 +6740,18 @@
       buttonDiv.appendChild(saveButton);
       buttonDiv.appendChild(saveCloseButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(h2);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
@@ -7236,9 +7256,18 @@
       buttonDiv.appendChild(saveButton);
       buttonDiv.appendChild(saveCloseButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(h2);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(configSection);
       dialog.appendChild(buttonDiv);
 
@@ -12447,6 +12476,7 @@
       this.isDuplicating = false; // Flag for Alt+Drag duplication
       this.isDragging = false;
       this.dragCleanup = null;
+      this._lastIndicatorRef = null; // Cached drop indicator position
     }
 
     /**
@@ -12476,8 +12506,8 @@
       if (cycles.length === 0) {
         container.appendChild(this._createEmptyMessage());
       } else {
-        cycles.forEach((cycle) => {
-          const cycleItem = this._createCycleListItem(cycle, config, dialog);
+        cycles.forEach((cycle, index) => {
+          const cycleItem = this._createCycleListItem(cycle, config, dialog, index, cycles.length);
           container.appendChild(cycleItem);
         });
       }
@@ -12570,10 +12600,12 @@
      * @param {Object} cycle - The cycle object
      * @param {Object} config - Current configuration
      * @param {HTMLElement} parentDialog - Parent dialog element
+     * @param {number} index - Index of the cycle in the list
+     * @param {number} totalCount - Total number of cycles
      * @returns {HTMLElement} The cycle list item element
      * @private
      */
-    _createCycleListItem(cycle, config, parentDialog) {
+    _createCycleListItem(cycle, config, parentDialog, index, totalCount) {
       const item = document.createElement('div');
       item.className = 'zen-pomodoro-cycle-list-item';
 
@@ -12597,6 +12629,30 @@
       const buttonsDiv = document.createElement('div');
       buttonsDiv.className = 'zen-pomodoro-cycle-buttons';
 
+      // Move Up button
+      const moveUpButton = document.createElement('button');
+      moveUpButton.className = 'zen-pomodoro-dialog-button secondary small';
+      moveUpButton.textContent = '▲';
+      moveUpButton.title = 'Move up';
+      moveUpButton.disabled = index === 0;
+      moveUpButton.style.padding = '4px 8px';
+      moveUpButton.style.minWidth = 'auto';
+      moveUpButton.addEventListener('click', () => {
+        this._reorderCycle(config, index, index - 1, parentDialog);
+      });
+
+      // Move Down button
+      const moveDownButton = document.createElement('button');
+      moveDownButton.className = 'zen-pomodoro-dialog-button secondary small';
+      moveDownButton.textContent = '▼';
+      moveDownButton.title = 'Move down';
+      moveDownButton.disabled = index >= totalCount - 1;
+      moveDownButton.style.padding = '4px 8px';
+      moveDownButton.style.minWidth = 'auto';
+      moveDownButton.addEventListener('click', () => {
+        this._reorderCycle(config, index, index + 1, parentDialog);
+      });
+
       // Edit button
       const editButton = document.createElement('button');
       editButton.className = 'zen-pomodoro-dialog-button secondary small';
@@ -12615,6 +12671,8 @@
         this._confirmDeleteCycle(cycle, config, parentDialog);
       });
 
+      buttonsDiv.appendChild(moveUpButton);
+      buttonsDiv.appendChild(moveDownButton);
       buttonsDiv.appendChild(editButton);
       buttonsDiv.appendChild(deleteButton);
 
@@ -12675,6 +12733,35 @@
 
       applyLastDialogPosition(confirmDialog);
       document.documentElement.appendChild(confirmDialog);
+    }
+
+    /**
+     * Reorder a cycle in the saved cycles list.
+     * @param {Object} config - Current configuration
+     * @param {number} fromIndex - Current index
+     * @param {number} toIndex - Target index
+     * @param {HTMLElement} parentDialog - Parent dialog to refresh
+     * @private
+     */
+    _reorderCycle(config, fromIndex, toIndex, parentDialog) {
+      const savedCycles = config.customCycles || [];
+      if (fromIndex < 0 || fromIndex >= savedCycles.length) return;
+      if (toIndex < 0 || toIndex >= savedCycles.length) return;
+
+      const cycle = savedCycles[fromIndex];
+      if (!cycle) return;
+      savedCycles.splice(fromIndex, 1);
+      savedCycles.splice(toIndex, 0, cycle);
+
+      config.customCycles = savedCycles;
+      saveConfig(config);
+
+      logger.log(LOG_CATEGORIES.MENU, `Reordered cycle from position ${fromIndex} to ${toIndex}`, { cycleName: cycle.name || 'Unknown' });
+
+      // Refresh the dialog
+      saveDialogPosition(parentDialog);
+      parentDialog.remove();
+      this.showCustomCyclesMenu();
     }
 
     /**
@@ -12978,9 +13065,18 @@
       buttonDiv.appendChild(cancelButton);
       buttonDiv.appendChild(saveButton);
 
-      dialog.appendChild(backButton);
+      // Assemble dialog - create header row for back button and undo/redo
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'flex';
+      headerRow.style.justifyContent = 'space-between';
+      headerRow.style.alignItems = 'center';
+      headerRow.style.marginBottom = '8px';
+      backButton.style.marginBottom = '0';
+      headerRow.appendChild(backButton);
+      headerRow.appendChild(undoRedoButtons);
+
+      dialog.appendChild(headerRow);
       dialog.appendChild(title);
-      dialog.appendChild(undoRedoButtons);
       dialog.appendChild(nameRow);
       dialog.appendChild(durationRow);
       dialog.appendChild(blocksLabel);
@@ -13228,8 +13324,13 @@
         }
       });
 
-      // Custom pointer-based drag on handle (supports mouse and touch)
-      dragHandle.addEventListener('pointerdown', (e) => {
+      // Custom pointer-based drag on entire block (supports mouse and touch)
+      blockDiv.addEventListener('pointerdown', (e) => {
+        // Don't start drag if clicking on input, delete button, or their children
+        if (durationInput.contains(e.target) || deleteButton.contains(e.target)) {
+          return;
+        }
+        if (e.shiftKey) return; // allow Shift+Click multi-select without drag
         // Allow left mouse button (button 0) or touch/pen input
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault();
@@ -13248,7 +13349,15 @@
      * @private
      */
     _startBlockDrag(e, blockDiv, index) {
-      if (this.isDragging) return;
+      // Safety: cleanup any existing drag state before starting new drag
+      if (this.isDragging) {
+        if (this.dragCleanup) {
+          this.dragCleanup();
+          this.dragCleanup = null;
+        }
+        this.isDragging = false;
+      }
+
       this.isDragging = true;
       this.draggedBlockIndex = index;
       this.isDuplicating = e.altKey;
@@ -13261,6 +13370,13 @@
       const dragIndices = isMultiSelect
         ? Array.from(this.selectedBlockIndices).sort((a, b) => a - b)
         : [index];
+
+      logger.log(Constants.LOG_CATEGORIES.MENU, 'Block drag started', {
+        index,
+        isMultiSelect,
+        isDuplicating: this.isDuplicating,
+        dragIndices
+      });
 
       // Mark all dragged blocks
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
@@ -13300,64 +13416,103 @@
       
       let lastTargetIndex = -1;
       let rafId = null;
+      let lastPointerY = e.clientY; // Track pointer Y for auto-scroll target recalculation
+      
+      // Reset cached indicator position for new drag
+      this._lastIndicatorRef = null;
+      
+      // Auto-scroll variables for dragging near container edges
+      const scrollContainer = container;
+      const SCROLL_ZONE = 40; // px from edge to trigger auto-scroll
+      const SCROLL_SPEED = 4; // px per frame
+      const scrollState = { rafId: null, direction: null };
 
-      const onPointerMove = (pointerMoveEvent) => {
-        if (rafId) return; // Throttle with rAF
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
-          const targetIndex = this._getDropTargetIndex(container, pointerMoveEvent.clientY, dragIndices);
-          
-          if (targetIndex === lastTargetIndex) return;
-          lastTargetIndex = targetIndex;
+      // Shared function to update drop target position based on pointer Y
+      const updateDropTarget = (clientY) => {
+        const targetIndex = this._getDropTargetIndex(container, clientY, dragIndices);
+        
+        if (targetIndex === lastTargetIndex) return;
+        lastTargetIndex = targetIndex;
 
-          const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-          
-          if (targetIndex < 0) return;
+        const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
+        
+        if (targetIndex < 0) return;
 
-          this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+        this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
 
-          if (this.isDuplicating && ghostBlocks.length > 0) {
-            this._showGhostBlocks(container, dropIndicator, ghostBlocks);
+        if (this.isDuplicating && ghostBlocks.length > 0) {
+          this._showGhostBlocks(container, dropIndicator, ghostBlocks);
+        }
+
+        // Reset and apply shift preview for move operations
+        nonDraggedBlocks.forEach((block) => {
+          block.classList.remove('shift-down', 'shift-up');
+          block.style.removeProperty('--block-shift-distance');
+          if (!this.isDuplicating) {
+            block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
           }
-
-          // Reset and apply shift preview for move operations
-          nonDraggedBlocks.forEach((block) => {
-            block.classList.remove('shift-down', 'shift-up');
-            block.style.removeProperty('--block-shift-distance');
-            if (!this.isDuplicating) {
-              block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
-            }
-          });
         });
       };
 
-      const onPointerUp = () => {
+      const onPointerMove = (pointerMoveEvent) => {
+        lastPointerY = pointerMoveEvent.clientY;
+        if (rafId) return; // Throttle with rAF
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          updateDropTarget(lastPointerY);
+        });
+        
+        // Handle auto-scroll near container edges
+        this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
+      };
+
+      const cleanup = () => {
         document.removeEventListener('pointermove', onPointerMove);
-        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('pointerup', cleanup);
+        document.removeEventListener('pointercancel', cleanup);
+        
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
         }
+        
+        // Stop auto-scroll
+        if (scrollState.rafId) {
+          cancelAnimationFrame(scrollState.rafId);
+          scrollState.rafId = null;
+        }
 
         this._cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks);
-        this._applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect);
+        const didApply = this._applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect);
 
-        // Re-render and push undo state
-        const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
-        if (blocksContainer) {
-          this._renderBlocks(blocksContainer);
-        }
-        if (this.currentUndoRedo) {
-          this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+        logger.log(Constants.LOG_CATEGORIES.MENU, 'Block drag completed', {
+          from: dragIndices,
+          to: lastTargetIndex
+        });
+
+        // Only re-render and push undo state if an actual operation occurred
+        if (didApply) {
+          const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');
+          if (blocksContainer) {
+            this._renderBlocks(blocksContainer);
+          }
+          if (this.currentUndoRedo) {
+            this.currentUndoRedo.pushState(JSON.parse(JSON.stringify(this.currentEditingCycle)));
+          }
         }
 
         this.isDragging = false;
         this.draggedBlockIndex = null;
         this.isDuplicating = false;
+        this.dragCleanup = null;
       };
 
+
+      this.dragCleanup = cleanup;
+
       document.addEventListener('pointermove', onPointerMove);
-      document.addEventListener('pointerup', onPointerUp);
+      document.addEventListener('pointerup', cleanup);
+      document.addEventListener('pointercancel', cleanup);
     }
 
     /**
@@ -13365,21 +13520,16 @@
      * @param {number} lastTargetIndex - Drop target index relative to non-dragged blocks
      * @param {Array<number>} dragIndices - Indices of dragged blocks
      * @param {boolean} isMultiSelect - Whether multiple blocks were selected
+     * @returns {boolean} True if an operation was applied, false if no-op
      * @private
      */
     _applyDragOperation(lastTargetIndex, dragIndices, isMultiSelect) {
-      if (lastTargetIndex < 0) return;
+      if (lastTargetIndex < 0) return false;
 
-      const nonDraggedIndices = [];
-      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
-        if (!dragIndices.includes(i)) {
-          nonDraggedIndices.push(i);
-        }
-      }
+      const absoluteTarget = this._computeAbsoluteTarget(lastTargetIndex, dragIndices);
 
-      const absoluteTarget = lastTargetIndex >= nonDraggedIndices.length
-        ? this.currentEditingCycle.blocks.length
-        : nonDraggedIndices[lastTargetIndex];
+      // Check if single-block move would result in no change
+      if (this._isSamePositionMove(absoluteTarget, isMultiSelect)) return false;
 
       if (this.isDuplicating) {
         this._duplicateBlocks(dragIndices, absoluteTarget);
@@ -13388,6 +13538,39 @@
       } else {
         this.reorderBlocks(this.draggedBlockIndex, absoluteTarget);
       }
+      return true;
+    }
+
+    /**
+     * Compute the absolute target index from a relative drop position.
+     * @param {number} relativeTarget - Target index among non-dragged blocks
+     * @param {Array<number>} dragIndices - Indices of blocks being dragged
+     * @returns {number} Absolute target index in the full blocks array
+     * @private
+     */
+    _computeAbsoluteTarget(relativeTarget, dragIndices) {
+      const nonDraggedIndices = [];
+      for (let i = 0; i < this.currentEditingCycle.blocks.length; i++) {
+        if (!dragIndices.includes(i)) {
+          nonDraggedIndices.push(i);
+        }
+      }
+      return relativeTarget >= nonDraggedIndices.length
+        ? this.currentEditingCycle.blocks.length
+        : nonDraggedIndices[relativeTarget];
+    }
+
+    /**
+     * Check if a single-block drag would result in no position change.
+     * @param {number} absoluteTarget - Target index in the full blocks array
+     * @param {boolean} isMultiSelect - Whether multiple blocks are selected
+     * @returns {boolean} True if the move is a no-op
+     * @private
+     */
+    _isSamePositionMove(absoluteTarget, isMultiSelect) {
+      if (this.isDuplicating || isMultiSelect) return false;
+      const from = this.draggedBlockIndex;
+      return absoluteTarget === from || absoluteTarget === from + 1;
     }
 
     /**
@@ -13398,12 +13581,45 @@
      * @private
      */
     _cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
-      dropIndicator.remove();
-      ghostBlocks.forEach(g => g.remove());
+      if (dropIndicator && dropIndicator.parentElement) {
+        dropIndicator.remove();
+      }
+      ghostBlocks.forEach((g) => {
+        if (g && g.parentElement) {
+          g.remove();
+        }
+      });
+      
+      // Remove any orphaned indicators or ghosts from container
+      const container = allBlocks[0]?.parentElement;
+      if (container) {
+        container.querySelectorAll('.zen-pomodoro-cycle-drop-indicator').forEach((el) => {
+          el.remove();
+        });
+        container.querySelectorAll('.zen-pomodoro-cycle-block-ghost').forEach((el) => {
+          el.remove();
+        });
+      }
+      
       allBlocks.forEach(block => {
         block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
         block.style.removeProperty('--block-shift-distance');
       });
+    }
+
+    /**
+     * Compute the reference element for drop indicator positioning.
+     * @param {Array<HTMLElement>} nonDraggedBlocks - Non-dragged block elements
+     * @param {number} targetIndex - Target insertion index
+     * @returns {HTMLElement|null} Reference element to insert before, or null to append
+     * @private
+     */
+    _getDropIndicatorRef(nonDraggedBlocks, targetIndex) {
+      if (targetIndex < nonDraggedBlocks.length) {
+        return nonDraggedBlocks[targetIndex];
+      }
+      const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
+      return (lastNonDragged && lastNonDragged.nextSibling) || null;
     }
 
     /**
@@ -13416,12 +13632,13 @@
      */
     _positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex) {
       dropIndicator.style.display = 'block';
-      if (targetIndex < nonDraggedBlocks.length) {
-        container.insertBefore(dropIndicator, nonDraggedBlocks[targetIndex]);
-      } else {
-        const lastNonDragged = nonDraggedBlocks[nonDraggedBlocks.length - 1];
-        if (lastNonDragged && lastNonDragged.nextSibling) {
-          container.insertBefore(dropIndicator, lastNonDragged.nextSibling);
+      const newRef = this._getDropIndicatorRef(nonDraggedBlocks, targetIndex);
+
+      // Only update DOM if position changed (prevents flickering)
+      if (newRef !== this._lastIndicatorRef) {
+        this._lastIndicatorRef = newRef;
+        if (newRef) {
+          container.insertBefore(dropIndicator, newRef);
         } else {
           container.appendChild(dropIndicator);
         }
@@ -13436,11 +13653,55 @@
      * @private
      */
     _showGhostBlocks(container, dropIndicator, ghostBlocks) {
-      ghostBlocks.forEach(g => g.remove());
-      ghostBlocks.forEach(ghost => {
+      ghostBlocks.forEach((g) => {
+        g.remove();
+      });
+      ghostBlocks.forEach((ghost) => {
         ghost.style.display = '';
         container.insertBefore(ghost, dropIndicator);
       });
+    }
+
+    /**
+     * Update auto-scroll state based on pointer position relative to container edges.
+     * @param {number} clientY - Current pointer Y position
+     * @param {HTMLElement} scrollContainer - Scrollable container element
+     * @param {number} scrollZone - Distance from edge to trigger scrolling (px)
+     * @param {number} scrollSpeed - Scroll speed per animation frame (px)
+     * @param {Object} scrollState - Mutable state object with rafId and direction
+     * @param {Function} onScroll - Callback to update drop target during scroll
+     * @private
+     */
+    _updateAutoScroll(clientY, scrollContainer, scrollZone, scrollSpeed, scrollState, onScroll) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      let newScrollDir = null;
+      if (clientY < containerRect.top + scrollZone) {
+        newScrollDir = 'up';
+      } else if (clientY > containerRect.bottom - scrollZone) {
+        newScrollDir = 'down';
+      }
+
+      if (newScrollDir === scrollState.direction) return;
+
+      // Stop any existing scroll
+      if (scrollState.rafId) {
+        cancelAnimationFrame(scrollState.rafId);
+        scrollState.rafId = null;
+      }
+      scrollState.direction = newScrollDir;
+      if (scrollState.direction) {
+        logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollState.direction})`);
+        const speed = scrollState.direction === 'up' ? -scrollSpeed : scrollSpeed;
+        const doScroll = () => {
+          scrollContainer.scrollTop += speed;
+          // Recalculate drop target as scroll position changes
+          if (onScroll) {
+            onScroll(clientY);
+          }
+          scrollState.rafId = requestAnimationFrame(doScroll);
+        };
+        scrollState.rafId = requestAnimationFrame(doScroll);
+      }
     }
 
     /**
