@@ -57,7 +57,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.1';                  // Current mod version
+const MOD_VERSION = '1.4.2';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -262,6 +262,54 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_getDropIndicatorRef(nonDraggedBlocks, targetIndex)` | Compute reference element for drop indicator positioning    |
 | `_isSamePositionMove(absoluteTarget, isMultiSelect)`  | Detect no-op moves where source and target are identical    |
 | `_updateAutoScroll(clientY, container, zone, speed, state, onScroll)` | Manage auto-scroll during drag near container edges |
+
+---
+
+## Bug Fixes and Features in v1.4.2
+
+### Dropdown Select Contrast Fix
+
+**Issue:** Dropdown select backgrounds (#252430) were nearly identical to the dialog background (#2b2a33), making them hard to distinguish. The dropdowns also flickered when opened due to CSS transitions.
+
+**Fix:** In `chrome.css`:
+- Changed select background-color from `#252430` to `#1a1926` (darker, more distinct)
+- Increased border from `1px` to `2px solid #4a4960` for better visibility
+- Changed hover background from `#2a2940` to `#222135`
+- **Removed CSS transitions** from all select elements to prevent flickering on open
+- Applied to all selectors: `.zen-pomodoro-config-row select`, `.zen-pomodoro-dialog select`, `.zen-pomodoro-cycle-editor-dialog select`, `select.zen-pomodoro-dialog-input`, `.zen-pomodoro-rule-select`
+
+### Block Drag Ordering Fix
+
+**Issue:** When dragging a block from position 0 to the middle position in a 3-block cycle, the block ended up at the bottom instead of the middle.
+
+**Root Cause:** `reorderBlocks()` called `splice(fromIndex, 1)` to remove the block, which shifts all subsequent indices down by 1. Then `splice(toIndex, 0, block)` used the unadjusted `toIndex`, inserting at the wrong position.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Added index adjustment: `const adjustedIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;`
+- Example: With [A, B, C], dragging A(0) to middle → absoluteTarget=2, adjustedIndex=1 → [B, A, C] ✓
+
+### Drop Indicator Visibility Fix
+
+**Issue:** Blue drop indicator line didn't appear during drag, and non-dragged blocks didn't move positions when dragging.
+
+**Root Cause:** Dragged blocks had `opacity: 0.4` and `transform: scale(0.95)` but still occupied layout space. Non-dragged blocks stayed in place, making the drop indicator hard to see. CSS classes `shift-down`/`shift-up` were referenced in JS but never defined in CSS.
+
+**Fix:**
+- **CSS**: Changed `.dragging` to collapse blocks: `height: 0 !important; padding: 0; margin: 0; border-width: 0; overflow: hidden; opacity: 0;`
+- **JS**: Removed dead shift-down/shift-up code and `--block-shift-distance` CSS variable logic
+- Non-dragged blocks now naturally fill the gap, making the drop indicator clearly visible
+
+### Ghost Block Index Corruption Fix
+
+**Issue:** During Alt+drag duplication, ghost blocks had the `zen-pomodoro-cycle-block` class, causing `_getDropTargetIndex()` to include them in block counts, corrupting drop position calculations.
+
+**Fix:** Changed `querySelectorAll('.zen-pomodoro-cycle-block')` to `querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)')` in both `_startBlockDrag()` and `_getDropTargetIndex()`.
+
+### Auto-Scroll Timing Fix
+
+**Issue:** Auto-scroll during block drag was not triggering reliably because the `_updateAutoScroll()` call was placed after the `if (rafId) return;` throttle check, meaning it was skipped when a requestAnimationFrame was pending.
+
+**Fix:** Moved `_updateAutoScroll()` call before the rAF throttle check in `onPointerMove`, so auto-scroll detection runs on every pointer move event.
 
 ---
 
