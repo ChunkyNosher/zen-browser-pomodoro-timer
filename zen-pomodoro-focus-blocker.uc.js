@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.1
+ * Version: 1.4.2
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.1',
+    MOD_VERSION: '1.4.2',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -13379,7 +13379,7 @@
       });
 
       // Mark all dragged blocks
-      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
       dragIndices.forEach(idx => {
         if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
       });
@@ -13408,12 +13408,6 @@
         });
       }
 
-      // Calculate block height for shift animations
-      const BLOCK_GAP_PX = 8; // Gap between blocks in container
-      const DEFAULT_BLOCK_HEIGHT_PX = 60; // Default fallback height
-      const blockHeight = allBlocks[0] ? allBlocks[0].offsetHeight + BLOCK_GAP_PX : DEFAULT_BLOCK_HEIGHT_PX;
-      const totalDragHeight = blockHeight * dragIndices.length;
-      
       let lastTargetIndex = -1;
       let rafId = null;
       let lastPointerY = e.clientY; // Track pointer Y for auto-scroll target recalculation
@@ -13444,26 +13438,19 @@
           this._showGhostBlocks(container, dropIndicator, ghostBlocks);
         }
 
-        // Reset and apply shift preview for move operations
-        nonDraggedBlocks.forEach((block) => {
-          block.classList.remove('shift-down', 'shift-up');
-          block.style.removeProperty('--block-shift-distance');
-          if (!this.isDuplicating) {
-            block.style.setProperty('--block-shift-distance', `${totalDragHeight}px`);
-          }
-        });
       };
 
       const onPointerMove = (pointerMoveEvent) => {
         lastPointerY = pointerMoveEvent.clientY;
-        if (rafId) return; // Throttle with rAF
+        
+        // Handle auto-scroll near container edges (not throttled by rAF)
+        this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
+        
+        if (rafId) return; // Throttle updateDropTarget with rAF
         rafId = requestAnimationFrame(() => {
           rafId = null;
           updateDropTarget(lastPointerY);
         });
-        
-        // Handle auto-scroll near container edges
-        this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
       };
 
       const cleanup = () => {
@@ -13602,8 +13589,7 @@
       }
       
       allBlocks.forEach(block => {
-        block.classList.remove('dragging', 'drag-transition', 'shift-down', 'shift-up');
-        block.style.removeProperty('--block-shift-distance');
+        block.classList.remove('dragging', 'drag-transition');
       });
     }
 
@@ -13754,7 +13740,7 @@
      * @private
      */
     _getDropTargetIndex(container, clientY, dragIndices) {
-      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block'));
+      const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
       const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
 
       // Find the position among non-dragged blocks
@@ -13921,9 +13907,12 @@
 
       const block = this.currentEditingCycle.blocks[fromIndex];
       this.currentEditingCycle.blocks.splice(fromIndex, 1);
-      this.currentEditingCycle.blocks.splice(toIndex, 0, block);
+      // Adjust target index: after removing the block at fromIndex,
+      // all indices above it shift down by 1
+      const adjustedIndex = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      this.currentEditingCycle.blocks.splice(adjustedIndex, 0, block);
       
-      logger.log(LOG_CATEGORIES.MENU, `Reordered block from ${fromIndex} to ${toIndex}`);
+      logger.log(LOG_CATEGORIES.MENU, `Reordered block from ${fromIndex} to ${adjustedIndex}`);
       
       // Re-render blocks to update indices
       const blocksContainer = document.getElementById('zen-pomodoro-cycle-blocks');

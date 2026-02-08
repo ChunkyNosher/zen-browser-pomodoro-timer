@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.4.1
+ * Version: 1.4.2
  * License: MIT
  * 
  * ZEN BROWSER 1.18.X COMPATIBILITY:
@@ -18,6 +18,12 @@
  * - Added context menu styles
  * - Added lock screen code display styles
  * 
+ * NEW IN 1.4.2:
+ * - Fixed dropdown select contrast (darker bg #1a1926 with thicker border)
+ * - Removed select transitions to prevent flickering on open
+ * - Collapsed dragged blocks during drag for cleaner visual feedback
+ * - Fixed drop indicator visibility during block drag
+ *
  * NEW IN 1.4.1:
  * - Fixed dropdown option styling with distinct backgrounds
  * - Added cycle reorder button disabled state styling
@@ -493,8 +499,8 @@
 .zen-pomodoro-config-row select,
 .zen-pomodoro-dialog select,
 .zen-pomodoro-cycle-editor-dialog select {
-  background-color: #252430;
-  border: 1px solid #4a4960;
+  background-color: #1a1926;
+  border: 2px solid #4a4960;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 13px;
@@ -505,14 +511,13 @@
   background-repeat: no-repeat;
   background-position: right 8px center;
   padding-right: 28px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .zen-pomodoro-config-row select:hover,
 .zen-pomodoro-dialog select:hover,
 .zen-pomodoro-cycle-editor-dialog select:hover {
   border-color: #5a59a0;
-  background-color: #2a2940;
+  background-color: #222135;
 }
 
 .zen-pomodoro-config-row select:focus,
@@ -524,8 +529,8 @@
 }
 
 select.zen-pomodoro-dialog-input {
-  background-color: #252430;
-  border: 1px solid #4a4960;
+  background-color: #1a1926;
+  border: 2px solid #4a4960;
   padding: 6px 10px;
   font-size: 13px;
   color: #e0e0e0;
@@ -1364,8 +1369,8 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-rule-select {
-  background-color: #252430;
-  border: 1px solid #4a4960;
+  background-color: #1a1926;
+  border: 2px solid #4a4960;
   color: #e0e0e0;
   border-radius: 4px;
   padding: 6px 8px;
@@ -1376,12 +1381,11 @@ select.zen-pomodoro-dialog-input option:checked {
   background-repeat: no-repeat;
   background-position: right 8px center;
   padding-right: 28px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .zen-pomodoro-rule-select:hover {
   border-color: #5a59a0;
-  background-color: #2a2940;
+  background-color: #222135;
 }
 
 .zen-pomodoro-rule-select:focus {
@@ -2176,9 +2180,14 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-cycle-block.dragging {
-  opacity: 0.4;
-  transform: scale(0.95);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
