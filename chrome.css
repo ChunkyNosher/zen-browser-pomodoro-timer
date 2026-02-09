@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.4.2
+ * Version: 1.4.3
  * License: MIT
  * 
  * ZEN BROWSER 1.18.X COMPATIBILITY:
@@ -18,6 +18,13 @@
  * - Added context menu styles
  * - Added lock screen code display styles
  * 
+ * NEW IN 1.4.3:
+ * - Added floating drag preview that follows cursor during block drag
+ * - Fixed drop indicator flickering (animation pulses shadow only, not opacity)
+ * - Added z-index to drop indicator for proper layering
+ * - Changed block transition to only affect bg/border colors (not height/padding)
+ * - Improved dropdown contrast: darker bg (#151422), brighter borders (#5a5980), inset shadow
+ *
  * NEW IN 1.4.2:
  * - Fixed dropdown select contrast (darker bg #1a1926 with thicker border)
  * - Removed select transitions to prevent flickering on open
