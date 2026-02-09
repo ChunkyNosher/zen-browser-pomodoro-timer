@@ -13387,7 +13387,12 @@
       
       // Create floating drag preview that follows the cursor
       const dragPreview = document.createElement('div');
-      dragPreview.style.cssText = 'position: fixed; pointer-events: none; z-index: 2147483647; opacity: 0.85; width: ' + blockWidth + 'px; transition: none;';
+      dragPreview.style.position = 'fixed';
+      dragPreview.style.pointerEvents = 'none';
+      dragPreview.style.zIndex = '2147483647';
+      dragPreview.style.opacity = '0.85';
+      dragPreview.style.width = `${blockWidth}px`;
+      dragPreview.style.transition = 'none';
       dragPreview.className = 'zen-pomodoro-drag-preview';
       
       // Clone the dragged blocks into the preview BEFORE they get collapsed
@@ -13402,8 +13407,8 @@
       });
       
       // Position at cursor
-      dragPreview.style.left = blockRect.left + 'px';
-      dragPreview.style.top = (startY - offsetY) + 'px';
+      dragPreview.style.left = `${blockRect.left}px`;
+      dragPreview.style.top = `${startY - offsetY}px`;
       document.documentElement.appendChild(dragPreview);
 
       // Mark all dragged blocks
@@ -13471,7 +13476,7 @@
         lastPointerY = pointerMoveEvent.clientY;
         
         // Update floating drag preview position
-        dragPreview.style.top = (lastPointerY - offsetY) + 'px';
+        dragPreview.style.top = `${lastPointerY - offsetY}px`;
         
         // Handle auto-scroll near container edges (not throttled by rAF)
         this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
