@@ -499,8 +499,9 @@
 .zen-pomodoro-config-row select,
 .zen-pomodoro-dialog select,
 .zen-pomodoro-cycle-editor-dialog select {
-  background-color: #1a1926;
-  border: 2px solid #4a4960;
+  background-color: #151422;
+  border: 2px solid #5a5980;
+  box-shadow: inset 0 1px 4px rgb(0 0 0 / 40%);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 13px;
@@ -516,8 +517,8 @@
 .zen-pomodoro-config-row select:hover,
 .zen-pomodoro-dialog select:hover,
 .zen-pomodoro-cycle-editor-dialog select:hover {
-  border-color: #5a59a0;
-  background-color: #222135;
+  border-color: #7a79c0;
+  background-color: #1c1b30;
 }
 
 .zen-pomodoro-dialog select:focus,
@@ -528,8 +529,9 @@
 }
 
 select.zen-pomodoro-dialog-input {
-  background-color: #1a1926;
-  border: 2px solid #4a4960;
+  background-color: #151422;
+  border: 2px solid #5a5980;
+  box-shadow: inset 0 1px 4px rgb(0 0 0 / 40%);
   padding: 6px 10px;
   font-size: 13px;
   color: #e0e0e0;
@@ -546,7 +548,7 @@ select.zen-pomodoro-dialog-input {
 .zen-pomodoro-dialog select option,
 .zen-pomodoro-cycle-editor-dialog select option,
 select.zen-pomodoro-dialog-input option {
-  background-color: #1e1d26;
+  background-color: #131220;
   color: #e0e0e0;
   padding: 6px 10px;
 }
@@ -1368,8 +1370,9 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-rule-select {
-  background-color: #1a1926;
-  border: 2px solid #4a4960;
+  background-color: #151422;
+  border: 2px solid #5a5980;
+  box-shadow: inset 0 1px 4px rgb(0 0 0 / 40%);
   color: #e0e0e0;
   border-radius: 4px;
   padding: 6px 8px;
@@ -1383,8 +1386,8 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-rule-select:hover {
-  border-color: #5a59a0;
-  background-color: #222135;
+  border-color: #7a79c0;
+  background-color: #1c1b30;
 }
 
 .zen-pomodoro-rule-select:focus {
@@ -1394,7 +1397,7 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-rule-select option {
-  background-color: #1e1d26;
+  background-color: #131220;
   color: #e0e0e0;
   padding: 6px 10px;
 }
@@ -2219,6 +2222,7 @@ select.zen-pomodoro-dialog-input option:checked {
   0%, 100% {
     box-shadow: 0 0 6px rgb(74 158 255 / 40%);
   }
+
   50% {
     box-shadow: 0 0 12px rgb(74 158 255 / 80%);
   }
