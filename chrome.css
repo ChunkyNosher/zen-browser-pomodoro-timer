@@ -520,7 +520,6 @@
   background-color: #222135;
 }
 
-.zen-pomodoro-config-row select:focus,
 .zen-pomodoro-dialog select:focus,
 .zen-pomodoro-cycle-editor-dialog select:focus {
   outline: none;
