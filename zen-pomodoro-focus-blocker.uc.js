@@ -13378,8 +13378,35 @@
         dragIndices
       });
 
-      // Mark all dragged blocks
+      // Capture dimensions BEFORE adding dragging class
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+      const blockWidth = blockDiv.offsetWidth;
+      const blockRect = blockDiv.getBoundingClientRect();
+      const startY = e.clientY;
+      const offsetY = startY - blockRect.top;
+      
+      // Create floating drag preview that follows the cursor
+      const dragPreview = document.createElement('div');
+      dragPreview.style.cssText = 'position: fixed; pointer-events: none; z-index: 2147483647; opacity: 0.85; width: ' + blockWidth + 'px; transition: none;';
+      dragPreview.className = 'zen-pomodoro-drag-preview';
+      
+      // Clone the dragged blocks into the preview BEFORE they get collapsed
+      dragIndices.forEach(idx => {
+        if (allBlocks[idx]) {
+          const clone = allBlocks[idx].cloneNode(true);
+          clone.classList.remove('selected'); // Remove selection highlight from preview
+          clone.style.margin = '0';
+          clone.style.pointerEvents = 'none';
+          dragPreview.appendChild(clone);
+        }
+      });
+      
+      // Position at cursor
+      dragPreview.style.left = blockRect.left + 'px';
+      dragPreview.style.top = (startY - offsetY) + 'px';
+      document.documentElement.appendChild(dragPreview);
+
+      // Mark all dragged blocks
       dragIndices.forEach(idx => {
         if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
       });
@@ -13443,6 +13470,9 @@
       const onPointerMove = (pointerMoveEvent) => {
         lastPointerY = pointerMoveEvent.clientY;
         
+        // Update floating drag preview position
+        dragPreview.style.top = (lastPointerY - offsetY) + 'px';
+        
         // Handle auto-scroll near container edges (not throttled by rAF)
         this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
         
@@ -13457,6 +13487,9 @@
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', cleanup);
         document.removeEventListener('pointercancel', cleanup);
+        
+        // Remove floating drag preview
+        if (dragPreview.parentElement) dragPreview.remove();
         
         if (rafId) {
           cancelAnimationFrame(rafId);
