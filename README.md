@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.2-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.3-green.svg)
 
 ## ✨ Features
 
@@ -357,6 +357,21 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.3
+
+- ✅ **Floating Drag Preview**: Blocks now show a floating clone following the cursor during drag instead of disappearing
+- ✅ **Drop Indicator Fix**: Eliminated flickering by changing animation to shadow-only pulse and limiting CSS transitions to hover properties
+- ✅ **Drop Indicator Layering**: Added z-index to drop indicator for proper visibility above blocks
+- 🎨 **Improved Dropdown Contrast**: Darker background (#151422), brighter borders (#5a5980), inset shadow for clear visual distinction from dialog background
+
+### Version 1.4.2
+
+- ✅ **Dropdown Select Contrast**: Darker background with thicker border, removed transitions preventing flicker
+- ✅ **Block Drag Ordering**: Fixed splice index adjustment for correct reorder positioning
+- ✅ **Drop Indicator Visibility**: Collapsed dragged blocks for cleaner layout feedback
+- ✅ **Ghost Block Index Fix**: Excluded ghost blocks from querySelectorAll to prevent index corruption
+- ✅ **Auto-Scroll Timing**: Moved auto-scroll check before rAF throttle for reliable edge detection
 
 ### Version 1.4.1
 

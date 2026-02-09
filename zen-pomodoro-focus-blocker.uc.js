@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.2
+ * Version: 1.4.3
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -47,7 +47,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.2',
+    MOD_VERSION: '1.4.3',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -13378,8 +13378,11 @@
         dragIndices
       });
 
-      // Mark all dragged blocks
+      // Capture dimensions BEFORE adding dragging class
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+      const { dragPreview, offsetY } = this._createDragPreview(e, blockDiv, allBlocks, dragIndices);
+
+      // Mark all dragged blocks
       dragIndices.forEach(idx => {
         if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
       });
@@ -13443,6 +13446,9 @@
       const onPointerMove = (pointerMoveEvent) => {
         lastPointerY = pointerMoveEvent.clientY;
         
+        // Update floating drag preview position
+        dragPreview.style.top = `${lastPointerY - offsetY}px`;
+        
         // Handle auto-scroll near container edges (not throttled by rAF)
         this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
         
@@ -13457,6 +13463,9 @@
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', cleanup);
         document.removeEventListener('pointercancel', cleanup);
+        
+        // Remove floating drag preview
+        if (dragPreview.parentElement) dragPreview.remove();
         
         if (rafId) {
           cancelAnimationFrame(rafId);
@@ -13500,6 +13509,48 @@
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', cleanup);
       document.addEventListener('pointercancel', cleanup);
+    }
+
+    /**
+     * Create a floating drag preview element that follows the cursor.
+     * Must be called BEFORE blocks are collapsed with the dragging class.
+     * @param {PointerEvent} e - The pointer event
+     * @param {HTMLElement} blockDiv - The primary block being dragged
+     * @param {Array<HTMLElement>} allBlocks - All block elements
+     * @param {Array<number>} dragIndices - Indices of blocks being dragged
+     * @returns {{ dragPreview: HTMLElement, offsetY: number }}
+     * @private
+     */
+    _createDragPreview(e, blockDiv, allBlocks, dragIndices) {
+      const blockWidth = blockDiv.offsetWidth;
+      const blockRect = blockDiv.getBoundingClientRect();
+      const startY = e.clientY;
+      const offsetY = startY - blockRect.top;
+
+      const dragPreview = document.createElement('div');
+      dragPreview.style.position = 'fixed';
+      dragPreview.style.pointerEvents = 'none';
+      dragPreview.style.zIndex = '2147483647';
+      dragPreview.style.opacity = '0.85';
+      dragPreview.style.width = `${blockWidth}px`;
+      dragPreview.style.transition = 'none';
+      dragPreview.className = 'zen-pomodoro-drag-preview';
+
+      dragIndices.forEach(idx => {
+        if (allBlocks[idx]) {
+          const clone = allBlocks[idx].cloneNode(true);
+          clone.classList.remove('selected');
+          clone.style.margin = '0';
+          clone.style.pointerEvents = 'none';
+          dragPreview.appendChild(clone);
+        }
+      });
+
+      dragPreview.style.left = `${blockRect.left}px`;
+      dragPreview.style.top = `${startY - offsetY}px`;
+      document.documentElement.appendChild(dragPreview);
+
+      return { dragPreview, offsetY };
     }
 
     /**

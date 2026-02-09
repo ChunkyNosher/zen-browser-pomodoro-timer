@@ -57,7 +57,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.2';                  // Current mod version
+const MOD_VERSION = '1.4.3';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -259,9 +259,55 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_applyDragOperation(targetIndex, dragIndices, multi)` | Apply drag/drop move or duplicate operation                |
 | `_cleanupDragVisuals(allBlocks, indicator, ghosts)`   | Clean up all drag visual state and orphaned elements        |
 | `_computeAbsoluteTarget(relativeTarget, dragIndices)` | Calculate absolute insertion index from relative drag index |
+| `_createDragPreview(e, blockDiv, allBlocks, dragIndices)` | Create floating drag preview that follows cursor (returns {dragPreview, offsetY}) |
 | `_getDropIndicatorRef(nonDraggedBlocks, targetIndex)` | Compute reference element for drop indicator positioning    |
 | `_isSamePositionMove(absoluteTarget, isMultiSelect)`  | Detect no-op moves where source and target are identical    |
 | `_updateAutoScroll(clientY, container, zone, speed, state, onScroll)` | Manage auto-scroll during drag near container edges |
+
+---
+
+## Bug Fixes and Features in v1.4.3
+
+### Floating Drag Preview for Block Drag
+
+**Issue:** When dragging blocks in the custom cycle editor, the blocks completely disappeared during drag and only reappeared when released. The `.dragging` CSS class collapsed blocks to `height: 0; opacity: 0` to make room for the drop indicator, but no visual feedback showed what was being dragged.
+
+**Fix:** In `zen-pomodoro-focus-blocker.uc.js`:
+- Created a floating drag preview element that follows the cursor during drag
+- Clones the dragged block(s) into a `position: fixed` container with `z-index: 2147483647`
+- Captures block dimensions BEFORE adding `.dragging` class (which collapses blocks)
+- Preview positioned at cursor offset and updates on every `pointermove` event
+- Preview removed on drag end (cleanup)
+
+**Fix:** In `chrome.css`:
+- Added `.zen-pomodoro-drag-preview` class with semi-transparent background, shadow, and blue border accent
+
+### Drop Indicator Flickering Fix
+
+**Issue:** The blue drop indicator line flickered during block dragging in short lists and didn't appear at all in scrollable lists.
+
+**Root Cause:** Multiple CSS issues contributed:
+1. `.zen-pomodoro-cycle-block` had `transition: all 0.2s ease` which animated the collapse when `.dragging` class was added, causing layout jitter
+2. The drop indicator had no `z-index`, so it could be hidden behind block elements
+3. The pulsing animation oscillated `opacity` between 0.7 and 1.0, compounding the visual flickering
+
+**Fix:** In `chrome.css`:
+- Changed `.zen-pomodoro-cycle-block` transition from `all 0.2s ease` to `background-color 0.2s ease, border-color 0.2s ease` (only hover effects, not layout properties)
+- Added `position: relative; z-index: 5;` to `.zen-pomodoro-cycle-drop-indicator`
+- Changed animation to only pulse `box-shadow` (not opacity) with 1.5s timing for smoother effect
+
+### Dropdown Select Contrast Improvement
+
+**Issue:** Dropdown select backgrounds (`#1a1926`) were still nearly identical to the dialog background (`#2b2a33`) on many displays.
+
+**Fix:** In `chrome.css`:
+- Changed select background-color from `#1a1926` to `#151422` (darker, more distinct)
+- Changed border from `2px solid #4a4960` to `2px solid #5a5980` (brighter purple)
+- Added `box-shadow: inset 0 1px 4px rgb(0 0 0 / 40%)` for visual depth
+- Changed hover background from `#222135` to `#1c1b30`
+- Changed hover border from `#5a59a0` to `#7a79c0` (brighter)
+- Changed option background from `#1e1d26` to `#131220`
+- Applied to all select selectors: `.zen-pomodoro-config-row select`, `.zen-pomodoro-dialog select`, `.zen-pomodoro-cycle-editor-dialog select`, `select.zen-pomodoro-dialog-input`, `.zen-pomodoro-rule-select`
 
 ---
 
