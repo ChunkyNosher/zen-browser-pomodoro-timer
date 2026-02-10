@@ -829,6 +829,12 @@
         const rawElapsed = Math.floor((Date.now() - adjustedState.timestamp) / 1000);
         // Cap elapsed time to heartbeat timeout to prevent extreme drift
         const maxElapsed = Math.floor(Constants.OWNER_HEARTBEAT_TIMEOUT_MS / 1000);
+        if (rawElapsed > maxElapsed) {
+          logger.log(Constants.LOG_CATEGORIES.SYNC, 'Time drift exceeded heartbeat timeout during takeover', {
+            rawElapsed,
+            maxElapsed,
+          });
+        }
         const elapsed = Math.min(rawElapsed, maxElapsed);
         adjustedState.remainingTime = Math.max(0, adjustedState.remainingTime - elapsed);
       }
