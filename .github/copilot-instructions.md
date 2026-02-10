@@ -16,6 +16,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 - Transition phase warnings before breaks end
 - Draggable UI dialogs and timer indicator
 - Full keyboard shortcut support
+- **Cross-window timer sync** (primary/secondary window architecture)
 
 ---
 
@@ -50,6 +51,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 | `DistractionDumpManager`     | Manages "Distraction Dump" feature - pauses timer, unblocks everything for thought capture            |
 | `CustomCycleManager`         | Manages custom Pomodoro cycles with drag-and-drop block editing and per-cycle duration defaults       |
 | `UndoRedoManager`            | Generic undo/redo state management for dialog menus with UI buttons                                   |
+| `WindowSyncManager`          | Manages cross-window timer sync using primary/secondary window pattern with heartbeat ownership       |
 
 ---
 
@@ -57,11 +59,15 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.3';                  // Current mod version
+const MOD_VERSION = '1.4.4';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
 const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before showing daily reminder
+const SYNC_PREF_KEY = 'timer-sync';              // Pref key for timer sync state
+const OWNER_PREF_KEY = 'timer-owner';             // Pref key for timer owner window
+const OWNER_HEARTBEAT_TIMEOUT_MS = 15000;         // Heartbeat timeout (15 seconds)
+const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log broadcast
 ```
 
 ---
@@ -263,6 +269,66 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `_getDropIndicatorRef(nonDraggedBlocks, targetIndex)` | Compute reference element for drop indicator positioning    |
 | `_isSamePositionMove(absoluteTarget, isMultiSelect)`  | Detect no-op moves where source and target are identical    |
 | `_updateAutoScroll(clientY, container, zone, speed, state, onScroll)` | Manage auto-scroll during drag near container edges |
+| `WindowSyncManager.isAnotherWindowActive()`      | Check if another window is actively managing the timer        |
+| `WindowSyncManager.claimOwnership()`              | Claim timer ownership for this window                         |
+| `WindowSyncManager.releaseOwnership()`            | Release timer ownership (e.g., window closing)                |
+| `WindowSyncManager.writeSyncState(state)`         | Write timer state to sync pref for other windows              |
+| `WindowSyncManager.readSyncState()`               | Read current sync state from pref                             |
+| `WindowSyncManager.clearSyncState()`              | Clear all sync-related prefs                                  |
+| `WindowSyncManager.startHeartbeatMonitor()`       | Start monitoring owner heartbeat (secondary windows)          |
+| `PomodoroTimer._writeSyncState()`                 | Write timer state to sync pref on each tick                   |
+| `PomodoroTimer.syncFromState(syncState)`          | Update timer state from cross-window sync data                |
+| `LogManager.initSync()`                           | Initialize cross-window log sync via Services.obs             |
+| `LogManager.requestExistingLogs()`                | Request historical logs from other windows on startup         |
+| `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
+
+---
+
+## Bug Fixes and Features in v1.4.4
+
+### Cross-Window Timer Synchronization
+
+**Issue:** When opening multiple Zen Browser windows with an active Pomodoro timer, each window ran its own independent timer. The second window showed a "Timer Restored" notification even though the browser hadn't restarted. Logs exported from different windows contained different entries.
+
+**Root Cause:** Each window created its own independent `PomodoroTimer` instance with its own `setInterval` countdown. The `loadState()` method always set `restoredFromRestart = true` and forced `isPaused = true`, not distinguishing between a genuine browser restart and a new window opening while another window was active. Each window had its own in-memory `LogManager` with no cross-window sharing.
+
+**Fix:** Implemented a primary/secondary window architecture:
+
+**WindowSyncManager (new class):**
+- Manages window ownership via `zen-pomodoro.timer-owner` pref with heartbeat timestamps
+- Only the "owner" window runs the actual timer countdown (`setInterval`)
+- Secondary windows observe `zen-pomodoro.timer-sync` pref for real-time state updates
+- Dead owner detection: secondary windows check heartbeat every 5 seconds, take over if stale (>15s)
+- Ownership transfer: when user interacts (pause/resume/stop) in secondary window, it claims ownership
+- Uses `Services.prefs.addObserver()` for cross-window pref change notification
+
+**PomodoroTimer modifications:**
+- `startInterval()` checks ownership on every tick, stops if lost
+- New `_writeSyncState()` writes timer state to sync pref every tick
+- New `syncFromState()` updates timer state from sync data (secondary windows)
+- `start()`, `startCustomCycle()`, `pause()`, `resume()` claim ownership
+- `stop()` clears sync state to notify all windows
+
+**LogManager sync:**
+- `initSync()` registers `Services.obs` observer for `zen-pomodoro-log` topic
+- Each `log()` call broadcasts entry to all windows via `Services.obs.notifyObservers()`
+- `requestExistingLogs()` requests historical logs from other windows on startup
+- `_respondToLogRequest()` writes logs to shared pref for new windows
+- `destroySync()` cleans up observers
+
+**ZenPomodoroApp onReady() changes:**
+- Checks `windowSync.isAnotherWindowActive()` before showing "Timer Restored" notification
+- If another window is active: syncs state from sync pref, does NOT force pause, does NOT show notification
+- If no other window active: genuine restart, claims ownership, proceeds with existing behavior
+- Sets up sync callbacks: `onSyncStateChanged`, `onOwnershipLost`, `onOwnershipTaken`
+
+**New Helper Methods:**
+- `_onSyncStateReceived(syncState)` - Handle sync update from owner window
+- `_onOwnershipLost()` - Stop interval, become secondary
+- `_onOwnershipTaken(syncState)` - Take over timer, start interval
+- `_claimOwnershipForAction()` - Claim ownership when user interacts in secondary
+
+**Optimization:** Only one window runs the countdown interval at any time, regardless of how many windows are open. This means no additional CPU usage per window - secondary windows are purely reactive UI displays.
 
 ---
 

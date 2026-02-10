@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.3-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.4-green.svg)
 
 ## ✨ Features
 
@@ -12,6 +12,12 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
   - Traditional Pomodoro cycles with focus/break periods
   - **Custom Cycles** with configurable focus/break sequences
   - Customizable long breaks every N cycles
+
+- 🔄 **Cross-Window Sync**:
+  - Timer state syncs automatically across all open browser windows
+  - Only one window runs the countdown (primary/secondary architecture)
+  - Seamless ownership transfer when interacting in any window
+  - Logs shared across windows for consistent debugging
 
 - 🚫 **Workspace-Based Blocking**:
   - Block specific workspaces during focus periods
