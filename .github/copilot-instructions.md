@@ -67,7 +67,7 @@ const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before show
 const SYNC_PREF_KEY = 'timer-sync';              // Pref key for timer sync state
 const OWNER_PREF_KEY = 'timer-owner';             // Pref key for timer owner window
 const OWNER_HEARTBEAT_TIMEOUT_MS = 30000;         // Heartbeat timeout (30 seconds)
-const HEARTBEAT_UPDATE_TICK_INTERVAL = 5;         // Write heartbeat every 5 seconds (wall-clock)
+const HEARTBEAT_WRITE_INTERVAL_MS = 5000;         // Owner writes heartbeat every 5 seconds (wall-clock)
 const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log broadcast
 ```
 

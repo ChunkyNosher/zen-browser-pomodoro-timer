@@ -257,8 +257,8 @@
     LOG_REQUEST_TOPIC: 'zen-pomodoro-log-request',
     /** Cross-window sync: interval for secondary windows to check owner heartbeat (ms) */
     HEARTBEAT_CHECK_INTERVAL_MS: 5000,
-    /** Cross-window sync: how often owner updates heartbeat (every N timer ticks) */
-    HEARTBEAT_UPDATE_TICK_INTERVAL: 5,
+    /** Cross-window sync: how often owner writes heartbeat (ms, wall-clock) */
+    HEARTBEAT_WRITE_INTERVAL_MS: 5000,
   };
 
   // Freeze Constants and nested objects to prevent accidental mutation
@@ -2727,8 +2727,8 @@
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
         sync.claimOwnership();
+        this._writeSyncState();
       }
-      this._writeSyncState();
     }
 
     /**
@@ -2781,8 +2781,8 @@
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
         sync.claimOwnership();
+        this._writeSyncState();
       }
-      this._writeSyncState();
     }
 
     /**
@@ -2870,7 +2870,7 @@
      */
     _maybeUpdateHeartbeat(sync) {
       const now = Date.now();
-      if (!this._lastHeartbeatWriteTs || now - this._lastHeartbeatWriteTs >= 5000) {
+      if (!this._lastHeartbeatWriteTs || now - this._lastHeartbeatWriteTs >= Constants.HEARTBEAT_WRITE_INTERVAL_MS) {
         sync.updateHeartbeat();
         this._lastHeartbeatWriteTs = now;
       }
