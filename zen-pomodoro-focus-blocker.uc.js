@@ -14138,7 +14138,7 @@
         // Handle auto-scroll near container edges (not throttled by rAF)
         this._updateAutoScroll(lastPointerY, scrollContainer, scrollState, {
           zone: SCROLL_ZONE,
-          speed: SCROLL_SPEED,
+          scrollSpeed: SCROLL_SPEED,
           onScroll: updateDropTarget,
         });
         
@@ -14396,11 +14396,11 @@
      * @param {Object} scrollState - Mutable state object with rafId and direction
      * @param {Object} options - Auto-scroll options
      * @param {number} options.zone - Distance from edge to trigger scrolling (px)
-     * @param {number} options.speed - Scroll speed per animation frame (px)
+     * @param {number} options.scrollSpeed - Scroll speed per animation frame (px)
      * @param {Function} options.onScroll - Callback to update drop target during scroll
      * @private
      */
-    _updateAutoScroll(clientY, scrollContainer, scrollState, { zone, speed, onScroll }) {
+    _updateAutoScroll(clientY, scrollContainer, scrollState, { zone, scrollSpeed, onScroll }) {
       const containerRect = scrollContainer.getBoundingClientRect();
       let newScrollDir = null;
       if (clientY < containerRect.top + zone) {
@@ -14419,7 +14419,7 @@
       scrollState.direction = newScrollDir;
       if (scrollState.direction) {
         logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollState.direction})`);
-        const scrollDelta = scrollState.direction === 'up' ? -speed : speed;
+        const scrollDelta = scrollState.direction === 'up' ? -scrollSpeed : scrollSpeed;
         const doScroll = () => {
           scrollContainer.scrollTop += scrollDelta;
           // Recalculate drop target as scroll position changes
