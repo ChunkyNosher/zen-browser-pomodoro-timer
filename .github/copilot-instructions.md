@@ -66,7 +66,7 @@ const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
 const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before showing daily reminder
 const SYNC_PREF_KEY = 'timer-sync';              // Pref key for timer sync state
 const OWNER_PREF_KEY = 'timer-owner';             // Pref key for timer owner window
-const OWNER_HEARTBEAT_TIMEOUT_MS = 15000;         // Heartbeat timeout (15 seconds)
+const OWNER_HEARTBEAT_TIMEOUT_MS = 30000;         // Heartbeat timeout (30 seconds)
 const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log broadcast
 ```
 
@@ -298,7 +298,7 @@ Allows users to pause their focus timer and capture distracting thoughts without
 - Manages window ownership via `zen-pomodoro.timer-owner` pref with heartbeat timestamps
 - Only the "owner" window runs the actual timer countdown (`setInterval`)
 - Secondary windows observe `zen-pomodoro.timer-sync` pref for real-time state updates
-- Dead owner detection: secondary windows check heartbeat every 5 seconds, take over if stale (>15s)
+- Dead owner detection: secondary windows check heartbeat every 5 seconds, take over if stale (>30s)
 - Ownership transfer: when user interacts (pause/resume/stop) in secondary window, it claims ownership
 - Uses `Services.prefs.addObserver()` for cross-window pref change notification
 

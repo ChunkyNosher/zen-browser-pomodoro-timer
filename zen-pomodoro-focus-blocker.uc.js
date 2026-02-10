@@ -250,7 +250,7 @@
     /** Cross-window sync: pref key for timer owner */
     OWNER_PREF_KEY: 'timer-owner',
     /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
-    OWNER_HEARTBEAT_TIMEOUT_MS: 15000,
+    OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
     /** Cross-window sync: Services.obs topic for log entry broadcasting */
     LOG_BROADCAST_TOPIC: 'zen-pomodoro-log',
     /** Cross-window sync: Services.obs topic for requesting logs from other windows */
@@ -391,9 +391,9 @@
     _mergeSharedLogs(sharedLogs) {
       if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
 
-      const existingKeys = new Set(this.logs.map((l) => l.timestamp + l.message));
+      const existingKeys = new Set(this.logs.map((l) => `${l.timestamp}|${l.message}`));
       for (const entry of sharedLogs) {
-        if (!existingKeys.has(entry.timestamp + entry.message)) {
+        if (!existingKeys.has(`${entry.timestamp}|${entry.message}`)) {
           this.logs.push(entry);
         }
       }
@@ -591,7 +591,7 @@
   class WindowSyncManager {
     constructor() {
       /** Unique ID for this window instance */
-      this.windowId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      this.windowId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
       /** Whether this window is the timer owner (runs the countdown interval) */
       this.isTimerOwner = false;
       /** Pref observer for cross-window sync */
