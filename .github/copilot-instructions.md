@@ -67,6 +67,7 @@ const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before show
 const SYNC_PREF_KEY = 'timer-sync';              // Pref key for timer sync state
 const OWNER_PREF_KEY = 'timer-owner';             // Pref key for timer owner window
 const OWNER_HEARTBEAT_TIMEOUT_MS = 30000;         // Heartbeat timeout (30 seconds)
+const HEARTBEAT_UPDATE_TICK_INTERVAL = 5;         // Write heartbeat every 5 seconds (wall-clock)
 const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log broadcast
 ```
 
@@ -278,6 +279,7 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `WindowSyncManager.startHeartbeatMonitor()`       | Start monitoring owner heartbeat (secondary windows)          |
 | `PomodoroTimer._writeSyncState()`                 | Write timer state to sync pref on each tick                   |
 | `PomodoroTimer.syncFromState(syncState)`          | Update timer state from cross-window sync data                |
+| `PomodoroTimer._processActiveTick()`              | Process countdown tick logic (extracted for cross-window sync)|
 | `LogManager.initSync()`                           | Initialize cross-window log sync via Services.obs             |
 | `LogManager.requestExistingLogs()`                | Request historical logs from other windows on startup         |
 | `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
@@ -303,7 +305,7 @@ Allows users to pause their focus timer and capture distracting thoughts without
 - Uses `Services.prefs.addObserver()` for cross-window pref change notification
 
 **PomodoroTimer modifications:**
-- `startInterval()` checks ownership on every tick, stops if lost
+- The interval callback checks ownership on every tick via `_hasLostOwnership()`, stops if lost
 - New `_writeSyncState()` writes timer state to sync pref every tick
 - New `syncFromState()` updates timer state from sync data (secondary windows)
 - `start()`, `startCustomCycle()`, `pause()`, `resume()` claim ownership

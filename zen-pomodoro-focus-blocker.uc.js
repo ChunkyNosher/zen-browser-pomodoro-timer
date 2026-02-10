@@ -261,6 +261,22 @@
     HEARTBEAT_UPDATE_TICK_INTERVAL: 5,
   };
 
+  // Freeze Constants and nested objects to prevent accidental mutation
+  Object.freeze(Constants.LOG_CATEGORIES);
+  Object.freeze(Constants.LOCKOUT_METHODS);
+  Object.freeze(Constants.DISTRACTION_DUMP_LOCK_ALERT);
+  Object.freeze(Constants.WORKSPACE_CONTAINER_SELECTORS);
+  Object.freeze(Constants.CONTENT_AREA_SELECTORS);
+  Object.freeze(Constants.WORKSPACE_NAME_ATTRIBUTES);
+  Object.freeze(Constants.SENSITIVE_KEYS);
+  Object.freeze(Constants.DEFAULT_CONFIG.rulesets[0]);
+  Object.freeze(Constants.DEFAULT_CONFIG.rulesets);
+  Object.freeze(Constants.DEFAULT_CONFIG.dailyReminderTimes);
+  Object.freeze(Constants.DEFAULT_CONFIG.focusPhaseReminders);
+  Object.freeze(Constants.DEFAULT_CONFIG.breakPhaseReminders);
+  Object.freeze(Constants.DEFAULT_CONFIG);
+  Object.freeze(Constants);
+
   // ============================================
   // State Variables
   // ============================================
@@ -321,7 +337,6 @@
             /* ignore parse errors from log sync */
           }
         },
-        QueryInterface: ChromeUtils.generateQI([]),
       };
       Services.obs.addObserver(this._logObserver, Constants.LOG_BROADCAST_TOPIC);
 
@@ -329,10 +344,9 @@
       this._logRequestObserver = {
         observe: (subject, topic, data) => {
           if (data !== this.windowId) {
-            this._respondToLogRequest();
+            this._respondToLogRequest(data);
           }
         },
-        QueryInterface: ChromeUtils.generateQI([]),
       };
       Services.obs.addObserver(this._logRequestObserver, Constants.LOG_REQUEST_TOPIC);
     }
@@ -374,12 +388,14 @@
     requestExistingLogs() {
       if (!this.windowId) return;
       try {
+        // Use per-request pref key to avoid race between multiple responders
+        const prefKey = `shared-logs-${this.windowId}`;
         Services.obs.notifyObservers(null, Constants.LOG_REQUEST_TOPIC, this.windowId);
-        const sharedLogsStr = Storage.getPref('shared-logs', '');
+        const sharedLogsStr = Storage.getPref(prefKey, '');
         if (sharedLogsStr) {
           this._mergeSharedLogs(JSON.parse(sharedLogsStr));
-          // Clear the shared-logs pref after reading to prevent stale data
-          Storage.setPref('shared-logs', '');
+          // Clear after reading to prevent stale data
+          Storage.setPref(prefKey, '');
         }
       } catch (e) {
         /* ignore errors during log request */
@@ -414,16 +430,19 @@
      * @private
      */
     _logDedupeKey(entry) {
-      return `${entry.timestamp}\0${entry.message}`;
+      return `${entry.timestamp}||${entry.message}`;
     }
 
     /**
-     * Respond to a log request from another window by writing our logs to a shared pref.
+     * Respond to a log request from another window.
+     * Writes logs to a per-requester pref key to avoid race conditions.
+     * @param {string} requesterId - The window ID of the requesting window
      * @private
      */
-    _respondToLogRequest() {
+    _respondToLogRequest(requesterId) {
       try {
-        Storage.setPref('shared-logs', JSON.stringify(this.logs));
+        const prefKey = `shared-logs-${requesterId}`;
+        Storage.setPref(prefKey, JSON.stringify(this.logs));
       } catch (e) {
         /* ignore errors during log response */
       }
@@ -605,7 +624,10 @@
   class WindowSyncManager {
     constructor() {
       /** Unique ID for this window instance */
-      this.windowId = crypto.randomUUID();
+      this.windowId =
+        typeof crypto?.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `win-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       /** Whether this window is the timer owner (runs the countdown interval) */
       this.isTimerOwner = false;
       /** Pref observer for cross-window sync */
@@ -618,8 +640,6 @@
       this.onOwnershipLost = null;
       /** Callback: called when this window takes over from a dead owner */
       this.onOwnershipTaken = null;
-      /** Track the last known active state to detect remote start/stop */
-      this._lastKnownActive = false;
     }
 
     /**
@@ -783,7 +803,7 @@
         }
         const owner = JSON.parse(ownerStr);
         if (owner.id === this.windowId) return;
-        if (Date.now() - owner.heartbeat > Constants.OWNER_HEARTBEAT_TIMEOUT_MS) {
+        if (Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS) {
           this._takeOverFromDeadOwner(syncState);
         }
       } catch (e) {
@@ -806,7 +826,10 @@
       // Create adjusted state without mutating the original object
       const adjustedState = { ...syncState };
       if (!adjustedState.isPaused && adjustedState.timestamp) {
-        const elapsed = Math.floor((Date.now() - adjustedState.timestamp) / 1000);
+        const rawElapsed = Math.floor((Date.now() - adjustedState.timestamp) / 1000);
+        // Cap elapsed time to heartbeat timeout to prevent extreme drift
+        const maxElapsed = Math.floor(Constants.OWNER_HEARTBEAT_TIMEOUT_MS / 1000);
+        const elapsed = Math.min(rawElapsed, maxElapsed);
         adjustedState.remainingTime = Math.max(0, adjustedState.remainingTime - elapsed);
       }
 
@@ -831,7 +854,6 @@
             this._handleOwnerPrefChange();
           }
         },
-        QueryInterface: ChromeUtils.generateQI([]),
       };
       Services.prefs.addObserver(`${prefPrefix}.`, this._prefObserver);
     }
@@ -1662,7 +1684,6 @@
   const CONTENT_AREA_SELECTORS = Constants.CONTENT_AREA_SELECTORS;
   const WORKSPACE_NAME_ATTRIBUTES = Constants.WORKSPACE_NAME_ATTRIBUTES;
   const URL_REVOKE_DELAY_MS = Constants.URL_REVOKE_DELAY_MS;
-  const HEARTBEAT_UPDATE_TICK_INTERVAL = Constants.HEARTBEAT_UPDATE_TICK_INTERVAL;
 
   // ============================================
   // Remaining Helper Functions
@@ -2702,12 +2723,12 @@
       this.startInterval();
       this.saveState();
 
-      // CROSS-WINDOW SYNC: Claim ownership when starting a timer
+      // CROSS-WINDOW SYNC: Claim ownership and write sync state after saveState
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
         sync.claimOwnership();
-        this._writeSyncState();
       }
+      this._writeSyncState();
     }
 
     /**
@@ -2756,12 +2777,12 @@
       this.startInterval();
       this.saveState();
 
-      // CROSS-WINDOW SYNC: Claim ownership when starting a timer
+      // CROSS-WINDOW SYNC: Claim ownership and write sync state after saveState
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
         sync.claimOwnership();
-        this._writeSyncState();
       }
+      this._writeSyncState();
     }
 
     /**
@@ -2838,12 +2859,13 @@
       const sync = window.zenPomodoroApp?.windowSync;
       if (!sync || !sync.isTimerOwner) return;
 
-      // Update heartbeat every 5 ticks (5 seconds) - less frequent than sync state
-      // to reduce pref write overhead while keeping 30s timeout safe
-      if (this.tickCounter % HEARTBEAT_UPDATE_TICK_INTERVAL === 0) {
+      // Update heartbeat based on wall-clock time so it continues even while paused
+      const now = Date.now();
+      if (!this._lastHeartbeatWriteTs || now - this._lastHeartbeatWriteTs >= 5000) {
         sync.updateHeartbeat();
+        this._lastHeartbeatWriteTs = now;
       }
-      sync.writeSyncState({
+      const payload = {
         isActive: this.isActive,
         isPaused: this.isPaused,
         remainingTime: this.remainingTime,
@@ -2852,7 +2874,18 @@
         totalCycles: this.totalCycles,
         mode: this.mode,
         pausedOnBlockedWorkspace: this.pausedOnBlockedWorkspace,
-      });
+      };
+      // Include custom cycle state when in custom mode
+      if (this.mode === 'custom' && this.customCycleBlocks) {
+        payload.customCycleBlocks = this.customCycleBlocks;
+        payload.currentBlockIndex = this.currentBlockIndex;
+      }
+      // Include distraction dump active state
+      const dumpMgr = window.zenPomodoroApp?.distractionDump;
+      if (dumpMgr) {
+        payload.dumpActive = dumpMgr.isActive || false;
+      }
+      sync.writeSyncState(payload);
     }
 
     /**
@@ -2873,6 +2906,11 @@
       }
       if (syncState.pausedOnBlockedWorkspace !== undefined) {
         this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace;
+      }
+      // Sync custom cycle state
+      if (syncState.customCycleBlocks) {
+        this.customCycleBlocks = syncState.customCycleBlocks;
+        this.currentBlockIndex = syncState.currentBlockIndex ?? 0;
       }
     }
 
@@ -3607,11 +3645,12 @@
       this.savedConfig = null;
       this.clearState();
 
-      // CROSS-WINDOW SYNC: Clear sync state and write final state
+      // CROSS-WINDOW SYNC: Clear sync state, write final state, and release ownership
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
         sync.writeSyncState({ isActive: false, isPaused: false, remainingTime: 0 });
         sync.clearSyncState();
+        sync.releaseOwnership();
       }
     }
 
@@ -5479,6 +5518,9 @@
      * @private
      */
     _handleCutBreakEarly(currentPhase) {
+      // CROSS-WINDOW SYNC: Claim ownership before modifying timer
+      window.zenPomodoroApp?._claimOwnershipForAction();
+
       const timer = window.zenPomodoroApp.timer;
 
       // If in transition phase, directly start the focus phase (skip transition popup)
@@ -5635,6 +5677,8 @@
             this.menuDialog = null;
             
             handleSkipFocusWithLockout(() => {
+              // CROSS-WINDOW SYNC: Claim ownership before modifying timer
+              window.zenPomodoroApp?._claimOwnershipForAction();
               const timer = window.zenPomodoroApp.timer;
               if (timer.skipFocusToBreak()) {
                 window.zenPomodoroApp.updateOverlayVisibility();
@@ -15073,6 +15117,23 @@
       this.overlay.updateIndicatorPausedState(syncState.isPaused);
       this.updateOverlayVisibility();
 
+      // Handle distraction dump state from owner window
+      if (syncState.dumpActive !== undefined) {
+        const dumpMgr = this.distractionDump;
+        const wasInDump = dumpMgr?.isActive || false;
+        if (syncState.dumpActive && !wasInDump) {
+          // Dump started remotely - lift blocking in this window
+          if (this.websiteBlocker) {
+            this.websiteBlocker.distractionDumpActive = true;
+          }
+        } else if (!syncState.dumpActive && wasInDump) {
+          // Dump ended remotely - restore blocking in this window
+          if (this.websiteBlocker) {
+            this.websiteBlocker.distractionDumpActive = false;
+          }
+        }
+      }
+
       // Handle remote timer stop
       if (wasActive && !syncState.isActive) {
         logger.log(LOG_CATEGORIES.SYNC, 'Timer stopped remotely');
@@ -15160,6 +15221,8 @@
         if (!this.timer.intervalId) {
           this.timer.startInterval();
         }
+        // Write initial sync state immediately so other windows see the update
+        this.timer._writeSyncState();
       }
     }
 
@@ -15273,6 +15336,9 @@
      */
     onTransitionPopupComplete() {
       logger.log(LOG_CATEGORIES.TIMER, 'Transition popup closed - starting focus phase');
+
+      // CROSS-WINDOW SYNC: Claim ownership before modifying timer
+      this._claimOwnershipForAction();
 
       // Start the actual focus phase
       this.timer.startFocusFromTransition();

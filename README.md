@@ -14,10 +14,9 @@ Transform Zen Browser into a productivity powerhouse with customizable Pomodoro 
   - Customizable long breaks every N cycles
 
 - 🔄 **Cross-Window Sync**:
-  - Timer state syncs automatically across all open browser windows
-  - Only one window runs the countdown (primary/secondary architecture)
-  - Seamless ownership transfer when interacting in any window
-  - Logs shared across windows for consistent debugging
+  - Timer state syncs automatically across all open browser windows — no configuration needed
+  - One active countdown shared across all windows with seamless ownership transfer
+  - Activity history synced across all windows for consistent tracking
 
 - 🚫 **Workspace-Based Blocking**:
   - Block specific workspaces during focus periods
@@ -319,7 +318,7 @@ Set a simple timer for 15 minutes to prepare for meetings without getting distra
 
 - **Browser-Level Only**: Blocking works only within Zen Browser. Users can open other browsers.
 - **Developer Tools Access**: Users with DevTools knowledge could theoretically bypass the overlay.
-- **Single Timer Per Window**: One active timer per browser window (multiple windows can have independent timers).
+- **Single Shared Timer**: All open browser windows share one timer. Interacting with the timer in any window transfers control automatically.
 - **Workspace-Specific**: Blocking is per-workspace, not per-window.
 
 ## 🤝 Contributing
