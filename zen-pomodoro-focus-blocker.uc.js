@@ -2859,12 +2859,29 @@
       const sync = window.zenPomodoroApp?.windowSync;
       if (!sync || !sync.isTimerOwner) return;
 
-      // Update heartbeat based on wall-clock time so it continues even while paused
+      this._maybeUpdateHeartbeat(sync);
+      sync.writeSyncState(this._buildSyncPayload());
+    }
+
+    /**
+     * Update heartbeat if enough wall-clock time has passed.
+     * @param {Object} sync - WindowSyncManager instance
+     * @private
+     */
+    _maybeUpdateHeartbeat(sync) {
       const now = Date.now();
       if (!this._lastHeartbeatWriteTs || now - this._lastHeartbeatWriteTs >= 5000) {
         sync.updateHeartbeat();
         this._lastHeartbeatWriteTs = now;
       }
+    }
+
+    /**
+     * Build the sync payload object with current timer state.
+     * @returns {Object} Sync payload to broadcast to secondary windows
+     * @private
+     */
+    _buildSyncPayload() {
       const payload = {
         isActive: this.isActive,
         isPaused: this.isPaused,
@@ -2875,17 +2892,15 @@
         mode: this.mode,
         pausedOnBlockedWorkspace: this.pausedOnBlockedWorkspace,
       };
-      // Include custom cycle state when in custom mode
       if (this.mode === 'custom' && this.customCycleBlocks) {
         payload.customCycleBlocks = this.customCycleBlocks;
         payload.currentBlockIndex = this.currentBlockIndex;
       }
-      // Include distraction dump active state
       const dumpMgr = window.zenPomodoroApp?.distractionDump;
       if (dumpMgr) {
         payload.dumpActive = dumpMgr.isActive || false;
       }
-      sync.writeSyncState(payload);
+      return payload;
     }
 
     /**
@@ -15117,53 +15132,73 @@
       this.overlay.updateIndicatorPausedState(syncState.isPaused);
       this.updateOverlayVisibility();
 
-      // Handle distraction dump state from owner window
-      if (syncState.dumpActive !== undefined) {
-        const dumpMgr = this.distractionDump;
-        const wasInDump = dumpMgr?.isActive || false;
-        if (syncState.dumpActive && !wasInDump) {
-          // Dump started remotely - lift blocking in this window
-          if (this.websiteBlocker) {
-            this.websiteBlocker.distractionDumpActive = true;
-          }
-        } else if (!syncState.dumpActive && wasInDump) {
-          // Dump ended remotely - restore blocking in this window
-          if (this.websiteBlocker) {
-            this.websiteBlocker.distractionDumpActive = false;
-          }
-        }
-      }
+      this._syncDumpState(syncState);
+      this._handleRemoteTimerStop(wasActive, syncState);
+      this._handleRemoteTimerStart(wasActive, syncState);
+      this._handleRemotePhaseChange(oldPhase, syncState);
+    }
 
-      // Handle remote timer stop
-      if (wasActive && !syncState.isActive) {
-        logger.log(LOG_CATEGORIES.SYNC, 'Timer stopped remotely');
-        this.overlay.hide();
-        this.overlay.hideIndicator();
-        this.transitionManager.destroy();
-        this.sineModBlocker.onTimerStop();
-        this.websiteBlocker.onTimerStop();
-        this.windowSync.stopHeartbeatMonitor();
+    /**
+     * Sync distraction dump state from owner window to this secondary window.
+     * @param {Object} syncState - Timer state from owner window
+     * @private
+     */
+    _syncDumpState(syncState) {
+      if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
+      const wasInDump = this.distractionDump?.isActive || false;
+      if (syncState.dumpActive && !wasInDump) {
+        this.websiteBlocker.distractionDumpActive = true;
+      } else if (!syncState.dumpActive && wasInDump) {
+        this.websiteBlocker.distractionDumpActive = false;
       }
+    }
 
-      // Handle remote timer start (wasActive false -> now active)
-      if (!wasActive && syncState.isActive) {
-        logger.log(LOG_CATEGORIES.SYNC, 'Timer started remotely');
-        this.overlay.showIndicator();
-        this.sineModBlocker.onTimerStart();
-        this.websiteBlocker.onTimerStart();
-        this.windowSync.startHeartbeatMonitor();
-      }
+    /**
+     * Handle remote timer stop event in secondary window.
+     * @param {boolean} wasActive - Whether timer was active before sync
+     * @param {Object} syncState - Timer state from owner window
+     * @private
+     */
+    _handleRemoteTimerStop(wasActive, syncState) {
+      if (!wasActive || syncState.isActive) return;
+      logger.log(LOG_CATEGORIES.SYNC, 'Timer stopped remotely');
+      this.overlay.hide();
+      this.overlay.hideIndicator();
+      this.transitionManager.destroy();
+      this.sineModBlocker.onTimerStop();
+      this.websiteBlocker.onTimerStop();
+      this.windowSync.stopHeartbeatMonitor();
+    }
 
-      // Handle remote phase change
-      if (oldPhase !== syncState.currentPhase) {
-        logger.log(LOG_CATEGORIES.SYNC, 'Phase changed remotely', {
-          oldPhase,
-          newPhase: syncState.currentPhase,
-        });
-        // Update distraction dump availability on phase change
-        if (syncState.currentPhase === 'focus') {
-          this.distractionDump.resetForNewFocusPhase();
-        }
+    /**
+     * Handle remote timer start event in secondary window.
+     * @param {boolean} wasActive - Whether timer was active before sync
+     * @param {Object} syncState - Timer state from owner window
+     * @private
+     */
+    _handleRemoteTimerStart(wasActive, syncState) {
+      if (wasActive || !syncState.isActive) return;
+      logger.log(LOG_CATEGORIES.SYNC, 'Timer started remotely');
+      this.overlay.showIndicator();
+      this.sineModBlocker.onTimerStart();
+      this.websiteBlocker.onTimerStart();
+      this.windowSync.startHeartbeatMonitor();
+    }
+
+    /**
+     * Handle remote phase change event in secondary window.
+     * @param {string} oldPhase - Previous phase before sync
+     * @param {Object} syncState - Timer state from owner window
+     * @private
+     */
+    _handleRemotePhaseChange(oldPhase, syncState) {
+      if (oldPhase === syncState.currentPhase) return;
+      logger.log(LOG_CATEGORIES.SYNC, 'Phase changed remotely', {
+        oldPhase,
+        newPhase: syncState.currentPhase,
+      });
+      if (syncState.currentPhase === 'focus') {
+        this.distractionDump.resetForNewFocusPhase();
       }
     }
 
