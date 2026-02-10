@@ -24,7 +24,34 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 | File                               | Purpose                                                                              |
 | ---------------------------------- | ------------------------------------------------------------------------------------ |
-| `zen-pomodoro-focus-blocker.uc.js` | Main JavaScript file containing all logic, classes, and UI components                |
+| `zen-pomodoro-focus-blocker.uc.js` | Bundled output file (IIFE) - DO NOT EDIT DIRECTLY, edit src/ files instead           |
+| `src/`                             | Source ES modules directory - all code changes go here                                |
+| `src/index.js`                     | Entry point - dependency injection and app initialization                            |
+| `src/constants.js`                 | All application constants (PREF_PREFIX, DEFAULT_CONFIG, etc.)                        |
+| `src/state.js`                     | Shared mutable state (lastDialogPosition)                                            |
+| `src/log-manager.js`              | LogManager class + logger singleton instance                                          |
+| `src/window-sync-manager.js`      | WindowSyncManager class for cross-window timer sync                                   |
+| `src/storage.js`                   | Storage module - Firefox Services.prefs operations                                    |
+| `src/utils.js`                     | Utils module - general utility functions                                              |
+| `src/helpers.js`                   | Legacy wrappers, sendBrowserNotification, constant re-exports                         |
+| `src/ui-helpers.js`               | Dialog drag, UI creation helpers, timer control functions                              |
+| `src/break-phase-utils.js`        | Break phase detection utility                                                         |
+| `src/shared-blocker-utils.js`     | Shared utilities for SineModBlocker and WebsiteBlocker                                |
+| `src/pomodoro-timer.js`           | PomodoroTimer class                                                                   |
+| `src/workspace-detector.js`       | WorkspaceDetector class                                                               |
+| `src/overlay-manager.js`          | OverlayManager class                                                                  |
+| `src/keyboard-shortcut-handler.js`| KeyboardShortcutHandler class (largest module)                                        |
+| `src/security-manager.js`         | SecurityManager class                                                                 |
+| `src/sine-mod-blocker.js`         | SineModBlocker class                                                                  |
+| `src/website-blocker.js`          | WebsiteBlocker class                                                                  |
+| `src/transition-phase-manager.js` | TransitionPhaseManager class                                                          |
+| `src/daily-reminder-manager.js`   | DailyReminderManager class                                                            |
+| `src/post-session-reminder-manager.js` | PostSessionReminderManager class                                                 |
+| `src/distraction-dump-manager.js` | DistractionDumpManager class                                                          |
+| `src/undo-redo-manager.js`        | UndoRedoManager class                                                                 |
+| `src/custom-cycle-manager.js`     | CustomCycleManager class                                                              |
+| `src/zen-pomodoro-app.js`         | ZenPomodoroApp main application class                                                 |
+| `rollup.config.mjs`               | Rollup bundler configuration                                                          |
 | `chrome.css`                       | All styling for overlays, dialogs, indicators, and blockers                          |
 | `theme.json`                       | Mod metadata (id, name, version, author, URLs) for Zen Browser mod system            |
 | `preferences.json`                 | Zen Browser preferences UI definitions (keyboard shortcut, notifications, reminders) |
@@ -73,30 +100,82 @@ const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log 
 
 ---
 
-## Module Architecture (IIFE Pattern)
+## Module Architecture (ES Modules + Rollup)
 
-The codebase uses a modular IIFE (Immediately Invoked Function Expression) architecture for better organization:
+The codebase uses **ES modules** in the `src/` directory, bundled into a single IIFE file by **Rollup**.
 
-### Core Modules
+### Build System
 
-| Module      | Type        | Purpose                                                    |
-| ----------- | ----------- | ---------------------------------------------------------- |
-| `Constants` | Plain Object | All application constants (PREF_PREFIX, DEFAULT_CONFIG, etc.) |
-| `Storage`   | IIFE        | Firefox Services.prefs operations (getPref, setPref, loadConfig, saveConfig) |
-| `Utils`     | IIFE        | General utility functions (formatTime, validateIntegerInput, etc.) |
+```bash
+# Install dependencies (first time only)
+npm install
+
+# Build the bundled output file
+npm run build
+
+# Lint source files
+npm run lint
+```
+
+**IMPORTANT:** After making changes to any file in `src/`, you MUST run `npm run build` to regenerate `zen-pomodoro-focus-blocker.uc.js`. The bundled output file should be committed alongside the source changes.
+
+### Module Dependency Graph
+
+```
+constants.js (no dependencies)
+    ↓
+    ├─→ state.js (no dependencies)
+    ├─→ log-manager.js (Storage injected via DI at runtime)
+    │       ↓
+    │       ├─→ window-sync-manager.js
+    │       │
+    │       └─→ storage.js
+    │               ↓
+    │               └─→ utils.js
+    │                       ↓
+    │                       └─→ helpers.js (re-exports from Storage, Utils, Constants)
+    │                               ↓
+    │                               ├─→ ui-helpers.js
+    │                               ├─→ break-phase-utils.js
+    │                               └─→ shared-blocker-utils.js
+    │
+    ├─→ pomodoro-timer.js
+    ├─→ workspace-detector.js
+    ├─→ overlay-manager.js
+    ├─→ keyboard-shortcut-handler.js (largest module, ~3400 lines)
+    ├─→ security-manager.js
+    ├─→ sine-mod-blocker.js
+    ├─→ website-blocker.js
+    ├─→ transition-phase-manager.js
+    ├─→ daily-reminder-manager.js
+    ├─→ post-session-reminder-manager.js
+    ├─→ distraction-dump-manager.js
+    ├─→ undo-redo-manager.js
+    ├─→ custom-cycle-manager.js
+    └─→ zen-pomodoro-app.js (imports all classes, wires them together)
+            ↓
+            └─→ index.js (entry point: DI setup, app creation, event listeners)
+```
+
+### Circular Dependency Resolution
+
+LogManager needs Storage for cross-window log sync, but Storage needs LogManager for logging. This is resolved via **dependency injection**: LogManager has a `setStorage()` method that is called after both modules are initialized (in `src/index.js`).
 
 ### Module Usage Pattern
 
 ```javascript
-// Constants are accessed directly
-const config = { ...Constants.DEFAULT_CONFIG };
+// In src/ modules, use ES import/export:
+import Constants from './constants.js';
+import { logger } from './log-manager.js';
+import Storage from './storage.js';
+import { formatTime, LOG_CATEGORIES } from './helpers.js';
+import { setupDialogDrag } from './ui-helpers.js';
 
-// Storage module for preferences
-const savedConfig = Storage.loadConfig();
-Storage.saveConfig(config);
+// Export classes as default exports:
+export default MyClass;
 
-// Utils module for helpers
-const timeStr = Utils.formatTime(seconds);
+// Export functions as named exports:
+export function myHelper() { ... }
 ```
 
 ---
