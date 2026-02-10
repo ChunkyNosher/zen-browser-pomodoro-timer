@@ -1,0 +1,1130 @@
+{
+  "exportedAt": "2026-02-10T17:07:31.705Z",
+  "totalEntries": 130,
+  "logs": [
+    {
+      "timestamp": "2026-02-10T17:03:52.608Z",
+      "category": "INIT",
+      "message": "Application initializing"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Application ready"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Initializing keyboard shortcut handler"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Starting workspace monitoring"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "WORKSPACE",
+      "message": "Starting workspace monitoring",
+      "data": {
+        "initialWorkspace": null
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "WORKSPACE",
+      "message": "Workspace observer configured",
+      "data": {
+        "container": "#tabbrowser-arrowscrollbox",
+        "observingAttributes": [
+          "active",
+          "selected",
+          "zen-workspace-id"
+        ]
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Initializing Sine Mod Blocker"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Initializing Website Blocker"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.247Z",
+      "category": "INIT",
+      "message": "Timer state restored from previous session"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.253Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 351,
+        "width": 1758,
+        "height": 1199
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "OVERLAY",
+      "message": "Overlay attached with fixed positioning",
+      "data": {
+        "selector": "#tabbrowser-tabbox",
+        "bounds": {
+          "top": 38,
+          "left": 351,
+          "width": 1758,
+          "height": 1199
+        }
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 351,
+        "width": 1758,
+        "height": 1199
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "OVERLAY",
+      "message": "Timer indicator shown"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": null,
+        "isPaused": true,
+        "workspaceBlocked": false,
+        "isBlockedParam": null
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "INIT",
+      "message": "Initializing Daily Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "remindersShownCount": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.254Z",
+      "category": "INIT",
+      "message": "Initializing Post-Session Reminder Manager"
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.255Z",
+      "category": "TIMER",
+      "message": "Post-session reminder: Loaded persisted state",
+      "data": {
+        "skipCount": 0,
+        "lastSkipTime": null,
+        "idleStartTime": null
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:03:54.255Z",
+      "category": "INIT",
+      "message": "Application initialization complete"
+    },
+    {
+      "timestamp": "2026-02-10T17:04:16.446Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-02-10T17:04:16.784Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:16.784Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:16.945Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:17.120Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": null,
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:17.121Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isBlocked": false,
+        "timerActive": true,
+        "timerPaused": true,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:17.121Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is unblocked - hiding overlay",
+      "data": {
+        "workspaceId": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "isPaused": true,
+        "workspaceBlocked": false,
+        "isBlockedParam": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:17.882Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:20.159Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:25.067Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:29.665Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:32.154Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:37.897Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:39.949Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:40.070Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:42.981Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:49.729Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:51.275Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:51.435Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:04:54.309Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-02-10T17:05:22.722Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.426Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.426Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.426Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.426Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.427Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.427Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:25.428Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:26.786Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:26.786Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.968Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:27.969Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:28.598Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:28.598Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.993Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.994Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.994Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.994Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.995Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.995Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:36.995Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:37.615Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:37.615Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.4t1yhvolog0h",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:47.832Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:50.229Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:54.692Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-02-10T17:05:54.692Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:54.693Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:54.693Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.342Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.356Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.420Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.420Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.421Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.421Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.421Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.949Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:05:55.949Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.865Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "changed": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:03.866Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:04.389Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "Lessons in Meme Culture - A Masterclass in Irony -..."
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:04.389Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://docs.google.com/document/d/1m9fdDq4cCDd3gX4GmjCrww11xNdR1IR7WAvjunyE8lQ/edit?pli=1&tab=t.0",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.292Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.292Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.293Z",
+      "category": "WORKSPACE",
+      "message": "Workspace mutation detected",
+      "data": {
+        "oldWorkspace": "{e53b4e2e-c524-4faf-bab6-1ce2d6c3e8ae}",
+        "newWorkspace": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "changed": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.293Z",
+      "category": "WORKSPACE",
+      "message": "Workspace changed",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isBlocked": true,
+        "timerActive": true,
+        "timerPaused": true,
+        "pausedOnBlockedWorkspace": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.293Z",
+      "category": "OVERLAY",
+      "message": "Current workspace is blocked - showing overlay",
+      "data": {
+        "workspaceId": "{2339ca57-a3ce-43a2-9fa3-56197fcb591f}",
+        "isPaused": true,
+        "workspaceBlocked": true,
+        "isBlockedParam": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.293Z",
+      "category": "OVERLAY",
+      "message": "Overlay shown",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.297Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 309,
+        "width": 2243,
+        "height": 1506
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.298Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 309,
+        "width": 2243,
+        "height": 1506
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.298Z",
+      "category": "OVERLAY",
+      "message": "Overlay phase color updated",
+      "data": {
+        "phase": "focus"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.298Z",
+      "category": "OVERLAY",
+      "message": "Indicator paused state attribute updated",
+      "data": {
+        "isPaused": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:14.304Z",
+      "category": "OVERLAY",
+      "message": "Overlay bounds updated",
+      "data": {
+        "top": 38,
+        "left": 309,
+        "width": 2243,
+        "height": 1506
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:17.656Z",
+      "category": "SECURITY",
+      "message": "Sine Mod page check",
+      "data": {
+        "isSineModsPage": false,
+        "timerActive": true,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:17.731Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "I Test the MOST POWERFUL Fake Beyblades - YouTube"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:17.731Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://www.youtube.com/watch?v=KWMwAZOKS18&t=687s",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:17.844Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": true,
+        "method": "code"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:17.844Z",
+      "category": "SECURITY",
+      "message": "Code entry mode initialized",
+      "data": {
+        "codeLength": "[REDACTED]",
+        "timerActive": true
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:18.293Z",
+      "category": "SECURITY",
+      "message": "Page title retrieved for keyword check",
+      "data": {
+        "title": "I Test the MOST POWERFUL Fake Beyblades - YouTube"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:18.293Z",
+      "category": "SECURITY",
+      "message": "Website blocker page check",
+      "data": {
+        "url": "https://www.youtube.com/watch?v=KWMwAZOKS18&t=687s",
+        "blocked": false,
+        "isBlocking": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:06:54.743Z",
+      "category": "TIMER",
+      "message": "Daily reminder: Timer already active"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:04.409Z",
+      "category": "SECURITY",
+      "message": "Code verification failed - incorrect code"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:17.202Z",
+      "category": "SECURITY",
+      "message": "Code verification successful"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:18.268Z",
+      "category": "TIMER",
+      "message": "Stop timer requested by user"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:18.268Z",
+      "category": "TIMER",
+      "message": "Timer stopped",
+      "data": {
+        "wasActive": true,
+        "remainingTime": 1270,
+        "phase": "focus",
+        "cycle": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:07:18.268Z",
+      "category": "OVERLAY",
+      "message": "Overlay hidden"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:18.269Z",
+      "category": "OVERLAY",
+      "message": "Timer indicator hidden"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:24.889Z",
+      "category": "MENU",
+      "message": "Opening main menu"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:27.555Z",
+      "category": "MENU",
+      "message": "Settings dialog requested"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:27.556Z",
+      "category": "SECURITY",
+      "message": "Lock screen required for settings",
+      "data": {
+        "timerActive": false
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:07:27.556Z",
+      "category": "SECURITY",
+      "message": "Lock screen shown",
+      "data": {
+        "timerActive": false,
+        "method": "hold"
+      }
+    },
+    {
+      "timestamp": "2026-02-10T17:07:29.134Z",
+      "category": "SECURITY",
+      "message": "Hold-to-unlock completed successfully"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:29.134Z",
+      "category": "MENU",
+      "message": "Opening settings dialog"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:31.705Z",
+      "category": "SETTINGS",
+      "message": "Export logs button clicked"
+    },
+    {
+      "timestamp": "2026-02-10T17:07:31.705Z",
+      "category": "SETTINGS",
+      "message": "Logs exported",
+      "data": {
+        "entryCount": 129
+      }
+    }
+  ]
+}
