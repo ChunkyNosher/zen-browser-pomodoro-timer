@@ -8,6 +8,7 @@ import {
   sanitizeText, validateIntegerInput, getActiveBlockedWorkspaces,
   findRuleAndExecute, sendBrowserNotification, generateRandomCode,
   isNonEmptyArray, isValidRangeValue, getValidatedIntFromDialog,
+  URL_REVOKE_DELAY_MS,
   PREF_PREFIX, MOD_VERSION, MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES, DEFAULT_CONFIG,
   DATA_NO_POSITION_SAVE
 } from './helpers.js';

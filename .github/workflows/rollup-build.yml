@@ -1,0 +1,64 @@
+# Rollup Build - Bundles ES modules into zen-pomodoro-focus-blocker.uc.js
+# Runs on push to main branch and on pull requests to verify the bundle is up to date.
+
+name: Rollup Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'rollup.config.mjs'
+      - 'package.json'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'rollup.config.mjs'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './package.json'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build with Rollup
+        run: npm run build
+
+      - name: Verify bundle exists
+        run: |
+          if [ ! -f zen-pomodoro-focus-blocker.uc.js ]; then
+            echo "ERROR: Bundle file not found!"
+            exit 1
+          fi
+          echo "Bundle created successfully: $(wc -l < zen-pomodoro-focus-blocker.uc.js) lines"
+
+      - name: Check bundle is up to date
+        run: |
+          # Rebuild and check if the committed bundle matches
+          npm run build
+          if git diff --exit-code zen-pomodoro-focus-blocker.uc.js; then
+            echo "Bundle is up to date"
+          else
+            echo "WARNING: The committed bundle does not match the build output."
+            echo "Run 'npm run build' locally and commit the updated bundle."
+            exit 1
+          fi

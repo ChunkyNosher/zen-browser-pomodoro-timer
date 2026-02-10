@@ -1,7 +1,7 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import { 
-  generateRandomCode, LOG_CATEGORIES, LOCKOUT_METHODS 
+  generateRandomCode, LOG_CATEGORIES, LOCKOUT_METHODS, getConfig
 } from './helpers.js';
 import { setupHoldToUnlockHandlers } from './shared-blocker-utils.js';
 

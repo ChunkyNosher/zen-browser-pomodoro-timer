@@ -1,6 +1,7 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import { getConfig, formatTime, validateIntegerInput, LOG_CATEGORIES } from './helpers.js';
+import { applyLastDialogPosition, setupDialogDrag } from './ui-helpers.js';
 
 // ============================================
 // DistractionDumpManager Class

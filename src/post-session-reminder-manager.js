@@ -8,6 +8,7 @@ import {
   POST_SESSION_ESCALATION_FACTOR, POST_SESSION_CHECK_INTERVAL_MS,
   EARLY_MORNING_CUTOFF_MINUTES
 } from './helpers.js';
+import { isValidTimeFormat } from './ui-helpers.js';
 import { updateCountdownElement } from './ui-helpers.js';
 import { setupHoldToUnlockHandlers } from './shared-blocker-utils.js';
 

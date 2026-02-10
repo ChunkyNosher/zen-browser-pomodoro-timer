@@ -1,7 +1,8 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import Storage from './storage.js';
-import { formatTime, getShortPhaseLabel, sanitizeText } from './helpers.js';
+import { formatTime, getShortPhaseLabel, sanitizeText, getPhaseLabel, getPref, setPref } from './helpers.js';
+import { handlePauseResumeTimer, handleStopTimerWithLockout, isDistractionDumpBlocking } from './ui-helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
 
 const { LOG_CATEGORIES, MAX_OVERLAY_Z_INDEX, MIN_CONTENT_AREA_DIMENSION, CONTENT_AREA_SELECTORS } =

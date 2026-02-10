@@ -2,13 +2,15 @@ import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import Storage from './storage.js';
 import {
-  formatTime, getShortPhaseLabel, getConfig, LOG_CATEGORIES, REGEX_ESCAPE_PATTERN, REGEX_ESCAPE_PATTERN_KEEP_ASTERISK
+  formatTime, getShortPhaseLabel, getConfig, LOG_CATEGORIES, REGEX_ESCAPE_PATTERN, REGEX_ESCAPE_PATTERN_KEEP_ASTERISK,
+  CONTENT_OBSERVER_DEBOUNCE_DELAY_MS
 } from './helpers.js';
+import { handleStopTimerWithLockout } from './ui-helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
 import {
   createProgressListener, setupBrowserListeners, removeBrowserListeners,
   handleBlockerGoBack, startBlockerTimerStatusUpdates,
-  createBlockerButtons
+  createBlockerButtons, updateBlockerTimerStatus
 } from './shared-blocker-utils.js';
 
 // ============================================

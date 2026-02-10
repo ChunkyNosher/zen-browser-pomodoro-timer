@@ -6,8 +6,9 @@ import {
   formatTime, sanitizeText, generateRandomCode,
   LOG_CATEGORIES, LOCKOUT_METHODS, DAILY_REMINDER_CHECK_INTERVAL_MS,
   DAILY_REMINDER_STARTUP_DELAY_MS, DAILY_REMINDER_ESCALATION_FACTOR,
-  EARLY_MORNING_CUTOFF_MINUTES
+  EARLY_MORNING_CUTOFF_MINUTES, isNonEmptyArray
 } from './helpers.js';
+import { isValidTimeFormat } from './ui-helpers.js';
 import { setupHoldToUnlockHandlers } from './shared-blocker-utils.js';
 
 // ============================================

@@ -2,7 +2,7 @@ import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import {
   getConfig, saveConfig, sanitizeText, validateIntegerInput,
-  LOG_CATEGORIES
+  LOG_CATEGORIES, DATA_NO_POSITION_SAVE, isValidRangeValue
 } from './helpers.js';
 import {
   setupDialogDrag, applyLastDialogPosition, saveDialogPosition,

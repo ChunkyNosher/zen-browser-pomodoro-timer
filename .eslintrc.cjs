@@ -21,10 +21,17 @@ module.exports = {
     Components: 'readonly',
     Notification: 'readonly',
     crypto: 'readonly',
+    gBrowser: 'readonly',
   },
   overrides: [
     {
       files: ['*.uc.mjs'],
+      parserOptions: {
+        sourceType: 'module',
+      },
+    },
+    {
+      files: ['src/**/*.js'],
       parserOptions: {
         sourceType: 'module',
       },

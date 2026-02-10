@@ -6,12 +6,12 @@ import {
   formatTime, formatTimeWithHours, getPhaseLabel, getShortPhaseLabel,
   sendBrowserNotification, isPopupWindow,
   LOG_CATEGORIES, MOD_VERSION, PREF_PREFIX, LOCKOUT_METHODS,
-  RESTORATION_NOTIFICATION_DELAY_MS
+  RESTORATION_NOTIFICATION_DELAY_MS, DOM_SETTLE_DELAY_MS
 } from './helpers.js';
 import {
   handlePauseResumeTimer, handleSkipFocusWithLockout,
   handleStopTimerWithLockout, isDistractionDumpBlocking,
-  updateCountdownElement
+  updateCountdownElement, applyLastDialogPosition, setupDialogDrag
 } from './ui-helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
 import PomodoroTimer from './pomodoro-timer.js';

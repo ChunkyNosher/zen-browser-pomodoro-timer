@@ -4,6 +4,7 @@ import {
   formatTime, getShortPhaseLabel, LOG_CATEGORIES 
 } from './helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
+import { handleStopTimerWithLockout } from './ui-helpers.js';
 import {
   createProgressListener, setupBrowserListeners, removeBrowserListeners,
   handleBlockerGoBack, updateBlockerTimerStatus, startBlockerTimerStatusUpdates,

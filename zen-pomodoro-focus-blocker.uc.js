@@ -641,7 +641,7 @@
    * @param {string} key - Preference key (without prefix)
    * @param {*} value - Value to set (string, number, or boolean)
    */
-  function setPref$3(key, value) {
+  function setPref$2(key, value) {
     const prefKey = `${Constants.PREF_PREFIX}.${key}`;
     try {
       if (typeof value === 'string') {
@@ -723,7 +723,7 @@
    * @param {string} timeStr - Time string to validate
    * @returns {boolean} True if valid time format
    */
-  function isValidTimeFormat$2(timeStr) {
+  function isValidTimeFormat$1(timeStr) {
     if (!timeStr || typeof timeStr !== 'string') return false;
 
     const match = timeStr.match(/^(\d{2}):(\d{2})$/);
@@ -744,7 +744,7 @@
   function loadTimePref(prefName, config, configKey) {
     const value = getPref$2(prefName, null);
     const hasValue = value !== null && value !== '';
-    const isValidTimePref = hasValue && isValidTimeFormat$2(value);
+    const isValidTimePref = hasValue && isValidTimeFormat$1(value);
     if (isValidTimePref) {
       config[configKey] = value;
     }
@@ -763,7 +763,7 @@
       // Split by comma and trim whitespace
       const times = value.split(',').map((t) => t.trim());
       // Filter to only valid times
-      const validTimes = times.filter((t) => isValidTimeFormat$2(t));
+      const validTimes = times.filter((t) => isValidTimeFormat$1(t));
       if (validTimes.length > 0) {
         config[configKey] = validTimes;
       }
@@ -881,7 +881,7 @@
    */
   function saveConfig$2(config) {
     try {
-      setPref$3('config', JSON.stringify(config));
+      setPref$2('config', JSON.stringify(config));
       logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Configuration saved', {
         timerMode: config.timerMode,
         focusDuration: config.focusDuration,
@@ -898,14 +898,14 @@
   // Default export for backward compatibility
   const Storage = {
     getPref: getPref$2,
-    setPref: setPref$3,
+    setPref: setPref$2,
     loadConfig,
     saveConfig: saveConfig$2,
     loadStoredConfigJson,
     loadBooleanPref,
     loadPositiveIntPref,
     loadNonEmptyStringPref,
-    isValidTimeFormat: isValidTimeFormat$2,
+    isValidTimeFormat: isValidTimeFormat$1,
     loadTimePref,
     loadTimeArrayPref,
     loadIntArrayPref,
@@ -953,7 +953,7 @@
    * @param {string} phase - Phase identifier ('focus', 'break', 'transition')
    * @returns {string} Human-readable phase label
    */
-  function getPhaseLabel$2(phase) {
+  function getPhaseLabel$1(phase) {
     const labels = {
       focus: 'Focus Period',
       break: 'Break Time',
@@ -1019,7 +1019,7 @@
    * @param {number} max - Maximum value (inclusive)
    * @returns {boolean} True if value is valid
    */
-  function isValidRangeValue$2(value, min, max) {
+  function isValidRangeValue$1(value, min, max) {
     return !isNaN(value) && value >= min && value <= max;
   }
 
@@ -1208,7 +1208,7 @@
   const Utils = {
     formatTime: formatTime$1,
     formatTimeWithHours: formatTimeWithHours$1,
-    getPhaseLabel: getPhaseLabel$2,
+    getPhaseLabel: getPhaseLabel$1,
     getShortPhaseLabel: getShortPhaseLabel$1,
     sanitizeText: sanitizeText$1,
     validateIntegerInput: validateIntegerInput$1,
@@ -1221,7 +1221,7 @@
     getActiveBlockedWorkspaces: getActiveBlockedWorkspaces$1,
     findRuleAndExecute: findRuleAndExecute$1,
     isNonEmptyArray: isNonEmptyArray$1,
-    isValidRangeValue: isValidRangeValue$2,
+    isValidRangeValue: isValidRangeValue$1,
   };
 
   /**
@@ -1230,11 +1230,19 @@
    */
 
 
-  function setPref$2(key, value) {
+  // ============================================
+  // Storage Legacy Wrappers
+  // ============================================
+
+  function getPref$1(key, defaultValue) {
+    return Storage.getPref(key, defaultValue);
+  }
+
+  function setPref$1(key, value) {
     Storage.setPref(key, value);
   }
 
-  function getConfig$4() {
+  function getConfig$3() {
     return Storage.loadConfig();
   }
 
@@ -1254,7 +1262,7 @@
     return Utils.formatTimeWithHours(seconds, useHours);
   }
 
-  function getPhaseLabel$1(phase) {
+  function getPhaseLabel(phase) {
     return Utils.getPhaseLabel(phase);
   }
 
@@ -1274,7 +1282,11 @@
     return Utils.getValidatedIntFromDialog(dialog, options);
   }
 
-  function isValidRangeValue$1(value, min, max) {
+  function isNonEmptyArray(value) {
+    return Utils.isNonEmptyArray(value);
+  }
+
+  function isValidRangeValue(value, min, max) {
     return Utils.isValidRangeValue(value, min, max);
   }
 
@@ -1334,14 +1346,14 @@
   const MOD_VERSION = Constants.MOD_VERSION;
   const MODIFIER_KEYS = Constants.MODIFIER_KEYS;
   const LOCKOUT_METHODS = Constants.LOCKOUT_METHODS;
-  const DATA_NO_POSITION_SAVE$1 = Constants.DATA_NO_POSITION_SAVE;
+  const DATA_NO_POSITION_SAVE = Constants.DATA_NO_POSITION_SAVE;
   Constants.DEFAULT_CONFIG;
   Constants.SAVE_STATE_INTERVAL_SECONDS;
-  Constants.DOM_SETTLE_DELAY_MS;
+  const DOM_SETTLE_DELAY_MS = Constants.DOM_SETTLE_DELAY_MS;
   const RESTORATION_NOTIFICATION_DELAY_MS = Constants.RESTORATION_NOTIFICATION_DELAY_MS;
   Constants.MAX_OVERLAY_Z_INDEX;
   Constants.MIN_CONTENT_AREA_DIMENSION;
-  Constants.CONTENT_OBSERVER_DEBOUNCE_DELAY_MS;
+  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = Constants.CONTENT_OBSERVER_DEBOUNCE_DELAY_MS;
   const TRANSITION_PHASE_DURATION_SECONDS$1 = Constants.TRANSITION_PHASE_DURATION_SECONDS;
   const POST_SESSION_ESCALATION_FACTOR = Constants.POST_SESSION_ESCALATION_FACTOR;
   const POST_SESSION_CHECK_INTERVAL_MS = Constants.POST_SESSION_CHECK_INTERVAL_MS;
@@ -1356,7 +1368,7 @@
   Constants.WORKSPACE_CONTAINER_SELECTORS;
   Constants.CONTENT_AREA_SELECTORS;
   Constants.WORKSPACE_NAME_ATTRIBUTES;
-  Constants.URL_REVOKE_DELAY_MS;
+  const URL_REVOKE_DELAY_MS = Constants.URL_REVOKE_DELAY_MS;
 
   // ============================================
   // Remaining Helper Functions
@@ -1474,7 +1486,7 @@
    * document.documentElement.appendChild(dialog);
    * setupDialogDrag(dialog);
    */
-  function setupDialogDrag$1(dialog) {
+  function setupDialogDrag(dialog) {
     const header = dialog.querySelector('h2');
     if (!header) {
       console.warn(
@@ -1563,7 +1575,7 @@
       header.style.cursor = 'move';
 
       // Only save position for dialogs that don't have the no-save attribute
-      if (!dialog.hasAttribute(DATA_NO_POSITION_SAVE$1)) {
+      if (!dialog.hasAttribute(DATA_NO_POSITION_SAVE)) {
         saveDialogPosition(dialog);
       }
 
@@ -1705,7 +1717,7 @@
    * Call this after appending the dialog to the DOM but before setupDialogDrag.
    * @param {HTMLElement} dialog - The dialog element to position
    */
-  function applyLastDialogPosition$1(dialog) {
+  function applyLastDialogPosition(dialog) {
     if (!dialog || !lastDialogPosition) return;
 
     const { left, top } = lastDialogPosition;
@@ -1734,7 +1746,7 @@
    * @param {string} timeStr - Time string to validate
    * @returns {boolean} True if valid time format
    */
-  function isValidTimeFormat$1(timeStr) {
+  function isValidTimeFormat(timeStr) {
     if (!timeStr || typeof timeStr !== 'string') return false;
 
     const match = timeStr.match(/^(\d{2}):(\d{2})$/);
@@ -1893,7 +1905,7 @@
    *
    * @param {() => void} onStop - Callback to execute after successful stop confirmation
    */
-  function handleStopTimerWithLockout$1(onStop) {
+  function handleStopTimerWithLockout(onStop) {
     if (!window.zenPomodoroApp) return;
 
     const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
@@ -1949,7 +1961,7 @@
    *
    * @returns {boolean} True if Distraction Dump is active and blocking timer actions
    */
-  function isDistractionDumpBlocking$1() {
+  function isDistractionDumpBlocking() {
     return Boolean(window.zenPomodoroApp?.distractionDump?.isActive);
   }
 
@@ -1966,7 +1978,7 @@
    *
    * @returns {void}
    */
-  function handlePauseResumeTimer$1() {
+  function handlePauseResumeTimer() {
     // Null safety checks for all required objects
     if (!window.zenPomodoroApp) return;
     if (!window.zenPomodoroApp.timer) return;
@@ -1974,7 +1986,7 @@
     if (!window.zenPomodoroApp.overlay) return;
 
     // Check if Distraction Dump is active - don't allow pause/resume during dump
-    if (isDistractionDumpBlocking$1()) {
+    if (isDistractionDumpBlocking()) {
       logger.log(LOG_CATEGORIES$4.TIMER, 'Cannot pause/resume timer - Distraction Dump is active');
       return;
     }
@@ -2033,9 +2045,9 @@
   const { SAVE_STATE_INTERVAL_SECONDS, TRANSITION_PHASE_DURATION_SECONDS } = Constants;
 
   // Backward compatibility: getConfig, getPref, setPref
-  const getConfig$3 = () => Storage.loadConfig();
-  const getPref$1 = (key) => Storage.getPref(key);
-  const setPref$1 = (key, value) => Storage.setPref(key, value);
+  const getConfig$2 = () => Storage.loadConfig();
+  const getPref = (key) => Storage.getPref(key);
+  const setPref = (key, value) => Storage.setPref(key, value);
 
   class PomodoroTimer {
     constructor() {
@@ -2048,7 +2060,7 @@
       this.totalCycles = 4;
       this.mode = 'pomodoro';
       this.intervalId = null;
-      this.config = getConfig$3();
+      this.config = getConfig$2();
       this.savedConfig = null; // Store config with timer state
       this.onTick = null;
       this.onPhaseChange = null;
@@ -2081,7 +2093,7 @@
       this.shownRemindersForCurrentPhase.clear();
 
       // Get base config from preferences (ensures we start fresh without previous session modifications)
-      this.config = getConfig$3();
+      this.config = getConfig$2();
 
       // Apply session-only overrides (these don't persist to saved config)
       const effectiveConfig = { ...this.config, ...sessionOverrides };
@@ -2143,7 +2155,7 @@
       this.shownRemindersForCurrentPhase.clear();
 
       // Load fresh config from preferences (ensures we start fresh without previous session modifications)
-      this.config = getConfig$3();
+      this.config = getConfig$2();
 
       // Store the config with timer state for proper restoration
       this.savedConfig = { ...this.config };
@@ -2580,7 +2592,7 @@
       };
 
       try {
-        setPref$1('timer-state', JSON.stringify(state));
+        setPref('timer-state', JSON.stringify(state));
         logger.log(LOG_CATEGORIES$3.TIMER, 'Timer state saved', {
           phase: this.currentPhase,
           remaining: this.remainingTime,
@@ -2626,7 +2638,7 @@
      */
     loadState() {
       try {
-        const stateJson = getPref$1('timer-state');
+        const stateJson = getPref('timer-state');
         if (!stateJson) {
           logger.log(LOG_CATEGORIES$3.TIMER, 'No saved timer state found');
           return false;
@@ -2656,7 +2668,7 @@
         const pendingDumpState = state.distractionDump;
 
         // Load fresh config (for preferences that may have changed)
-        this.config = getConfig$3();
+        this.config = getConfig$2();
 
         // If we were paused, stay paused
         if (!this.isPaused) {
@@ -2699,7 +2711,7 @@
      */
     clearState() {
       try {
-        setPref$1('timer-state', '');
+        setPref('timer-state', '');
         logger.log(LOG_CATEGORIES$3.TIMER, 'Timer state cleared');
       } catch (error) {
         logger.log(LOG_CATEGORIES$3.TIMER, 'Failed to clear timer state', { error: error.message });
@@ -3142,7 +3154,7 @@
   const { LOG_CATEGORIES: LOG_CATEGORIES$2, WORKSPACE_CONTAINER_SELECTORS, WORKSPACE_MUTATION_DELAY_MS } = Constants;
 
   // Backward compatibility helpers
-  const getConfig$2 = () => Storage.loadConfig();
+  const getConfig$1 = () => Storage.loadConfig();
   const saveConfig = (config) => Storage.saveConfig(config);
 
   /**
@@ -3166,7 +3178,7 @@
   class WorkspaceDetector {
     constructor() {
       this.activeWorkspace = null;
-      this.config = getConfig$2();
+      this.config = getConfig$1();
       this.onWorkspaceChange = null;
       this.workspaceObserver = null; // Store observer for cleanup
       this.validatedWorkspaces = null; // Cache validated workspace list
@@ -3285,7 +3297,7 @@
      */
     _checkWorkspaceBlocked(logMessage) {
       // Reload config to get latest blocked workspaces
-      this.config = getConfig$2();
+      this.config = getConfig$1();
 
       const activeWorkspace = this.getActiveWorkspace();
       if (!activeWorkspace) {
@@ -3313,7 +3325,7 @@
     isWorkspaceIdBlocked(workspaceId) {
       // Use cached config if available, otherwise reload
       if (!this.config) {
-        this.config = getConfig$2();
+        this.config = getConfig$1();
       }
       // Get blocked workspaces from all active rulesets
       const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
@@ -3640,13 +3652,13 @@
     Constants;
 
   // Backward compatibility helper
-  const getConfig$1 = () => Storage.loadConfig();
+  const getConfig = () => Storage.loadConfig();
 
   class OverlayManager {
     constructor() {
       this.overlay = null;
       this.indicator = null;
-      this.config = getConfig$1();
+      this.config = getConfig();
       this.isVisible = false;
       this.contentAreaObserver = null; // Issue 1: Observer for content area size changes
       this.indicatorWidth = 0; // Cached indicator width for drag operations
@@ -4007,8 +4019,8 @@
       let startLeft, startTop;
 
       // Load saved position from preferences and validate against viewport bounds
-      const savedPosX = getPref('indicatorPosX', null);
-      const savedPosY = getPref('indicatorPosY', null);
+      const savedPosX = getPref$1('indicatorPosX', null);
+      const savedPosY = getPref$1('indicatorPosY', null);
       if (savedPosX !== null && savedPosY !== null) {
         // Ensure saved position is within current viewport bounds
         const rect = this.indicator.getBoundingClientRect();
@@ -4097,8 +4109,8 @@
 
         // Save position to preferences
         const rect = this.indicator.getBoundingClientRect();
-        setPref('indicatorPosX', Math.round(rect.left));
-        setPref('indicatorPosY', Math.round(rect.top));
+        setPref$1('indicatorPosX', Math.round(rect.left));
+        setPref$1('indicatorPosY', Math.round(rect.top));
 
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
@@ -4883,7 +4895,7 @@
      * Initialize keyboard shortcut handler
      */
     init() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       this.setupKeyboardShortcut(config.keyboardShortcut);
       console.log(`Zen Pomodoro: Keyboard shortcut registered: ${config.keyboardShortcut}`);
 
@@ -5131,7 +5143,7 @@
         pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
         pauseResumeBtn.addEventListener('click', () => {
           // Check if Distraction Dump is active - provide user feedback
-          if (isDistractionDumpBlocking$1()) {
+          if (isDistractionDumpBlocking()) {
             window.zenPomodoroApp.showCustomAlert(
               Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
               Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
@@ -5139,7 +5151,7 @@
             return;
           }
           this._stopMenuTimerUpdates();
-          handlePauseResumeTimer$1();
+          handlePauseResumeTimer();
           dialog.remove();
           this.menuDialog = null;
         });
@@ -5171,7 +5183,7 @@
           skipFocusBtn.textContent = 'Skip Focus';
           skipFocusBtn.addEventListener('click', () => {
             // Check if Distraction Dump is active - provide user feedback
-            if (isDistractionDumpBlocking$1()) {
+            if (isDistractionDumpBlocking()) {
               window.zenPomodoroApp.showCustomAlert(
                 Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
                 Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
@@ -5201,7 +5213,7 @@
           dialog.remove();
           this.menuDialog = null;
           // Issue 6: Require lockout before stopping timer using helper function
-          handleStopTimerWithLockout$1(() => {
+          handleStopTimerWithLockout(() => {
             window.zenPomodoroApp.stopTimer();
           });
         });
@@ -5253,7 +5265,7 @@
         // (temporarily lifting ALL blocks for thought capture, not just pausing timer)
         // Only one dump is allowed per focus phase
         let dumpBtn = null;
-        const config = getConfig$4();
+        const config = getConfig$3();
         const dumpManager = window.zenPomodoroApp?.distractionDump;
         const isDumpActive = dumpManager?.isActive;
         const isDumpAvailable = dumpManager?.isDumpAvailable();
@@ -5398,10 +5410,10 @@
       document.documentElement.appendChild(dialog);
 
       // Apply saved position from previous dialog before setting up drag
-      applyLastDialogPosition$1(dialog);
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
-      setupDialogDrag$1(dialog);
+      setupDialogDrag(dialog);
 
       // Focus the dialog
       dialog.focus();
@@ -5460,7 +5472,7 @@
       dialog.id = 'zen-pomodoro-start-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
 
-      const config = getConfig$4();
+      const config = getConfig$3();
       const isSimpleMode = config.timerMode === 'simple';
 
       // Create dialog structure
@@ -5522,7 +5534,7 @@
 
       // Track changes for undo/redo
       configSection.addEventListener('change', () => {
-        configUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$4())));
+        configUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$3())));
       });
 
       // Set restore callback for undo/redo
@@ -5534,8 +5546,8 @@
       };
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition$1(dialog);
-      setupDialogDrag$1(dialog);
+      applyLastDialogPosition(dialog);
+      setupDialogDrag(dialog);
 
       // Event handlers
       this._setupModeToggleHandler(modeSelect, [...durationRows, customCycleRow]);
@@ -5928,7 +5940,7 @@
       dialog.id = 'zen-pomodoro-settings-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
 
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Issue 5: Add back button
       const backButton = document.createElement('button');
@@ -6720,7 +6732,7 @@
       addFocusReminderBtn.textContent = 'Add';
       addFocusReminderBtn.addEventListener('click', () => {
         const value = parseInt(addFocusReminderInput.value, 10);
-        if (isValidRangeValue$1(value, 1, 120)) {
+        if (isValidRangeValue(value, 1, 120)) {
           if (!config.focusPhaseReminders.includes(value)) {
             config.focusPhaseReminders.push(value);
             config.focusPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -6814,7 +6826,7 @@
       addBreakReminderBtn.textContent = 'Add';
       addBreakReminderBtn.addEventListener('click', () => {
         const value = parseInt(addBreakReminderInput.value, 10);
-        if (isValidRangeValue$1(value, 1, 60)) {
+        if (isValidRangeValue(value, 1, 60)) {
           if (!config.breakPhaseReminders.includes(value)) {
             config.breakPhaseReminders.push(value);
             config.breakPhaseReminders.sort((a, b) => b - a); // Sort descending
@@ -6917,7 +6929,7 @@
 
       // Track changes for undo/redo
       configSection.addEventListener('change', () => {
-        settingsUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$4())));
+        settingsUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$3())));
       });
 
       // Set restore callback for undo/redo
@@ -6931,10 +6943,10 @@
       };
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition$1(dialog);
+      applyLastDialogPosition(dialog);
 
       // Issue 8: Make dialog draggable
-      setupDialogDrag$1(dialog);
+      setupDialogDrag(dialog);
 
       cancelButton.addEventListener('click', () => {
         logger.log(LOG_CATEGORIES$4.MENU, 'Settings dialog cancelled');
@@ -6986,7 +6998,7 @@
       if (window.zenPomodoroApp?.keyboardShortcut) {
         window.zenPomodoroApp.keyboardShortcut.setupKeyboardShortcut(newShortcut);
       }
-      setPref$2('keyboardShortcut', newShortcut);
+      setPref$1('keyboardShortcut', newShortcut);
     }
 
     /**
@@ -7010,7 +7022,7 @@
       if (window.zenPomodoroApp?.keyboardShortcut) {
         window.zenPomodoroApp.keyboardShortcut.setupToggleIndicatorShortcut(newShortcut);
       }
-      setPref$2('toggleIndicatorShortcut', newShortcut);
+      setPref$1('toggleIndicatorShortcut', newShortcut);
     }
 
     /**
@@ -7143,12 +7155,12 @@
       if (!selectedMode) {
         logger.log(LOG_CATEGORIES$4.SETTINGS, 'No reminder mode selected, defaulting to none');
         config.reminderMode = Constants.REMINDER_MODES.NONE;
-        setPref$2('reminderMode', Constants.REMINDER_MODES.NONE);
+        setPref$1('reminderMode', Constants.REMINDER_MODES.NONE);
         return;
       }
 
       config.reminderMode = selectedMode;
-      setPref$2('reminderMode', selectedMode);
+      setPref$1('reminderMode', selectedMode);
       logger.log(LOG_CATEGORIES$4.SETTINGS, 'Saving reminder mode', { mode: selectedMode });
 
       if (selectedMode === Constants.REMINDER_MODES.DAILY) {
@@ -7199,7 +7211,7 @@
       if (!timesInput?.value) return [];
       
       const times = timesInput.value.split(',').map((t) => t.trim());
-      return times.filter((t) => isValidTimeFormat$1(t));
+      return times.filter((t) => isValidTimeFormat(t));
     }
 
     /**
@@ -7227,15 +7239,15 @@
         const value = getValidatedIntFromDialog(dialog, { selector, min, max, defaultValue: config[key] });
         if (value !== null) {
           config[key] = value;
-          if (zenUiPrefKey) setPref$2(zenUiPrefKey, value);
+          if (zenUiPrefKey) setPref$1(zenUiPrefKey, value);
         }
       });
 
       // Save end time (with HH:MM validation)
       const endTimeInput = dialog.querySelector('#post-session-end-time');
-      if (endTimeInput?.value && isValidTimeFormat$1(endTimeInput.value)) {
+      if (endTimeInput?.value && isValidTimeFormat(endTimeInput.value)) {
         config.postSessionReminderEndTime = endTimeInput.value;
-        setPref$2('postSessionReminderEndTime', endTimeInput.value);
+        setPref$1('postSessionReminderEndTime', endTimeInput.value);
       }
 
       logger.log(LOG_CATEGORIES$4.SETTINGS, 'Saved post-session reminder settings', {
@@ -7258,17 +7270,17 @@
       const enabledCheckbox = dialog.querySelector('#timer-reminders-enabled');
       if (enabledCheckbox) {
         config.timerRemindersEnabled = enabledCheckbox.checked;
-        setPref$2('timerRemindersEnabled', enabledCheckbox.checked);
+        setPref$1('timerRemindersEnabled', enabledCheckbox.checked);
       }
 
       // Save focus phase reminders array
       if (config.focusPhaseReminders && Array.isArray(config.focusPhaseReminders)) {
-        setPref$2('focusPhaseReminders', config.focusPhaseReminders.join(','));
+        setPref$1('focusPhaseReminders', config.focusPhaseReminders.join(','));
       }
 
       // Save break phase reminders array
       if (config.breakPhaseReminders && Array.isArray(config.breakPhaseReminders)) {
-        setPref$2('breakPhaseReminders', config.breakPhaseReminders.join(','));
+        setPref$1('breakPhaseReminders', config.breakPhaseReminders.join(','));
       }
 
       logger.log(LOG_CATEGORIES$4.SETTINGS, 'Saved timer reminders settings', {
@@ -7304,7 +7316,7 @@
       dialog.id = 'zen-pomodoro-ruleset-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
 
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Back button - returns to settings or closes
       const backButton = document.createElement('button');
@@ -7433,7 +7445,7 @@
 
       // Track changes for undo/redo
       configSection.addEventListener('change', () => {
-        rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$4())));
+        rulesetUndoRedo.pushState(JSON.parse(JSON.stringify(getConfig$3())));
       });
 
       // Set restore callback for undo/redo
@@ -7445,10 +7457,10 @@
       };
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition$1(dialog);
+      applyLastDialogPosition(dialog);
 
       // Make dialog draggable
-      setupDialogDrag$1(dialog);
+      setupDialogDrag(dialog);
 
       cancelButton.addEventListener('click', () => {
         logger.log(LOG_CATEGORIES$4.MENU, 'Ruleset settings dialog cancelled');
@@ -8321,7 +8333,7 @@
    * Shared utility to reduce code duplication between SineModBlocker and WebsiteBlocker.
    * @param {HTMLElement} statusElement - Element to update with timer status
    */
-  function updateBlockerTimerStatus$1(statusElement) {
+  function updateBlockerTimerStatus(statusElement) {
     const timer = window.zenPomodoroApp?.timer;
     if (!timer) {
       statusElement.textContent = '';
@@ -8352,12 +8364,12 @@
    */
   function startBlockerTimerStatusUpdates(context, statusElement) {
     // Update immediately
-    updateBlockerTimerStatus$1(statusElement);
+    updateBlockerTimerStatus(statusElement);
 
     // Update every second
     context._timerStatusInterval = setInterval(() => {
       if (context.isBlocking && statusElement) {
-        updateBlockerTimerStatus$1(statusElement);
+        updateBlockerTimerStatus(statusElement);
 
         // Also check if timer is still active
         if (!window.zenPomodoroApp?.timer?.isActive) {
@@ -8527,7 +8539,7 @@
      * Refactored to reduce "Bumpy Road" code smell with extracted helpers.
      */
     shouldLockSettings(timerActive) {
-      const config = getConfig();
+      const config = getConfig$3();
       return timerActive ? this._shouldLockActiveTimer(config) : this._shouldLockIdleTimer(config);
     }
 
@@ -8564,7 +8576,7 @@
      * Z-INDEX FIX: Temporarily disable overlay pointer-events so lock screen can receive input
      */
     showLockScreen(timerActive, onUnlock) {
-      const config = getConfig();
+      const config = getConfig$3();
       const method = this._determineLockoutMethod(timerActive, config);
 
       logger.log(LOG_CATEGORIES$4.SECURITY, 'Lock screen shown', {
@@ -9146,7 +9158,7 @@
      * @private
      */
     _updateTimerStatus(statusElement) {
-      updateBlockerTimerStatus$1(statusElement);
+      updateBlockerTimerStatus(statusElement);
     }
 
     /**
@@ -9351,7 +9363,7 @@
    */
   class WebsiteBlocker {
     constructor() {
-      this.config = getConfig$4();
+      this.config = getConfig$3();
       this.blockerOverlay = null;
       this.isBlocking = false;
       this.currentlyBlockedReason = null;
@@ -9467,7 +9479,7 @@
      * @private
      */
     _evaluateUrlAndUpdateBlocker(url) {
-      this.config = getConfig$4();
+      this.config = getConfig$3();
       const blockResult = this._checkUrlAgainstActiveRulesets(
         url,
         this.config.activeRulesets || ['default'],
@@ -9598,7 +9610,7 @@
      * @private
      */
     _hasActiveKeywordRules() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const activeRulesets = config.activeRulesets || ['default'];
       const rulesets = config.rulesets || [];
 
@@ -10326,7 +10338,7 @@
       document.documentElement.appendChild(this.popup);
 
       // Make popup draggable
-      setupDialogDrag$1(this.popup);
+      setupDialogDrag(this.popup);
 
       // Start countdown
       this._startCountdown();
@@ -10534,7 +10546,7 @@
      * @private
      */
     _loadState() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       this.skipCount = config.dailyReminderSkipCount || 0;
       this.lastSkipTime = config.dailyReminderLastSkipTime || null;
       this.remindersShownToday = config.dailyRemindersShownToday || [];
@@ -10554,7 +10566,7 @@
      * @private
      */
     _saveState() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       config.dailyReminderSkipCount = this.skipCount;
       config.dailyReminderLastSkipTime = this.lastSkipTime;
       config.dailyRemindersShownToday = this.remindersShownToday;
@@ -10611,7 +10623,7 @@
      * @private
      */
     _getFirstReminderTime() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const times = config.dailyReminderTimes;
       
       if (!isNonEmptyArray(times)) {
@@ -10666,7 +10678,7 @@
      * @private
      */
     _canShowDailyReminder() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Check if feature is enabled via reminderMode
       if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) {
@@ -10695,7 +10707,7 @@
      * @private
      */
     _checkReminderTimes() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const now = new Date();
       const currentTimeMinutes = this._getCurrentTimeInMinutes(now);
 
@@ -10749,7 +10761,7 @@
      */
     _shouldShowReminderForTime(currentTimeMinutes, hours, minutes, timeStr) {
       const reminderTimeMinutes = hours * 60 + minutes;
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Check if we're at or past this reminder time
       if (currentTimeMinutes >= reminderTimeMinutes) {
@@ -10804,7 +10816,7 @@
      * @private
      */
     _wasTimerStartedAfterReminderTime(reminderHours, reminderMinutes) {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const lastTimerStartTime = config.lastTimerStartTime;
 
       if (!lastTimerStartTime) {
@@ -11026,7 +11038,7 @@
      * Saves timestamp and resets skip count.
      */
     recordTimerStarted() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       config.lastTimerStartTime = Date.now();
 
       // Reset skip count when timer starts
@@ -11063,7 +11075,7 @@
      * @private
      */
     _createOverlay() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       this.reminderOverlay = document.createElement('div');
       this.reminderOverlay.id = 'zen-pomodoro-daily-reminder';
@@ -11454,7 +11466,7 @@
     }
 
     getTimeUntilDailyReminder() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       if (config.reminderMode !== Constants.REMINDER_MODES.DAILY) return null;
 
@@ -11554,7 +11566,7 @@
      * @private
      */
     _loadState() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       this.skipCount = config.postSessionSkipCount || 0;
       this.lastSkipTime = config.postSessionLastSkipTime || null;
@@ -11572,7 +11584,7 @@
      * @private
      */
     _saveState() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       config.postSessionSkipCount = this.skipCount;
       config.postSessionLastSkipTime = this.lastSkipTime;
@@ -11594,7 +11606,7 @@
      * @private
      */
     _checkFocusTimeGoalReached() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       const focusTimeGoal = config.postSessionFocusTimeGoal || 150; // Default 2h 30min
       const totalFocusTimeToday = config.totalFocusTimeToday || 0;
@@ -11621,7 +11633,7 @@
      * is set when the auto-off time is reached, and reset here when a timer completes.
      */
     onTimerComplete() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) {
         logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Feature disabled (reminderMode not set to post-session)');
         return;
@@ -11760,7 +11772,7 @@
      * @private
      */
     _checkAutoDisableTime() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Skip if feature is disabled or already disabled for the day
       if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION || config.postSessionReminderDisabledForDay) {
@@ -11875,7 +11887,7 @@
      * @private
      */
     _isPostSessionFeatureEnabled() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       return config.reminderMode === Constants.REMINDER_MODES.POST_SESSION;
     }
 
@@ -11921,7 +11933,7 @@
      * @private
      */
     _isReminderDisabledForDay() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       if (config.postSessionReminderDisabledForDay) {
         logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Disabled for the day');
         return true;
@@ -11950,7 +11962,7 @@
       // Check basic preconditions
       if (!this._canPotentiallyShowReminder()) return;
 
-      const config = getConfig$4();
+      const config = getConfig$3();
       const now = Date.now();
       const idleTimeMs = now - this.idleStartTime;
       const idleTimeMinutes = idleTimeMs / (60 * 1000);
@@ -11976,7 +11988,7 @@
      * @private
      */
     _canShowReminderCountdown() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Check basic conditions
       if (config.reminderMode !== Constants.REMINDER_MODES.POST_SESSION) return false;
@@ -11998,7 +12010,7 @@
         return null;
       }
 
-      const config = getConfig$4();
+      const config = getConfig$3();
       const now = Date.now();
 
       // If in cooldown, calculate time until cooldown ends
@@ -12082,7 +12094,7 @@
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder skipped', {
         skipCount: this.skipCount,
-        cooldownMinutes: getConfig$4().postSessionSkipCooldown,
+        cooldownMinutes: getConfig$3().postSessionSkipCooldown,
       });
 
       // Save state to persist across browser restarts
@@ -12096,7 +12108,7 @@
      * @private
      */
     _createOverlay() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       this.reminderOverlay = document.createElement('div');
       this.reminderOverlay.id = 'zen-pomodoro-post-session-reminder';
@@ -12497,7 +12509,7 @@
      * Show the configuration dialog to set dump duration before starting.
      */
     showDumpConfigDialog() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       if (!config.distractionDumpEnabled) {
         logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump feature is disabled');
@@ -12908,7 +12920,7 @@
     showCustomCyclesMenu() {
       logger.log(LOG_CATEGORIES$4.MENU, 'Opening custom cycles menu');
 
-      const config = getConfig$4();
+      const config = getConfig$3();
       const savedCycles = config.customCycles || [];
 
       const dialog = document.createElement('div');
@@ -12979,9 +12991,9 @@
       dialog.appendChild(cyclesContainer);
       dialog.appendChild(buttonDiv);
 
-      applyLastDialogPosition$1(dialog);
+      applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
-      setupDialogDrag$1(dialog);
+      setupDialogDrag(dialog);
     }
 
     /**
@@ -13121,7 +13133,7 @@
       confirmDialog.appendChild(message);
       confirmDialog.appendChild(buttonDiv);
 
-      applyLastDialogPosition$1(confirmDialog);
+      applyLastDialogPosition(confirmDialog);
       document.documentElement.appendChild(confirmDialog);
     }
 
@@ -13161,7 +13173,7 @@
     showCycleEditor(cycleId = null) {
       logger.log(LOG_CATEGORIES$4.MENU, cycleId ? 'Editing custom cycle' : 'Creating new custom cycle');
 
-      const config = getConfig$4();
+      const config = getConfig$3();
       const savedCycles = config.customCycles || [];
       
       // Load existing cycle or create new one
@@ -13490,9 +13502,9 @@
         this._renderBlocks(blocksContainer);
       };
 
-      applyLastDialogPosition$1(dialog);
+      applyLastDialogPosition(dialog);
       document.documentElement.appendChild(dialog);
-      setupDialogDrag$1(dialog);
+      setupDialogDrag(dialog);
     }
 
     /**
@@ -14285,7 +14297,7 @@
       menu.appendChild(description);
       menu.appendChild(buttonsDiv);
 
-      applyLastDialogPosition$1(menu);
+      applyLastDialogPosition(menu);
       document.documentElement.appendChild(menu);
     }
 
@@ -14328,7 +14340,7 @@
         errorDialog.appendChild(message);
         errorDialog.appendChild(okButton);
 
-        applyLastDialogPosition$1(errorDialog);
+        applyLastDialogPosition(errorDialog);
         document.documentElement.appendChild(errorDialog);
         return;
       }
@@ -14422,7 +14434,7 @@
       errorDialog.appendChild(messageP);
       errorDialog.appendChild(okButton);
 
-      applyLastDialogPosition$1(errorDialog);
+      applyLastDialogPosition(errorDialog);
       document.documentElement.appendChild(errorDialog);
     }
 
@@ -14430,7 +14442,7 @@
      * Save the current editing cycle.
      */
     saveCycle() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const savedCycles = config.customCycles || [];
       
       // Find if cycle already exists
@@ -14457,7 +14469,7 @@
      * @param {string} cycleId - ID of cycle to delete
      */
     deleteCycle(cycleId) {
-      const config = getConfig$4();
+      const config = getConfig$3();
       const savedCycles = config.customCycles || [];
       
       const index = savedCycles.findIndex((c) => c.id === cycleId);
@@ -14475,7 +14487,7 @@
      * @returns {Array} Array of saved cycles
      */
     getSavedCycles() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       return config.customCycles || [];
     }
 
@@ -14743,7 +14755,7 @@
      * MISSING FEATURE: Notification permission request
      */
     requestNotificationPermission() {
-      const config = getConfig$4();
+      const config = getConfig$3();
       if (config.enableNotifications && !this.notificationPermissionRequested) {
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
           Notification.requestPermission()
@@ -15038,7 +15050,7 @@
       }
 
       // Show notification if enabled
-      const config = getConfig$4();
+      const config = getConfig$3();
       if (config.enableNotifications) {
         this.showNotification(phase);
       }
@@ -15076,7 +15088,7 @@
       this.updateOverlayVisibility();
 
       // Show notification about break ending
-      const config = getConfig$4();
+      const config = getConfig$3();
       if (config.enableNotifications) {
         this.showNotification('transition');
       }
@@ -15345,7 +15357,7 @@
     showRestorationNotification() {
       const status = this.timer.getStatus();
       const timeStr = formatTime(status.remainingTime);
-      const phaseLabel = getPhaseLabel$1(status.currentPhase);
+      const phaseLabel = getPhaseLabel(status.currentPhase);
 
       const message = `Your ${phaseLabel} timer (${timeStr} remaining) has been paused. Click the indicator to resume.`;
 
@@ -15453,7 +15465,7 @@
      * @private
      */
     _migrateBlockedWorkspacesToRulesets() {
-      const config = getConfig$4();
+      const config = getConfig$3();
 
       // Only migrate if there are global blocked workspaces
       if (!config.blockedWorkspaces || config.blockedWorkspaces.length === 0) {
