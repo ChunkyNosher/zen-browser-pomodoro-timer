@@ -2217,6 +2217,9 @@
 
     const timer = window.zenPomodoroApp.timer;
 
+    // CROSS-WINDOW SYNC: Claim ownership if this is a secondary window
+    window.zenPomodoroApp._claimOwnershipForAction();
+
     if (timer.isPaused) {
       timer.resume();
     } else {
@@ -2678,6 +2681,13 @@
 
       this.startInterval();
       this.saveState();
+
+      // CROSS-WINDOW SYNC: Claim ownership when starting a timer
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (sync) {
+        sync.claimOwnership();
+        this._writeSyncState();
+      }
     }
 
     /**
@@ -2725,6 +2735,13 @@
 
       this.startInterval();
       this.saveState();
+
+      // CROSS-WINDOW SYNC: Claim ownership when starting a timer
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (sync) {
+        sync.claimOwnership();
+        this._writeSyncState();
+      }
     }
 
     /**
@@ -2736,6 +2753,15 @@
       }
 
       this.intervalId = setInterval(() => {
+        // CROSS-WINDOW SYNC: Check if we lost ownership (another window claimed it)
+        const sync = window.zenPomodoroApp?.windowSync;
+        if (sync && !sync.isTimerOwner) {
+          clearInterval(this.intervalId);
+          this.intervalId = null;
+          logger.log(LOG_CATEGORIES.SYNC, 'Stopped interval - no longer timer owner');
+          return;
+        }
+
         if (!this.isPaused && this.isActive) {
           this.remainingTime--;
 
@@ -2762,7 +2788,53 @@
             this.tickCounter = 0;
           }
         }
+
+        // CROSS-WINDOW SYNC: Write sync state on every tick for secondary windows
+        this._writeSyncState();
       }, 1000);
+    }
+
+    /**
+     * Write current timer state to the sync pref for cross-window synchronization.
+     * Called on every timer tick by the owner window.
+     * @private
+     */
+    _writeSyncState() {
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (!sync || !sync.isTimerOwner) return;
+
+      sync.updateHeartbeat();
+      sync.writeSyncState({
+        isActive: this.isActive,
+        isPaused: this.isPaused,
+        remainingTime: this.remainingTime,
+        currentPhase: this.currentPhase,
+        currentCycle: this.currentCycle,
+        totalCycles: this.totalCycles,
+        mode: this.mode,
+        pausedOnBlockedWorkspace: this.pausedOnBlockedWorkspace,
+      });
+    }
+
+    /**
+     * Update timer state from cross-window sync data.
+     * Used by secondary windows to update their state without running an interval.
+     * Does NOT trigger phase change callbacks - only updates state and UI.
+     * @param {Object} syncState - Timer state received from the owner window
+     */
+    syncFromState(syncState) {
+      this.isActive = syncState.isActive;
+      this.isPaused = syncState.isPaused;
+      this.remainingTime = syncState.remainingTime;
+      this.currentPhase = syncState.currentPhase;
+      this.currentCycle = syncState.currentCycle;
+      this.totalCycles = syncState.totalCycles;
+      if (syncState.mode) {
+        this.mode = syncState.mode;
+      }
+      if (syncState.pausedOnBlockedWorkspace !== undefined) {
+        this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace;
+      }
     }
 
     /**
@@ -3433,6 +3505,16 @@
         pausedOnBlockedWorkspace: isOnBlockedWorkspace,
       });
       this.saveState();
+
+      // CROSS-WINDOW SYNC: Claim ownership on pause if not already owner
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (sync && !sync.isTimerOwner) {
+        sync.claimOwnership();
+        if (!this.intervalId && this.isActive) {
+          this.startInterval();
+        }
+      }
+      this._writeSyncState();
     }
 
     /**
@@ -3457,6 +3539,13 @@
       }
 
       this.saveState();
+
+      // CROSS-WINDOW SYNC: Claim ownership on resume if not already owner
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (sync && !sync.isTimerOwner) {
+        sync.claimOwnership();
+      }
+      this._writeSyncState();
     }
 
     /**
@@ -3478,6 +3567,13 @@
       }
       this.savedConfig = null;
       this.clearState();
+
+      // CROSS-WINDOW SYNC: Clear sync state and write final state
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (sync) {
+        sync.writeSyncState({ isActive: false, isPaused: false, remainingTime: 0 });
+        sync.clearSyncState();
+      }
     }
 
     /**
@@ -14574,6 +14670,7 @@
   class ZenPomodoroApp {
     constructor() {
       this.timer = new PomodoroTimer();
+      this.windowSync = new WindowSyncManager(); // Cross-window timer sync
       this.workspace = new WorkspaceDetector();
       this.overlay = new OverlayManager();
       this.keyboardShortcut = new KeyboardShortcutHandler();
@@ -14630,6 +14727,24 @@
       // Expose app globally early so restoration code can access it
       window.zenPomodoroApp = this;
 
+      // CROSS-WINDOW SYNC: Initialize sync manager and log sync
+      logger.log(LOG_CATEGORIES.INIT, 'Initializing cross-window sync');
+      this.windowSync.init();
+      logger.setWindowId(this.windowSync.windowId);
+      logger.initSync();
+      logger.requestExistingLogs();
+
+      // Setup sync callbacks
+      this.windowSync.onSyncStateChanged = (syncState) => {
+        this._onSyncStateReceived(syncState);
+      };
+      this.windowSync.onOwnershipLost = () => {
+        this._onOwnershipLost();
+      };
+      this.windowSync.onOwnershipTaken = (syncState) => {
+        this._onOwnershipTaken(syncState);
+      };
+
       // Migrate global blockedWorkspaces to default ruleset if needed
       this._migrateBlockedWorkspacesToRulesets();
 
@@ -14683,54 +14798,93 @@
       // Try to restore timer state
       const restored = this.timer.loadState();
       if (restored) {
-        logger.log(LOG_CATEGORIES.INIT, 'Timer state restored from previous session');
-        console.log('Restored timer state from previous session');
+        // CROSS-WINDOW SYNC: Check if another window is actively managing the timer
+        const isAnotherWindowActive = this.windowSync.isAnotherWindowActive();
 
-        // INDICATOR FIX: Show indicator after state restoration
-        this.overlay.showIndicator();
-        // Ensure paused state is reflected on the indicator since timer is paused on restore
-        this.overlay.updateIndicatorPausedState(true);
-        this.updateOverlayVisibility();
+        if (isAnotherWindowActive) {
+          // Another window is running the timer - sync from it instead of treating as restart
+          logger.log(LOG_CATEGORIES.INIT, 'Another window is active - syncing timer state');
 
-        // Restore distraction dump state if it was active
-        if (this.timer.pendingDumpState) {
-          const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
-          if (dumpRestored) {
-            logger.log(LOG_CATEGORIES.INIT, 'Distraction dump state restored');
-            // Re-enable dump mode (pause timer, lift blocks)
-            this.distractionDump._enableDumpMode();
-            this.distractionDump._setupDumpIndicator();
-            // Restart the dump countdown
-            this.distractionDump.dumpInterval = setInterval(() => {
-              this.distractionDump.dumpTimeRemaining--;
-              this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
-              if (this.distractionDump.dumpTimeRemaining <= 0) {
-                this.distractionDump.endDump();
-              }
-            }, 1000);
+          // Read more accurate state from sync pref (updated every tick by owner)
+          const syncState = this.windowSync.readSyncState();
+          if (syncState) {
+            this.timer.syncFromState(syncState);
           }
-          this.timer.pendingDumpState = null;
-        }
 
-        // If restored into transition phase, show the popup
-        if (this.timer.currentPhase === 'transition') {
-          this.transitionManager.showTransitionPopup();
-        }
+          // Show indicator with correct paused state (NOT forced paused)
+          this.overlay.showIndicator();
+          this.overlay.updateIndicatorPausedState(this.timer.isPaused);
+          this.updateOverlayVisibility();
 
-        // AUTO-PAUSE FIX: Show notification that timer was paused
-        // POPUP FIX: Only show restoration notification in main browser window, not popups
-        // This prevents confusing notifications in auth popups (Google sign-in, etc.)
-        if (this.timer.restoredFromRestart && !isPopupWindow()) {
-          // Show a non-blocking notification after a short delay to ensure DOM is ready
-          setTimeout(() => {
-            this.showRestorationNotification();
-          }, RESTORATION_NOTIFICATION_DELAY_MS);
-          // Clear flag after scheduling notification to prevent duplicate notifications
+          // Update display with current timer values
+          if (this.timer.onTick) {
+            this.timer.onTick(
+              this.timer.remainingTime,
+              this.timer.currentPhase,
+              this.timer.currentCycle,
+              this.timer.totalCycles
+            );
+          }
+
+          // Start heartbeat monitoring (detect if owner dies)
+          this.windowSync.startHeartbeatMonitor();
+
+          // Notify blockers that timer is active
+          this.sineModBlocker.onTimerStart();
+          this.websiteBlocker.onTimerStart();
+
+          // Do NOT show "Timer Restored" notification - this is not a restart
           this.timer.restoredFromRestart = false;
-        } else if (this.timer.restoredFromRestart) {
-          // Clear flag even in popup windows to prevent duplicate notifications when returning
-          logger.log(LOG_CATEGORIES.INIT, 'Skipping restoration notification in popup window');
-          this.timer.restoredFromRestart = false;
+        } else {
+          // No other window active - this is a genuine browser restart
+          logger.log(LOG_CATEGORIES.INIT, 'Timer state restored from previous session');
+          console.log('Restored timer state from previous session');
+
+          // Claim ownership since we're the only window
+          this.windowSync.claimOwnership();
+
+          // INDICATOR FIX: Show indicator after state restoration
+          this.overlay.showIndicator();
+          // Ensure paused state is reflected on the indicator since timer is paused on restore
+          this.overlay.updateIndicatorPausedState(true);
+          this.updateOverlayVisibility();
+
+          // Restore distraction dump state if it was active
+          if (this.timer.pendingDumpState) {
+            const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
+            if (dumpRestored) {
+              logger.log(LOG_CATEGORIES.INIT, 'Distraction dump state restored');
+              // Re-enable dump mode (pause timer, lift blocks)
+              this.distractionDump._enableDumpMode();
+              this.distractionDump._setupDumpIndicator();
+              // Restart the dump countdown
+              this.distractionDump.dumpInterval = setInterval(() => {
+                this.distractionDump.dumpTimeRemaining--;
+                this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
+                if (this.distractionDump.dumpTimeRemaining <= 0) {
+                  this.distractionDump.endDump();
+                }
+              }, 1000);
+            }
+            this.timer.pendingDumpState = null;
+          }
+
+          // If restored into transition phase, show the popup
+          if (this.timer.currentPhase === 'transition') {
+            this.transitionManager.showTransitionPopup();
+          }
+
+          // AUTO-PAUSE FIX: Show notification that timer was paused
+          // POPUP FIX: Only show restoration notification in main browser window, not popups
+          if (this.timer.restoredFromRestart && !isPopupWindow()) {
+            setTimeout(() => {
+              this.showRestorationNotification();
+            }, RESTORATION_NOTIFICATION_DELAY_MS);
+            this.timer.restoredFromRestart = false;
+          } else if (this.timer.restoredFromRestart) {
+            logger.log(LOG_CATEGORIES.INIT, 'Skipping restoration notification in popup window');
+            this.timer.restoredFromRestart = false;
+          }
         }
       }
 
@@ -14858,10 +15012,126 @@
     }
 
     /**
+     * Handle sync state received from the owner window.
+     * Updates timer state and UI for secondary windows.
+     * @param {Object} syncState - Timer state from owner window
+     * @private
+     */
+    _onSyncStateReceived(syncState) {
+      const wasActive = this.timer.isActive;
+      const oldPhase = this.timer.currentPhase;
+
+      // Update timer state
+      this.timer.syncFromState(syncState);
+
+      // Update UI
+      this.overlay.updateDisplay(
+        syncState.remainingTime,
+        syncState.currentPhase,
+        syncState.currentCycle,
+        syncState.totalCycles
+      );
+      this.overlay.updateIndicatorPausedState(syncState.isPaused);
+      this.updateOverlayVisibility();
+
+      // Handle remote timer stop
+      if (wasActive && !syncState.isActive) {
+        logger.log(LOG_CATEGORIES.SYNC, 'Timer stopped remotely');
+        this.overlay.hide();
+        this.overlay.hideIndicator();
+        this.transitionManager.destroy();
+        this.sineModBlocker.onTimerStop();
+        this.websiteBlocker.onTimerStop();
+        this.windowSync.stopHeartbeatMonitor();
+      }
+
+      // Handle remote timer start (wasActive false -> now active)
+      if (!wasActive && syncState.isActive) {
+        logger.log(LOG_CATEGORIES.SYNC, 'Timer started remotely');
+        this.overlay.showIndicator();
+        this.sineModBlocker.onTimerStart();
+        this.websiteBlocker.onTimerStart();
+        this.windowSync.startHeartbeatMonitor();
+      }
+
+      // Handle remote phase change
+      if (oldPhase !== syncState.currentPhase) {
+        logger.log(LOG_CATEGORIES.SYNC, 'Phase changed remotely', {
+          oldPhase,
+          newPhase: syncState.currentPhase,
+        });
+        // Update distraction dump availability on phase change
+        if (syncState.currentPhase === 'focus') {
+          this.distractionDump.resetForNewFocusPhase();
+        }
+      }
+    }
+
+    /**
+     * Handle loss of timer ownership to another window.
+     * Stops local interval and becomes a secondary window.
+     * @private
+     */
+    _onOwnershipLost() {
+      logger.log(LOG_CATEGORIES.SYNC, 'Ownership lost - switching to secondary mode');
+      // Stop our interval since we're no longer the owner
+      if (this.timer.intervalId) {
+        clearInterval(this.timer.intervalId);
+        this.timer.intervalId = null;
+      }
+      // Start heartbeat monitoring to detect if new owner dies
+      this.windowSync.startHeartbeatMonitor();
+    }
+
+    /**
+     * Handle taking over timer ownership from a dead/crashed owner window.
+     * Resumes the timer interval with adjusted remaining time.
+     * @param {Object} syncState - Last known timer state from dead owner
+     * @private
+     */
+    _onOwnershipTaken(syncState) {
+      logger.log(LOG_CATEGORIES.SYNC, 'Taking over timer ownership', {
+        remainingTime: syncState.remainingTime,
+        phase: syncState.currentPhase,
+      });
+
+      // Update timer state from the last known sync state
+      this.timer.syncFromState(syncState);
+
+      // If timer was running (not paused), start our own interval
+      if (this.timer.isActive && !this.timer.isPaused) {
+        this.timer.startInterval();
+      } else if (this.timer.isActive && this.timer.isPaused) {
+        // Timer was paused - don't start interval, just update UI
+        this.overlay.updateIndicatorPausedState(true);
+      }
+
+      this.updateOverlayVisibility();
+    }
+
+    /**
+     * Claim ownership for a user-initiated action in a secondary window.
+     * Ensures this window becomes the owner before modifying timer state.
+     * @private
+     */
+    _claimOwnershipForAction() {
+      if (!this.windowSync.isTimerOwner && this.timer.isActive) {
+        this.windowSync.claimOwnership();
+        // Start interval since we're now the owner
+        if (!this.timer.intervalId) {
+          this.timer.startInterval();
+        }
+      }
+    }
+
+    /**
      * Stop the timer
      */
     stopTimer() {
       logger.log(LOG_CATEGORIES.TIMER, 'Stop timer requested by user');
+
+      // CROSS-WINDOW SYNC: Claim ownership before stopping
+      this._claimOwnershipForAction();
 
       this.timer.stop();
       this.overlay.hide();
@@ -14875,6 +15145,9 @@
 
       // Notify Website Blocker that timer stopped
       this.websiteBlocker.onTimerStop();
+
+      // CROSS-WINDOW SYNC: Stop heartbeat monitoring since timer is stopped
+      this.windowSync.stopHeartbeatMonitor();
     }
 
     /**
@@ -15359,6 +15632,7 @@
 
       // All modules with destroy() methods (null-checked in _destroyModules)
       const modules = [
+        this.windowSync,
         this.sineModBlocker,
         this.websiteBlocker,
         this.transitionManager,
@@ -15372,6 +15646,9 @@
 
       // Additional cleanup
       this._runCleanupActions();
+
+      // Clean up cross-window log sync
+      logger.destroySync();
 
       this.initialized = false;
 
@@ -15423,6 +15700,10 @@
       if (app?.timer?.isActive) {
         app.timer.saveState();
         logger.log(LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+      }
+      // CROSS-WINDOW SYNC: Release ownership so other windows can take over
+      if (app?.windowSync) {
+        app.windowSync.releaseOwnership();
       }
     }
   );
