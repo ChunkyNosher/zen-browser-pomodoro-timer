@@ -376,6 +376,8 @@
         const sharedLogsStr = Storage.getPref('shared-logs', '');
         if (sharedLogsStr) {
           this._mergeSharedLogs(JSON.parse(sharedLogsStr));
+          // Clear the shared-logs pref after reading to prevent stale data
+          Storage.setPref('shared-logs', '');
         }
       } catch (e) {
         /* ignore errors during log request */
@@ -391,9 +393,9 @@
     _mergeSharedLogs(sharedLogs) {
       if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
 
-      const existingKeys = new Set(this.logs.map((l) => `${l.timestamp}|${l.message}`));
+      const existingKeys = new Set(this.logs.map((l) => `${l.timestamp}\0${l.message}`));
       for (const entry of sharedLogs) {
-        if (!existingKeys.has(`${entry.timestamp}|${entry.message}`)) {
+        if (!existingKeys.has(`${entry.timestamp}\0${entry.message}`)) {
           this.logs.push(entry);
         }
       }
@@ -591,7 +593,7 @@
   class WindowSyncManager {
     constructor() {
       /** Unique ID for this window instance */
-      this.windowId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      this.windowId = crypto.randomUUID();
       /** Whether this window is the timer owner (runs the countdown interval) */
       this.isTimerOwner = false;
       /** Pref observer for cross-window sync */
@@ -789,15 +791,16 @@
         phase: syncState.currentPhase,
       });
 
-      // Adjust remaining time for elapsed time since last sync
-      if (!syncState.isPaused && syncState.timestamp) {
-        const elapsed = Math.floor((Date.now() - syncState.timestamp) / 1000);
-        syncState.remainingTime = Math.max(0, syncState.remainingTime - elapsed);
+      // Create adjusted state without mutating the original object
+      const adjustedState = { ...syncState };
+      if (!adjustedState.isPaused && adjustedState.timestamp) {
+        const elapsed = Math.floor((Date.now() - adjustedState.timestamp) / 1000);
+        adjustedState.remainingTime = Math.max(0, adjustedState.remainingTime - elapsed);
       }
 
       this.claimOwnership();
       if (this.onOwnershipTaken) {
-        this.onOwnershipTaken(syncState);
+        this.onOwnershipTaken(adjustedState);
       }
     }
 
@@ -2822,7 +2825,11 @@
       const sync = window.zenPomodoroApp?.windowSync;
       if (!sync || !sync.isTimerOwner) return;
 
-      sync.updateHeartbeat();
+      // Update heartbeat every 5 ticks (5 seconds) - less frequent than sync state
+      // to reduce pref write overhead while keeping 30s timeout safe
+      if (this.tickCounter % 5 === 0) {
+        sync.updateHeartbeat();
+      }
       sync.writeSyncState({
         isActive: this.isActive,
         isPaused: this.isPaused,
