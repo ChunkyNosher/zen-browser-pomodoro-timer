@@ -257,6 +257,8 @@
     LOG_REQUEST_TOPIC: 'zen-pomodoro-log-request',
     /** Cross-window sync: interval for secondary windows to check owner heartbeat (ms) */
     HEARTBEAT_CHECK_INTERVAL_MS: 5000,
+    /** Cross-window sync: how often owner updates heartbeat (every N timer ticks) */
+    HEARTBEAT_UPDATE_TICK_INTERVAL: 5,
   };
 
   // ============================================
@@ -393,9 +395,9 @@
     _mergeSharedLogs(sharedLogs) {
       if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
 
-      const existingKeys = new Set(this.logs.map((l) => `${l.timestamp}\0${l.message}`));
+      const existingKeys = new Set(this.logs.map((l) => this._logDedupeKey(l)));
       for (const entry of sharedLogs) {
-        if (!existingKeys.has(`${entry.timestamp}\0${entry.message}`)) {
+        if (!existingKeys.has(this._logDedupeKey(entry))) {
           this.logs.push(entry);
         }
       }
@@ -403,6 +405,16 @@
       while (this.logs.length > this.maxLogSize) {
         this.logs.shift();
       }
+    }
+
+    /**
+     * Generate a deduplication key for a log entry.
+     * @param {Object} entry - Log entry with timestamp and message
+     * @returns {string} Deduplication key
+     * @private
+     */
+    _logDedupeKey(entry) {
+      return `${entry.timestamp}\0${entry.message}`;
     }
 
     /**
@@ -1650,6 +1662,7 @@
   const CONTENT_AREA_SELECTORS = Constants.CONTENT_AREA_SELECTORS;
   const WORKSPACE_NAME_ATTRIBUTES = Constants.WORKSPACE_NAME_ATTRIBUTES;
   const URL_REVOKE_DELAY_MS = Constants.URL_REVOKE_DELAY_MS;
+  const HEARTBEAT_UPDATE_TICK_INTERVAL = Constants.HEARTBEAT_UPDATE_TICK_INTERVAL;
 
   // ============================================
   // Remaining Helper Functions
@@ -2827,7 +2840,7 @@
 
       // Update heartbeat every 5 ticks (5 seconds) - less frequent than sync state
       // to reduce pref write overhead while keeping 30s timeout safe
-      if (this.tickCounter % 5 === 0) {
+      if (this.tickCounter % HEARTBEAT_UPDATE_TICK_INTERVAL === 0) {
         sync.updateHeartbeat();
       }
       sync.writeSyncState({
