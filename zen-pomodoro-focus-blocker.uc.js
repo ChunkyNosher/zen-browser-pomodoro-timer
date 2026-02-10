@@ -1749,11 +1749,8 @@
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
    *
-   * NOTE: Cyclomatic complexity (cc=9) is at the threshold. The function coordinates
-   * mouse and touch event handling with drag state management. Helper functions
-   * (isTouchEventWithTouches, getClientCoords, addDragListeners, removeDragListeners)
-   * and the observer setup (_setupDragCleanupObserver) have been extracted to reduce
-   * complexity. Further splitting would force-separate tightly coupled drag state.
+   * Helper functions extracted to module scope: isTouchEventWithTouches(),
+   * getClientCoords(), _setupDragCleanupObserver().
    *
    * @param {HTMLElement} dialog - The dialog element to make draggable.
    *                               Must contain an h2 element as the drag handle.
@@ -1766,6 +1763,27 @@
    * document.documentElement.appendChild(dialog);
    * setupDialogDrag(dialog);
    */
+  /**
+   * Check if an event is a valid touch event with active touches.
+   * @param {Event} e - The event to check
+   * @returns {boolean} True if the event is a touch event with touches
+   */
+  function isTouchEventWithTouches(e) {
+    return e.type?.startsWith('touch') && e.touches?.length > 0;
+  }
+
+  /**
+   * Get client coordinates from a mouse or touch event.
+   * @param {Event} e - The mouse or touch event
+   * @returns {{x: number, y: number}} The client coordinates
+   */
+  function getClientCoords(e) {
+    if (isTouchEventWithTouches(e)) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
   function setupDialogDrag(dialog) {
     const header = dialog.querySelector('h2');
     if (!header) {
@@ -1788,17 +1806,6 @@
     let startX, startY;
     let startLeft, startTop;
     let dialogWidth, dialogHeight;
-
-    // Helper to check if event is a valid touch event with touches
-    const isTouchEventWithTouches = (e) => e.type?.startsWith('touch') && e.touches?.length > 0;
-
-    // Helper to get client coordinates from mouse or touch event
-    const getClientCoords = (e) => {
-      if (isTouchEventWithTouches(e)) {
-        return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      }
-      return { x: e.clientX, y: e.clientY };
-    };
 
     // Helper to add/remove document-level drag listeners
     const addDragListeners = () => {
