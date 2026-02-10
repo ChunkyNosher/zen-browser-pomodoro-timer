@@ -4,15 +4,18 @@
   "description": "A productivity mod implementing Pomodoro timer with workspace blocking",
   "main": "userChrome.uc.mjs",
   "scripts": {
+    "build": "rollup -c rollup.config.mjs",
     "lint": "eslint . && stylelint '**/*.css'",
     "lint:fix": "eslint --fix . && stylelint --fix '**/*.css' && prettier --write .",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@eslint/js": "^8.56.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "eslint": "^8.56.0",
     "eslint-plugin-no-unsanitized": "^4.0.2",
     "prettier": "^3.1.0",
+    "rollup": "^4.57.1",
     "stylelint": "^16.0.0",
     "stylelint-config-standard": "^35.0.0"
   },

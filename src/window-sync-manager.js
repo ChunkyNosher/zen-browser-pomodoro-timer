@@ -1,0 +1,339 @@
+import Constants from './constants.js';
+import { logger } from './log-manager.js';
+
+/**
+ * WindowSyncManager - Manages cross-window timer synchronization.
+ * Uses a primary/secondary window pattern where only one window (the "owner")
+ * runs the actual timer countdown interval. Other windows sync their UI state
+ * by observing pref changes written by the owner window.
+ *
+ * Architecture:
+ * - Owner window: runs setInterval, writes timer-sync pref every tick, updates heartbeat
+ * - Secondary windows: observe timer-sync pref, update UI from sync data, no interval
+ * - Ownership transfer: when user interacts in secondary, it claims ownership
+ * - Dead owner detection: secondary checks heartbeat periodically, takes over if stale
+ *
+ * Communication:
+ * - Timer state sync: via Services.prefs (zen-pomodoro.timer-sync)
+ * - Owner heartbeat: via Services.prefs (zen-pomodoro.timer-owner)
+ * - Log sync: via Services.obs (zen-pomodoro-log topic)
+ */
+class WindowSyncManager {
+  constructor() {
+    /** Unique ID for this window instance */
+    this.windowId =
+      typeof crypto?.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `win-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    /** Whether this window is the timer owner (runs the countdown interval) */
+    this.isTimerOwner = false;
+    /** Pref observer for cross-window sync */
+    this._prefObserver = null;
+    /** Interval ID for heartbeat monitoring in secondary windows */
+    this._heartbeatCheckInterval = null;
+    /** Callback: called when sync state is received from owner (secondary only) */
+    this.onSyncStateChanged = null;
+    /** Callback: called when this window loses ownership to another window */
+    this.onOwnershipLost = null;
+    /** Callback: called when this window takes over from a dead owner */
+    this.onOwnershipTaken = null;
+    /** Storage module reference (injected to avoid circular dependency) */
+    this._storage = null;
+  }
+
+  /**
+   * Set the Storage module reference (dependency injection to avoid circular dependency).
+   * @param {Object} storage - Storage module with getPref/setPref methods
+   */
+  setStorage(storage) {
+    this._storage = storage;
+  }
+
+  /**
+   * Initialize the sync manager - set up pref observer for cross-window communication.
+   */
+  init() {
+    this._setupPrefObserver();
+  }
+
+  /**
+   * Check if another window is currently actively managing the timer.
+   * Uses heartbeat timestamp to determine if the owner is alive.
+   * @returns {boolean} True if another window is the active timer owner
+   */
+  isAnotherWindowActive() {
+    if (!this._storage) return false;
+    try {
+      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+      if (!ownerStr) return false;
+      const owner = JSON.parse(ownerStr);
+      return (
+        owner.id !== this.windowId &&
+        Date.now() - owner.heartbeat < Constants.OWNER_HEARTBEAT_TIMEOUT_MS
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Claim ownership of the timer - this window will run the countdown interval.
+   */
+  claimOwnership() {
+    this.isTimerOwner = true;
+    this._writeOwnership();
+    this.stopHeartbeatMonitor();
+    logger.log(Constants.LOG_CATEGORIES.SYNC, 'Claimed timer ownership', {
+      windowId: this.windowId,
+    });
+  }
+
+  /**
+   * Release ownership of the timer (e.g., when window closes).
+   * Only clears the owner pref if this window is still the registered owner.
+   */
+  releaseOwnership() {
+    if (!this.isTimerOwner || !this._storage) return;
+    this.isTimerOwner = false;
+    try {
+      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+      if (ownerStr) {
+        const owner = JSON.parse(ownerStr);
+        if (owner.id === this.windowId) {
+          this._storage.setPref(Constants.OWNER_PREF_KEY, '');
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    logger.log(Constants.LOG_CATEGORIES.SYNC, 'Released timer ownership');
+  }
+
+  /**
+   * Update the heartbeat timestamp for this owner window.
+   * Called on every timer tick to signal that the owner is alive.
+   */
+  updateHeartbeat() {
+    if (this.isTimerOwner) {
+      this._writeOwnership();
+    }
+  }
+
+  /**
+   * Write current timer state to the sync pref for secondary windows to read.
+   * @param {Object} timerState - Timer state object to broadcast
+   */
+  writeSyncState(timerState) {
+    if (!this._storage) return;
+    this._storage.setPref(
+      Constants.SYNC_PREF_KEY,
+      JSON.stringify({
+        ownerId: this.windowId,
+        timestamp: Date.now(),
+        ...timerState,
+      })
+    );
+  }
+
+  /**
+   * Read the current sync state from the pref.
+   * @returns {Object|null} Parsed sync state or null
+   */
+  readSyncState() {
+    if (!this._storage) return null;
+    try {
+      const syncStr = this._storage.getPref(Constants.SYNC_PREF_KEY, '');
+      if (!syncStr) return null;
+      return JSON.parse(syncStr);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Clear all sync-related prefs (timer-sync and timer-owner).
+   * Called when the timer is stopped.
+   */
+  clearSyncState() {
+    if (!this._storage) return;
+    this._storage.setPref(Constants.SYNC_PREF_KEY, '');
+    this._storage.setPref(Constants.OWNER_PREF_KEY, '');
+  }
+
+  /**
+   * Start periodic heartbeat monitoring (for secondary windows).
+   * Checks if the owner window is still alive and takes over if not.
+   */
+  startHeartbeatMonitor() {
+    if (this._heartbeatCheckInterval) return;
+    this._heartbeatCheckInterval = setInterval(() => {
+      this._checkOwnerHeartbeat();
+    }, Constants.HEARTBEAT_CHECK_INTERVAL_MS);
+  }
+
+  /**
+   * Stop the heartbeat monitoring interval.
+   */
+  stopHeartbeatMonitor() {
+    if (this._heartbeatCheckInterval) {
+      clearInterval(this._heartbeatCheckInterval);
+      this._heartbeatCheckInterval = null;
+    }
+  }
+
+  /**
+   * Write this window's ID and current timestamp to the owner pref.
+   * @private
+   */
+  _writeOwnership() {
+    if (!this._storage) return;
+    this._storage.setPref(
+      Constants.OWNER_PREF_KEY,
+      JSON.stringify({
+        id: this.windowId,
+        heartbeat: Date.now(),
+      })
+    );
+  }
+
+  /**
+   * Check if the current owner is still alive by checking heartbeat.
+   * If the owner's heartbeat is stale, this secondary window takes over.
+   * @private
+   */
+  _checkOwnerHeartbeat() {
+    if (this.isTimerOwner || !this._storage) return;
+
+    const syncState = this.readSyncState();
+    if (!syncState || !syncState.isActive) return;
+
+    try {
+      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+      if (!ownerStr) {
+        this._takeOverFromDeadOwner(syncState);
+        return;
+      }
+      const owner = JSON.parse(ownerStr);
+      if (owner.id === this.windowId) return;
+      if (Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS) {
+        this._takeOverFromDeadOwner(syncState);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Take over timer ownership from a dead/crashed owner window.
+   * Adjusts remaining time based on elapsed time since last heartbeat.
+   * @param {Object} syncState - Last known sync state
+   * @private
+   */
+  _takeOverFromDeadOwner(syncState) {
+    logger.log(Constants.LOG_CATEGORIES.SYNC, 'Taking over from dead owner window', {
+      remainingTime: syncState.remainingTime,
+      phase: syncState.currentPhase,
+    });
+
+    // Create adjusted state without mutating the original object
+    const adjustedState = { ...syncState };
+    if (!adjustedState.isPaused && adjustedState.timestamp) {
+      const rawElapsed = Math.floor((Date.now() - adjustedState.timestamp) / 1000);
+      // Cap elapsed time to heartbeat timeout to prevent extreme drift
+      const maxElapsed = Math.floor(Constants.OWNER_HEARTBEAT_TIMEOUT_MS / 1000);
+      if (rawElapsed > maxElapsed) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Time drift exceeded heartbeat timeout during takeover', {
+          rawElapsed,
+          maxElapsed,
+        });
+      }
+      const elapsed = Math.min(rawElapsed, maxElapsed);
+      adjustedState.remainingTime = Math.max(0, adjustedState.remainingTime - elapsed);
+    }
+
+    this.claimOwnership();
+    if (this.onOwnershipTaken) {
+      this.onOwnershipTaken(adjustedState);
+    }
+  }
+
+  /**
+   * Set up pref observer for cross-window communication.
+   * Watches for changes to timer-sync and timer-owner prefs.
+   * @private
+   */
+  _setupPrefObserver() {
+    const prefPrefix = Constants.PREF_PREFIX;
+    const syncPrefFull = `${prefPrefix}.${Constants.SYNC_PREF_KEY}`;
+    const ownerPrefFull = `${prefPrefix}.${Constants.OWNER_PREF_KEY}`;
+    this._prefObserver = {
+      observe: (subject, topic, data) => {
+        if (data === syncPrefFull) {
+          this._handleSyncPrefChange();
+        } else if (data === ownerPrefFull) {
+          this._handleOwnerPrefChange();
+        }
+      },
+    };
+    Services.prefs.addObserver(`${prefPrefix}.`, this._prefObserver);
+  }
+
+  /**
+   * Handle changes to the timer-sync pref (timer state updates from owner).
+   * Secondary windows use this to update their UI.
+   * @private
+   */
+  _handleSyncPrefChange() {
+    if (this.isTimerOwner) return;
+    const syncState = this.readSyncState();
+    if (!syncState) return;
+    if (syncState.ownerId === this.windowId) return;
+
+    if (this.onSyncStateChanged) {
+      this.onSyncStateChanged(syncState);
+    }
+  }
+
+  /**
+   * Handle changes to the timer-owner pref.
+   * If this window was the owner and another window claimed ownership, handle the transfer.
+   * @private
+   */
+  _handleOwnerPrefChange() {
+    if (!this.isTimerOwner || !this._storage) return;
+    try {
+      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+      if (!ownerStr) return;
+      const owner = JSON.parse(ownerStr);
+      if (owner.id !== this.windowId) {
+        this.isTimerOwner = false;
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Lost timer ownership to another window', {
+          newOwnerId: owner.id,
+        });
+        if (this.onOwnershipLost) {
+          this.onOwnershipLost();
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Clean up all resources - remove observers, stop heartbeat, release ownership.
+   */
+  destroy() {
+    this.stopHeartbeatMonitor();
+    if (this._prefObserver) {
+      try {
+        Services.prefs.removeObserver(`${Constants.PREF_PREFIX}.`, this._prefObserver);
+      } catch (e) {
+        /* ignore */
+      }
+      this._prefObserver = null;
+    }
+    this.releaseOwnership();
+  }
+}
+
+export default WindowSyncManager;
