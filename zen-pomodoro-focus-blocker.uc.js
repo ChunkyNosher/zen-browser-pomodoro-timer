@@ -1745,25 +1745,6 @@
   }
 
   /**
-   * Issue 8: Setup drag functionality for dialogs
-   * Makes a dialog draggable by its header (h2 element).
-   * The dialog can be moved within the viewport boundaries.
-   *
-   * Helper functions extracted to module scope: isTouchEventWithTouches(),
-   * getClientCoords(), _setupDragCleanupObserver().
-   *
-   * @param {HTMLElement} dialog - The dialog element to make draggable.
-   *                               Must contain an h2 element as the drag handle.
-   * @returns {void}
-   *
-   * @example
-   * const dialog = document.createElement('div');
-   * dialog.className = 'zen-pomodoro-dialog active';
-   * // ... add h2 and other content ...
-   * document.documentElement.appendChild(dialog);
-   * setupDialogDrag(dialog);
-   */
-  /**
    * Check if an event is a valid touch event with active touches.
    * @param {Event} e - The event to check
    * @returns {boolean} True if the event is a touch event with touches
@@ -1784,6 +1765,22 @@
     return { x: e.clientX, y: e.clientY };
   }
 
+  /**
+   * Issue 8: Setup drag functionality for dialogs
+   * Makes a dialog draggable by its header (h2 element).
+   * The dialog can be moved within the viewport boundaries.
+   *
+   * @param {HTMLElement} dialog - The dialog element to make draggable.
+   *                               Must contain an h2 element as the drag handle.
+   * @returns {void}
+   *
+   * @example
+   * const dialog = document.createElement('div');
+   * dialog.className = 'zen-pomodoro-dialog active';
+   * // ... add h2 and other content ...
+   * document.documentElement.appendChild(dialog);
+   * setupDialogDrag(dialog);
+   */
   function setupDialogDrag(dialog) {
     const header = dialog.querySelector('h2');
     if (!header) {
