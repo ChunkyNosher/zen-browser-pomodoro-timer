@@ -852,11 +852,13 @@
      */
     _setupPrefObserver() {
       const prefPrefix = Constants.PREF_PREFIX;
+      const syncPrefFull = `${prefPrefix}.${Constants.SYNC_PREF_KEY}`;
+      const ownerPrefFull = `${prefPrefix}.${Constants.OWNER_PREF_KEY}`;
       this._prefObserver = {
         observe: (subject, topic, data) => {
-          if (data === `${prefPrefix}.${Constants.SYNC_PREF_KEY}`) {
+          if (data === syncPrefFull) {
             this._handleSyncPrefChange();
-          } else if (data === `${prefPrefix}.${Constants.OWNER_PREF_KEY}`) {
+          } else if (data === ownerPrefFull) {
             this._handleOwnerPrefChange();
           }
         },
@@ -1747,10 +1749,11 @@
    * Makes a dialog draggable by its header (h2 element).
    * The dialog can be moved within the viewport boundaries.
    *
-   * NOTE: Cyclomatic complexity (cc=9) is acceptable for this function since it provides
-   * unified drag handling for both mouse and touch events, coordinate transform conversion,
-   * and viewport boundary clamping. Helper functions (isTouchEventWithTouches, getClientCoords,
-   * cleanupDrag) have already been extracted to reduce complexity where practical.
+   * NOTE: Cyclomatic complexity (cc=9) is at the threshold. The function coordinates
+   * mouse and touch event handling with drag state management. Helper functions
+   * (isTouchEventWithTouches, getClientCoords, addDragListeners, removeDragListeners)
+   * and the observer setup (_setupDragCleanupObserver) have been extracted to reduce
+   * complexity. Further splitting would force-separate tightly coupled drag state.
    *
    * @param {HTMLElement} dialog - The dialog element to make draggable.
    *                               Must contain an h2 element as the drag handle.
@@ -1797,13 +1800,19 @@
       return { x: e.clientX, y: e.clientY };
     };
 
-    // Clean up function to remove document-level listeners
-    const cleanupDrag = () => {
+    // Helper to add/remove document-level drag listeners
+    const addDragListeners = () => {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onEnd);
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    };
+
+    const removeDragListeners = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onEnd);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onEnd);
-      isDragging = false;
     };
 
     const startDrag = (e) => {
@@ -1829,11 +1838,7 @@
       dialog.classList.add('dragging');
       header.style.cursor = 'grabbing';
 
-      // Add document-level event listeners for drag tracking
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onEnd);
-      document.addEventListener('touchmove', onMove, { passive: false });
-      document.addEventListener('touchend', onEnd);
+      addDragListeners();
     };
 
     const onMove = (e) => {
@@ -1861,19 +1866,14 @@
       header.style.cursor = 'move';
 
       // Only save position for dialogs that don't have the no-save attribute
-      // This prevents the transition popup position from affecting the settings menu position
       if (!dialog.hasAttribute(DATA_NO_POSITION_SAVE)) {
         saveDialogPosition(dialog);
       }
 
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onEnd);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onEnd);
+      removeDragListeners();
     };
 
     // Add event listeners to header for both mouse and touch
-    // Note: Not using capture phase as it can interfere with event handling in Firefox/Zen
     header.addEventListener('mousedown', startDrag);
     header.addEventListener('touchstart', startDrag, { passive: false });
 
@@ -1882,11 +1882,23 @@
     dialog._dragHeader = header;
 
     // Use MutationObserver to clean up when dialog is removed from DOM
+    _setupDragCleanupObserver(dialog, header, startDrag, removeDragListeners);
+  }
+
+  /**
+   * Set up a MutationObserver to clean up drag listeners when dialog is removed from DOM.
+   * @param {HTMLElement} dialog - The dialog element being observed
+   * @param {HTMLElement} header - The drag handle header element
+   * @param {function} startDrag - The drag start handler to remove
+   * @param {function} removeDragListeners - Function to remove document-level listeners
+   * @private
+   */
+  function _setupDragCleanupObserver(dialog, header, startDrag, removeDragListeners) {
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const removedNode of mutation.removedNodes) {
           if (removedNode === dialog) {
-            cleanupDrag();
+            removeDragListeners();
             header.removeEventListener('mousedown', startDrag);
             header.removeEventListener('touchstart', startDrag);
             observer.disconnect();
@@ -13180,7 +13192,7 @@
         container.appendChild(this._createEmptyMessage());
       } else {
         cycles.forEach((cycle, index) => {
-          const cycleItem = this._createCycleListItem(cycle, config, dialog, index, cycles.length);
+          const cycleItem = this._createCycleListItem(cycle, config, dialog, { index, totalCount: cycles.length });
           container.appendChild(cycleItem);
         });
       }
@@ -13273,12 +13285,13 @@
      * @param {Object} cycle - The cycle object
      * @param {Object} config - Current configuration
      * @param {HTMLElement} parentDialog - Parent dialog element
-     * @param {number} index - Index of the cycle in the list
-     * @param {number} totalCount - Total number of cycles
+     * @param {Object} position - Position info for ordering
+     * @param {number} position.index - Index of the cycle in the list
+     * @param {number} position.totalCount - Total number of cycles
      * @returns {HTMLElement} The cycle list item element
      * @private
      */
-    _createCycleListItem(cycle, config, parentDialog, index, totalCount) {
+    _createCycleListItem(cycle, config, parentDialog, { index, totalCount }) {
       const item = document.createElement('div');
       item.className = 'zen-pomodoro-cycle-list-item';
 
@@ -14123,7 +14136,11 @@
         dragPreview.style.top = `${lastPointerY - offsetY}px`;
         
         // Handle auto-scroll near container edges (not throttled by rAF)
-        this._updateAutoScroll(lastPointerY, scrollContainer, SCROLL_ZONE, SCROLL_SPEED, scrollState, updateDropTarget);
+        this._updateAutoScroll(lastPointerY, scrollContainer, scrollState, {
+          zone: SCROLL_ZONE,
+          speed: SCROLL_SPEED,
+          onScroll: updateDropTarget,
+        });
         
         if (rafId) return; // Throttle updateDropTarget with rAF
         rafId = requestAnimationFrame(() => {
@@ -14376,18 +14393,19 @@
      * Update auto-scroll state based on pointer position relative to container edges.
      * @param {number} clientY - Current pointer Y position
      * @param {HTMLElement} scrollContainer - Scrollable container element
-     * @param {number} scrollZone - Distance from edge to trigger scrolling (px)
-     * @param {number} scrollSpeed - Scroll speed per animation frame (px)
      * @param {Object} scrollState - Mutable state object with rafId and direction
-     * @param {Function} onScroll - Callback to update drop target during scroll
+     * @param {Object} options - Auto-scroll options
+     * @param {number} options.zone - Distance from edge to trigger scrolling (px)
+     * @param {number} options.speed - Scroll speed per animation frame (px)
+     * @param {Function} options.onScroll - Callback to update drop target during scroll
      * @private
      */
-    _updateAutoScroll(clientY, scrollContainer, scrollZone, scrollSpeed, scrollState, onScroll) {
+    _updateAutoScroll(clientY, scrollContainer, scrollState, { zone, speed, onScroll }) {
       const containerRect = scrollContainer.getBoundingClientRect();
       let newScrollDir = null;
-      if (clientY < containerRect.top + scrollZone) {
+      if (clientY < containerRect.top + zone) {
         newScrollDir = 'up';
-      } else if (clientY > containerRect.bottom - scrollZone) {
+      } else if (clientY > containerRect.bottom - zone) {
         newScrollDir = 'down';
       }
 
@@ -14401,9 +14419,9 @@
       scrollState.direction = newScrollDir;
       if (scrollState.direction) {
         logger.log(Constants.LOG_CATEGORIES.MENU, `Auto-scroll activated (${scrollState.direction})`);
-        const speed = scrollState.direction === 'up' ? -scrollSpeed : scrollSpeed;
+        const scrollDelta = scrollState.direction === 'up' ? -speed : speed;
         const doScroll = () => {
-          scrollContainer.scrollTop += speed;
+          scrollContainer.scrollTop += scrollDelta;
           // Recalculate drop target as scroll position changes
           if (onScroll) {
             onScroll(clientY);
@@ -15151,7 +15169,7 @@
      */
     _syncDumpState(syncState) {
       if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
-      const wasInDump = this.distractionDump?.isActive || false;
+      const wasInDump = this.websiteBlocker.distractionDumpActive || false;
       if (syncState.dumpActive && !wasInDump) {
         this.websiteBlocker.distractionDumpActive = true;
       } else if (!syncState.dumpActive && wasInDump) {
