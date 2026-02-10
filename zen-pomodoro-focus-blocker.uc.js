@@ -372,30 +372,34 @@
     requestExistingLogs() {
       if (!this.windowId) return;
       try {
-        // Notify other windows to write their logs to a temporary pref
         Services.obs.notifyObservers(null, Constants.LOG_REQUEST_TOPIC, this.windowId);
-        // Read the response from the temporary pref (written synchronously by other windows)
         const sharedLogsStr = Storage.getPref('shared-logs', '');
         if (sharedLogsStr) {
-          const sharedLogs = JSON.parse(sharedLogsStr);
-          if (Array.isArray(sharedLogs) && sharedLogs.length > 0) {
-            // Merge shared logs with our current logs, avoiding duplicates by timestamp
-            const existingTimestamps = new Set(this.logs.map((l) => l.timestamp + l.message));
-            for (const entry of sharedLogs) {
-              const key = entry.timestamp + entry.message;
-              if (!existingTimestamps.has(key)) {
-                this.logs.push(entry);
-              }
-            }
-            // Sort by timestamp and trim to max size
-            this.logs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-            while (this.logs.length > this.maxLogSize) {
-              this.logs.shift();
-            }
-          }
+          this._mergeSharedLogs(JSON.parse(sharedLogsStr));
         }
       } catch (e) {
         /* ignore errors during log request */
+      }
+    }
+
+    /**
+     * Merge shared logs from another window into our local log array.
+     * Deduplicates by timestamp+message key and sorts chronologically.
+     * @param {Array} sharedLogs - Array of log entries from another window
+     * @private
+     */
+    _mergeSharedLogs(sharedLogs) {
+      if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
+
+      const existingKeys = new Set(this.logs.map((l) => l.timestamp + l.message));
+      for (const entry of sharedLogs) {
+        if (!existingKeys.has(entry.timestamp + entry.message)) {
+          this.logs.push(entry);
+        }
+      }
+      this.logs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      while (this.logs.length > this.maxLogSize) {
+        this.logs.shift();
       }
     }
 
@@ -2754,8 +2758,7 @@
 
       this.intervalId = setInterval(() => {
         // CROSS-WINDOW SYNC: Check if we lost ownership (another window claimed it)
-        const sync = window.zenPomodoroApp?.windowSync;
-        if (sync && !sync.isTimerOwner) {
+        if (this._hasLostOwnership()) {
           clearInterval(this.intervalId);
           this.intervalId = null;
           logger.log(LOG_CATEGORIES.SYNC, 'Stopped interval - no longer timer owner');
@@ -2763,35 +2766,51 @@
         }
 
         if (!this.isPaused && this.isActive) {
-          this.remainingTime--;
-
-          // Track focus time for post-session reminder goal
-          if (this.currentPhase === 'focus') {
-            this._trackFocusTime();
-          }
-
-          if (this.onTick) {
-            this.onTick(this.remainingTime, this.currentPhase, this.currentCycle, this.totalCycles);
-          }
-
-          // Check for timer reminders
-          this._checkTimerReminders();
-
-          if (this.remainingTime <= 0) {
-            this.handlePhaseComplete();
-          }
-
-          // PERFORMANCE FIX: Save state every 10 seconds instead of every second
-          this.tickCounter++;
-          if (this.tickCounter >= SAVE_STATE_INTERVAL_SECONDS) {
-            this.saveState();
-            this.tickCounter = 0;
-          }
+          this._processActiveTick();
         }
 
         // CROSS-WINDOW SYNC: Write sync state on every tick for secondary windows
         this._writeSyncState();
       }, 1000);
+    }
+
+    /**
+     * Check if this window has lost timer ownership to another window.
+     * @returns {boolean} True if a sync manager exists and this window is not the owner
+     * @private
+     */
+    _hasLostOwnership() {
+      const sync = window.zenPomodoroApp?.windowSync;
+      return sync && !sync.isTimerOwner;
+    }
+
+    /**
+     * Process a single active timer tick - decrement time, fire callbacks, check completion.
+     * @private
+     */
+    _processActiveTick() {
+      this.remainingTime--;
+
+      if (this.currentPhase === 'focus') {
+        this._trackFocusTime();
+      }
+
+      if (this.onTick) {
+        this.onTick(this.remainingTime, this.currentPhase, this.currentCycle, this.totalCycles);
+      }
+
+      this._checkTimerReminders();
+
+      if (this.remainingTime <= 0) {
+        this.handlePhaseComplete();
+      }
+
+      // PERFORMANCE FIX: Save state every 10 seconds instead of every second
+      this.tickCounter++;
+      if (this.tickCounter >= SAVE_STATE_INTERVAL_SECONDS) {
+        this.saveState();
+        this.tickCounter = 0;
+      }
     }
 
     /**
