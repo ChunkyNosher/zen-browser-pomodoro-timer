@@ -1,106 +1,73 @@
 /**
- * Main entry point for Zen Pomodoro Focus Blocker mod
- * 
- * This file demonstrates how to initialize and wire together the extracted modules.
- * The modules are organized as follows:
- * 
+ * Zen Pomodoro Focus Blocker Mod - Entry Point
+ *
+ * This is the main entry point that Rollup uses to bundle all modules into
+ * a single IIFE file (zen-pomodoro-focus-blocker.uc.js).
+ *
+ * Module load order:
  * 1. constants.js - No dependencies (pure data)
  * 2. state.js - No dependencies (simple shared state)
  * 3. log-manager.js - Depends on constants.js (Storage injected later)
- * 4. window-sync-manager.js - Depends on constants.js, log-manager.js (Storage injected later)
+ * 4. window-sync-manager.js - Depends on constants.js, log-manager.js
  * 5. storage.js - Depends on constants.js, log-manager.js
  * 6. utils.js - Depends on constants.js, log-manager.js, storage.js
- * 7. helpers.js - Legacy wrappers for Storage and Utils (backward compatibility)
+ * 7. helpers.js - Legacy wrappers for Storage and Utils
  * 8. ui-helpers.js - UI helper functions for dialog management
- * 9. break-phase-utils.js - Break phase detection utilities
- * 10. shared-blocker-utils.js - Shared utilities for blockers
- * 
+ * 9. break-phase-utils.js - Break phase detection
+ * 10. shared-blocker-utils.js - Shared blocker utilities
+ * 11-23. Class modules (Timer, Workspace, Overlay, etc.)
+ * 24. zen-pomodoro-app.js - Main application class
+ *
  * CIRCULAR DEPENDENCY RESOLUTION:
- * - LogManager needs Storage for cross-window log sync (getPref/setPref)
- * - Storage needs LogManager for logging configuration changes
- * - Solution: Dependency injection via setStorage() method after both are initialized
+ * - LogManager needs Storage for cross-window log sync
+ * - Storage needs LogManager for logging
+ * - Solution: Dependency injection via setStorage() after both are initialized
  */
 
-import Constants from './constants.js';
-import { lastDialogPosition, setLastDialogPosition } from './state.js';
-import { LogManager, logger } from './log-manager.js';
-import WindowSyncManager from './window-sync-manager.js';
+// Import all modules (Rollup will bundle them into the IIFE)
+import { logger } from './log-manager.js';
 import Storage from './storage.js';
-import Utils from './utils.js';
-
-// Import helper modules
-import * as Helpers from './helpers.js';
-import * as UIHelpers from './ui-helpers.js';
-import * as BreakPhaseUtils from './break-phase-utils.js';
-import * as SharedBlockerUtils from './shared-blocker-utils.js';
+import ZenPomodoroApp from './zen-pomodoro-app.js';
+import Constants from './constants.js';
 
 // ============================================
-// Initialization
+// Dependency Injection
 // ============================================
 
-/**
- * Initialize all modules with proper dependency injection.
- * This function should be called once when the mod loads.
- */
-function initModules() {
-  // Step 1: Inject Storage into logger to resolve circular dependency
-  logger.setStorage(Storage);
-  
-  // Step 2: Create and configure WindowSyncManager
-  const windowSync = new WindowSyncManager();
-  windowSync.setStorage(Storage);
-  
-  // Step 3: Set up cross-window log sync
-  logger.setWindowId(windowSync.windowId);
-  logger.initSync();
-  logger.requestExistingLogs();
-  
-  // Step 4: Initialize window sync manager
-  windowSync.init();
-  
-  // Log successful initialization
-  logger.log(Constants.LOG_CATEGORIES.INIT, 'Modules initialized', {
-    windowId: windowSync.windowId,
-    modVersion: Constants.MOD_VERSION,
-  });
-  
-  return {
-    logger,
-    windowSync,
-    Storage,
-    Utils,
-    Constants,
-  };
-}
+// Resolve circular dependency: LogManager needs Storage for cross-window log sync
+logger.setStorage(Storage);
 
 // ============================================
-// Exports
+// Initialize Application
 // ============================================
 
-// Export individual modules
-export { Constants, logger, Storage, Utils, WindowSyncManager };
+// Create and store the app instance for cleanup
+const app = new ZenPomodoroApp();
 
-// Export helper modules
-export { Helpers, UIHelpers, BreakPhaseUtils, SharedBlockerUtils };
+// TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
+// This ensures state is saved even on sudden browser/PC shutdown
+window.addEventListener(
+  'beforeunload',
+  () => {
+    if (app?.timer?.isActive) {
+      app.timer.saveState();
+      logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+    }
+    // CROSS-WINDOW SYNC: Release ownership so other windows can take over
+    if (app?.windowSync) {
+      app.windowSync.releaseOwnership();
+    }
+  }
+);
 
-// Export state management
-export { lastDialogPosition, setLastDialogPosition };
-
-// Export initialization function
-export { initModules };
-
-// Default export with all modules
-export default {
-  Constants,
-  logger,
-  Storage,
-  Utils,
-  WindowSyncManager,
-  Helpers,
-  UIHelpers,
-  BreakPhaseUtils,
-  SharedBlockerUtils,
-  lastDialogPosition,
-  setLastDialogPosition,
-  initModules,
-};
+// MEMORY LEAK FIX: Register shutdown handler to cleanup resources
+// This ensures SineModBlocker and other modules are properly destroyed
+window.addEventListener(
+  'unload',
+  () => {
+    if (app) {
+      app.destroy();
+    }
+  },
+  { once: true }
+);
