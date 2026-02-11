@@ -75,7 +75,7 @@ export function cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
   
   allBlocks.forEach(block => {
     block.classList.remove('dragging', 'drag-transition');
-    block.style.transform = '';
+    block.style.removeProperty('transform');
   });
 }
 

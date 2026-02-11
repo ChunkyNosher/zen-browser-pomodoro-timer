@@ -3350,7 +3350,7 @@
           this.onReminderSyncChanged(syncData);
         }
       } catch (e) {
-        /* ignore */
+        console.warn('Zen Pomodoro: Failed to parse reminder sync data', e);
       }
     }
 
@@ -13252,7 +13252,7 @@
     
     allBlocks.forEach(block => {
       block.classList.remove('dragging', 'drag-transition');
-      block.style.transform = '';
+      block.style.removeProperty('transform');
     });
   }
 

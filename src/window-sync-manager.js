@@ -406,7 +406,7 @@ class WindowSyncManager {
         this.onReminderSyncChanged(syncData);
       }
     } catch (e) {
-      /* ignore */
+      console.warn('Zen Pomodoro: Failed to parse reminder sync data', e);
     }
   }
 
