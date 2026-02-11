@@ -18,6 +18,9 @@
  * - Added context menu styles
  * - Added lock screen code display styles
  * 
+ * NEW IN 1.4.5:
+ * - No CSS changes (ES module architecture refactoring is JS-only)
+ *
  * NEW IN 1.4.4:
  * - No CSS changes (cross-window timer sync is JS-only)
  *
