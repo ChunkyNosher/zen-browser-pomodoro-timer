@@ -22,6 +22,7 @@ module.exports = {
     Notification: 'readonly',
     crypto: 'readonly',
     gBrowser: 'readonly',
+    Ci: 'readonly',
   },
   overrides: [
     {

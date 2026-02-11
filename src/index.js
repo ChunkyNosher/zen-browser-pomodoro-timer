@@ -44,6 +44,11 @@ logger.setStorage(Storage);
 // Create and store the app instance for cleanup
 const app = new ZenPomodoroApp();
 
+// Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
+if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
+  app.windowSync.setStorage(Storage);
+}
+
 // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
 // This ensures state is saved even on sudden browser/PC shutdown
 window.addEventListener(

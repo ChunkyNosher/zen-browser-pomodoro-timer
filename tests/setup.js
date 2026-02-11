@@ -74,6 +74,9 @@ globalThis.Components = {
   },
 };
 
+// Mock Ci (shorthand for Components.interfaces)
+globalThis.Ci = globalThis.Components.interfaces;
+
 // Mock gBrowser
 globalThis.gBrowser = {
   selectedBrowser: {

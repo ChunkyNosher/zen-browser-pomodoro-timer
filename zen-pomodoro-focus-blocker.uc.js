@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.4',
+    MOD_VERSION: '1.4.5',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -176,6 +176,7 @@
       simpleDuration: 25,
       focusDuration: 25,
       breakDuration: 5,
+      longBreakDuration: 15,
       cycles: 4,
       blockedWorkspaces: [],
       overlayColor: '#808080',
@@ -339,7 +340,8 @@
               this._addEntryFromSync(entry);
             }
           } catch (e) {
-            /* ignore parse errors from log sync */
+            // Log parse errors to console (cannot use logger to avoid recursion)
+            console.warn('[Zen Pomodoro] Log sync parse error:', e.message);
           }
         },
       };
@@ -381,7 +383,8 @@
         const broadcastEntry = { ...entry, _sourceWindowId: this.windowId };
         Services.obs.notifyObservers(null, Constants.LOG_BROADCAST_TOPIC, JSON.stringify(broadcastEntry));
       } catch (e) {
-        /* ignore broadcast errors - other windows may not be listening */
+        // Log to console only (cannot use logger to avoid recursion)
+        console.warn('[Zen Pomodoro] Log broadcast error:', e.message);
       }
     }
 
@@ -403,7 +406,7 @@
           this._storage.setPref(prefKey, '');
         }
       } catch (e) {
-        /* ignore errors during log request */
+        console.warn('[Zen Pomodoro] Log request error:', e.message);
       }
     }
 
@@ -450,7 +453,7 @@
         const prefKey = `shared-logs-${requesterId}`;
         this._storage.setPref(prefKey, JSON.stringify(this.logs));
       } catch (e) {
-        /* ignore errors during log response */
+        console.warn('[Zen Pomodoro] Log response error:', e.message);
       }
     }
 
@@ -462,7 +465,7 @@
         try {
           Services.obs.removeObserver(this._logObserver, Constants.LOG_BROADCAST_TOPIC);
         } catch (e) {
-          /* ignore */
+          console.warn('[Zen Pomodoro] Failed to remove log observer:', e.message);
         }
         this._logObserver = null;
       }
@@ -470,7 +473,7 @@
         try {
           Services.obs.removeObserver(this._logRequestObserver, Constants.LOG_REQUEST_TOPIC);
         } catch (e) {
-          /* ignore */
+          console.warn('[Zen Pomodoro] Failed to remove log request observer:', e.message);
         }
         this._logRequestObserver = null;
       }
@@ -507,7 +510,7 @@
 
       // Also output to console for real-time debugging
       const dataStr = entry.data ? ` | Data: ${JSON.stringify(entry.data)}` : '';
-      console.log(`[Zen Pomodoro][${category}] ${message}${dataStr}`);
+      console.log(`[Zen Pomodoro][${entry.category}] ${entry.message}${dataStr}`);
     }
 
     /**
@@ -2204,16 +2207,18 @@
 
       // Notify phase change callback if registered
       if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.remainingTime);
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
     }
 
     /**
      * Pause the timer
+     * @param {boolean} [isOnBlockedWorkspace=false] - Whether paused while on a blocked workspace
      */
-    pause() {
+    pause(isOnBlockedWorkspace = false) {
       if (!this.isActive || this.isPaused) return;
       this.isPaused = true;
+      this.pausedOnBlockedWorkspace = isOnBlockedWorkspace;
       this.stopInterval();
       logger.log(LOG_CATEGORIES$3.TIMER, 'Timer paused', {
         remainingTime: this.remainingTime,
@@ -2251,11 +2256,13 @@
       // Clear saved state
       this.clearState();
 
-      // CROSS-WINDOW SYNC: Release ownership and clear sync state
+      // CROSS-WINDOW SYNC: Clear sync state then release ownership
       const sync = window.zenPomodoroApp?.windowSync;
       if (sync) {
-        sync.releaseOwnership();
+        // Write final inactive state so other windows see the stop
         this._writeSyncState();
+        sync.clearSyncState();
+        sync.releaseOwnership();
       }
 
       // Notify completion callback if registered
@@ -2291,7 +2298,7 @@
 
       // Notify phase change callback if registered
       if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.remainingTime);
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
 
       // Log the skip action with clear before/after info
@@ -2431,7 +2438,12 @@
 
         // Call tick callback if registered
         if (this.onTick) {
-          this.onTick(this.remainingTime);
+          this.onTick(
+            this.remainingTime,
+            this.currentPhase,
+            this.currentCycle,
+            this.totalCycles
+          );
         }
 
         // Save state every N seconds to reduce I/O overhead
@@ -2475,7 +2487,7 @@
 
       // Notify phase change callback if registered
       if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.remainingTime);
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
 
       this.saveState();
@@ -2560,7 +2572,7 @@
 
       // Notify phase change callback if registered
       if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.remainingTime);
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
       }
 
       this.saveState();
@@ -2625,7 +2637,7 @@
       if (!sync) return;
 
       // Only write if we own the timer
-      if (!sync.ownsTimer) return;
+      if (!sync.isTimerOwner) return;
 
       const state = {
         isActive: this.isActive,
@@ -2643,7 +2655,7 @@
         timestamp: Date.now(),
       };
 
-      sync.writeState(state);
+      sync.writeSyncState(state);
     }
 
     /**
@@ -2859,6 +2871,72 @@
     updateConfig(newConfig) {
       this.config = newConfig;
       logger.log(LOG_CATEGORIES$3.TIMER, 'Timer config updated');
+    }
+
+    /**
+     * Sync timer state from cross-window sync data (for secondary windows).
+     * Updates all timer properties to match the owner window's state.
+     * @param {Object} syncState - Timer state from owner window
+     */
+    syncFromState(syncState) {
+      this.isActive = syncState.isActive;
+      this.isPaused = syncState.isPaused || false;
+      this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace || false;
+      this.remainingTime = syncState.remainingTime;
+      this.currentPhase = syncState.currentPhase;
+      this.currentCycle = syncState.currentCycle;
+      this.totalCycles = syncState.totalCycles;
+      this.mode = syncState.mode;
+      this.savedConfig = syncState.savedConfig;
+      this.customCycle = syncState.customCycle;
+      this.customCycleBlocks = syncState.customCycleBlocks;
+      this.currentBlockIndex = syncState.currentBlockIndex || 0;
+    }
+
+    /**
+     * Get current timer status object.
+     * Used by UI components to display timer state.
+     * @returns {Object} Timer status with currentPhase, remainingTime, currentCycle, totalCycles
+     */
+    getStatus() {
+      return {
+        currentPhase: this.currentPhase,
+        remainingTime: this.remainingTime,
+        currentCycle: this.currentCycle,
+        totalCycles: this.totalCycles,
+        isActive: this.isActive,
+        isPaused: this.isPaused,
+        mode: this.mode,
+      };
+    }
+
+    /**
+     * Start focus phase from transition (when transition popup is closed).
+     * Used by custom cycles and regular pomodoro mode when transitioning from break → focus.
+     */
+    startFocusFromTransition() {
+      if (this.mode === 'custom') {
+        // In custom mode, advance to the next block
+        this.currentBlockIndex++;
+        if (this.currentBlockIndex >= this.customCycleBlocks.length) {
+          logger.log(LOG_CATEGORIES$3.TIMER, 'Custom cycle completed after transition');
+          this.stop();
+          return;
+        }
+        const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
+        this._startCustomBlock(nextBlock);
+      } else {
+        // In pomodoro mode, start the next focus phase
+        this.startFocusPhase();
+      }
+
+      // Notify phase change callback if registered
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.currentCycle);
+      }
+
+      this.saveState();
+      this._writeSyncState();
     }
   }
 
@@ -3218,15 +3296,18 @@
 
   /**
    * Get combined blocked workspaces from all active rulesets (including global blockedWorkspaces for backwards compatibility).
+   * Only includes rulesets that are both enabled AND listed in config.activeRulesets.
    * @returns {string[]} Array of blocked workspace IDs
    */
   function getActiveBlockedWorkspaces() {
     const config = Storage.loadConfig();
     const blocked = new Set([...config.blockedWorkspaces]); // Start with global blocked list
+    const activeRulesetIds = new Set(config.activeRulesets || []);
 
-    // Add blocked workspaces from all active rulesets
+    // Add blocked workspaces from rulesets that are both enabled and active
     (config.rulesets || []).forEach((ruleset) => {
-      if (ruleset.enabled && ruleset.blockedWorkspaces && Array.isArray(ruleset.blockedWorkspaces)) {
+      if (ruleset.enabled && activeRulesetIds.has(ruleset.id) &&
+          ruleset.blockedWorkspaces && Array.isArray(ruleset.blockedWorkspaces)) {
         ruleset.blockedWorkspaces.forEach((wsId) => blocked.add(wsId));
       }
     });
@@ -3240,7 +3321,6 @@
       this.config = getConfig$1();
       this.onWorkspaceChange = null;
       this.workspaceObserver = null; // Store observer for cleanup
-      this.validatedWorkspaces = null; // Cache validated workspace list
       this.needsValidation = true; // Flag to track if validation is needed
       this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
     }
@@ -3314,8 +3394,6 @@
         saveConfig(this.config);
       }
 
-      // Cache the combined blocked workspaces from active rulesets
-      this.validatedWorkspaces = getActiveBlockedWorkspaces();
       this.needsValidation = false;
     }
 
@@ -8311,8 +8389,8 @@
     try {
       return {
         QueryInterface: ChromeUtils.generateQI([
-          'nsIWebProgressListener',
-          'nsISupportsWeakReference',
+          Ci.nsIWebProgressListener,
+          Ci.nsISupportsWeakReference,
         ]),
 
         // eslint-disable-next-line no-unused-vars
@@ -8558,7 +8636,6 @@
    * @param {number} options.waitTime - Total wait time in seconds
    * @param {HTMLElement} options.timerElement - Element to display countdown
    * @param {Function} options.onComplete - Callback when hold completes
-   * @param {Function} options.getIntervalId - Function to get current interval ID
    * @param {Function} options.setIntervalId - Function to set interval ID
    * @param {Function} options.clearInterval - Function to clear interval
    * @param {string} [options.logCategory] - Log category for logging (default: SECURITY)
@@ -15969,6 +16046,11 @@
 
   // Create and store the app instance for cleanup
   const app = new ZenPomodoroApp();
+
+  // Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
+  if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
+    app.windowSync.setStorage(Storage);
+  }
 
   // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
   // This ensures state is saved even on sudden browser/PC shutdown

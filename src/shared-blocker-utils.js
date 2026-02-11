@@ -23,8 +23,8 @@ export function createProgressListener(checkCallback, delayMs) {
   try {
     return {
       QueryInterface: ChromeUtils.generateQI([
-        'nsIWebProgressListener',
-        'nsISupportsWeakReference',
+        Ci.nsIWebProgressListener,
+        Ci.nsISupportsWeakReference,
       ]),
 
       // eslint-disable-next-line no-unused-vars
@@ -270,7 +270,6 @@ export function createBlockerButtons(buttonsId, onGoBack, onStopTimer) {
  * @param {number} options.waitTime - Total wait time in seconds
  * @param {HTMLElement} options.timerElement - Element to display countdown
  * @param {Function} options.onComplete - Callback when hold completes
- * @param {Function} options.getIntervalId - Function to get current interval ID
  * @param {Function} options.setIntervalId - Function to set interval ID
  * @param {Function} options.clearInterval - Function to clear interval
  * @param {string} [options.logCategory] - Log category for logging (default: SECURITY)

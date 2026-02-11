@@ -171,16 +171,18 @@ class PomodoroTimer {
 
     // Notify phase change callback if registered
     if (this.onPhaseChange) {
-      this.onPhaseChange(this.currentPhase, this.remainingTime);
+      this.onPhaseChange(this.currentPhase, this.currentCycle);
     }
   }
 
   /**
    * Pause the timer
+   * @param {boolean} [isOnBlockedWorkspace=false] - Whether paused while on a blocked workspace
    */
-  pause() {
+  pause(isOnBlockedWorkspace = false) {
     if (!this.isActive || this.isPaused) return;
     this.isPaused = true;
+    this.pausedOnBlockedWorkspace = isOnBlockedWorkspace;
     this.stopInterval();
     logger.log(LOG_CATEGORIES.TIMER, 'Timer paused', {
       remainingTime: this.remainingTime,
@@ -218,11 +220,13 @@ class PomodoroTimer {
     // Clear saved state
     this.clearState();
 
-    // CROSS-WINDOW SYNC: Release ownership and clear sync state
+    // CROSS-WINDOW SYNC: Clear sync state then release ownership
     const sync = window.zenPomodoroApp?.windowSync;
     if (sync) {
-      sync.releaseOwnership();
+      // Write final inactive state so other windows see the stop
       this._writeSyncState();
+      sync.clearSyncState();
+      sync.releaseOwnership();
     }
 
     // Notify completion callback if registered
@@ -258,7 +262,7 @@ class PomodoroTimer {
 
     // Notify phase change callback if registered
     if (this.onPhaseChange) {
-      this.onPhaseChange(this.currentPhase, this.remainingTime);
+      this.onPhaseChange(this.currentPhase, this.currentCycle);
     }
 
     // Log the skip action with clear before/after info
@@ -398,7 +402,12 @@ class PomodoroTimer {
 
       // Call tick callback if registered
       if (this.onTick) {
-        this.onTick(this.remainingTime);
+        this.onTick(
+          this.remainingTime,
+          this.currentPhase,
+          this.currentCycle,
+          this.totalCycles
+        );
       }
 
       // Save state every N seconds to reduce I/O overhead
@@ -442,7 +451,7 @@ class PomodoroTimer {
 
     // Notify phase change callback if registered
     if (this.onPhaseChange) {
-      this.onPhaseChange(this.currentPhase, this.remainingTime);
+      this.onPhaseChange(this.currentPhase, this.currentCycle);
     }
 
     this.saveState();
@@ -527,7 +536,7 @@ class PomodoroTimer {
 
     // Notify phase change callback if registered
     if (this.onPhaseChange) {
-      this.onPhaseChange(this.currentPhase, this.remainingTime);
+      this.onPhaseChange(this.currentPhase, this.currentCycle);
     }
 
     this.saveState();
@@ -592,7 +601,7 @@ class PomodoroTimer {
     if (!sync) return;
 
     // Only write if we own the timer
-    if (!sync.ownsTimer) return;
+    if (!sync.isTimerOwner) return;
 
     const state = {
       isActive: this.isActive,
@@ -610,7 +619,7 @@ class PomodoroTimer {
       timestamp: Date.now(),
     };
 
-    sync.writeState(state);
+    sync.writeSyncState(state);
   }
 
   /**
@@ -826,6 +835,72 @@ class PomodoroTimer {
   updateConfig(newConfig) {
     this.config = newConfig;
     logger.log(LOG_CATEGORIES.TIMER, 'Timer config updated');
+  }
+
+  /**
+   * Sync timer state from cross-window sync data (for secondary windows).
+   * Updates all timer properties to match the owner window's state.
+   * @param {Object} syncState - Timer state from owner window
+   */
+  syncFromState(syncState) {
+    this.isActive = syncState.isActive;
+    this.isPaused = syncState.isPaused || false;
+    this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace || false;
+    this.remainingTime = syncState.remainingTime;
+    this.currentPhase = syncState.currentPhase;
+    this.currentCycle = syncState.currentCycle;
+    this.totalCycles = syncState.totalCycles;
+    this.mode = syncState.mode;
+    this.savedConfig = syncState.savedConfig;
+    this.customCycle = syncState.customCycle;
+    this.customCycleBlocks = syncState.customCycleBlocks;
+    this.currentBlockIndex = syncState.currentBlockIndex || 0;
+  }
+
+  /**
+   * Get current timer status object.
+   * Used by UI components to display timer state.
+   * @returns {Object} Timer status with currentPhase, remainingTime, currentCycle, totalCycles
+   */
+  getStatus() {
+    return {
+      currentPhase: this.currentPhase,
+      remainingTime: this.remainingTime,
+      currentCycle: this.currentCycle,
+      totalCycles: this.totalCycles,
+      isActive: this.isActive,
+      isPaused: this.isPaused,
+      mode: this.mode,
+    };
+  }
+
+  /**
+   * Start focus phase from transition (when transition popup is closed).
+   * Used by custom cycles and regular pomodoro mode when transitioning from break → focus.
+   */
+  startFocusFromTransition() {
+    if (this.mode === 'custom') {
+      // In custom mode, advance to the next block
+      this.currentBlockIndex++;
+      if (this.currentBlockIndex >= this.customCycleBlocks.length) {
+        logger.log(LOG_CATEGORIES.TIMER, 'Custom cycle completed after transition');
+        this.stop();
+        return;
+      }
+      const nextBlock = this.customCycleBlocks[this.currentBlockIndex];
+      this._startCustomBlock(nextBlock);
+    } else {
+      // In pomodoro mode, start the next focus phase
+      this.startFocusPhase();
+    }
+
+    // Notify phase change callback if registered
+    if (this.onPhaseChange) {
+      this.onPhaseChange(this.currentPhase, this.currentCycle);
+    }
+
+    this.saveState();
+    this._writeSyncState();
   }
 }
 

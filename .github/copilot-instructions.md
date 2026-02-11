@@ -137,7 +137,7 @@ Test files:
 
 ### Module Dependency Graph
 
-```
+```text
 constants.js (no dependencies)
     ↓
     ├─→ state.js (no dependencies)
@@ -1174,7 +1174,7 @@ Custom cycles allow users to create personalized timer sequences with any combin
 
 **Example Memory Usage:**
 
-```
+```javascript
 store_memory(
   subject: "time sorting",
   fact: "Always use numeric comparator when sorting HH:MM time strings, not lexicographic sort",

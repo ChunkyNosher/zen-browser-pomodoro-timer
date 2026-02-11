@@ -50,7 +50,8 @@ class LogManager {
             this._addEntryFromSync(entry);
           }
         } catch (e) {
-          /* ignore parse errors from log sync */
+          // Log parse errors to console (cannot use logger to avoid recursion)
+          console.warn('[Zen Pomodoro] Log sync parse error:', e.message);
         }
       },
     };
@@ -92,7 +93,8 @@ class LogManager {
       const broadcastEntry = { ...entry, _sourceWindowId: this.windowId };
       Services.obs.notifyObservers(null, Constants.LOG_BROADCAST_TOPIC, JSON.stringify(broadcastEntry));
     } catch (e) {
-      /* ignore broadcast errors - other windows may not be listening */
+      // Log to console only (cannot use logger to avoid recursion)
+      console.warn('[Zen Pomodoro] Log broadcast error:', e.message);
     }
   }
 
@@ -114,7 +116,7 @@ class LogManager {
         this._storage.setPref(prefKey, '');
       }
     } catch (e) {
-      /* ignore errors during log request */
+      console.warn('[Zen Pomodoro] Log request error:', e.message);
     }
   }
 
@@ -161,7 +163,7 @@ class LogManager {
       const prefKey = `shared-logs-${requesterId}`;
       this._storage.setPref(prefKey, JSON.stringify(this.logs));
     } catch (e) {
-      /* ignore errors during log response */
+      console.warn('[Zen Pomodoro] Log response error:', e.message);
     }
   }
 
@@ -173,7 +175,7 @@ class LogManager {
       try {
         Services.obs.removeObserver(this._logObserver, Constants.LOG_BROADCAST_TOPIC);
       } catch (e) {
-        /* ignore */
+        console.warn('[Zen Pomodoro] Failed to remove log observer:', e.message);
       }
       this._logObserver = null;
     }
@@ -181,7 +183,7 @@ class LogManager {
       try {
         Services.obs.removeObserver(this._logRequestObserver, Constants.LOG_REQUEST_TOPIC);
       } catch (e) {
-        /* ignore */
+        console.warn('[Zen Pomodoro] Failed to remove log request observer:', e.message);
       }
       this._logRequestObserver = null;
     }
@@ -218,7 +220,7 @@ class LogManager {
 
     // Also output to console for real-time debugging
     const dataStr = entry.data ? ` | Data: ${JSON.stringify(entry.data)}` : '';
-    console.log(`[Zen Pomodoro][${category}] ${message}${dataStr}`);
+    console.log(`[Zen Pomodoro][${entry.category}] ${entry.message}${dataStr}`);
   }
 
   /**

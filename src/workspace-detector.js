@@ -16,15 +16,18 @@ const saveConfig = (config) => Storage.saveConfig(config);
 
 /**
  * Get combined blocked workspaces from all active rulesets (including global blockedWorkspaces for backwards compatibility).
+ * Only includes rulesets that are both enabled AND listed in config.activeRulesets.
  * @returns {string[]} Array of blocked workspace IDs
  */
 function getActiveBlockedWorkspaces() {
   const config = Storage.loadConfig();
   const blocked = new Set([...config.blockedWorkspaces]); // Start with global blocked list
+  const activeRulesetIds = new Set(config.activeRulesets || []);
 
-  // Add blocked workspaces from all active rulesets
+  // Add blocked workspaces from rulesets that are both enabled and active
   (config.rulesets || []).forEach((ruleset) => {
-    if (ruleset.enabled && ruleset.blockedWorkspaces && Array.isArray(ruleset.blockedWorkspaces)) {
+    if (ruleset.enabled && activeRulesetIds.has(ruleset.id) &&
+        ruleset.blockedWorkspaces && Array.isArray(ruleset.blockedWorkspaces)) {
       ruleset.blockedWorkspaces.forEach((wsId) => blocked.add(wsId));
     }
   });
@@ -38,7 +41,6 @@ class WorkspaceDetector {
     this.config = getConfig();
     this.onWorkspaceChange = null;
     this.workspaceObserver = null; // Store observer for cleanup
-    this.validatedWorkspaces = null; // Cache validated workspace list
     this.needsValidation = true; // Flag to track if validation is needed
     this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
   }
@@ -112,8 +114,6 @@ class WorkspaceDetector {
       saveConfig(this.config);
     }
 
-    // Cache the combined blocked workspaces from active rulesets
-    this.validatedWorkspaces = getActiveBlockedWorkspaces();
     this.needsValidation = false;
   }
 

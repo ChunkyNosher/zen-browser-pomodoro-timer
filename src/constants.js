@@ -4,7 +4,7 @@
  */
 const Constants = {
   PREF_PREFIX: 'zen-pomodoro',
-  MOD_VERSION: '1.4.4',
+  MOD_VERSION: '1.4.5',
 
   /** Modifier keys used by the keyboard shortcut recorder */
   MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -135,6 +135,7 @@ const Constants = {
     simpleDuration: 25,
     focusDuration: 25,
     breakDuration: 5,
+    longBreakDuration: 15,
     cycles: 4,
     blockedWorkspaces: [],
     overlayColor: '#808080',

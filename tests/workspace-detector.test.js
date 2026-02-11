@@ -100,10 +100,6 @@ describe('WorkspaceDetector', () => {
       expect(detector.workspaceObserver).toBeNull();
     });
 
-    it('should initialize validatedWorkspaces to null', () => {
-      expect(detector.validatedWorkspaces).toBeNull();
-    });
-
     it('should initialize mutationDebounceTimer to null', () => {
       expect(detector.mutationDebounceTimer).toBeNull();
     });
@@ -249,7 +245,7 @@ describe('WorkspaceDetector', () => {
 
       detector.validateBlockedWorkspaces();
 
-      expect(detector.validatedWorkspaces).toEqual(['ws1', 'ws2']);
+      expect(detector.needsValidation).toBe(false);
     });
 
     it('should handle rulesets without blockedWorkspaces property', () => {
@@ -314,8 +310,14 @@ describe('WorkspaceDetector', () => {
       vi.spyOn(detector, 'getActiveWorkspace').mockReturnValue('ws2');
       detector.config.blockedWorkspaces = [];
       detector.config.rulesets = [
-        { enabled: true, blockedWorkspaces: ['ws2'] },
+        { id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] },
       ];
+      // getActiveBlockedWorkspaces reads from Storage.loadConfig
+      Storage.loadConfig.mockReturnValue({
+        blockedWorkspaces: [],
+        rulesets: [{ id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] }],
+        activeRulesets: ['r1'],
+      });
 
       const result = detector.isCurrentWorkspaceBlocked();
 
@@ -374,8 +376,13 @@ describe('WorkspaceDetector', () => {
     it('should include rulesets in check', () => {
       detector.config.blockedWorkspaces = [];
       detector.config.rulesets = [
-        { enabled: true, blockedWorkspaces: ['ws2'] },
+        { id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] },
       ];
+      Storage.loadConfig.mockReturnValue({
+        blockedWorkspaces: [],
+        rulesets: [{ id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] }],
+        activeRulesets: ['r1'],
+      });
 
       const result = detector.isWorkspaceIdBlocked('ws2');
 
@@ -398,9 +405,17 @@ describe('WorkspaceDetector', () => {
     it('should only check enabled rulesets', () => {
       detector.config.blockedWorkspaces = [];
       detector.config.rulesets = [
-        { enabled: false, blockedWorkspaces: ['ws1'] },
-        { enabled: true, blockedWorkspaces: ['ws2'] },
+        { id: 'r1', enabled: false, blockedWorkspaces: ['ws1'] },
+        { id: 'r2', enabled: true, blockedWorkspaces: ['ws2'] },
       ];
+      Storage.loadConfig.mockReturnValue({
+        blockedWorkspaces: [],
+        rulesets: [
+          { id: 'r1', enabled: false, blockedWorkspaces: ['ws1'] },
+          { id: 'r2', enabled: true, blockedWorkspaces: ['ws2'] },
+        ],
+        activeRulesets: ['r1', 'r2'],
+      });
 
       expect(detector.isWorkspaceIdBlocked('ws1')).toBe(false);
       expect(detector.isWorkspaceIdBlocked('ws2')).toBe(true);
