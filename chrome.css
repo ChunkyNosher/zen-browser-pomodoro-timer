@@ -2195,14 +2195,7 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-cycle-block.dragging {
-  height: 0 !important;
-  min-height: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  margin: 0 !important;
-  border-width: 0 !important;
-  overflow: hidden;
-  opacity: 0;
+  opacity: 0.3;
   pointer-events: none;
 }
 
@@ -2220,12 +2213,11 @@ select.zen-pomodoro-dialog-input option:checked {
 
 /* Drop indicator line - shows where blocks will be inserted */
 .zen-pomodoro-cycle-drop-indicator {
-  position: relative;
   z-index: 5;
   height: 3px;
   background: #4a9eff;
   border-radius: 2px;
-  margin: 2px 0;
+  margin: 0;
   box-shadow: 0 0 8px rgb(74 158 255 / 50%);
   pointer-events: none;
   animation: drop-indicator-pulse 1.5s ease-in-out infinite;

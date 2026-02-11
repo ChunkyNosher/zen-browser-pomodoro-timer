@@ -75,6 +75,7 @@ export function cleanupDragVisuals(allBlocks, dropIndicator, ghostBlocks) {
   
   allBlocks.forEach(block => {
     block.classList.remove('dragging', 'drag-transition');
+    block.style.transform = '';
   });
 }
 
@@ -218,4 +219,87 @@ export function positionDropIndicator(container, dropIndicator, nonDraggedBlocks
     return newRef;
   }
   return lastIndicatorRef;
+}
+
+/**
+ * Calculate CSS translateY transforms for all blocks during a drag operation.
+ * Creates a smooth visual reorder by moving blocks to their target visual positions.
+ * @param {Array<number>} dragIndices - Sorted indices of blocks being dragged
+ * @param {number} relativeTarget - Target index among non-dragged blocks
+ * @param {Array<number>} blockHeights - Array of heights (including gaps) for each block
+ * @returns {Array<number>} Array of translateY pixel values for each block
+ */
+export function calculateBlockTransforms(dragIndices, relativeTarget, blockHeights) {
+  const totalBlocks = blockHeights.length;
+  const transforms = new Array(totalBlocks).fill(0);
+
+  // Build non-dragged indices in original order
+  const nonDraggedIndices = [];
+  for (let i = 0; i < totalBlocks; i++) {
+    if (!dragIndices.includes(i)) {
+      nonDraggedIndices.push(i);
+    }
+  }
+
+  // Clamp target
+  const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+  // Build visual order: non-dragged before target, then dragged, then non-dragged after target
+  const visualOrder = [
+    ...nonDraggedIndices.slice(0, clampedTarget),
+    ...dragIndices,
+    ...nonDraggedIndices.slice(clampedTarget),
+  ];
+
+  // Calculate DOM tops (cumulative heights in DOM order: 0, 1, 2, ...)
+  const domTops = new Array(totalBlocks);
+  let cumTop = 0;
+  for (let i = 0; i < totalBlocks; i++) {
+    domTops[i] = cumTop;
+    cumTop += blockHeights[i];
+  }
+
+  // Calculate visual tops (cumulative heights in visual order)
+  const visualTops = {};
+  let visCumTop = 0;
+  for (const idx of visualOrder) {
+    visualTops[idx] = visCumTop;
+    visCumTop += blockHeights[idx];
+  }
+
+  // Transform = desired visual position - actual DOM position
+  for (let i = 0; i < totalBlocks; i++) {
+    transforms[i] = visualTops[i] - domTops[i];
+  }
+
+  return transforms;
+}
+
+/**
+ * Calculate the absolute Y position for the drop indicator within the container.
+ * The indicator should appear at the gap boundary (top edge of where dragged blocks will land).
+ * @param {Array<number>} dragIndices - Sorted indices of dragged blocks
+ * @param {number} relativeTarget - Target index among non-dragged blocks
+ * @param {Array<number>} blockHeights - Heights of all blocks
+ * @returns {number} Y offset in pixels from container top for the indicator
+ */
+export function calculateDropIndicatorOffset(dragIndices, relativeTarget, blockHeights) {
+  const totalBlocks = blockHeights.length;
+  const nonDraggedIndices = [];
+  for (let i = 0; i < totalBlocks; i++) {
+    if (!dragIndices.includes(i)) {
+      nonDraggedIndices.push(i);
+    }
+  }
+
+  const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+  // Sum up heights of all blocks that appear BEFORE the gap in visual order
+  const beforeGap = nonDraggedIndices.slice(0, clampedTarget);
+  let offset = 0;
+  for (const idx of beforeGap) {
+    offset += blockHeights[idx];
+  }
+
+  return offset;
 }

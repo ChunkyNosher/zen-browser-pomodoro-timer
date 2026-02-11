@@ -13252,6 +13252,7 @@
     
     allBlocks.forEach(block => {
       block.classList.remove('dragging', 'drag-transition');
+      block.style.transform = '';
     });
   }
 
@@ -13328,30 +13329,6 @@
   }
 
   /**
-   * Calculate the drop target index based on pointer Y position.
-   * Returns the index among non-dragged blocks where the drop should occur.
-   * @param {HTMLElement} container - The blocks container
-   * @param {number} clientY - Pointer Y position
-   * @param {Array<number>} dragIndices - Indices of blocks being dragged
-   * @returns {number} Target insertion index among non-dragged blocks
-   */
-  function getDropTargetIndex(container, clientY, dragIndices) {
-    const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
-    const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-
-    // Find the position among non-dragged blocks
-    for (let i = 0; i < nonDraggedBlocks.length; i++) {
-      const rect = nonDraggedBlocks[i].getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      if (clientY < midY) {
-        return i;
-      }
-    }
-    
-    return nonDraggedBlocks.length; // After all blocks
-  }
-
-  /**
    * Convert a relative drop target index (among non-dragged blocks) to an absolute
    * index in the full blocks array.
    * @param {number} relativeTarget - Target index among non-dragged blocks
@@ -13369,6 +13346,89 @@
     return relativeTarget >= nonDraggedIndices.length
       ? blocksLength
       : nonDraggedIndices[relativeTarget];
+  }
+
+  /**
+   * Calculate CSS translateY transforms for all blocks during a drag operation.
+   * Creates a smooth visual reorder by moving blocks to their target visual positions.
+   * @param {Array<number>} dragIndices - Sorted indices of blocks being dragged
+   * @param {number} relativeTarget - Target index among non-dragged blocks
+   * @param {Array<number>} blockHeights - Array of heights (including gaps) for each block
+   * @returns {Array<number>} Array of translateY pixel values for each block
+   */
+  function calculateBlockTransforms(dragIndices, relativeTarget, blockHeights) {
+    const totalBlocks = blockHeights.length;
+    const transforms = new Array(totalBlocks).fill(0);
+
+    // Build non-dragged indices in original order
+    const nonDraggedIndices = [];
+    for (let i = 0; i < totalBlocks; i++) {
+      if (!dragIndices.includes(i)) {
+        nonDraggedIndices.push(i);
+      }
+    }
+
+    // Clamp target
+    const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+    // Build visual order: non-dragged before target, then dragged, then non-dragged after target
+    const visualOrder = [
+      ...nonDraggedIndices.slice(0, clampedTarget),
+      ...dragIndices,
+      ...nonDraggedIndices.slice(clampedTarget),
+    ];
+
+    // Calculate DOM tops (cumulative heights in DOM order: 0, 1, 2, ...)
+    const domTops = new Array(totalBlocks);
+    let cumTop = 0;
+    for (let i = 0; i < totalBlocks; i++) {
+      domTops[i] = cumTop;
+      cumTop += blockHeights[i];
+    }
+
+    // Calculate visual tops (cumulative heights in visual order)
+    const visualTops = {};
+    let visCumTop = 0;
+    for (const idx of visualOrder) {
+      visualTops[idx] = visCumTop;
+      visCumTop += blockHeights[idx];
+    }
+
+    // Transform = desired visual position - actual DOM position
+    for (let i = 0; i < totalBlocks; i++) {
+      transforms[i] = visualTops[i] - domTops[i];
+    }
+
+    return transforms;
+  }
+
+  /**
+   * Calculate the absolute Y position for the drop indicator within the container.
+   * The indicator should appear at the gap boundary (top edge of where dragged blocks will land).
+   * @param {Array<number>} dragIndices - Sorted indices of dragged blocks
+   * @param {number} relativeTarget - Target index among non-dragged blocks
+   * @param {Array<number>} blockHeights - Heights of all blocks
+   * @returns {number} Y offset in pixels from container top for the indicator
+   */
+  function calculateDropIndicatorOffset(dragIndices, relativeTarget, blockHeights) {
+    const totalBlocks = blockHeights.length;
+    const nonDraggedIndices = [];
+    for (let i = 0; i < totalBlocks; i++) {
+      if (!dragIndices.includes(i)) {
+        nonDraggedIndices.push(i);
+      }
+    }
+
+    const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+    // Sum up heights of all blocks that appear BEFORE the gap in visual order
+    const beforeGap = nonDraggedIndices.slice(0, clampedTarget);
+    let offset = 0;
+    for (const idx of beforeGap) {
+      offset += blockHeights[idx];
+    }
+
+    return offset;
   }
 
   // ============================================
@@ -14398,23 +14458,29 @@
      * @private
      */
     _setupDragVisuals(container, allBlocks, dragIndices) {
-      // Mark all dragged blocks
+      // Mark all dragged blocks (now shows at reduced opacity, keeps height)
       dragIndices.forEach(idx => {
         if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
       });
 
-      // Add transition class to non-dragged blocks for smooth shifting
-      allBlocks.forEach((block, idx) => {
-        if (!dragIndices.includes(idx)) {
-          block.classList.add('drag-transition');
-        }
+      // Add transition class to ALL blocks for smooth transform animation
+      allBlocks.forEach(block => {
+        block.classList.add('drag-transition');
       });
 
-      // Create drop indicator
+      // Create drop indicator - positioned absolutely within container
       const dropIndicator = document.createElement('div');
       dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
       dropIndicator.style.display = 'none';
+      dropIndicator.style.position = 'absolute';
+      dropIndicator.style.left = '0';
+      dropIndicator.style.right = '0';
       container.appendChild(dropIndicator);
+
+      // Ensure container has position: relative for absolute indicator positioning
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
 
       // Create ghost blocks for duplication mode
       let ghostBlocks = [];
@@ -14442,10 +14508,12 @@
      * @param {Array<number>} dragIndices - Indices being dragged
      * @param {HTMLElement} dropIndicator - Drop indicator element
      * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @param {Array<number>} blockHeightsWithGap - Block heights including gaps
+     * @param {Array<number>} cachedNonDraggedMidpoints - Midpoints of non-dragged blocks
      * @returns {Object} Object with onPointerMove handler, state refs, and updateDropTarget function
      * @private
      */
-    _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks) {
+    _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints) {
       let lastTargetIndex = -1;
       let rafId = null;
       let lastPointerY;
@@ -14457,17 +14525,38 @@
 
       // Shared function to update drop target position based on pointer Y
       const updateDropTarget = (clientY) => {
-        const targetIndex = getDropTargetIndex(container, clientY, dragIndices);
-        
+        // Calculate container-relative Y position
+        const containerRect = container.getBoundingClientRect();
+        const containerRelativeY = clientY - containerRect.top + container.scrollTop;
+
+        // Find target index using cached midpoints (unaffected by transforms)
+        let targetIndex = cachedNonDraggedMidpoints.length; // default: after all
+        for (let i = 0; i < cachedNonDraggedMidpoints.length; i++) {
+          if (containerRelativeY < cachedNonDraggedMidpoints[i]) {
+            targetIndex = i;
+            break;
+          }
+        }
+
         if (targetIndex === lastTargetIndex) return;
         lastTargetIndex = targetIndex;
 
-        const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-        
         if (targetIndex < 0) return;
 
-        this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+        // Calculate CSS transforms for all blocks
+        const transforms = calculateBlockTransforms(dragIndices, targetIndex, blockHeightsWithGap);
+        
+        // Apply transforms to all blocks
+        allBlocks.forEach((block, idx) => {
+          block.style.transform = transforms[idx] !== 0 ? `translateY(${transforms[idx]}px)` : '';
+        });
 
+        // Position drop indicator at the gap boundary
+        const indicatorOffset = calculateDropIndicatorOffset(dragIndices, targetIndex, blockHeightsWithGap);
+        dropIndicator.style.display = 'block';
+        dropIndicator.style.top = `${indicatorOffset}px`;
+
+        // Show ghost blocks for duplication mode
         if (this.isDuplicating && ghostBlocks.length > 0) {
           showGhostBlocks(container, dropIndicator, ghostBlocks);
         }
@@ -14578,6 +14667,26 @@
 
       // Capture dimensions BEFORE adding dragging class
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+      
+      // Cache block layout info for transform-based drag (unaffected by CSS transforms)
+      const cachedBlockInfo = allBlocks.map(block => ({
+        top: block.offsetTop,
+        height: block.offsetHeight,
+      }));
+      // Calculate total height per block including gap (use margin between blocks)
+      const blockHeights = cachedBlockInfo.map(info => info.height);
+      // Account for gap between blocks (CSS gap on container)
+      const containerGap = parseFloat(getComputedStyle(container).gap) || 0;
+      const blockHeightsWithGap = blockHeights.map((h, i) => h + (i < blockHeights.length - 1 ? containerGap : 0));
+
+      // Cache non-dragged midpoints for target calculation
+      const cachedNonDraggedMidpoints = [];
+      allBlocks.forEach((block, idx) => {
+        if (!dragIndices.includes(idx)) {
+          cachedNonDraggedMidpoints.push(cachedBlockInfo[idx].top + cachedBlockInfo[idx].height / 2);
+        }
+      });
+
       const { dragPreview, offsetY } = createDragPreview(e, blockDiv, allBlocks, dragIndices);
 
       // Setup visual elements
@@ -14591,7 +14700,9 @@
         allBlocks,
         dragIndices,
         dropIndicator,
-        ghostBlocks
+        ghostBlocks,
+        blockHeightsWithGap,
+        cachedNonDraggedMidpoints
       );
 
       // Create cleanup handler

@@ -10,8 +10,8 @@ import {
 import UndoRedoManager from './undo-redo-manager.js';
 import {
   createDragPreview, cleanupDragVisuals, getDropIndicatorRef,
-  showGhostBlocks, updateAutoScroll, getDropTargetIndex,
-  computeAbsoluteTarget
+  showGhostBlocks, updateAutoScroll,
+  computeAbsoluteTarget, calculateBlockTransforms, calculateDropIndicatorOffset
 } from './drag-utils.js';
 
 // ============================================
@@ -1041,23 +1041,29 @@ class CustomCycleManager {
    * @private
    */
   _setupDragVisuals(container, allBlocks, dragIndices) {
-    // Mark all dragged blocks
+    // Mark all dragged blocks (now shows at reduced opacity, keeps height)
     dragIndices.forEach(idx => {
       if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
     });
 
-    // Add transition class to non-dragged blocks for smooth shifting
-    allBlocks.forEach((block, idx) => {
-      if (!dragIndices.includes(idx)) {
-        block.classList.add('drag-transition');
-      }
+    // Add transition class to ALL blocks for smooth transform animation
+    allBlocks.forEach(block => {
+      block.classList.add('drag-transition');
     });
 
-    // Create drop indicator
+    // Create drop indicator - positioned absolutely within container
     const dropIndicator = document.createElement('div');
     dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
     dropIndicator.style.display = 'none';
+    dropIndicator.style.position = 'absolute';
+    dropIndicator.style.left = '0';
+    dropIndicator.style.right = '0';
     container.appendChild(dropIndicator);
+
+    // Ensure container has position: relative for absolute indicator positioning
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
 
     // Create ghost blocks for duplication mode
     let ghostBlocks = [];
@@ -1085,10 +1091,12 @@ class CustomCycleManager {
    * @param {Array<number>} dragIndices - Indices being dragged
    * @param {HTMLElement} dropIndicator - Drop indicator element
    * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+   * @param {Array<number>} blockHeightsWithGap - Block heights including gaps
+   * @param {Array<number>} cachedNonDraggedMidpoints - Midpoints of non-dragged blocks
    * @returns {Object} Object with onPointerMove handler, state refs, and updateDropTarget function
    * @private
    */
-  _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks) {
+  _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints) {
     let lastTargetIndex = -1;
     let rafId = null;
     let lastPointerY;
@@ -1100,17 +1108,38 @@ class CustomCycleManager {
 
     // Shared function to update drop target position based on pointer Y
     const updateDropTarget = (clientY) => {
-      const targetIndex = getDropTargetIndex(container, clientY, dragIndices);
-      
+      // Calculate container-relative Y position
+      const containerRect = container.getBoundingClientRect();
+      const containerRelativeY = clientY - containerRect.top + container.scrollTop;
+
+      // Find target index using cached midpoints (unaffected by transforms)
+      let targetIndex = cachedNonDraggedMidpoints.length; // default: after all
+      for (let i = 0; i < cachedNonDraggedMidpoints.length; i++) {
+        if (containerRelativeY < cachedNonDraggedMidpoints[i]) {
+          targetIndex = i;
+          break;
+        }
+      }
+
       if (targetIndex === lastTargetIndex) return;
       lastTargetIndex = targetIndex;
 
-      const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-      
       if (targetIndex < 0) return;
 
-      this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+      // Calculate CSS transforms for all blocks
+      const transforms = calculateBlockTransforms(dragIndices, targetIndex, blockHeightsWithGap);
+      
+      // Apply transforms to all blocks
+      allBlocks.forEach((block, idx) => {
+        block.style.transform = transforms[idx] !== 0 ? `translateY(${transforms[idx]}px)` : '';
+      });
 
+      // Position drop indicator at the gap boundary
+      const indicatorOffset = calculateDropIndicatorOffset(dragIndices, targetIndex, blockHeightsWithGap);
+      dropIndicator.style.display = 'block';
+      dropIndicator.style.top = `${indicatorOffset}px`;
+
+      // Show ghost blocks for duplication mode
       if (this.isDuplicating && ghostBlocks.length > 0) {
         showGhostBlocks(container, dropIndicator, ghostBlocks);
       }
@@ -1221,6 +1250,26 @@ class CustomCycleManager {
 
     // Capture dimensions BEFORE adding dragging class
     const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+    
+    // Cache block layout info for transform-based drag (unaffected by CSS transforms)
+    const cachedBlockInfo = allBlocks.map(block => ({
+      top: block.offsetTop,
+      height: block.offsetHeight,
+    }));
+    // Calculate total height per block including gap (use margin between blocks)
+    const blockHeights = cachedBlockInfo.map(info => info.height);
+    // Account for gap between blocks (CSS gap on container)
+    const containerGap = parseFloat(getComputedStyle(container).gap) || 0;
+    const blockHeightsWithGap = blockHeights.map((h, i) => h + (i < blockHeights.length - 1 ? containerGap : 0));
+
+    // Cache non-dragged midpoints for target calculation
+    const cachedNonDraggedMidpoints = [];
+    allBlocks.forEach((block, idx) => {
+      if (!dragIndices.includes(idx)) {
+        cachedNonDraggedMidpoints.push(cachedBlockInfo[idx].top + cachedBlockInfo[idx].height / 2);
+      }
+    });
+
     const { dragPreview, offsetY } = createDragPreview(e, blockDiv, allBlocks, dragIndices);
 
     // Setup visual elements
@@ -1234,7 +1283,9 @@ class CustomCycleManager {
       allBlocks,
       dragIndices,
       dropIndicator,
-      ghostBlocks
+      ghostBlocks,
+      blockHeightsWithGap,
+      cachedNonDraggedMidpoints
     );
 
     // Create cleanup handler
