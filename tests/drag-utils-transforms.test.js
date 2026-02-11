@@ -287,16 +287,8 @@ describe('Drag Utils - Transform Calculations', () => {
       // Block 2 moves up by -200 (to make room for blocks 0-1)
       expect(transforms[2]).toBe(-200);
       
-      // Indicator after block 2
+      // Indicator after block 2 (at Y=100, the gap boundary)
       expect(offset).toBe(100);
-      
-      // Verify: dragged blocks end up at offset position
-      // Block 2's visual top = 0 (original top) + transform = 0 + (-200) = -200 (wraps to 0)
-      // Actually, block 2 visually at 0, blocks 0-1 at 100 and 200
-      // But in DOM order, blocks are still 0, 1, 2 at positions 0, 100, 200
-      // With transforms: 0→100, 1→200, 2→0
-      // So visual order is 2(at 0), 0(at 100), 1(at 200)
-      // Indicator at 100 is correct (gap between 2 and 0)
     });
   });
 });

@@ -224,7 +224,11 @@ export function positionDropIndicator(container, dropIndicator, nonDraggedBlocks
 /**
  * Calculate CSS translateY transforms for all blocks during a drag operation.
  * Creates a smooth visual reorder by moving blocks to their target visual positions.
- * @param {Array<number>} dragIndices - Sorted indices of blocks being dragged
+ * 
+ * NOTE: dragIndices MUST be sorted in ascending order for correct visual order.
+ * The caller is responsible for ensuring indices are sorted before calling this function.
+ * 
+ * @param {Array<number>} dragIndices - Sorted indices of blocks being dragged (ascending order)
  * @param {number} relativeTarget - Target index among non-dragged blocks
  * @param {Array<number>} blockHeights - Array of heights (including gaps) for each block
  * @returns {Array<number>} Array of translateY pixel values for each block
@@ -278,7 +282,11 @@ export function calculateBlockTransforms(dragIndices, relativeTarget, blockHeigh
 /**
  * Calculate the absolute Y position for the drop indicator within the container.
  * The indicator should appear at the gap boundary (top edge of where dragged blocks will land).
- * @param {Array<number>} dragIndices - Sorted indices of dragged blocks
+ * 
+ * NOTE: dragIndices MUST be sorted in ascending order for correct visual order.
+ * The caller is responsible for ensuring indices are sorted before calling this function.
+ * 
+ * @param {Array<number>} dragIndices - Sorted indices of dragged blocks (ascending order)
  * @param {number} relativeTarget - Target index among non-dragged blocks
  * @param {Array<number>} blockHeights - Heights of all blocks
  * @returns {number} Y offset in pixels from container top for the indicator

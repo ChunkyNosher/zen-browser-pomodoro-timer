@@ -1256,7 +1256,7 @@ class CustomCycleManager {
       top: block.offsetTop,
       height: block.offsetHeight,
     }));
-    // Calculate total height per block including gap (use margin between blocks)
+    // Calculate total height per block including gap
     const blockHeights = cachedBlockInfo.map(info => info.height);
     // Account for gap between blocks (CSS gap on container)
     const containerGap = parseFloat(getComputedStyle(container).gap) || 0;
