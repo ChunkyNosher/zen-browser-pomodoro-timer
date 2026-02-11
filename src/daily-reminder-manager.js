@@ -1,12 +1,10 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
-import Storage from './storage.js';
 import {
-  getConfig, saveConfig, getPref, setPref,
-  formatTime, sanitizeText, generateRandomCode,
+  getConfig, saveConfig, generateRandomCode,
   LOG_CATEGORIES, LOCKOUT_METHODS, DAILY_REMINDER_CHECK_INTERVAL_MS,
   DAILY_REMINDER_STARTUP_DELAY_MS, DAILY_REMINDER_ESCALATION_FACTOR,
-  EARLY_MORNING_CUTOFF_MINUTES, isNonEmptyArray
+  isNonEmptyArray
 } from './helpers.js';
 import { isValidTimeFormat } from './ui-helpers.js';
 import { setupHoldToUnlockHandlers } from './shared-blocker-utils.js';

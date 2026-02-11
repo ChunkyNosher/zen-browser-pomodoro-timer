@@ -1,13 +1,11 @@
-import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import { 
-  formatTime, getShortPhaseLabel, LOG_CATEGORIES 
+  LOG_CATEGORIES 
 } from './helpers.js';
-import { isInBreakPhase } from './break-phase-utils.js';
 import { handleStopTimerWithLockout } from './ui-helpers.js';
 import {
-  createProgressListener, setupBrowserListeners, removeBrowserListeners,
-  handleBlockerGoBack, updateBlockerTimerStatus, startBlockerTimerStatusUpdates,
+  setupBrowserListeners, removeBrowserListeners,
+  updateBlockerTimerStatus, startBlockerTimerStatusUpdates,
   createBlockerButtons
 } from './shared-blocker-utils.js';
 

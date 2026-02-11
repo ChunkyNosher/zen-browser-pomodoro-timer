@@ -1,15 +1,12 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
-import Storage from './storage.js';
 import {
-  getConfig, saveConfig, getPref, setPref,
-  formatTime, formatTimeWithHours, sanitizeText, generateRandomCode,
+  getConfig, saveConfig, generateRandomCode,
   LOG_CATEGORIES, LOCKOUT_METHODS,
   POST_SESSION_ESCALATION_FACTOR, POST_SESSION_CHECK_INTERVAL_MS,
   EARLY_MORNING_CUTOFF_MINUTES
 } from './helpers.js';
 import { isValidTimeFormat } from './ui-helpers.js';
-import { updateCountdownElement } from './ui-helpers.js';
 import { setupHoldToUnlockHandlers } from './shared-blocker-utils.js';
 
 // ============================================

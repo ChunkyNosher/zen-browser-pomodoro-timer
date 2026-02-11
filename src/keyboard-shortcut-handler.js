@@ -1,26 +1,22 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
-import Storage from './storage.js';
-import Utils from './utils.js';
 import { 
-  getPref, setPref, getConfig, saveConfig,
-  formatTime, formatTimeWithHours, getPhaseLabel, getShortPhaseLabel,
-  sanitizeText, validateIntegerInput, getActiveBlockedWorkspaces,
-  findRuleAndExecute, sendBrowserNotification, generateRandomCode,
-  isNonEmptyArray, isValidRangeValue, getValidatedIntFromDialog,
+  getConfig, saveConfig, setPref,
+  formatTime,
+  sanitizeText, validateIntegerInput,
+  findRuleAndExecute,
+  isValidRangeValue, getValidatedIntFromDialog,
   URL_REVOKE_DELAY_MS,
-  PREF_PREFIX, MOD_VERSION, MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES, DEFAULT_CONFIG,
-  DATA_NO_POSITION_SAVE
+  MOD_VERSION, MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES
 } from './helpers.js';
 import {
   setupDialogDrag, applyLastDialogPosition, saveDialogPosition,
-  ensureDialogInViewport, isValidTimeFormat,
+  isValidTimeFormat,
   createLabeledInputRow, createLabeledSelectRow,
   renderListOrEmptyMessage, updateCountdownElement, getMenuPhaseLabel,
   handleStopTimerWithLockout, handleSkipFocusWithLockout,
   isDistractionDumpBlocking, handlePauseResumeTimer
 } from './ui-helpers.js';
-import { isInBreakPhase } from './break-phase-utils.js';
 import UndoRedoManager from './undo-redo-manager.js';
 
 // ============================================

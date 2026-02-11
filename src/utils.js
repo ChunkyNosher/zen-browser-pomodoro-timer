@@ -1,5 +1,4 @@
 import Constants from './constants.js';
-import { logger } from './log-manager.js';
 import Storage from './storage.js';
 
 /**

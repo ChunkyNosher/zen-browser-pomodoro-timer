@@ -1,6 +1,5 @@
-import Constants from './constants.js';
 import { logger } from './log-manager.js';
-import { LOG_CATEGORIES, TRANSITION_PHASE_DURATION_SECONDS, formatTime, sanitizeText, DATA_NO_POSITION_SAVE } from './helpers.js';
+import { LOG_CATEGORIES, TRANSITION_PHASE_DURATION_SECONDS, formatTime, DATA_NO_POSITION_SAVE } from './helpers.js';
 import { setupDialogDrag } from './ui-helpers.js';
 
 // ============================================

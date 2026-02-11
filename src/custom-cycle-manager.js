@@ -1,12 +1,11 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import {
-  getConfig, saveConfig, sanitizeText, validateIntegerInput,
+  getConfig, saveConfig, validateIntegerInput,
   LOG_CATEGORIES, DATA_NO_POSITION_SAVE, isValidRangeValue
 } from './helpers.js';
 import {
-  setupDialogDrag, applyLastDialogPosition, saveDialogPosition,
-  createLabeledInputRow, renderListOrEmptyMessage
+  setupDialogDrag, applyLastDialogPosition, saveDialogPosition
 } from './ui-helpers.js';
 import UndoRedoManager from './undo-redo-manager.js';
 

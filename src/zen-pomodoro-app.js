@@ -1,17 +1,13 @@
-import Constants from './constants.js';
 import { logger } from './log-manager.js';
-import Storage from './storage.js';
 import {
-  getConfig, saveConfig, getPref, setPref,
-  formatTime, formatTimeWithHours, getPhaseLabel, getShortPhaseLabel,
+  getConfig, saveConfig,
+  formatTime, getPhaseLabel,
   sendBrowserNotification, isPopupWindow,
-  LOG_CATEGORIES, MOD_VERSION, PREF_PREFIX, LOCKOUT_METHODS,
+  LOG_CATEGORIES,
   RESTORATION_NOTIFICATION_DELAY_MS, DOM_SETTLE_DELAY_MS
 } from './helpers.js';
 import {
-  handlePauseResumeTimer, handleSkipFocusWithLockout,
-  handleStopTimerWithLockout, isDistractionDumpBlocking,
-  updateCountdownElement, applyLastDialogPosition, setupDialogDrag
+  applyLastDialogPosition, setupDialogDrag
 } from './ui-helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
 import PomodoroTimer from './pomodoro-timer.js';

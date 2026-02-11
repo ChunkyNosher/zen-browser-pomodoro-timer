@@ -2,10 +2,9 @@
  * UI Helper Functions - Utilities for dialog management and UI interactions.
  */
 
-import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import { lastDialogPosition, setLastDialogPosition } from './state.js';
-import { formatTime, formatTimeWithHours, clampToViewportBound, DATA_NO_POSITION_SAVE, LOG_CATEGORIES } from './helpers.js';
+import { formatTimeWithHours, clampToViewportBound, DATA_NO_POSITION_SAVE, LOG_CATEGORIES } from './helpers.js';
 
 // ============================================
 // Dialog Drag & Positioning Functions
