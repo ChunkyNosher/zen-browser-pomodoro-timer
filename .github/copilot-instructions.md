@@ -115,9 +115,25 @@ npm run build
 
 # Lint source files
 npm run lint
+
+# Run unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
 ```
 
 **IMPORTANT:** After making changes to any file in `src/`, you MUST run `npm run build` to regenerate `zen-pomodoro-focus-blocker.uc.js`. The bundled output file should be committed alongside the source changes.
+
+### Testing
+
+Unit tests use **Vitest** and are located in the `tests/` directory. The test setup file (`tests/setup.js`) mocks Firefox-specific globals (Services, ChromeUtils, gBrowser, etc.) so tests can run in Node.js.
+
+Test files:
+- `tests/constants.test.js` - Constants module, DEFAULT_CONFIG, freeze behavior
+- `tests/utils.test.js` - All utility functions with edge cases
+- `tests/undo-redo-manager.test.js` - Undo/redo stack operations
+- `tests/pomodoro-timer.test.js` - Timer modes, phases, state management
 
 ### Module Dependency Graph
 

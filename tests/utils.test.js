@@ -49,11 +49,7 @@ describe('Utils Module', () => {
     });
 
     it('should format without hours when useHours=false', () => {
-      // When useHours=false and hours > 0, hours are converted to minutes
-      // 3661 seconds = 1 hour 1 minute 1 second = 61 minutes 1 second
-      // But the function doesn't convert - it just returns MM:SS format
-      // 3661 seconds = 61.01666... minutes, but Math.floor(3661 % 3600 / 60) = 1 minute
-      // Actually: (3661 % 3600) = 61, 61 / 60 = 1 minute, 61 % 60 = 1 second
+      // When useHours=false, formats as MM:SS regardless of hour component
       expect(formatTimeWithHours(3661, false)).toBe('1:01');
     });
 
@@ -243,8 +239,7 @@ describe('Utils Module', () => {
 
     it('should handle element larger than viewport', () => {
       const result = clampToViewportBound(100, 900, 800);
-      // Element is 900px but viewport is 800px
-      // Max position should be -(900-800) = -100, min should be 0
+      // Element size (900px) exceeds viewport (800px), position is clamped
       expect(result).toBeLessThanOrEqual(0);
       expect(result).toBeGreaterThanOrEqual(-100);
     });
