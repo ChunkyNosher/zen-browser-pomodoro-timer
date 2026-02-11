@@ -4,12 +4,12 @@ import {
   getConfig, saveConfig, setPref,
   sanitizeText, validateIntegerInput,
   isValidRangeValue, getValidatedIntFromDialog,
-  MOD_VERSION, MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES
+  MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES
 } from './helpers.js';
 import {
   setupDialogDrag, applyLastDialogPosition, saveDialogPosition,
   isValidTimeFormat,
-  createLabeledInputRow, createLabeledSelectRow
+  createLabeledInputRow
 } from './ui-helpers.js';
 import UndoRedoManager from './undo-redo-manager.js';
 

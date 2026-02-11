@@ -1,19 +1,14 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import { 
-  getConfig, saveConfig, setPref,
-  formatTime,
-  sanitizeText, validateIntegerInput,
-  findRuleAndExecute,
-  isValidRangeValue, getValidatedIntFromDialog,
-  URL_REVOKE_DELAY_MS,
-  MOD_VERSION, MODIFIER_KEYS, LOCKOUT_METHODS, LOG_CATEGORIES
+  getConfig, saveConfig,
+  formatTime, validateIntegerInput,
+  MOD_VERSION, LOG_CATEGORIES
 } from './helpers.js';
 import {
   setupDialogDrag, applyLastDialogPosition, saveDialogPosition,
-  isValidTimeFormat,
   createLabeledInputRow, createLabeledSelectRow,
-  renderListOrEmptyMessage, updateCountdownElement, getMenuPhaseLabel,
+  updateCountdownElement, getMenuPhaseLabel,
   handleStopTimerWithLockout, handleSkipFocusWithLockout,
   isDistractionDumpBlocking, handlePauseResumeTimer
 } from './ui-helpers.js';
