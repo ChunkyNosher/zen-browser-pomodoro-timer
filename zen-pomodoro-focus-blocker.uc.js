@@ -8463,6 +8463,10 @@
    * @param {HTMLElement} statusElement - Element to update with timer status
    */
   function updateBlockerTimerStatus(statusElement) {
+    if (!statusElement) {
+      return;
+    }
+
     const timer = window.zenPomodoroApp?.timer;
     if (!timer) {
       statusElement.textContent = '';
