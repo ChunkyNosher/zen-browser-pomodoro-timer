@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.4.5
+ * Version: 1.4.6
  * License: MIT
  * 
  * ZEN BROWSER 1.18.X COMPATIBILITY:
@@ -229,6 +229,15 @@
   margin-top: 24px;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+/* Ensure utility controls (e.g., dev bypass) inside the controls container
+   are always a full-width row below the main buttons */
+#zen-pomodoro-controls > :last-child:not(.zen-pomodoro-button) {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 12px;
+  text-align: center;
 }
 
 .zen-pomodoro-button {
@@ -1447,6 +1456,11 @@ select.zen-pomodoro-dialog-input option:checked {
    - When a new transition phase starts, the popup resets to
      this default position (dragged position is not persisted)
    ============================================ */
+/* Transition popup positioning:
+   - Always appears at top: 20px; right: 20px on each show.
+   - Users can drag/move the popup while visible.
+   - Position intentionally resets on each new transition phase
+     (does not persist previously dragged coordinates). */
 .zen-pomodoro-transition-popup {
   position: fixed !important;
   top: 20px;
