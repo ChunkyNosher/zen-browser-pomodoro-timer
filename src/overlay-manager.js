@@ -370,120 +370,166 @@ class OverlayManager {
   setupIndicatorDrag() {
     if (!this.indicator) return;
 
-    let isDragging = false;
-    let startX, startY;
-    let startLeft, startTop;
+    // Restore saved position from preferences
+    this._restoreSavedIndicatorPosition();
 
-    // Load saved position from preferences and validate against viewport bounds
-    const savedPosX = getPref('indicatorPosX', null);
-    const savedPosY = getPref('indicatorPosY', null);
-    if (savedPosX !== null && savedPosY !== null) {
-      // Ensure saved position is within current viewport bounds
-      const rect = this.indicator.getBoundingClientRect();
-      const indicatorWidth = rect.width;
-      const indicatorHeight = rect.height;
-
-      const rawX = Number(savedPosX);
-      const rawY = Number(savedPosY);
-
-      if (Number.isFinite(rawX) && Number.isFinite(rawY)) {
-        const maxX = Math.max(0, window.innerWidth - indicatorWidth);
-        const maxY = Math.max(0, window.innerHeight - indicatorHeight);
-
-        const clampedX = Math.max(0, Math.min(rawX, maxX));
-        const clampedY = Math.max(0, Math.min(rawY, maxY));
-
-        this.indicator.style.right = 'auto';
-        this.indicator.style.left = `${clampedX}px`;
-        this.indicator.style.top = `${clampedY}px`;
-      }
-    }
-
-    const onMouseDown = (e) => {
-      // Only start drag on left mouse button
-      if (e.button !== 0) return;
-
-      e.preventDefault();
-      isDragging = true;
-      this.indicatorDidDrag = false; // Reset drag state on new mousedown
-
-      const rect = this.indicator.getBoundingClientRect();
-      startX = e.clientX;
-      startY = e.clientY;
-      startLeft = rect.left;
-      startTop = rect.top;
-
-      // Cache dimensions at start of drag to avoid repeated getBoundingClientRect calls
-      this.indicatorWidth = rect.width;
-      this.indicatorHeight = rect.height;
-
-      // Add dragging class to disable CSS transitions during drag
-      if (this.indicator?.classList) {
-        this.indicator.classList.add('dragging');
-      }
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
+    // Initialize drag state as instance property for access by handlers
+    this._dragState = {
+      isDragging: false,
+      startX: 0,
+      startY: 0,
+      startLeft: 0,
+      startTop: 0,
     };
 
-    const onMouseMove = (e) => {
-      if (!isDragging) return;
-
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-
-      // Mark as dragged if movement exceeds threshold (5 pixels)
-      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-        this.indicatorDidDrag = true;
-      }
-
-      let newLeft = startLeft + deltaX;
-      let newTop = startTop + deltaY;
-
-      // Keep within viewport boundaries using cached dimensions
-      const maxX = window.innerWidth - this.indicatorWidth;
-      const maxY = window.innerHeight - this.indicatorHeight;
-
-      newLeft = Math.max(0, Math.min(newLeft, maxX));
-      newTop = Math.max(0, Math.min(newTop, maxY));
-
-      // Use left positioning instead of right
-      this.indicator.style.right = 'auto';
-      this.indicator.style.left = `${newLeft}px`;
-      this.indicator.style.top = `${newTop}px`;
-    };
-
-    const onMouseUp = () => {
-      if (!isDragging) return;
-
-      isDragging = false;
-
-      // Remove dragging class to re-enable CSS transitions
-      if (this.indicator?.classList) {
-        this.indicator.classList.remove('dragging');
-      }
-
-      // Save position to preferences
-      const rect = this.indicator.getBoundingClientRect();
-      setPref('indicatorPosX', Math.round(rect.left));
-      setPref('indicatorPosY', Math.round(rect.top));
-
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-
-      // Reset drag flag after a delay to allow click event to check it
-      // 100ms is sufficient since click events fire immediately after mouseup
-      setTimeout(() => {
-        this.indicatorDidDrag = false;
-      }, 100);
-    };
+    // Create drag handler
+    const onMouseDown = (e) => this._handleIndicatorMouseDown(e);
 
     // Store reference for cleanup
     this.indicatorMouseDownHandler = onMouseDown;
     this.indicator.addEventListener('mousedown', onMouseDown);
 
-    // RIGHT-CLICK TO PAUSE/UNPAUSE: Add contextmenu event handler
-    // This allows users to quickly pause/resume timer without opening menu
+    // Setup right-click context menu for pause/unpause
+    this._setupIndicatorContextMenu();
+  }
+
+  /**
+   * Handle mouse down event for indicator drag.
+   * @param {MouseEvent} e - Mouse event
+   * @private
+   */
+  _handleIndicatorMouseDown(e) {
+    // Only start drag on left mouse button
+    if (e.button !== 0) return;
+
+    e.preventDefault();
+
+    // Clean up any existing handlers from previous drag (defensive)
+    if (this._onMouseMove) {
+      document.removeEventListener('mousemove', this._onMouseMove);
+    }
+    if (this._onMouseUp) {
+      document.removeEventListener('mouseup', this._onMouseUp);
+    }
+
+    this._dragState.isDragging = true;
+    this.indicatorDidDrag = false; // Reset drag state on new mousedown
+
+    const rect = this.indicator.getBoundingClientRect();
+    this._dragState.startX = e.clientX;
+    this._dragState.startY = e.clientY;
+    this._dragState.startLeft = rect.left;
+    this._dragState.startTop = rect.top;
+
+    // Cache dimensions at start of drag to avoid repeated getBoundingClientRect calls
+    this._cacheIndicatorDimensions(rect);
+
+    // Add dragging class to disable CSS transitions during drag
+    if (this.indicator?.classList) {
+      this.indicator.classList.add('dragging');
+    }
+
+    // Create and store handlers for cleanup
+    this._onMouseMove = (e) => this._handleIndicatorMouseMove(e);
+    this._onMouseUp = () => this._handleIndicatorMouseUp();
+    
+    document.addEventListener('mousemove', this._onMouseMove);
+    document.addEventListener('mouseup', this._onMouseUp);
+  }
+
+  /**
+   * Handle mouse move event for indicator drag.
+   * @param {MouseEvent} e - Mouse event
+   * @private
+   */
+  _handleIndicatorMouseMove(e) {
+    if (!this._dragState.isDragging) return;
+
+    const deltaX = e.clientX - this._dragState.startX;
+    const deltaY = e.clientY - this._dragState.startY;
+
+    // Mark as dragged if movement exceeds threshold (5 pixels)
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      this.indicatorDidDrag = true;
+    }
+
+    const newLeft = this._dragState.startLeft + deltaX;
+    const newTop = this._dragState.startTop + deltaY;
+
+    // Apply clamped position
+    this._applyClampedIndicatorPosition(newLeft, newTop);
+  }
+
+  /**
+   * Handle mouse up event for indicator drag.
+   * @private
+   */
+  _handleIndicatorMouseUp() {
+    if (!this._dragState.isDragging) return;
+
+    this._dragState.isDragging = false;
+
+    // Remove dragging class to re-enable CSS transitions
+    if (this.indicator?.classList) {
+      this.indicator.classList.remove('dragging');
+    }
+
+    // Save position to preferences
+    const rect = this.indicator.getBoundingClientRect();
+    setPref('indicatorPosX', Math.round(rect.left));
+    setPref('indicatorPosY', Math.round(rect.top));
+
+    document.removeEventListener('mousemove', this._onMouseMove);
+    document.removeEventListener('mouseup', this._onMouseUp);
+
+    // Reset drag flag after a delay to allow click event to check it
+    // 100ms is sufficient since click events fire immediately after mouseup
+    setTimeout(() => {
+      this.indicatorDidDrag = false;
+    }, 100);
+  }
+
+  /**
+   * Restore saved indicator position from preferences, validating against viewport bounds.
+   * @private
+   */
+  _restoreSavedIndicatorPosition() {
+    const savedPosX = getPref('indicatorPosX', null);
+    const savedPosY = getPref('indicatorPosY', null);
+    if (savedPosX === null || savedPosY === null) {
+      return;
+    }
+
+    // Ensure saved position is within current viewport bounds
+    const rect = this.indicator.getBoundingClientRect();
+    this._cacheIndicatorDimensions(rect);
+
+    const rawX = Number(savedPosX);
+    const rawY = Number(savedPosY);
+
+    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+      return;
+    }
+
+    // Apply clamped position
+    this._applyClampedIndicatorPosition(rawX, rawY);
+  }
+
+  /**
+   * Cache indicator dimensions for use in position calculations.
+   * @param {DOMRect} rect - Bounding rectangle of the indicator
+   * @private
+   */
+  _cacheIndicatorDimensions(rect) {
+    this.indicatorWidth = rect.width;
+    this.indicatorHeight = rect.height;
+  }
+
+  /**
+   * Setup right-click context menu handler for pause/unpause functionality.
+   * @private
+   */
+  _setupIndicatorContextMenu() {
     const onContextMenu = (e) => {
       // Prevent the default context menu from showing
       e.preventDefault();
@@ -515,6 +561,26 @@ class OverlayManager {
     // Store reference for cleanup
     this.indicatorContextMenuHandler = onContextMenu;
     this.indicator.addEventListener('contextmenu', onContextMenu);
+  }
+
+  /**
+   * Apply clamped position to indicator, ensuring it stays within viewport bounds.
+   * @param {number} left - Desired left position
+   * @param {number} top - Desired top position
+   * @private
+   */
+  _applyClampedIndicatorPosition(left, top) {
+    // Keep within viewport boundaries using cached dimensions
+    const maxX = window.innerWidth - this.indicatorWidth;
+    const maxY = window.innerHeight - this.indicatorHeight;
+
+    const clampedLeft = Math.max(0, Math.min(left, maxX));
+    const clampedTop = Math.max(0, Math.min(top, maxY));
+
+    // Use left positioning instead of right
+    this.indicator.style.right = 'auto';
+    this.indicator.style.left = `${clampedLeft}px`;
+    this.indicator.style.top = `${clampedTop}px`;
   }
 
   /**

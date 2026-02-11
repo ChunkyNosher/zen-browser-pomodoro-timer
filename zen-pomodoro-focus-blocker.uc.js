@@ -2461,15 +2461,7 @@
 
       // Send notification
       const config = this.savedConfig || this.config;
-      if (config.enableNotifications) {
-        if (this.currentPhase === 'focus') {
-          sendBrowserNotification('Focus Complete', 'Time for a break!');
-        } else if (this.currentPhase === 'break' || this.currentPhase === 'long-break') {
-          sendBrowserNotification('Break Complete', 'Time to focus!');
-        } else if (this.currentPhase === 'transition') {
-          sendBrowserNotification('Break Ending Soon', 'Get ready to focus!');
-        }
-      }
+      this._sendPhaseCompleteNotification(config);
 
       // Handle mode-specific completion
       if (this.mode === 'custom') {
@@ -2484,6 +2476,40 @@
       }
 
       // Pomodoro mode
+      this._handlePomodoroPhaseComplete(config);
+
+      // Notify phase change callback if registered
+      if (this.onPhaseChange) {
+        this.onPhaseChange(this.currentPhase, this.remainingTime);
+      }
+
+      this.saveState();
+      this._writeSyncState();
+    }
+
+    /**
+     * Send phase completion notification
+     * @private
+     * @param {Object} config - Configuration object
+     */
+    _sendPhaseCompleteNotification(config) {
+      if (!config.enableNotifications) return;
+
+      if (this.currentPhase === 'focus') {
+        sendBrowserNotification('Focus Complete', 'Time for a break!');
+      } else if (this.currentPhase === 'break' || this.currentPhase === 'long-break') {
+        sendBrowserNotification('Break Complete', 'Time to focus!');
+      } else if (this.currentPhase === 'transition') {
+        sendBrowserNotification('Break Ending Soon', 'Get ready to focus!');
+      }
+    }
+
+    /**
+     * Handle pomodoro mode phase completion
+     * @private
+     * @param {Object} config - Configuration object
+     */
+    _handlePomodoroPhaseComplete(config) {
       if (this.currentPhase === 'focus') {
         // Start break after focus
         this.startBreakPhase();
@@ -2499,14 +2525,6 @@
         // Transition phase complete - start next focus phase or complete
         this.handleBreakComplete();
       }
-
-      // Notify phase change callback if registered
-      if (this.onPhaseChange) {
-        this.onPhaseChange(this.currentPhase, this.remainingTime);
-      }
-
-      this.saveState();
-      this._writeSyncState();
     }
 
     /**
@@ -2650,27 +2668,13 @@
           return false;
         }
 
-        // Restore state
-        this.isActive = state.isActive;
-        this.isPaused = state.isPaused || false;
-        this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
-        this.remainingTime = state.remainingTime;
-        this.currentPhase = state.currentPhase;
-        this.currentCycle = state.currentCycle;
-        this.totalCycles = state.totalCycles;
-        this.mode = state.mode;
-        this.savedConfig = state.savedConfig;
-        this.customCycle = state.customCycle;
-        this.customCycleBlocks = state.customCycleBlocks;
-        this.currentBlockIndex = state.currentBlockIndex || 0;
-
-        // Store distraction dump state for later restoration
-        const pendingDumpState = state.distractionDump;
+        // Restore timer properties from state
+        this._restoreTimerProperties(state);
 
         // Load fresh config (for preferences that may have changed)
         this.config = getConfig$2();
 
-        // If we were paused, stay paused
+        // Start interval if timer was not paused
         if (!this.isPaused) {
           this.startInterval();
         }
@@ -2683,27 +2687,56 @@
           mode: this.mode,
         });
 
-        // CROSS-WINDOW SYNC: Write sync state after loading (will claim ownership)
-        const sync = window.zenPomodoroApp?.windowSync;
-        if (sync) {
-          // Set callback to restore distraction dump after components are ready
-          this.onReady = () => {
-            // Restore distraction dump state if present
-            if (pendingDumpState && window.zenPomodoroApp?.distractionDump) {
-              window.zenPomodoroApp.distractionDump.restoreState(pendingDumpState);
-              logger.log(LOG_CATEGORIES$3.TIMER, 'Distraction dump state restored', pendingDumpState);
-            }
-          };
-
-          sync.claimOwnership();
-          this._writeSyncState();
-        }
+        // Setup cross-window sync
+        this._setupSyncAfterRestore(state.distractionDump);
 
         return true;
       } catch (error) {
         logger.log(LOG_CATEGORIES$3.TIMER, 'Failed to restore timer state', { error: error.message });
         return false;
       }
+    }
+
+    /**
+     * Restore timer properties from saved state
+     * @private
+     * @param {Object} state - Saved state object
+     */
+    _restoreTimerProperties(state) {
+      this.isActive = state.isActive;
+      this.isPaused = state.isPaused || false;
+      this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
+      this.remainingTime = state.remainingTime;
+      this.currentPhase = state.currentPhase;
+      this.currentCycle = state.currentCycle;
+      this.totalCycles = state.totalCycles;
+      this.mode = state.mode;
+      this.savedConfig = state.savedConfig;
+      this.customCycle = state.customCycle;
+      this.customCycleBlocks = state.customCycleBlocks;
+      this.currentBlockIndex = state.currentBlockIndex || 0;
+    }
+
+    /**
+     * Setup cross-window sync after state restoration
+     * @private
+     * @param {Object} pendingDumpState - Saved distraction dump state
+     */
+    _setupSyncAfterRestore(pendingDumpState) {
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (!sync) return;
+
+      // Set callback to restore distraction dump after components are ready
+      this.onReady = () => {
+        // Restore distraction dump state if present
+        if (pendingDumpState && window.zenPomodoroApp?.distractionDump) {
+          window.zenPomodoroApp.distractionDump.restoreState(pendingDumpState);
+          logger.log(LOG_CATEGORIES$3.TIMER, 'Distraction dump state restored', pendingDumpState);
+        }
+      };
+
+      sync.claimOwnership();
+      this._writeSyncState();
     }
 
     /**
@@ -2766,18 +2799,36 @@
      * @returns {number} Total seconds for current phase
      */
     _getTotalPhaseTime() {
-      const config = this.savedConfig || this.config;
-
       if (this.mode === 'custom') {
-        if (
-          this.currentBlockIndex >= 0 &&
-          this.currentBlockIndex < this.customCycleBlocks.length
-        ) {
-          return this.customCycleBlocks[this.currentBlockIndex].duration * 60;
-        }
-        return 0;
+        return this._getCustomBlockDuration();
       }
 
+      const config = this.savedConfig || this.config;
+      return this._getPomodoroPhaseTime(config);
+    }
+
+    /**
+     * Get duration for current custom cycle block
+     * @private
+     * @returns {number} Duration in seconds
+     */
+    _getCustomBlockDuration() {
+      if (
+        this.currentBlockIndex >= 0 &&
+        this.currentBlockIndex < this.customCycleBlocks.length
+      ) {
+        return this.customCycleBlocks[this.currentBlockIndex].duration * 60;
+      }
+      return 0;
+    }
+
+    /**
+     * Get duration for pomodoro mode phase
+     * @private
+     * @param {Object} config - Configuration object
+     * @returns {number} Duration in seconds
+     */
+    _getPomodoroPhaseTime(config) {
       switch (this.currentPhase) {
         case 'focus':
           return config.focusDuration * 60;
@@ -2939,15 +2990,11 @@
      * @param {Object} timerState - Timer state object to broadcast
      */
     writeSyncState(timerState) {
-      if (!this._storage) return;
-      this._storage.setPref(
-        Constants.SYNC_PREF_KEY,
-        JSON.stringify({
-          ownerId: this.windowId,
-          timestamp: Date.now(),
-          ...timerState,
-        })
-      );
+      this._writePref(Constants.SYNC_PREF_KEY, {
+        ownerId: this.windowId,
+        timestamp: Date.now(),
+        ...timerState,
+      });
     }
 
     /**
@@ -3001,14 +3048,10 @@
      * @private
      */
     _writeOwnership() {
-      if (!this._storage) return;
-      this._storage.setPref(
-        Constants.OWNER_PREF_KEY,
-        JSON.stringify({
-          id: this.windowId,
-          heartbeat: Date.now(),
-        })
-      );
+      this._writePref(Constants.OWNER_PREF_KEY, {
+        id: this.windowId,
+        heartbeat: Date.now(),
+      });
     }
 
     /**
@@ -3022,20 +3065,41 @@
       const syncState = this.readSyncState();
       if (!syncState || !syncState.isActive) return;
 
+      if (this._isOwnerHeartbeatStale()) {
+        this._takeOverFromDeadOwner(syncState);
+      }
+    }
+
+    /**
+     * Check if the owner's heartbeat is stale (missing or too old).
+     * @returns {boolean} True if owner is missing or heartbeat is stale
+     * @private
+     */
+    _isOwnerHeartbeatStale() {
       try {
         const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
         if (!ownerStr) {
-          this._takeOverFromDeadOwner(syncState);
-          return;
+          return true;
         }
         const owner = JSON.parse(ownerStr);
-        if (owner.id === this.windowId) return;
-        if (Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS) {
-          this._takeOverFromDeadOwner(syncState);
+        if (owner.id === this.windowId) {
+          return false;
         }
+        return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
       } catch (e) {
-        /* ignore */
+        return false;
       }
+    }
+
+    /**
+     * Write data to a preference key with timestamp.
+     * @param {string} key - Preference key (without prefix)
+     * @param {Object} data - Data object to serialize and store
+     * @private
+     */
+    _writePref(key, data) {
+      if (!this._storage) return;
+      this._storage.setPref(key, JSON.stringify(data));
     }
 
     /**
@@ -4014,120 +4078,166 @@
     setupIndicatorDrag() {
       if (!this.indicator) return;
 
-      let isDragging = false;
-      let startX, startY;
-      let startLeft, startTop;
+      // Restore saved position from preferences
+      this._restoreSavedIndicatorPosition();
 
-      // Load saved position from preferences and validate against viewport bounds
-      const savedPosX = getPref$1('indicatorPosX', null);
-      const savedPosY = getPref$1('indicatorPosY', null);
-      if (savedPosX !== null && savedPosY !== null) {
-        // Ensure saved position is within current viewport bounds
-        const rect = this.indicator.getBoundingClientRect();
-        const indicatorWidth = rect.width;
-        const indicatorHeight = rect.height;
-
-        const rawX = Number(savedPosX);
-        const rawY = Number(savedPosY);
-
-        if (Number.isFinite(rawX) && Number.isFinite(rawY)) {
-          const maxX = Math.max(0, window.innerWidth - indicatorWidth);
-          const maxY = Math.max(0, window.innerHeight - indicatorHeight);
-
-          const clampedX = Math.max(0, Math.min(rawX, maxX));
-          const clampedY = Math.max(0, Math.min(rawY, maxY));
-
-          this.indicator.style.right = 'auto';
-          this.indicator.style.left = `${clampedX}px`;
-          this.indicator.style.top = `${clampedY}px`;
-        }
-      }
-
-      const onMouseDown = (e) => {
-        // Only start drag on left mouse button
-        if (e.button !== 0) return;
-
-        e.preventDefault();
-        isDragging = true;
-        this.indicatorDidDrag = false; // Reset drag state on new mousedown
-
-        const rect = this.indicator.getBoundingClientRect();
-        startX = e.clientX;
-        startY = e.clientY;
-        startLeft = rect.left;
-        startTop = rect.top;
-
-        // Cache dimensions at start of drag to avoid repeated getBoundingClientRect calls
-        this.indicatorWidth = rect.width;
-        this.indicatorHeight = rect.height;
-
-        // Add dragging class to disable CSS transitions during drag
-        if (this.indicator?.classList) {
-          this.indicator.classList.add('dragging');
-        }
-
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+      // Initialize drag state as instance property for access by handlers
+      this._dragState = {
+        isDragging: false,
+        startX: 0,
+        startY: 0,
+        startLeft: 0,
+        startTop: 0,
       };
 
-      const onMouseMove = (e) => {
-        if (!isDragging) return;
-
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-
-        // Mark as dragged if movement exceeds threshold (5 pixels)
-        if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-          this.indicatorDidDrag = true;
-        }
-
-        let newLeft = startLeft + deltaX;
-        let newTop = startTop + deltaY;
-
-        // Keep within viewport boundaries using cached dimensions
-        const maxX = window.innerWidth - this.indicatorWidth;
-        const maxY = window.innerHeight - this.indicatorHeight;
-
-        newLeft = Math.max(0, Math.min(newLeft, maxX));
-        newTop = Math.max(0, Math.min(newTop, maxY));
-
-        // Use left positioning instead of right
-        this.indicator.style.right = 'auto';
-        this.indicator.style.left = `${newLeft}px`;
-        this.indicator.style.top = `${newTop}px`;
-      };
-
-      const onMouseUp = () => {
-        if (!isDragging) return;
-
-        isDragging = false;
-
-        // Remove dragging class to re-enable CSS transitions
-        if (this.indicator?.classList) {
-          this.indicator.classList.remove('dragging');
-        }
-
-        // Save position to preferences
-        const rect = this.indicator.getBoundingClientRect();
-        setPref$1('indicatorPosX', Math.round(rect.left));
-        setPref$1('indicatorPosY', Math.round(rect.top));
-
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-
-        // Reset drag flag after a delay to allow click event to check it
-        // 100ms is sufficient since click events fire immediately after mouseup
-        setTimeout(() => {
-          this.indicatorDidDrag = false;
-        }, 100);
-      };
+      // Create drag handler
+      const onMouseDown = (e) => this._handleIndicatorMouseDown(e);
 
       // Store reference for cleanup
       this.indicatorMouseDownHandler = onMouseDown;
       this.indicator.addEventListener('mousedown', onMouseDown);
 
-      // RIGHT-CLICK TO PAUSE/UNPAUSE: Add contextmenu event handler
-      // This allows users to quickly pause/resume timer without opening menu
+      // Setup right-click context menu for pause/unpause
+      this._setupIndicatorContextMenu();
+    }
+
+    /**
+     * Handle mouse down event for indicator drag.
+     * @param {MouseEvent} e - Mouse event
+     * @private
+     */
+    _handleIndicatorMouseDown(e) {
+      // Only start drag on left mouse button
+      if (e.button !== 0) return;
+
+      e.preventDefault();
+
+      // Clean up any existing handlers from previous drag (defensive)
+      if (this._onMouseMove) {
+        document.removeEventListener('mousemove', this._onMouseMove);
+      }
+      if (this._onMouseUp) {
+        document.removeEventListener('mouseup', this._onMouseUp);
+      }
+
+      this._dragState.isDragging = true;
+      this.indicatorDidDrag = false; // Reset drag state on new mousedown
+
+      const rect = this.indicator.getBoundingClientRect();
+      this._dragState.startX = e.clientX;
+      this._dragState.startY = e.clientY;
+      this._dragState.startLeft = rect.left;
+      this._dragState.startTop = rect.top;
+
+      // Cache dimensions at start of drag to avoid repeated getBoundingClientRect calls
+      this._cacheIndicatorDimensions(rect);
+
+      // Add dragging class to disable CSS transitions during drag
+      if (this.indicator?.classList) {
+        this.indicator.classList.add('dragging');
+      }
+
+      // Create and store handlers for cleanup
+      this._onMouseMove = (e) => this._handleIndicatorMouseMove(e);
+      this._onMouseUp = () => this._handleIndicatorMouseUp();
+      
+      document.addEventListener('mousemove', this._onMouseMove);
+      document.addEventListener('mouseup', this._onMouseUp);
+    }
+
+    /**
+     * Handle mouse move event for indicator drag.
+     * @param {MouseEvent} e - Mouse event
+     * @private
+     */
+    _handleIndicatorMouseMove(e) {
+      if (!this._dragState.isDragging) return;
+
+      const deltaX = e.clientX - this._dragState.startX;
+      const deltaY = e.clientY - this._dragState.startY;
+
+      // Mark as dragged if movement exceeds threshold (5 pixels)
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+        this.indicatorDidDrag = true;
+      }
+
+      const newLeft = this._dragState.startLeft + deltaX;
+      const newTop = this._dragState.startTop + deltaY;
+
+      // Apply clamped position
+      this._applyClampedIndicatorPosition(newLeft, newTop);
+    }
+
+    /**
+     * Handle mouse up event for indicator drag.
+     * @private
+     */
+    _handleIndicatorMouseUp() {
+      if (!this._dragState.isDragging) return;
+
+      this._dragState.isDragging = false;
+
+      // Remove dragging class to re-enable CSS transitions
+      if (this.indicator?.classList) {
+        this.indicator.classList.remove('dragging');
+      }
+
+      // Save position to preferences
+      const rect = this.indicator.getBoundingClientRect();
+      setPref$1('indicatorPosX', Math.round(rect.left));
+      setPref$1('indicatorPosY', Math.round(rect.top));
+
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('mouseup', this._onMouseUp);
+
+      // Reset drag flag after a delay to allow click event to check it
+      // 100ms is sufficient since click events fire immediately after mouseup
+      setTimeout(() => {
+        this.indicatorDidDrag = false;
+      }, 100);
+    }
+
+    /**
+     * Restore saved indicator position from preferences, validating against viewport bounds.
+     * @private
+     */
+    _restoreSavedIndicatorPosition() {
+      const savedPosX = getPref$1('indicatorPosX', null);
+      const savedPosY = getPref$1('indicatorPosY', null);
+      if (savedPosX === null || savedPosY === null) {
+        return;
+      }
+
+      // Ensure saved position is within current viewport bounds
+      const rect = this.indicator.getBoundingClientRect();
+      this._cacheIndicatorDimensions(rect);
+
+      const rawX = Number(savedPosX);
+      const rawY = Number(savedPosY);
+
+      if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+        return;
+      }
+
+      // Apply clamped position
+      this._applyClampedIndicatorPosition(rawX, rawY);
+    }
+
+    /**
+     * Cache indicator dimensions for use in position calculations.
+     * @param {DOMRect} rect - Bounding rectangle of the indicator
+     * @private
+     */
+    _cacheIndicatorDimensions(rect) {
+      this.indicatorWidth = rect.width;
+      this.indicatorHeight = rect.height;
+    }
+
+    /**
+     * Setup right-click context menu handler for pause/unpause functionality.
+     * @private
+     */
+    _setupIndicatorContextMenu() {
       const onContextMenu = (e) => {
         // Prevent the default context menu from showing
         e.preventDefault();
@@ -4159,6 +4269,26 @@
       // Store reference for cleanup
       this.indicatorContextMenuHandler = onContextMenu;
       this.indicator.addEventListener('contextmenu', onContextMenu);
+    }
+
+    /**
+     * Apply clamped position to indicator, ensuring it stays within viewport bounds.
+     * @param {number} left - Desired left position
+     * @param {number} top - Desired top position
+     * @private
+     */
+    _applyClampedIndicatorPosition(left, top) {
+      // Keep within viewport boundaries using cached dimensions
+      const maxX = window.innerWidth - this.indicatorWidth;
+      const maxY = window.innerHeight - this.indicatorHeight;
+
+      const clampedLeft = Math.max(0, Math.min(left, maxX));
+      const clampedTop = Math.max(0, Math.min(top, maxY));
+
+      // Use left positioning instead of right
+      this.indicator.style.right = 'auto';
+      this.indicator.style.left = `${clampedLeft}px`;
+      this.indicator.style.top = `${clampedTop}px`;
     }
 
     /**
@@ -14565,7 +14695,21 @@
       // Expose app globally early so restoration code can access it
       window.zenPomodoroApp = this;
 
-      // CROSS-WINDOW SYNC: Initialize sync manager and log sync
+      this._initCrossWindowSync();
+      this._migrateBlockedWorkspacesToRulesets();
+      this._initModules();
+      this._restoreTimerState();
+      this.requestNotificationPermission();
+      this._initReminderManagers();
+
+      logger.log(LOG_CATEGORIES$4.INIT, 'Application initialization complete');
+    }
+
+    /**
+     * Initialize cross-window synchronization system
+     * @private
+     */
+    _initCrossWindowSync() {
       logger.log(LOG_CATEGORIES$4.INIT, 'Initializing cross-window sync');
       this.windowSync.init();
       logger.setWindowId(this.windowSync.windowId);
@@ -14582,14 +14726,18 @@
       this.windowSync.onOwnershipTaken = (syncState) => {
         this._onOwnershipTaken(syncState);
       };
+    }
 
-      // Migrate global blockedWorkspaces to default ruleset if needed
-      this._migrateBlockedWorkspacesToRulesets();
-
-      // Initialize modules
+    /**
+     * Initialize all modules and setup their callbacks
+     * @private
+     */
+    _initModules() {
+      // Initialize keyboard shortcut handler
       logger.log(LOG_CATEGORIES$4.INIT, 'Initializing keyboard shortcut handler');
       this.keyboardShortcut.init();
 
+      // Start workspace monitoring
       logger.log(LOG_CATEGORIES$4.INIT, 'Starting workspace monitoring');
       this.workspace.startMonitoring();
 
@@ -14632,103 +14780,155 @@
       this.workspace.onWorkspaceChange = (workspaceId, isBlocked) => {
         this.onWorkspaceChange(workspaceId, isBlocked);
       };
+    }
 
-      // Try to restore timer state
+    /**
+     * Restore timer state from previous session
+     * @private
+     */
+    _restoreTimerState() {
       const restored = this.timer.loadState();
-      if (restored) {
-        // CROSS-WINDOW SYNC: Check if another window is actively managing the timer
-        const isAnotherWindowActive = this.windowSync.isAnotherWindowActive();
-
-        if (isAnotherWindowActive) {
-          // Another window is running the timer - sync from it instead of treating as restart
-          logger.log(LOG_CATEGORIES$4.INIT, 'Another window is active - syncing timer state');
-
-          // Read more accurate state from sync pref (updated every tick by owner)
-          const syncState = this.windowSync.readSyncState();
-          if (syncState) {
-            this.timer.syncFromState(syncState);
-          }
-
-          // Show indicator with correct paused state (NOT forced paused)
-          this.overlay.showIndicator();
-          this.overlay.updateIndicatorPausedState(this.timer.isPaused);
-          this.updateOverlayVisibility();
-
-          // Update display with current timer values
-          if (this.timer.onTick) {
-            this.timer.onTick(
-              this.timer.remainingTime,
-              this.timer.currentPhase,
-              this.timer.currentCycle,
-              this.timer.totalCycles
-            );
-          }
-
-          // Start heartbeat monitoring (detect if owner dies)
-          this.windowSync.startHeartbeatMonitor();
-
-          // Notify blockers that timer is active
-          this.sineModBlocker.onTimerStart();
-          this.websiteBlocker.onTimerStart();
-
-          // Do NOT show "Timer Restored" notification - this is not a restart
-          this.timer.restoredFromRestart = false;
-        } else {
-          // No other window active - this is a genuine browser restart
-          logger.log(LOG_CATEGORIES$4.INIT, 'Timer state restored from previous session');
-          console.log('Restored timer state from previous session');
-
-          // Claim ownership since we're the only window
-          this.windowSync.claimOwnership();
-
-          // INDICATOR FIX: Show indicator after state restoration
-          this.overlay.showIndicator();
-          // Ensure paused state is reflected on the indicator since timer is paused on restore
-          this.overlay.updateIndicatorPausedState(true);
-          this.updateOverlayVisibility();
-
-          // Restore distraction dump state if it was active
-          if (this.timer.pendingDumpState) {
-            const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
-            if (dumpRestored) {
-              logger.log(LOG_CATEGORIES$4.INIT, 'Distraction dump state restored');
-              // Re-enable dump mode (pause timer, lift blocks)
-              this.distractionDump._enableDumpMode();
-              this.distractionDump._setupDumpIndicator();
-              // Restart the dump countdown
-              this.distractionDump.dumpInterval = setInterval(() => {
-                this.distractionDump.dumpTimeRemaining--;
-                this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
-                if (this.distractionDump.dumpTimeRemaining <= 0) {
-                  this.distractionDump.endDump();
-                }
-              }, 1000);
-            }
-            this.timer.pendingDumpState = null;
-          }
-
-          // If restored into transition phase, show the popup
-          if (this.timer.currentPhase === 'transition') {
-            this.transitionManager.showTransitionPopup();
-          }
-
-          // AUTO-PAUSE FIX: Show notification that timer was paused
-          // POPUP FIX: Only show restoration notification in main browser window, not popups
-          if (this.timer.restoredFromRestart && !isPopupWindow()) {
-            setTimeout(() => {
-              this.showRestorationNotification();
-            }, RESTORATION_NOTIFICATION_DELAY_MS);
-            this.timer.restoredFromRestart = false;
-          } else if (this.timer.restoredFromRestart) {
-            logger.log(LOG_CATEGORIES$4.INIT, 'Skipping restoration notification in popup window');
-            this.timer.restoredFromRestart = false;
-          }
-        }
+      if (!restored) {
+        return;
       }
 
-      // MISSING FEATURE: Request notification permission
-      this.requestNotificationPermission();
+      // CROSS-WINDOW SYNC: Check if another window is actively managing the timer
+      const isAnotherWindowActive = this.windowSync.isAnotherWindowActive();
 
+      if (isAnotherWindowActive) {
+        this._handleSecondaryWindowSync();
+      } else {
+        this._handlePrimaryWindowRestore();
+      }
+    }
+
+    /**
+     * Handle timer sync for secondary window (when another window is active)
+     * @private
+     */
+    _handleSecondaryWindowSync() {
+      // Another window is running the timer - sync from it instead of treating as restart
+      logger.log(LOG_CATEGORIES$4.INIT, 'Another window is active - syncing timer state');
+
+      // Read more accurate state from sync pref (updated every tick by owner)
+      const syncState = this.windowSync.readSyncState();
+      if (syncState) {
+        this.timer.syncFromState(syncState);
+      }
+
+      // Show indicator with correct paused state (NOT forced paused)
+      this.overlay.showIndicator();
+      this.overlay.updateIndicatorPausedState(this.timer.isPaused);
+      this.updateOverlayVisibility();
+
+      // Update display with current timer values
+      if (this.timer.onTick) {
+        this.timer.onTick(
+          this.timer.remainingTime,
+          this.timer.currentPhase,
+          this.timer.currentCycle,
+          this.timer.totalCycles
+        );
+      }
+
+      // Start heartbeat monitoring (detect if owner dies)
+      this.windowSync.startHeartbeatMonitor();
+
+      // Notify blockers that timer is active
+      this.sineModBlocker.onTimerStart();
+      this.websiteBlocker.onTimerStart();
+
+      // Do NOT show "Timer Restored" notification - this is not a restart
+      this.timer.restoredFromRestart = false;
+    }
+
+    /**
+     * Handle timer restoration for primary window (genuine browser restart)
+     * @private
+     */
+    _handlePrimaryWindowRestore() {
+      // No other window active - this is a genuine browser restart
+      logger.log(LOG_CATEGORIES$4.INIT, 'Timer state restored from previous session');
+      console.log('Restored timer state from previous session');
+
+      // Claim ownership since we're the only window
+      this.windowSync.claimOwnership();
+
+      // INDICATOR FIX: Show indicator after state restoration
+      this.overlay.showIndicator();
+      // Ensure paused state is reflected on the indicator since timer is paused on restore
+      this.overlay.updateIndicatorPausedState(true);
+      this.updateOverlayVisibility();
+
+      this._restoreDistractionDumpIfNeeded();
+      this._showTransitionPopupIfNeeded();
+      this._showRestorationNotificationIfNeeded();
+    }
+
+    /**
+     * Restore distraction dump state if it was active before restart
+     * @private
+     */
+    _restoreDistractionDumpIfNeeded() {
+      if (!this.timer.pendingDumpState) {
+        return;
+      }
+
+      const dumpRestored = this.distractionDump.restoreState(this.timer.pendingDumpState);
+      if (dumpRestored) {
+        logger.log(LOG_CATEGORIES$4.INIT, 'Distraction dump state restored');
+        // Re-enable dump mode (pause timer, lift blocks)
+        this.distractionDump._enableDumpMode();
+        this.distractionDump._setupDumpIndicator();
+        // Restart the dump countdown
+        this.distractionDump.dumpInterval = setInterval(() => {
+          this.distractionDump.dumpTimeRemaining--;
+          this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
+          if (this.distractionDump.dumpTimeRemaining <= 0) {
+            this.distractionDump.endDump();
+          }
+        }, 1000);
+      }
+      this.timer.pendingDumpState = null;
+    }
+
+    /**
+     * Show transition popup if timer was restored into transition phase
+     * @private
+     */
+    _showTransitionPopupIfNeeded() {
+      if (this.timer.currentPhase === 'transition') {
+        this.transitionManager.showTransitionPopup();
+      }
+    }
+
+    /**
+     * Show restoration notification if needed (not in popup windows)
+     * @private
+     */
+    _showRestorationNotificationIfNeeded() {
+      if (!this.timer.restoredFromRestart) {
+        return;
+      }
+
+      // AUTO-PAUSE FIX: Show notification that timer was paused
+      // POPUP FIX: Only show restoration notification in main browser window, not popups
+      if (!isPopupWindow()) {
+        setTimeout(() => {
+          this.showRestorationNotification();
+        }, RESTORATION_NOTIFICATION_DELAY_MS);
+      } else {
+        logger.log(LOG_CATEGORIES$4.INIT, 'Skipping restoration notification in popup window');
+      }
+
+      this.timer.restoredFromRestart = false;
+    }
+
+    /**
+     * Initialize daily and post-session reminder managers
+     * @private
+     */
+    _initReminderManagers() {
       // Initialize Daily Reminder Manager (after app is globally exposed)
       logger.log(LOG_CATEGORIES$4.INIT, 'Initializing Daily Reminder Manager');
       this.dailyReminder.onStartTimer = () => {
@@ -14746,8 +14946,6 @@
         this.keyboardShortcut.showConfigDialog();
       };
       this.postSessionReminder.init();
-
-      logger.log(LOG_CATEGORIES$4.INIT, 'Application initialization complete');
     }
 
     /**

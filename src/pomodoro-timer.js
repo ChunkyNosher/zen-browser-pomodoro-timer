@@ -423,15 +423,7 @@ class PomodoroTimer {
 
     // Send notification
     const config = this.savedConfig || this.config;
-    if (config.enableNotifications) {
-      if (this.currentPhase === 'focus') {
-        sendBrowserNotification('Focus Complete', 'Time for a break!');
-      } else if (this.currentPhase === 'break' || this.currentPhase === 'long-break') {
-        sendBrowserNotification('Break Complete', 'Time to focus!');
-      } else if (this.currentPhase === 'transition') {
-        sendBrowserNotification('Break Ending Soon', 'Get ready to focus!');
-      }
-    }
+    this._sendPhaseCompleteNotification(config);
 
     // Handle mode-specific completion
     if (this.mode === 'custom') {
@@ -446,6 +438,40 @@ class PomodoroTimer {
     }
 
     // Pomodoro mode
+    this._handlePomodoroPhaseComplete(config);
+
+    // Notify phase change callback if registered
+    if (this.onPhaseChange) {
+      this.onPhaseChange(this.currentPhase, this.remainingTime);
+    }
+
+    this.saveState();
+    this._writeSyncState();
+  }
+
+  /**
+   * Send phase completion notification
+   * @private
+   * @param {Object} config - Configuration object
+   */
+  _sendPhaseCompleteNotification(config) {
+    if (!config.enableNotifications) return;
+
+    if (this.currentPhase === 'focus') {
+      sendBrowserNotification('Focus Complete', 'Time for a break!');
+    } else if (this.currentPhase === 'break' || this.currentPhase === 'long-break') {
+      sendBrowserNotification('Break Complete', 'Time to focus!');
+    } else if (this.currentPhase === 'transition') {
+      sendBrowserNotification('Break Ending Soon', 'Get ready to focus!');
+    }
+  }
+
+  /**
+   * Handle pomodoro mode phase completion
+   * @private
+   * @param {Object} config - Configuration object
+   */
+  _handlePomodoroPhaseComplete(config) {
     if (this.currentPhase === 'focus') {
       // Start break after focus
       this.startBreakPhase();
@@ -461,14 +487,6 @@ class PomodoroTimer {
       // Transition phase complete - start next focus phase or complete
       this.handleBreakComplete();
     }
-
-    // Notify phase change callback if registered
-    if (this.onPhaseChange) {
-      this.onPhaseChange(this.currentPhase, this.remainingTime);
-    }
-
-    this.saveState();
-    this._writeSyncState();
   }
 
   /**
@@ -612,27 +630,13 @@ class PomodoroTimer {
         return false;
       }
 
-      // Restore state
-      this.isActive = state.isActive;
-      this.isPaused = state.isPaused || false;
-      this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
-      this.remainingTime = state.remainingTime;
-      this.currentPhase = state.currentPhase;
-      this.currentCycle = state.currentCycle;
-      this.totalCycles = state.totalCycles;
-      this.mode = state.mode;
-      this.savedConfig = state.savedConfig;
-      this.customCycle = state.customCycle;
-      this.customCycleBlocks = state.customCycleBlocks;
-      this.currentBlockIndex = state.currentBlockIndex || 0;
-
-      // Store distraction dump state for later restoration
-      const pendingDumpState = state.distractionDump;
+      // Restore timer properties from state
+      this._restoreTimerProperties(state);
 
       // Load fresh config (for preferences that may have changed)
       this.config = getConfig();
 
-      // If we were paused, stay paused
+      // Start interval if timer was not paused
       if (!this.isPaused) {
         this.startInterval();
       }
@@ -645,27 +649,56 @@ class PomodoroTimer {
         mode: this.mode,
       });
 
-      // CROSS-WINDOW SYNC: Write sync state after loading (will claim ownership)
-      const sync = window.zenPomodoroApp?.windowSync;
-      if (sync) {
-        // Set callback to restore distraction dump after components are ready
-        this.onReady = () => {
-          // Restore distraction dump state if present
-          if (pendingDumpState && window.zenPomodoroApp?.distractionDump) {
-            window.zenPomodoroApp.distractionDump.restoreState(pendingDumpState);
-            logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump state restored', pendingDumpState);
-          }
-        };
-
-        sync.claimOwnership();
-        this._writeSyncState();
-      }
+      // Setup cross-window sync
+      this._setupSyncAfterRestore(state.distractionDump);
 
       return true;
     } catch (error) {
       logger.log(LOG_CATEGORIES.TIMER, 'Failed to restore timer state', { error: error.message });
       return false;
     }
+  }
+
+  /**
+   * Restore timer properties from saved state
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreTimerProperties(state) {
+    this.isActive = state.isActive;
+    this.isPaused = state.isPaused || false;
+    this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
+    this.remainingTime = state.remainingTime;
+    this.currentPhase = state.currentPhase;
+    this.currentCycle = state.currentCycle;
+    this.totalCycles = state.totalCycles;
+    this.mode = state.mode;
+    this.savedConfig = state.savedConfig;
+    this.customCycle = state.customCycle;
+    this.customCycleBlocks = state.customCycleBlocks;
+    this.currentBlockIndex = state.currentBlockIndex || 0;
+  }
+
+  /**
+   * Setup cross-window sync after state restoration
+   * @private
+   * @param {Object} pendingDumpState - Saved distraction dump state
+   */
+  _setupSyncAfterRestore(pendingDumpState) {
+    const sync = window.zenPomodoroApp?.windowSync;
+    if (!sync) return;
+
+    // Set callback to restore distraction dump after components are ready
+    this.onReady = () => {
+      // Restore distraction dump state if present
+      if (pendingDumpState && window.zenPomodoroApp?.distractionDump) {
+        window.zenPomodoroApp.distractionDump.restoreState(pendingDumpState);
+        logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump state restored', pendingDumpState);
+      }
+    };
+
+    sync.claimOwnership();
+    this._writeSyncState();
   }
 
   /**
@@ -728,18 +761,36 @@ class PomodoroTimer {
    * @returns {number} Total seconds for current phase
    */
   _getTotalPhaseTime() {
-    const config = this.savedConfig || this.config;
-
     if (this.mode === 'custom') {
-      if (
-        this.currentBlockIndex >= 0 &&
-        this.currentBlockIndex < this.customCycleBlocks.length
-      ) {
-        return this.customCycleBlocks[this.currentBlockIndex].duration * 60;
-      }
-      return 0;
+      return this._getCustomBlockDuration();
     }
 
+    const config = this.savedConfig || this.config;
+    return this._getPomodoroPhaseTime(config);
+  }
+
+  /**
+   * Get duration for current custom cycle block
+   * @private
+   * @returns {number} Duration in seconds
+   */
+  _getCustomBlockDuration() {
+    if (
+      this.currentBlockIndex >= 0 &&
+      this.currentBlockIndex < this.customCycleBlocks.length
+    ) {
+      return this.customCycleBlocks[this.currentBlockIndex].duration * 60;
+    }
+    return 0;
+  }
+
+  /**
+   * Get duration for pomodoro mode phase
+   * @private
+   * @param {Object} config - Configuration object
+   * @returns {number} Duration in seconds
+   */
+  _getPomodoroPhaseTime(config) {
     switch (this.currentPhase) {
       case 'focus':
         return config.focusDuration * 60;

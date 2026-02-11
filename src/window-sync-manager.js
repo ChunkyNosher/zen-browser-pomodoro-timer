@@ -124,15 +124,11 @@ class WindowSyncManager {
    * @param {Object} timerState - Timer state object to broadcast
    */
   writeSyncState(timerState) {
-    if (!this._storage) return;
-    this._storage.setPref(
-      Constants.SYNC_PREF_KEY,
-      JSON.stringify({
-        ownerId: this.windowId,
-        timestamp: Date.now(),
-        ...timerState,
-      })
-    );
+    this._writePref(Constants.SYNC_PREF_KEY, {
+      ownerId: this.windowId,
+      timestamp: Date.now(),
+      ...timerState,
+    });
   }
 
   /**
@@ -186,14 +182,10 @@ class WindowSyncManager {
    * @private
    */
   _writeOwnership() {
-    if (!this._storage) return;
-    this._storage.setPref(
-      Constants.OWNER_PREF_KEY,
-      JSON.stringify({
-        id: this.windowId,
-        heartbeat: Date.now(),
-      })
-    );
+    this._writePref(Constants.OWNER_PREF_KEY, {
+      id: this.windowId,
+      heartbeat: Date.now(),
+    });
   }
 
   /**
@@ -207,20 +199,41 @@ class WindowSyncManager {
     const syncState = this.readSyncState();
     if (!syncState || !syncState.isActive) return;
 
+    if (this._isOwnerHeartbeatStale()) {
+      this._takeOverFromDeadOwner(syncState);
+    }
+  }
+
+  /**
+   * Check if the owner's heartbeat is stale (missing or too old).
+   * @returns {boolean} True if owner is missing or heartbeat is stale
+   * @private
+   */
+  _isOwnerHeartbeatStale() {
     try {
       const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
       if (!ownerStr) {
-        this._takeOverFromDeadOwner(syncState);
-        return;
+        return true;
       }
       const owner = JSON.parse(ownerStr);
-      if (owner.id === this.windowId) return;
-      if (Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS) {
-        this._takeOverFromDeadOwner(syncState);
+      if (owner.id === this.windowId) {
+        return false;
       }
+      return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
     } catch (e) {
-      /* ignore */
+      return false;
     }
+  }
+
+  /**
+   * Write data to a preference key with timestamp.
+   * @param {string} key - Preference key (without prefix)
+   * @param {Object} data - Data object to serialize and store
+   * @private
+   */
+  _writePref(key, data) {
+    if (!this._storage) return;
+    this._storage.setPref(key, JSON.stringify(data));
   }
 
   /**
