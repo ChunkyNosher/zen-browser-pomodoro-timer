@@ -37,6 +37,8 @@ class WindowSyncManager {
     this.onOwnershipLost = null;
     /** Callback: called when this window takes over from a dead owner */
     this.onOwnershipTaken = null;
+    /** Callback: called when reminder sync is received from another window */
+    this.onReminderSyncChanged = null;
     /** Storage module reference (injected to avoid circular dependency) */
     this._storage = null;
   }
@@ -272,19 +274,22 @@ class WindowSyncManager {
 
   /**
    * Set up pref observer for cross-window communication.
-   * Watches for changes to timer-sync and timer-owner prefs.
+   * Watches for changes to timer-sync, timer-owner, and reminder-sync prefs.
    * @private
    */
   _setupPrefObserver() {
     const prefPrefix = Constants.PREF_PREFIX;
     const syncPrefFull = `${prefPrefix}.${Constants.SYNC_PREF_KEY}`;
     const ownerPrefFull = `${prefPrefix}.${Constants.OWNER_PREF_KEY}`;
+    const reminderSyncPrefFull = `${prefPrefix}.${Constants.REMINDER_SYNC_PREF_KEY}`;
     this._prefObserver = {
       observe: (subject, topic, data) => {
         if (data === syncPrefFull) {
           this._handleSyncPrefChange();
         } else if (data === ownerPrefFull) {
           this._handleOwnerPrefChange();
+        } else if (data === reminderSyncPrefFull) {
+          this._handleReminderSyncPrefChange();
         }
       },
     };
@@ -326,6 +331,79 @@ class WindowSyncManager {
         if (this.onOwnershipLost) {
           this.onOwnershipLost();
         }
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Write reminder sync action to the reminder-sync pref for other windows to read.
+   * @param {Object} actionData - Action data object (must contain 'action' property)
+   */
+  writeReminderSync(actionData) {
+    // Validate actionData structure
+    if (!actionData) {
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is null/undefined');
+      return;
+    }
+    if (typeof actionData !== 'object') {
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is not an object', {
+        type: typeof actionData,
+      });
+      return;
+    }
+    if (!actionData.action) {
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - missing required action property', {
+        actionData,
+      });
+      return;
+    }
+    if (typeof actionData.action !== 'string') {
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - action must be a string', {
+        action: actionData.action,
+        type: typeof actionData.action,
+      });
+      return;
+    }
+
+    // Validate action value matches expected types
+    const validActions = [
+      'daily-dismissed',
+      'daily-skipped',
+      'post-session-dismissed',
+      'post-session-skipped',
+      'timer-started',
+    ];
+    if (!validActions.includes(actionData.action)) {
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - unknown action type', {
+        action: actionData.action,
+        validActions,
+      });
+      return;
+    }
+
+    this._writePref(Constants.REMINDER_SYNC_PREF_KEY, {
+      windowId: this.windowId,
+      timestamp: Date.now(),
+      ...actionData,
+    });
+  }
+
+  /**
+   * Handle changes to the reminder-sync pref (reminder actions from other windows).
+   * @private
+   */
+  _handleReminderSyncPrefChange() {
+    if (!this._storage) return;
+    try {
+      const syncStr = this._storage.getPref(Constants.REMINDER_SYNC_PREF_KEY, '');
+      if (!syncStr) return;
+      const syncData = JSON.parse(syncStr);
+      // Ignore if the action came from this window
+      if (syncData.windowId === this.windowId) return;
+      if (this.onReminderSyncChanged) {
+        this.onReminderSyncChanged(syncData);
       }
     } catch (e) {
       /* ignore */

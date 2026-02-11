@@ -248,6 +248,8 @@
     SYNC_PREF_KEY: 'timer-sync',
     /** Cross-window sync: pref key for timer owner */
     OWNER_PREF_KEY: 'timer-owner',
+    /** Cross-window sync: pref key for reminder sync state */
+    REMINDER_SYNC_PREF_KEY: 'reminder-sync',
     /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
     OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
     /** Cross-window sync: Services.obs topic for log entry broadcasting */
@@ -2652,6 +2654,9 @@
         customCycle: this.customCycle,
         customCycleBlocks: this.customCycleBlocks,
         currentBlockIndex: this.currentBlockIndex,
+        dumpActive: window.zenPomodoroApp?.distractionDump?.isActive || false,
+        dumpTimeRemaining: window.zenPomodoroApp?.distractionDump?.dumpTimeRemaining || 0,
+        dumpUsedThisFocusPhase: window.zenPomodoroApp?.distractionDump?.dumpUsedThisFocusPhase || false,
         timestamp: Date.now(),
       };
 
@@ -2976,6 +2981,8 @@
       this.onOwnershipLost = null;
       /** Callback: called when this window takes over from a dead owner */
       this.onOwnershipTaken = null;
+      /** Callback: called when reminder sync is received from another window */
+      this.onReminderSyncChanged = null;
       /** Storage module reference (injected to avoid circular dependency) */
       this._storage = null;
     }
@@ -3211,19 +3218,22 @@
 
     /**
      * Set up pref observer for cross-window communication.
-     * Watches for changes to timer-sync and timer-owner prefs.
+     * Watches for changes to timer-sync, timer-owner, and reminder-sync prefs.
      * @private
      */
     _setupPrefObserver() {
       const prefPrefix = Constants.PREF_PREFIX;
       const syncPrefFull = `${prefPrefix}.${Constants.SYNC_PREF_KEY}`;
       const ownerPrefFull = `${prefPrefix}.${Constants.OWNER_PREF_KEY}`;
+      const reminderSyncPrefFull = `${prefPrefix}.${Constants.REMINDER_SYNC_PREF_KEY}`;
       this._prefObserver = {
         observe: (subject, topic, data) => {
           if (data === syncPrefFull) {
             this._handleSyncPrefChange();
           } else if (data === ownerPrefFull) {
             this._handleOwnerPrefChange();
+          } else if (data === reminderSyncPrefFull) {
+            this._handleReminderSyncPrefChange();
           }
         },
       };
@@ -3265,6 +3275,79 @@
           if (this.onOwnershipLost) {
             this.onOwnershipLost();
           }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
+    /**
+     * Write reminder sync action to the reminder-sync pref for other windows to read.
+     * @param {Object} actionData - Action data object (must contain 'action' property)
+     */
+    writeReminderSync(actionData) {
+      // Validate actionData structure
+      if (!actionData) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is null/undefined');
+        return;
+      }
+      if (typeof actionData !== 'object') {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is not an object', {
+          type: typeof actionData,
+        });
+        return;
+      }
+      if (!actionData.action) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - missing required action property', {
+          actionData,
+        });
+        return;
+      }
+      if (typeof actionData.action !== 'string') {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - action must be a string', {
+          action: actionData.action,
+          type: typeof actionData.action,
+        });
+        return;
+      }
+
+      // Validate action value matches expected types
+      const validActions = [
+        'daily-dismissed',
+        'daily-skipped',
+        'post-session-dismissed',
+        'post-session-skipped',
+        'timer-started',
+      ];
+      if (!validActions.includes(actionData.action)) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - unknown action type', {
+          action: actionData.action,
+          validActions,
+        });
+        return;
+      }
+
+      this._writePref(Constants.REMINDER_SYNC_PREF_KEY, {
+        windowId: this.windowId,
+        timestamp: Date.now(),
+        ...actionData,
+      });
+    }
+
+    /**
+     * Handle changes to the reminder-sync pref (reminder actions from other windows).
+     * @private
+     */
+    _handleReminderSyncPrefChange() {
+      if (!this._storage) return;
+      try {
+        const syncStr = this._storage.getPref(Constants.REMINDER_SYNC_PREF_KEY, '');
+        if (!syncStr) return;
+        const syncData = JSON.parse(syncStr);
+        // Ignore if the action came from this window
+        if (syncData.windowId === this.windowId) return;
+        if (this.onReminderSyncChanged) {
+          this.onReminderSyncChanged(syncData);
         }
       } catch (e) {
         /* ignore */
@@ -11171,8 +11254,9 @@
     /**
      * Hide the daily reminder overlay.
      * Called when user starts a timer or successfully skips.
+     * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
      */
-    hideReminder() {
+    hideReminder(fromSync = false) {
       if (!this.reminderOverlay && !this.isShowing) {
         return;
       }
@@ -11198,6 +11282,11 @@
       if (this.reminderOverlay) {
         this.reminderOverlay.remove();
         this.reminderOverlay = null;
+      }
+
+      // Broadcast dismissal to other windows (unless this hide is from sync)
+      if (!fromSync) {
+        window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-dismissed' });
       }
     }
 
@@ -11593,6 +11682,9 @@
 
       // Save state to persist across browser restarts
       this._saveState();
+
+      // Broadcast skip to other windows
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-skipped' });
 
       this.hideReminder();
     }
@@ -12278,8 +12370,9 @@
 
     /**
      * Hide the post-session reminder overlay.
+     * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
      */
-    hideReminder() {
+    hideReminder(fromSync = false) {
       if (!this.reminderOverlay && !this.isShowing) return;
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Hiding post-session reminder overlay');
@@ -12297,6 +12390,11 @@
       if (this.reminderOverlay) {
         this.reminderOverlay.remove();
         this.reminderOverlay = null;
+      }
+
+      // Broadcast dismissal to other windows (unless this hide is from sync)
+      if (!fromSync) {
+        window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-dismissed' });
       }
     }
 
@@ -12316,6 +12414,9 @@
 
       // Save state to persist across browser restarts
       this._saveState();
+
+      // Broadcast skip to other windows
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-skipped' });
 
       this.hideReminder();
     }
@@ -14969,6 +15070,9 @@
       this.windowSync.onOwnershipTaken = (syncState) => {
         this._onOwnershipTaken(syncState);
       };
+      this.windowSync.onReminderSyncChanged = (syncData) => {
+        this._onReminderSyncReceived(syncData);
+      };
     }
 
     /**
@@ -15247,6 +15351,9 @@
       // Notify Post-Session Reminder that timer started (resets idle tracking)
       this.postSessionReminder.onTimerStart();
 
+      // Broadcast timer start to other windows to hide reminders
+      this.windowSync.writeReminderSync({ action: 'timer-started' });
+
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -15282,6 +15389,9 @@
 
       // Notify Post-Session Reminder that timer started (resets idle tracking)
       this.postSessionReminder.onTimerStart();
+
+      // Broadcast timer start to other windows to hide reminders
+      this.windowSync.writeReminderSync({ action: 'timer-started' });
 
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
@@ -15325,12 +15435,32 @@
      * @private
      */
     _syncDumpState(syncState) {
-      if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
-      const wasInDump = this.websiteBlocker.distractionDumpActive || false;
+      if (syncState.dumpActive === undefined || !this.websiteBlocker || !this.distractionDump) return;
+      const wasInDump = this.distractionDump.isActive || false;
+
       if (syncState.dumpActive && !wasInDump) {
+        // Dump started on owner window - sync to this window
+        this.distractionDump.isActive = true;
+        this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
+        this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
         this.websiteBlocker.distractionDumpActive = true;
+        this.websiteBlocker._checkCurrentPage();
+        this.overlay.hide();
+        // Show dump indicator on secondary window (no click handler needed, owner handles dump end)
+        if (this.overlay && this.overlay.showDumpIndicator) {
+          this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
+        }
       } else if (!syncState.dumpActive && wasInDump) {
+        // Dump ended on owner window - sync to this window
+        this.distractionDump.isActive = false;
+        this.distractionDump.dumpTimeRemaining = 0;
         this.websiteBlocker.distractionDumpActive = false;
+        this.websiteBlocker._checkCurrentPage();
+        this.updateOverlayVisibility();
+        // Hide dump indicator on secondary window
+        if (this.overlay && this.overlay.hideDumpIndicator) {
+          this.overlay.hideDumpIndicator();
+        }
       }
     }
 
@@ -15380,6 +15510,43 @@
       });
       if (syncState.currentPhase === 'focus') {
         this.distractionDump.resetForNewFocusPhase();
+      }
+    }
+
+    /**
+     * Handle reminder sync received from another window.
+     * Hides reminders on this window when dismissed/skipped on another window.
+     * @param {Object} syncData - Reminder action data from another window
+     * @private
+     */
+    _onReminderSyncReceived(syncData) {
+      if (!syncData || !syncData.action) return;
+      logger.log(LOG_CATEGORIES$4.SYNC, 'Reminder sync received', { action: syncData.action });
+
+      switch (syncData.action) {
+        case 'daily-dismissed':
+        case 'daily-skipped':
+          // Hide daily reminder on this window (fromSync=true to prevent infinite loop)
+          if (this.dailyReminder && this.dailyReminder.isShowing) {
+            this.dailyReminder.hideReminder(true);
+          }
+          break;
+        case 'post-session-dismissed':
+        case 'post-session-skipped':
+          // Hide post-session reminder on this window (fromSync=true to prevent infinite loop)
+          if (this.postSessionReminder && this.postSessionReminder.isShowing) {
+            this.postSessionReminder.hideReminder(true);
+          }
+          break;
+        case 'timer-started':
+          // Hide both reminders when timer starts on another window
+          if (this.dailyReminder && this.dailyReminder.isShowing) {
+            this.dailyReminder.hideReminder(true);
+          }
+          if (this.postSessionReminder && this.postSessionReminder.isShowing) {
+            this.postSessionReminder.hideReminder(true);
+          }
+          break;
       }
     }
 

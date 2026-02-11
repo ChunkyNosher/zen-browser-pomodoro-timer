@@ -119,6 +119,9 @@ class ZenPomodoroApp {
     this.windowSync.onOwnershipTaken = (syncState) => {
       this._onOwnershipTaken(syncState);
     };
+    this.windowSync.onReminderSyncChanged = (syncData) => {
+      this._onReminderSyncReceived(syncData);
+    };
   }
 
   /**
@@ -397,6 +400,9 @@ class ZenPomodoroApp {
     // Notify Post-Session Reminder that timer started (resets idle tracking)
     this.postSessionReminder.onTimerStart();
 
+    // Broadcast timer start to other windows to hide reminders
+    this.windowSync.writeReminderSync({ action: 'timer-started' });
+
     // Double-check overlay visibility after a short delay
     // This ensures the DOM has settled after timer start
     setTimeout(() => {
@@ -432,6 +438,9 @@ class ZenPomodoroApp {
 
     // Notify Post-Session Reminder that timer started (resets idle tracking)
     this.postSessionReminder.onTimerStart();
+
+    // Broadcast timer start to other windows to hide reminders
+    this.windowSync.writeReminderSync({ action: 'timer-started' });
 
     // Double-check overlay visibility after a short delay
     // This ensures the DOM has settled after timer start
@@ -475,12 +484,32 @@ class ZenPomodoroApp {
    * @private
    */
   _syncDumpState(syncState) {
-    if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
-    const wasInDump = this.websiteBlocker.distractionDumpActive || false;
+    if (syncState.dumpActive === undefined || !this.websiteBlocker || !this.distractionDump) return;
+    const wasInDump = this.distractionDump.isActive || false;
+
     if (syncState.dumpActive && !wasInDump) {
+      // Dump started on owner window - sync to this window
+      this.distractionDump.isActive = true;
+      this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
+      this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
       this.websiteBlocker.distractionDumpActive = true;
+      this.websiteBlocker._checkCurrentPage();
+      this.overlay.hide();
+      // Show dump indicator on secondary window (no click handler needed, owner handles dump end)
+      if (this.overlay && this.overlay.showDumpIndicator) {
+        this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
+      }
     } else if (!syncState.dumpActive && wasInDump) {
+      // Dump ended on owner window - sync to this window
+      this.distractionDump.isActive = false;
+      this.distractionDump.dumpTimeRemaining = 0;
       this.websiteBlocker.distractionDumpActive = false;
+      this.websiteBlocker._checkCurrentPage();
+      this.updateOverlayVisibility();
+      // Hide dump indicator on secondary window
+      if (this.overlay && this.overlay.hideDumpIndicator) {
+        this.overlay.hideDumpIndicator();
+      }
     }
   }
 
@@ -530,6 +559,43 @@ class ZenPomodoroApp {
     });
     if (syncState.currentPhase === 'focus') {
       this.distractionDump.resetForNewFocusPhase();
+    }
+  }
+
+  /**
+   * Handle reminder sync received from another window.
+   * Hides reminders on this window when dismissed/skipped on another window.
+   * @param {Object} syncData - Reminder action data from another window
+   * @private
+   */
+  _onReminderSyncReceived(syncData) {
+    if (!syncData || !syncData.action) return;
+    logger.log(LOG_CATEGORIES.SYNC, 'Reminder sync received', { action: syncData.action });
+
+    switch (syncData.action) {
+      case 'daily-dismissed':
+      case 'daily-skipped':
+        // Hide daily reminder on this window (fromSync=true to prevent infinite loop)
+        if (this.dailyReminder && this.dailyReminder.isShowing) {
+          this.dailyReminder.hideReminder(true);
+        }
+        break;
+      case 'post-session-dismissed':
+      case 'post-session-skipped':
+        // Hide post-session reminder on this window (fromSync=true to prevent infinite loop)
+        if (this.postSessionReminder && this.postSessionReminder.isShowing) {
+          this.postSessionReminder.hideReminder(true);
+        }
+        break;
+      case 'timer-started':
+        // Hide both reminders when timer starts on another window
+        if (this.dailyReminder && this.dailyReminder.isShowing) {
+          this.dailyReminder.hideReminder(true);
+        }
+        if (this.postSessionReminder && this.postSessionReminder.isShowing) {
+          this.postSessionReminder.hideReminder(true);
+        }
+        break;
     }
   }
 

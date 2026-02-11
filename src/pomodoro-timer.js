@@ -616,6 +616,9 @@ class PomodoroTimer {
       customCycle: this.customCycle,
       customCycleBlocks: this.customCycleBlocks,
       currentBlockIndex: this.currentBlockIndex,
+      dumpActive: window.zenPomodoroApp?.distractionDump?.isActive || false,
+      dumpTimeRemaining: window.zenPomodoroApp?.distractionDump?.dumpTimeRemaining || 0,
+      dumpUsedThisFocusPhase: window.zenPomodoroApp?.distractionDump?.dumpUsedThisFocusPhase || false,
       timestamp: Date.now(),
     };
 
