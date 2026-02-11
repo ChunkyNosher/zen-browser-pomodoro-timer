@@ -18,6 +18,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^8.56.0",
     "eslint-plugin-no-unsanitized": "^4.0.2",
+    "happy-dom": "^20.6.1",
     "prettier": "^3.1.0",
     "rollup": "^4.57.1",
     "stylelint": "^16.0.0",
