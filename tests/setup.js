@@ -11,9 +11,22 @@
 
 // Mock Services.prefs
 const mockPrefs = new Map();
+
+// Pref type constants (Firefox compatibility)
+const PREF_STRING = 32;
+const PREF_INT = 64;
+const PREF_BOOL = 128;
+
 globalThis.Services = {
   prefs: {
+    // Type constants
+    PREF_STRING,
+    PREF_INT,
+    PREF_BOOL,
+    // Getter methods with legacy alias
+    getCharPref: (key, defaultValue) => mockPrefs.get(key) ?? defaultValue ?? '',
     getStringPref: (key, defaultValue) => mockPrefs.get(key) ?? defaultValue ?? '',
+    setCharPref: (key, value) => mockPrefs.set(key, value),
     setStringPref: (key, value) => mockPrefs.set(key, value),
     getIntPref: (key, defaultValue) => mockPrefs.get(key) ?? defaultValue ?? 0,
     setIntPref: (key, value) => mockPrefs.set(key, value),
@@ -21,6 +34,15 @@ globalThis.Services = {
     setBoolPref: (key, value) => mockPrefs.set(key, value),
     prefHasUserValue: (key) => mockPrefs.has(key),
     clearUserPref: (key) => mockPrefs.delete(key),
+    // Get pref type based on stored value
+    getPrefType: (key) => {
+      if (!mockPrefs.has(key)) return 0;
+      const value = mockPrefs.get(key);
+      if (typeof value === 'string') return PREF_STRING;
+      if (typeof value === 'number') return PREF_INT;
+      if (typeof value === 'boolean') return PREF_BOOL;
+      return 0;
+    },
     addObserver: () => {},
     removeObserver: () => {},
     getDefaultBranch: () => ({
