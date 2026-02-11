@@ -12,18 +12,21 @@ import { logger } from './log-manager.js';
  * @param {*} defaultValue - Default value if preference not found
  * @returns {*} Preference value or defaultValue
  */
+/** Map from pref type constant to getter method name */
+const PREF_TYPE_GETTERS = {};
+
 function getPref(key, defaultValue) {
   const prefKey = `${Constants.PREF_PREFIX}.${key}`;
   try {
     if (Services.prefs.prefHasUserValue(prefKey)) {
-      const prefType = Services.prefs.getPrefType(prefKey);
-      if (prefType === Services.prefs.PREF_STRING) {
-        return Services.prefs.getCharPref(prefKey);
-      } else if (prefType === Services.prefs.PREF_INT) {
-        return Services.prefs.getIntPref(prefKey);
-      } else if (prefType === Services.prefs.PREF_BOOL) {
-        return Services.prefs.getBoolPref(prefKey);
+      // Initialize getter map lazily to ensure Services is available
+      if (!PREF_TYPE_GETTERS[Services.prefs.PREF_STRING]) {
+        PREF_TYPE_GETTERS[Services.prefs.PREF_STRING] = 'getCharPref';
+        PREF_TYPE_GETTERS[Services.prefs.PREF_INT] = 'getIntPref';
+        PREF_TYPE_GETTERS[Services.prefs.PREF_BOOL] = 'getBoolPref';
       }
+      const getter = PREF_TYPE_GETTERS[Services.prefs.getPrefType(prefKey)];
+      if (getter) return Services.prefs[getter](prefKey);
     }
   } catch (e) {
     console.error(`Failed to get pref ${prefKey}:`, e);
@@ -36,16 +39,18 @@ function getPref(key, defaultValue) {
  * @param {string} key - Preference key (without prefix)
  * @param {*} value - Value to set (string, number, or boolean)
  */
+/** Map from typeof value to setter method name */
+const PREF_TYPE_SETTERS = {
+  string: 'setCharPref',
+  number: 'setIntPref',
+  boolean: 'setBoolPref',
+};
+
 function setPref(key, value) {
   const prefKey = `${Constants.PREF_PREFIX}.${key}`;
   try {
-    if (typeof value === 'string') {
-      Services.prefs.setCharPref(prefKey, value);
-    } else if (typeof value === 'number') {
-      Services.prefs.setIntPref(prefKey, value);
-    } else if (typeof value === 'boolean') {
-      Services.prefs.setBoolPref(prefKey, value);
-    }
+    const setter = PREF_TYPE_SETTERS[typeof value];
+    if (setter) Services.prefs[setter](prefKey, value);
   } catch (e) {
     console.error(`Failed to set pref ${prefKey}:`, e);
   }
@@ -213,6 +218,29 @@ function loadReminderModePref(prefName, config, configKey) {
 }
 
 /**
+ * Migrate old boolean reminder flags to the new reminderMode enum.
+ * @param {Object} config - Config to migrate in place
+ * @private
+ */
+function migrateReminderSettings(config) {
+  if (config.dailyReminderEnabled === undefined && config.postSessionReminderEnabled === undefined) {
+    return;
+  }
+  if (config.dailyReminderEnabled === true) {
+    config.reminderMode = Constants.REMINDER_MODES.DAILY;
+  } else if (config.postSessionReminderEnabled === true) {
+    config.reminderMode = Constants.REMINDER_MODES.POST_SESSION;
+  } else {
+    config.reminderMode = Constants.REMINDER_MODES.NONE;
+  }
+  delete config.dailyReminderEnabled;
+  delete config.postSessionReminderEnabled;
+  logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Migrated reminder settings to new format', {
+    reminderMode: config.reminderMode,
+  });
+}
+
+/**
  * Get configuration object from preferences.
  * Loads default config, then merges stored JSON config, then applies individual preference overrides.
  * @returns {Object} Configuration object
@@ -222,21 +250,7 @@ function loadConfig() {
   let config = loadStoredConfigJson({ ...Constants.DEFAULT_CONFIG });
 
   // MIGRATION: Convert old boolean flags to new reminderMode
-  if (config.dailyReminderEnabled !== undefined || config.postSessionReminderEnabled !== undefined) {
-    if (config.dailyReminderEnabled === true) {
-      config.reminderMode = Constants.REMINDER_MODES.DAILY;
-    } else if (config.postSessionReminderEnabled === true) {
-      config.reminderMode = Constants.REMINDER_MODES.POST_SESSION;
-    } else {
-      config.reminderMode = Constants.REMINDER_MODES.NONE;
-    }
-    // Clean up old keys
-    delete config.dailyReminderEnabled;
-    delete config.postSessionReminderEnabled;
-    logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Migrated reminder settings to new format', {
-      reminderMode: config.reminderMode,
-    });
-  }
+  migrateReminderSettings(config);
 
   // Override with individual preferences if set
   // Boolean preferences (handles both true and 'true' for legacy support)

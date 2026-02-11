@@ -617,18 +617,21 @@
    * @param {*} defaultValue - Default value if preference not found
    * @returns {*} Preference value or defaultValue
    */
+  /** Map from pref type constant to getter method name */
+  const PREF_TYPE_GETTERS = {};
+
   function getPref$2(key, defaultValue) {
     const prefKey = `${Constants.PREF_PREFIX}.${key}`;
     try {
       if (Services.prefs.prefHasUserValue(prefKey)) {
-        const prefType = Services.prefs.getPrefType(prefKey);
-        if (prefType === Services.prefs.PREF_STRING) {
-          return Services.prefs.getCharPref(prefKey);
-        } else if (prefType === Services.prefs.PREF_INT) {
-          return Services.prefs.getIntPref(prefKey);
-        } else if (prefType === Services.prefs.PREF_BOOL) {
-          return Services.prefs.getBoolPref(prefKey);
+        // Initialize getter map lazily to ensure Services is available
+        if (!PREF_TYPE_GETTERS[Services.prefs.PREF_STRING]) {
+          PREF_TYPE_GETTERS[Services.prefs.PREF_STRING] = 'getCharPref';
+          PREF_TYPE_GETTERS[Services.prefs.PREF_INT] = 'getIntPref';
+          PREF_TYPE_GETTERS[Services.prefs.PREF_BOOL] = 'getBoolPref';
         }
+        const getter = PREF_TYPE_GETTERS[Services.prefs.getPrefType(prefKey)];
+        if (getter) return Services.prefs[getter](prefKey);
       }
     } catch (e) {
       console.error(`Failed to get pref ${prefKey}:`, e);
@@ -641,16 +644,18 @@
    * @param {string} key - Preference key (without prefix)
    * @param {*} value - Value to set (string, number, or boolean)
    */
+  /** Map from typeof value to setter method name */
+  const PREF_TYPE_SETTERS = {
+    string: 'setCharPref',
+    number: 'setIntPref',
+    boolean: 'setBoolPref',
+  };
+
   function setPref$2(key, value) {
     const prefKey = `${Constants.PREF_PREFIX}.${key}`;
     try {
-      if (typeof value === 'string') {
-        Services.prefs.setCharPref(prefKey, value);
-      } else if (typeof value === 'number') {
-        Services.prefs.setIntPref(prefKey, value);
-      } else if (typeof value === 'boolean') {
-        Services.prefs.setBoolPref(prefKey, value);
-      }
+      const setter = PREF_TYPE_SETTERS[typeof value];
+      if (setter) Services.prefs[setter](prefKey, value);
     } catch (e) {
       console.error(`Failed to set pref ${prefKey}:`, e);
     }
@@ -818,6 +823,29 @@
   }
 
   /**
+   * Migrate old boolean reminder flags to the new reminderMode enum.
+   * @param {Object} config - Config to migrate in place
+   * @private
+   */
+  function migrateReminderSettings(config) {
+    if (config.dailyReminderEnabled === undefined && config.postSessionReminderEnabled === undefined) {
+      return;
+    }
+    if (config.dailyReminderEnabled === true) {
+      config.reminderMode = Constants.REMINDER_MODES.DAILY;
+    } else if (config.postSessionReminderEnabled === true) {
+      config.reminderMode = Constants.REMINDER_MODES.POST_SESSION;
+    } else {
+      config.reminderMode = Constants.REMINDER_MODES.NONE;
+    }
+    delete config.dailyReminderEnabled;
+    delete config.postSessionReminderEnabled;
+    logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Migrated reminder settings to new format', {
+      reminderMode: config.reminderMode,
+    });
+  }
+
+  /**
    * Get configuration object from preferences.
    * Loads default config, then merges stored JSON config, then applies individual preference overrides.
    * @returns {Object} Configuration object
@@ -827,21 +855,7 @@
     let config = loadStoredConfigJson({ ...Constants.DEFAULT_CONFIG });
 
     // MIGRATION: Convert old boolean flags to new reminderMode
-    if (config.dailyReminderEnabled !== undefined || config.postSessionReminderEnabled !== undefined) {
-      if (config.dailyReminderEnabled === true) {
-        config.reminderMode = Constants.REMINDER_MODES.DAILY;
-      } else if (config.postSessionReminderEnabled === true) {
-        config.reminderMode = Constants.REMINDER_MODES.POST_SESSION;
-      } else {
-        config.reminderMode = Constants.REMINDER_MODES.NONE;
-      }
-      // Clean up old keys
-      delete config.dailyReminderEnabled;
-      delete config.postSessionReminderEnabled;
-      logger.log(Constants.LOG_CATEGORIES.SETTINGS, 'Migrated reminder settings to new format', {
-        reminderMode: config.reminderMode,
-      });
-    }
+    migrateReminderSettings(config);
 
     // Override with individual preferences if set
     // Boolean preferences (handles both true and 'true' for legacy support)
@@ -1905,27 +1919,29 @@
    *
    * @param {() => void} onStop - Callback to execute after successful stop confirmation
    */
-  function handleStopTimerWithLockout(onStop) {
-    if (!window.zenPomodoroApp) return;
+  /**
+   * Show a lockout-protected confirmation dialog for timer actions.
+   * @param {string} title - Confirmation dialog title
+   * @param {string} message - Confirmation dialog message
+   * @param {Function} onConfirm - Callback on confirmation
+   * @private
+   */
+  function showLockoutProtectedConfirm(title, message, onConfirm) {
+    const app = window.zenPomodoroApp;
+    if (!app) return;
 
-    const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+    const showConfirm = () => app.showCustomConfirm(title, message, onConfirm);
+    const timerActive = app.timer?.isActive;
 
-    const showStopConfirmation = () => {
-      window.zenPomodoroApp.showCustomConfirm(
-        'Stop Timer',
-        'Are you sure you want to stop the timer?',
-        onStop
-      );
-    };
-
-    // Issue 6: Always require lockout when stopping an active timer.
-    // This prevents accidental or impulsive timer stops during focus sessions.
-    // The lockout uses the user's configured settingsLockActiveMethod.
     if (timerActive) {
-      window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
+      app.security.showLockScreen(true, showConfirm);
     } else {
-      showStopConfirmation();
+      showConfirm();
     }
+  }
+
+  function handleStopTimerWithLockout(onStop) {
+    showLockoutProtectedConfirm('Stop Timer', 'Are you sure you want to stop the timer?', onStop);
   }
 
   /**
@@ -1935,24 +1951,11 @@
    * @param {Function} onSkip - Callback function to execute after lockout verification
    */
   function handleSkipFocusWithLockout(onSkip) {
-    if (!window.zenPomodoroApp) return;
-
-    const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
-
-    const showSkipConfirmation = () => {
-      window.zenPomodoroApp.showCustomConfirm(
-        'Skip Focus',
-        'Skip current focus phase and start break early? Your focus time will not be counted.',
-        onSkip
-      );
-    };
-
-    // Always require lockout when skipping focus (same as stopping timer)
-    if (timerActive) {
-      window.zenPomodoroApp.security.showLockScreen(true, showSkipConfirmation);
-    } else {
-      showSkipConfirmation();
-    }
+    showLockoutProtectedConfirm(
+      'Skip Focus',
+      'Skip current focus phase and start break early? Your focus time will not be counted.',
+      onSkip
+    );
   }
 
   /**
@@ -1979,11 +1982,8 @@
    * @returns {void}
    */
   function handlePauseResumeTimer() {
-    // Null safety checks for all required objects
-    if (!window.zenPomodoroApp) return;
-    if (!window.zenPomodoroApp.timer) return;
-    if (!window.zenPomodoroApp.workspace) return;
-    if (!window.zenPomodoroApp.overlay) return;
+    const app = window.zenPomodoroApp;
+    if (!app?.timer || !app.workspace || !app.overlay) return;
 
     // Check if Distraction Dump is active - don't allow pause/resume during dump
     if (isDistractionDumpBlocking()) {
@@ -1991,27 +1991,22 @@
       return;
     }
 
-    const timer = window.zenPomodoroApp.timer;
+    const timer = app.timer;
 
     // CROSS-WINDOW SYNC: Claim ownership if this is a secondary window
-    window.zenPomodoroApp._claimOwnershipForAction();
+    app._claimOwnershipForAction();
 
     if (timer.isPaused) {
       timer.resume();
     } else {
-      // PAUSE FIX: Track whether we're pausing on a blocked workspace
       // Use isWorkspaceInBlockedList() to check raw workspace membership
-      // without break phase interference (break phase already handled separately)
-      const isOnBlockedWorkspace = window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
+      const isOnBlockedWorkspace = app.workspace.isWorkspaceInBlockedList();
       timer.pause(isOnBlockedWorkspace);
     }
 
-    // Update overlay visibility after pause/resume state change
-    window.zenPomodoroApp.updateOverlayVisibility();
-
-    // PAUSE FIX: Update indicator paused state for visual feedback
-    // This ensures the indicator shows orange color when paused
-    window.zenPomodoroApp.overlay.updateIndicatorPausedState(timer.isPaused);
+    // Update overlay visibility and indicator paused state
+    app.updateOverlayVisibility();
+    app.overlay.updateIndicatorPausedState(timer.isPaused);
   }
 
   /**
@@ -11695,6 +11690,19 @@
     }
 
     /**
+     * Format the current state object for logging.
+     * @returns {Object} State object formatted for log output
+     * @private
+     */
+    _formatStateForLog() {
+      return {
+        skipCount: this.skipCount,
+        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+      };
+    }
+
+    /**
      * Load persisted state from config.
      * Restores skipCount, lastSkipTime, and idleStartTime across browser restarts.
      * @private
@@ -11706,11 +11714,7 @@
       this.lastSkipTime = config.postSessionLastSkipTime || null;
       this.idleStartTime = config.postSessionIdleStartTime || null;
 
-      logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Loaded persisted state', {
-        skipCount: this.skipCount,
-        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
-        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-      });
+      logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Loaded persisted state', this._formatStateForLog());
     }
 
     /**
@@ -11726,11 +11730,7 @@
 
       saveConfig$1(config);
 
-      logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Saved state', {
-        skipCount: this.skipCount,
-        lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
-        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-      });
+      logger.log(LOG_CATEGORIES$4.TIMER, 'Post-session reminder: Saved state', this._formatStateForLog());
     }
 
     /**
@@ -11822,23 +11822,35 @@
     }
 
     /**
+     * Transfer idle tracking state between active and paused, with logging.
+     * @param {boolean} pause - True to pause, false to resume
+     * @param {string} reason - Log message describing the reason
+     * @private
+     */
+    _toggleIdleTracking(pause, reason) {
+      if (pause && this.idleStartTime) {
+        this._pausedIdleStartTime = this.idleStartTime;
+        this.idleStartTime = null;
+        logger.log(LOG_CATEGORIES$4.TIMER, `Post-session reminder: ${reason}`, {
+          pausedIdleStartTime: this._pausedIdleStartTime
+            ? new Date(this._pausedIdleStartTime).toISOString()
+            : null,
+        });
+      } else if (!pause && this._pausedIdleStartTime) {
+        this.idleStartTime = this._pausedIdleStartTime;
+        this._pausedIdleStartTime = null;
+        logger.log(LOG_CATEGORIES$4.TIMER, `Post-session reminder: ${reason}`, {
+          idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+        });
+      }
+    }
+
+    /**
      * Pause idle tracking while daily reminder is showing.
      * Saves the current idleStartTime and temporarily nullifies it.
      */
     pauseIdleTracking() {
-      if (this.idleStartTime) {
-        this._pausedIdleStartTime = this.idleStartTime;
-        this.idleStartTime = null;
-        logger.log(
-          LOG_CATEGORIES$4.TIMER,
-          'Post-session reminder: Paused idle tracking (daily reminder showing)',
-          {
-            pausedIdleStartTime: this._pausedIdleStartTime
-              ? new Date(this._pausedIdleStartTime).toISOString()
-              : null,
-          }
-        );
-      }
+      this._toggleIdleTracking(true, 'Paused idle tracking (daily reminder showing)');
     }
 
     /**
@@ -11846,17 +11858,7 @@
      * Restores the previously paused idleStartTime.
      */
     resumeIdleTracking() {
-      if (this._pausedIdleStartTime) {
-        this.idleStartTime = this._pausedIdleStartTime;
-        this._pausedIdleStartTime = null;
-        logger.log(
-          LOG_CATEGORIES$4.TIMER,
-          'Post-session reminder: Resumed idle tracking (daily reminder hidden)',
-          {
-            idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-          }
-        );
-      }
+      this._toggleIdleTracking(false, 'Resumed idle tracking (daily reminder hidden)');
     }
 
     /**

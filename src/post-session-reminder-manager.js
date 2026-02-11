@@ -51,6 +51,19 @@ class PostSessionReminderManager {
   }
 
   /**
+   * Format the current state object for logging.
+   * @returns {Object} State object formatted for log output
+   * @private
+   */
+  _formatStateForLog() {
+    return {
+      skipCount: this.skipCount,
+      lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
+      idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+    };
+  }
+
+  /**
    * Load persisted state from config.
    * Restores skipCount, lastSkipTime, and idleStartTime across browser restarts.
    * @private
@@ -62,11 +75,7 @@ class PostSessionReminderManager {
     this.lastSkipTime = config.postSessionLastSkipTime || null;
     this.idleStartTime = config.postSessionIdleStartTime || null;
 
-    logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Loaded persisted state', {
-      skipCount: this.skipCount,
-      lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
-      idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-    });
+    logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Loaded persisted state', this._formatStateForLog());
   }
 
   /**
@@ -82,11 +91,7 @@ class PostSessionReminderManager {
 
     saveConfig(config);
 
-    logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Saved state', {
-      skipCount: this.skipCount,
-      lastSkipTime: this.lastSkipTime ? new Date(this.lastSkipTime).toISOString() : null,
-      idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-    });
+    logger.log(LOG_CATEGORIES.TIMER, 'Post-session reminder: Saved state', this._formatStateForLog());
   }
 
   /**
@@ -178,23 +183,35 @@ class PostSessionReminderManager {
   }
 
   /**
+   * Transfer idle tracking state between active and paused, with logging.
+   * @param {boolean} pause - True to pause, false to resume
+   * @param {string} reason - Log message describing the reason
+   * @private
+   */
+  _toggleIdleTracking(pause, reason) {
+    if (pause && this.idleStartTime) {
+      this._pausedIdleStartTime = this.idleStartTime;
+      this.idleStartTime = null;
+      logger.log(LOG_CATEGORIES.TIMER, `Post-session reminder: ${reason}`, {
+        pausedIdleStartTime: this._pausedIdleStartTime
+          ? new Date(this._pausedIdleStartTime).toISOString()
+          : null,
+      });
+    } else if (!pause && this._pausedIdleStartTime) {
+      this.idleStartTime = this._pausedIdleStartTime;
+      this._pausedIdleStartTime = null;
+      logger.log(LOG_CATEGORIES.TIMER, `Post-session reminder: ${reason}`, {
+        idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
+      });
+    }
+  }
+
+  /**
    * Pause idle tracking while daily reminder is showing.
    * Saves the current idleStartTime and temporarily nullifies it.
    */
   pauseIdleTracking() {
-    if (this.idleStartTime) {
-      this._pausedIdleStartTime = this.idleStartTime;
-      this.idleStartTime = null;
-      logger.log(
-        LOG_CATEGORIES.TIMER,
-        'Post-session reminder: Paused idle tracking (daily reminder showing)',
-        {
-          pausedIdleStartTime: this._pausedIdleStartTime
-            ? new Date(this._pausedIdleStartTime).toISOString()
-            : null,
-        }
-      );
-    }
+    this._toggleIdleTracking(true, 'Paused idle tracking (daily reminder showing)');
   }
 
   /**
@@ -202,17 +219,7 @@ class PostSessionReminderManager {
    * Restores the previously paused idleStartTime.
    */
   resumeIdleTracking() {
-    if (this._pausedIdleStartTime) {
-      this.idleStartTime = this._pausedIdleStartTime;
-      this._pausedIdleStartTime = null;
-      logger.log(
-        LOG_CATEGORIES.TIMER,
-        'Post-session reminder: Resumed idle tracking (daily reminder hidden)',
-        {
-          idleStartTime: this.idleStartTime ? new Date(this.idleStartTime).toISOString() : null,
-        }
-      );
-    }
+    this._toggleIdleTracking(false, 'Resumed idle tracking (daily reminder hidden)');
   }
 
   /**

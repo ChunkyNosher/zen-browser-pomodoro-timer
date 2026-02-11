@@ -481,27 +481,29 @@ export function renderListOrEmptyMessage({ container, items, emptyClass, emptyTe
  *
  * @param {() => void} onStop - Callback to execute after successful stop confirmation
  */
-export function handleStopTimerWithLockout(onStop) {
-  if (!window.zenPomodoroApp) return;
+/**
+ * Show a lockout-protected confirmation dialog for timer actions.
+ * @param {string} title - Confirmation dialog title
+ * @param {string} message - Confirmation dialog message
+ * @param {Function} onConfirm - Callback on confirmation
+ * @private
+ */
+function showLockoutProtectedConfirm(title, message, onConfirm) {
+  const app = window.zenPomodoroApp;
+  if (!app) return;
 
-  const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
+  const showConfirm = () => app.showCustomConfirm(title, message, onConfirm);
+  const timerActive = app.timer?.isActive;
 
-  const showStopConfirmation = () => {
-    window.zenPomodoroApp.showCustomConfirm(
-      'Stop Timer',
-      'Are you sure you want to stop the timer?',
-      onStop
-    );
-  };
-
-  // Issue 6: Always require lockout when stopping an active timer.
-  // This prevents accidental or impulsive timer stops during focus sessions.
-  // The lockout uses the user's configured settingsLockActiveMethod.
   if (timerActive) {
-    window.zenPomodoroApp.security.showLockScreen(true, showStopConfirmation);
+    app.security.showLockScreen(true, showConfirm);
   } else {
-    showStopConfirmation();
+    showConfirm();
   }
+}
+
+export function handleStopTimerWithLockout(onStop) {
+  showLockoutProtectedConfirm('Stop Timer', 'Are you sure you want to stop the timer?', onStop);
 }
 
 /**
@@ -511,24 +513,11 @@ export function handleStopTimerWithLockout(onStop) {
  * @param {Function} onSkip - Callback function to execute after lockout verification
  */
 export function handleSkipFocusWithLockout(onSkip) {
-  if (!window.zenPomodoroApp) return;
-
-  const timerActive = window.zenPomodoroApp.timer && window.zenPomodoroApp.timer.isActive;
-
-  const showSkipConfirmation = () => {
-    window.zenPomodoroApp.showCustomConfirm(
-      'Skip Focus',
-      'Skip current focus phase and start break early? Your focus time will not be counted.',
-      onSkip
-    );
-  };
-
-  // Always require lockout when skipping focus (same as stopping timer)
-  if (timerActive) {
-    window.zenPomodoroApp.security.showLockScreen(true, showSkipConfirmation);
-  } else {
-    showSkipConfirmation();
-  }
+  showLockoutProtectedConfirm(
+    'Skip Focus',
+    'Skip current focus phase and start break early? Your focus time will not be counted.',
+    onSkip
+  );
 }
 
 /**
@@ -555,11 +544,8 @@ export function isDistractionDumpBlocking() {
  * @returns {void}
  */
 export function handlePauseResumeTimer() {
-  // Null safety checks for all required objects
-  if (!window.zenPomodoroApp) return;
-  if (!window.zenPomodoroApp.timer) return;
-  if (!window.zenPomodoroApp.workspace) return;
-  if (!window.zenPomodoroApp.overlay) return;
+  const app = window.zenPomodoroApp;
+  if (!app?.timer || !app.workspace || !app.overlay) return;
 
   // Check if Distraction Dump is active - don't allow pause/resume during dump
   if (isDistractionDumpBlocking()) {
@@ -567,25 +553,20 @@ export function handlePauseResumeTimer() {
     return;
   }
 
-  const timer = window.zenPomodoroApp.timer;
+  const timer = app.timer;
 
   // CROSS-WINDOW SYNC: Claim ownership if this is a secondary window
-  window.zenPomodoroApp._claimOwnershipForAction();
+  app._claimOwnershipForAction();
 
   if (timer.isPaused) {
     timer.resume();
   } else {
-    // PAUSE FIX: Track whether we're pausing on a blocked workspace
     // Use isWorkspaceInBlockedList() to check raw workspace membership
-    // without break phase interference (break phase already handled separately)
-    const isOnBlockedWorkspace = window.zenPomodoroApp.workspace.isWorkspaceInBlockedList();
+    const isOnBlockedWorkspace = app.workspace.isWorkspaceInBlockedList();
     timer.pause(isOnBlockedWorkspace);
   }
 
-  // Update overlay visibility after pause/resume state change
-  window.zenPomodoroApp.updateOverlayVisibility();
-
-  // PAUSE FIX: Update indicator paused state for visual feedback
-  // This ensures the indicator shows orange color when paused
-  window.zenPomodoroApp.overlay.updateIndicatorPausedState(timer.isPaused);
+  // Update overlay visibility and indicator paused state
+  app.updateOverlayVisibility();
+  app.overlay.updateIndicatorPausedState(timer.isPaused);
 }
