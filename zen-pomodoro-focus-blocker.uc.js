@@ -7398,22 +7398,19 @@
     }
 
     /**
-     * Show the main Pomodoro menu dialog
-     * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
+     * Helper: Close menu dialog and clean up resources
      */
-    showPomodoroMenu() {
-      // Issue 4: Check if any dialogs are currently open using shared constant
-      const existingDialogs = document.querySelectorAll(POMODORO_DIALOG_SELECTORS.join(', '));
+    _closeMenuDialog(dialog) {
+      this._stopMenuTimerUpdates();
+      this._stopReminderCountdownUpdates();
+      dialog.remove();
+      this.menuDialog = null;
+    }
 
-      if (existingDialogs.length > 0) {
-        // If any dialog exists, close them all and return (toggle behavior)
-        logger.log(LOG_CATEGORIES$4.MENU, 'Closing all dialogs (toggle behavior)');
-        this.closeAllDialogs();
-        return;
-      }
-
-      logger.log(LOG_CATEGORIES$4.MENU, 'Opening main menu');
-
+    /**
+     * Helper: Create the dialog shell and basic structure
+     */
+    _createMenuDialogShell() {
       const dialog = document.createElement('div');
       dialog.id = 'zen-pomodoro-menu-dialog';
       dialog.className = 'zen-pomodoro-dialog active';
@@ -7425,41 +7422,148 @@
       const menuSection = document.createElement('div');
       menuSection.className = 'zen-pomodoro-config-section';
 
-      const timerActive =
-        window.zenPomodoroApp &&
-        window.zenPomodoroApp.timer &&
-        window.zenPomodoroApp.timer.isActive;
+      return { dialog, h2, menuSection };
+    }
 
-      if (timerActive) {
-        // Timer is running - show timer controls
-        const status = window.zenPomodoroApp.timer.getStatus();
-        const timeStr = formatTime(status.remainingTime);
-        // Use helper function to map phase to display label
-        const phaseStr = getMenuPhaseLabel(status.currentPhase);
+    /**
+     * Helper: Create distraction dump button based on current state
+     */
+    _createDumpButton(status) {
+      const config = getConfig$3();
+      const dumpManager = window.zenPomodoroApp?.distractionDump;
+      
+      if (!config.distractionDumpEnabled || status.currentPhase !== 'focus') {
+        return null;
+      }
+      
+      const isDumpActive = dumpManager?.isActive;
+      const isDumpAvailable = dumpManager?.isDumpAvailable();
+      
+      const dumpBtn = document.createElement('button');
+      dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
+      
+      if (isDumpActive) {
+        dumpBtn.textContent = '🧠 End Dump Early';
+        return { btn: dumpBtn, action: 'endDump' };
+      } else if (isDumpAvailable) {
+        dumpBtn.textContent = '🧠 Distraction Dump';
+        return { btn: dumpBtn, action: 'startDump' };
+      } else {
+        dumpBtn.textContent = '🧠 Dump Used';
+        dumpBtn.disabled = true;
+        dumpBtn.title = 'Distraction Dump can only be used once per focus phase';
+        dumpBtn.style.opacity = '0.5';
+        dumpBtn.style.cursor = 'not-allowed';
+        return { btn: dumpBtn, action: 'disabled' };
+      }
+    }
 
-        const statusRow = document.createElement('div');
-        statusRow.className = 'zen-pomodoro-config-row';
-        statusRow.style.justifyContent = 'center';
-        statusRow.style.marginBottom = '16px';
-        const statusText = document.createElement('div');
-        statusText.style.fontSize = '18px';
-        statusText.style.fontWeight = '600';
-        // Don't show cycle info for simple timer mode - only pomodoro mode has cycles
-        if (status.mode === 'simple') {
-          statusText.textContent = `${phaseStr}: ${timeStr}`;
-        } else {
-          statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+    /**
+     * Helper: Create menu for active timer state
+     */
+    _createTimerActiveMenu(dialog, menuSection) {
+      const status = window.zenPomodoroApp.timer.getStatus();
+
+      const statusRow = this._createStatusRow(status);
+      const pauseResumeBtn = this._createPauseResumeButton(dialog, status);
+      const phaseButtons = this._createPhaseButtons(dialog, status);
+      const stopBtn = this._createStopButton(dialog);
+      const toggleIndicatorBtn = this._createToggleIndicatorButton();
+      const navButtons = this._createActiveMenuNavButtons(dialog);
+
+      // Append all elements in order
+      menuSection.appendChild(statusRow);
+      menuSection.appendChild(pauseResumeBtn);
+      this._appendDumpButton(dialog, status, menuSection);
+      phaseButtons.forEach(btn => menuSection.appendChild(btn));
+      menuSection.appendChild(stopBtn);
+      menuSection.appendChild(toggleIndicatorBtn);
+      navButtons.forEach(btn => menuSection.appendChild(btn));
+    }
+
+    /**
+     * Create the status row showing current phase and time.
+     * @param {Object} status - Timer status object
+     * @returns {HTMLElement} Status row element
+     * @private
+     */
+    _createStatusRow(status) {
+      const timeStr = formatTime(status.remainingTime);
+      const phaseStr = getMenuPhaseLabel(status.currentPhase);
+
+      const statusRow = document.createElement('div');
+      statusRow.className = 'zen-pomodoro-config-row';
+      statusRow.style.justifyContent = 'center';
+      statusRow.style.marginBottom = '16px';
+      const statusText = document.createElement('div');
+      statusText.style.fontSize = '18px';
+      statusText.style.fontWeight = '600';
+
+      if (status.mode === 'simple') {
+        statusText.textContent = `${phaseStr}: ${timeStr}`;
+      } else {
+        statusText.textContent = `${phaseStr}: ${timeStr} (Cycle ${status.currentCycle}/${status.totalCycles})`;
+      }
+      statusRow.appendChild(statusText);
+      this._startMenuTimerUpdates(statusText);
+      return statusRow;
+    }
+
+    /**
+     * Create the pause/resume button.
+     * @param {HTMLElement} dialog - Menu dialog
+     * @param {Object} status - Timer status
+     * @returns {HTMLElement} Pause/Resume button
+     * @private
+     */
+    _createPauseResumeButton(dialog, status) {
+      const btn = document.createElement('button');
+      btn.className = 'zen-pomodoro-dialog-button';
+      btn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
+      btn.addEventListener('click', () => {
+        if (isDistractionDumpBlocking()) {
+          window.zenPomodoroApp.showCustomAlert(
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
+            Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
+          );
+          return;
         }
-        statusRow.appendChild(statusText);
+        this._closeMenuDialog(dialog);
+        handlePauseResumeTimer();
+      });
+      return btn;
+    }
 
-        // Start real-time timer updates while menu is open
-        this._startMenuTimerUpdates(statusText);
+    /**
+     * Create phase-specific buttons (Cut Break Early or Skip Focus).
+     * @param {HTMLElement} dialog - Menu dialog
+     * @param {Object} status - Timer status
+     * @returns {Array<HTMLElement>} Array of phase buttons (may be empty)
+     * @private
+     */
+    _createPhaseButtons(dialog, status) {
+      const buttons = [];
+      const isBreakOrTransition =
+        status.currentPhase === 'break' ||
+        status.currentPhase === 'long-break' ||
+        status.currentPhase === 'transition';
 
-        const pauseResumeBtn = document.createElement('button');
-        pauseResumeBtn.className = 'zen-pomodoro-dialog-button';
-        pauseResumeBtn.textContent = status.isPaused ? 'Resume Timer' : 'Pause Timer';
-        pauseResumeBtn.addEventListener('click', () => {
-          // Check if Distraction Dump is active - provide user feedback
+      if (isBreakOrTransition) {
+        const cutBreakBtn = document.createElement('button');
+        cutBreakBtn.className = 'zen-pomodoro-dialog-button secondary';
+        cutBreakBtn.textContent = 'Cut Break Early';
+        cutBreakBtn.addEventListener('click', () => {
+          this._closeMenuDialog(dialog);
+          this._handleCutBreakEarly(status.currentPhase);
+        });
+        buttons.push(cutBreakBtn);
+      }
+
+      if (status.currentPhase === 'focus') {
+        const skipFocusBtn = document.createElement('button');
+        skipFocusBtn.className = 'zen-pomodoro-dialog-button secondary';
+        skipFocusBtn.textContent = 'Skip Focus';
+        skipFocusBtn.addEventListener('click', () => {
           if (isDistractionDumpBlocking()) {
             window.zenPomodoroApp.showCustomAlert(
               Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
@@ -7467,224 +7571,185 @@
             );
             return;
           }
-          this._stopMenuTimerUpdates();
-          handlePauseResumeTimer();
-          dialog.remove();
-          this.menuDialog = null;
-        });
-
-        // Cut Break Early button - only shown during break, long-break, or transition phases
-        const isBreakOrTransition =
-          status.currentPhase === 'break' ||
-          status.currentPhase === 'long-break' ||
-          status.currentPhase === 'transition';
-        let cutBreakBtn = null;
-        if (isBreakOrTransition) {
-          cutBreakBtn = document.createElement('button');
-          cutBreakBtn.className = 'zen-pomodoro-dialog-button secondary';
-          cutBreakBtn.textContent = 'Cut Break Early';
-          cutBreakBtn.addEventListener('click', () => {
-            this._stopMenuTimerUpdates();
-            dialog.remove();
-            this.menuDialog = null;
-            this._handleCutBreakEarly(status.currentPhase);
-          });
-        }
-
-        // Skip Focus button - only shown during focus phase (not break/transition)
-        // Requires lockscreen verification like stopping timer
-        let skipFocusBtn = null;
-        if (status.currentPhase === 'focus') {
-          skipFocusBtn = document.createElement('button');
-          skipFocusBtn.className = 'zen-pomodoro-dialog-button secondary';
-          skipFocusBtn.textContent = 'Skip Focus';
-          skipFocusBtn.addEventListener('click', () => {
-            // Check if Distraction Dump is active - provide user feedback
-            if (isDistractionDumpBlocking()) {
-              window.zenPomodoroApp.showCustomAlert(
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.TITLE,
-                Constants.DISTRACTION_DUMP_LOCK_ALERT.MESSAGE
-              );
-              return;
+          this._closeMenuDialog(dialog);
+          handleSkipFocusWithLockout(() => {
+            window.zenPomodoroApp?._claimOwnershipForAction();
+            const timer = window.zenPomodoroApp.timer;
+            if (timer.skipFocusToBreak()) {
+              window.zenPomodoroApp.updateOverlayVisibility();
             }
-            this._stopMenuTimerUpdates();
-            dialog.remove();
-            this.menuDialog = null;
-            
-            handleSkipFocusWithLockout(() => {
-              // CROSS-WINDOW SYNC: Claim ownership before modifying timer
-              window.zenPomodoroApp?._claimOwnershipForAction();
-              const timer = window.zenPomodoroApp.timer;
-              if (timer.skipFocusToBreak()) {
-                window.zenPomodoroApp.updateOverlayVisibility();
-              }
-            });
-          });
-        }
-
-        const stopBtn = document.createElement('button');
-        stopBtn.className = 'zen-pomodoro-dialog-button secondary';
-        stopBtn.textContent = 'Stop Timer';
-        stopBtn.addEventListener('click', () => {
-          this._stopMenuTimerUpdates();
-          dialog.remove();
-          this.menuDialog = null;
-          // Issue 6: Require lockout before stopping timer using helper function
-          handleStopTimerWithLockout(() => {
-            window.zenPomodoroApp.stopTimer();
           });
         });
-
-        const settingsBtn = document.createElement('button');
-        settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
-        settingsBtn.textContent = 'Timer Settings';
-        settingsBtn.addEventListener('click', () => {
-          this._stopMenuTimerUpdates();
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          this.showSettingsDialog();
-        });
-
-        const rulesetBtn = document.createElement('button');
-        rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
-        rulesetBtn.textContent = 'Ruleset Settings';
-        rulesetBtn.addEventListener('click', () => {
-          this._stopMenuTimerUpdates();
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          this.showRulesetSettingsDialog();
-        });
-
-        // Toggle indicator visibility button
-        const toggleIndicatorBtn = document.createElement('button');
-        toggleIndicatorBtn.className = 'zen-pomodoro-dialog-button secondary';
-        toggleIndicatorBtn.textContent =
-          window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-            ? 'Hide Timer Indicator'
-            : 'Show Timer Indicator';
-        toggleIndicatorBtn.addEventListener('click', () => {
-          if (window.zenPomodoroApp?.overlay) {
-            const indicator = window.zenPomodoroApp.overlay.indicator;
-            if (indicator?.classList.contains('active')) {
-              window.zenPomodoroApp.overlay.hideIndicator();
-              toggleIndicatorBtn.textContent = 'Show Timer Indicator';
-            } else {
-              window.zenPomodoroApp.overlay.showIndicator();
-              toggleIndicatorBtn.textContent = 'Hide Timer Indicator';
-            }
-          }
-        });
-
-        // Distraction Dump button - only during focus phase
-        // Available even when paused since Distraction Dump serves a different purpose
-        // (temporarily lifting ALL blocks for thought capture, not just pausing timer)
-        // Only one dump is allowed per focus phase
-        let dumpBtn = null;
-        const config = getConfig$3();
-        const dumpManager = window.zenPomodoroApp?.distractionDump;
-        const isDumpActive = dumpManager?.isActive;
-        const isDumpAvailable = dumpManager?.isDumpAvailable();
-        if (
-          config.distractionDumpEnabled &&
-          status.currentPhase === 'focus'
-        ) {
-          dumpBtn = document.createElement('button');
-          dumpBtn.className = 'zen-pomodoro-dialog-button secondary zen-pomodoro-dump-button';
-          if (isDumpActive) {
-            // Dump is currently running - show End Dump Early option
-            dumpBtn.textContent = '🧠 End Dump Early';
-            dumpBtn.addEventListener('click', () => {
-              this._stopMenuTimerUpdates();
-              dialog.remove();
-              this.menuDialog = null;
-              window.zenPomodoroApp.distractionDump.showEndDumpConfirmation();
-            });
-          } else if (isDumpAvailable) {
-            // Dump is available - show Start Dump option
-            dumpBtn.textContent = '🧠 Distraction Dump';
-            dumpBtn.addEventListener('click', () => {
-              this._stopMenuTimerUpdates();
-              dialog.remove();
-              this.menuDialog = null;
-              window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
-            });
-          } else {
-            // Dump already used this focus phase
-            dumpBtn.textContent = '🧠 Dump Used';
-            dumpBtn.disabled = true;
-            dumpBtn.title = 'Distraction Dump can only be used once per focus phase';
-            dumpBtn.style.opacity = '0.5';
-            dumpBtn.style.cursor = 'not-allowed';
-          }
-        }
-
-        menuSection.appendChild(statusRow);
-        menuSection.appendChild(pauseResumeBtn);
-        if (dumpBtn) {
-          menuSection.appendChild(dumpBtn);
-        }
-        if (cutBreakBtn) {
-          menuSection.appendChild(cutBreakBtn);
-        }
-        if (skipFocusBtn) {
-          menuSection.appendChild(skipFocusBtn);
-        }
-        menuSection.appendChild(stopBtn);
-        menuSection.appendChild(toggleIndicatorBtn);
-        menuSection.appendChild(settingsBtn);
-        menuSection.appendChild(rulesetBtn);
-      } else {
-        // Timer not running - show start options
-        const startBtn = document.createElement('button');
-        startBtn.className = 'zen-pomodoro-dialog-button';
-        startBtn.textContent = 'Start Pomodoro Timer';
-        startBtn.addEventListener('click', () => {
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          this.showConfigDialog();
-        });
-
-        const settingsBtn = document.createElement('button');
-        settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
-        settingsBtn.textContent = 'Timer Settings';
-        settingsBtn.addEventListener('click', () => {
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          this.showSettingsDialog();
-        });
-
-        const rulesetBtn = document.createElement('button');
-        rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
-        rulesetBtn.textContent = 'Ruleset Settings';
-        rulesetBtn.addEventListener('click', () => {
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          this.showRulesetSettingsDialog();
-        });
-
-        const customCyclesBtn = document.createElement('button');
-        customCyclesBtn.className = 'zen-pomodoro-dialog-button secondary';
-        customCyclesBtn.textContent = 'Custom Cycles';
-        customCyclesBtn.addEventListener('click', () => {
-          saveDialogPosition(dialog);
-          dialog.remove();
-          this.menuDialog = null;
-          if (window.zenPomodoroApp?.customCycles) {
-            window.zenPomodoroApp.customCycles.showCustomCyclesMenu();
-          }
-        });
-
-        menuSection.appendChild(startBtn);
-        menuSection.appendChild(settingsBtn);
-        menuSection.appendChild(rulesetBtn);
-        menuSection.appendChild(customCyclesBtn);
+        buttons.push(skipFocusBtn);
       }
 
+      return buttons;
+    }
+
+    /**
+     * Create the stop timer button.
+     * @param {HTMLElement} dialog - Menu dialog
+     * @returns {HTMLElement} Stop button
+     * @private
+     */
+    _createStopButton(dialog) {
+      const stopBtn = document.createElement('button');
+      stopBtn.className = 'zen-pomodoro-dialog-button secondary';
+      stopBtn.textContent = 'Stop Timer';
+      stopBtn.addEventListener('click', () => {
+        this._closeMenuDialog(dialog);
+        handleStopTimerWithLockout(() => {
+          window.zenPomodoroApp.stopTimer();
+        });
+      });
+      return stopBtn;
+    }
+
+    /**
+     * Create the toggle timer indicator button.
+     * @returns {HTMLElement} Toggle indicator button
+     * @private
+     */
+    _createToggleIndicatorButton() {
+      const btn = document.createElement('button');
+      btn.className = 'zen-pomodoro-dialog-button secondary';
+      btn.textContent =
+        window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
+          ? 'Hide Timer Indicator'
+          : 'Show Timer Indicator';
+      btn.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.overlay) {
+          const indicator = window.zenPomodoroApp.overlay.indicator;
+          if (indicator?.classList.contains('active')) {
+            window.zenPomodoroApp.overlay.hideIndicator();
+            btn.textContent = 'Show Timer Indicator';
+          } else {
+            window.zenPomodoroApp.overlay.showIndicator();
+            btn.textContent = 'Hide Timer Indicator';
+          }
+        }
+      });
+      return btn;
+    }
+
+    /**
+     * Create navigation buttons (Settings, Rulesets) for the active timer menu.
+     * @param {HTMLElement} dialog - Menu dialog
+     * @returns {Array<HTMLElement>} Array of navigation buttons
+     * @private
+     */
+    _createActiveMenuNavButtons(dialog) {
+      const settingsBtn = document.createElement('button');
+      settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
+      settingsBtn.textContent = 'Timer Settings';
+      settingsBtn.addEventListener('click', () => {
+        this._stopMenuTimerUpdates();
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        this.showSettingsDialog();
+      });
+
+      const rulesetBtn = document.createElement('button');
+      rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
+      rulesetBtn.textContent = 'Ruleset Settings';
+      rulesetBtn.addEventListener('click', () => {
+        this._stopMenuTimerUpdates();
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        this.showRulesetSettingsDialog();
+      });
+
+      return [settingsBtn, rulesetBtn];
+    }
+
+    /**
+     * Create and append the distraction dump button if applicable.
+     * @param {HTMLElement} dialog - Menu dialog
+     * @param {Object} status - Timer status
+     * @param {HTMLElement} menuSection - Menu section to append to
+     * @private
+     */
+    _appendDumpButton(dialog, status, menuSection) {
+      const dumpButtonInfo = this._createDumpButton(status);
+      if (!dumpButtonInfo) return;
+
+      const { btn: dumpBtn, action } = dumpButtonInfo;
+      if (action === 'endDump') {
+        dumpBtn.addEventListener('click', () => {
+          this._closeMenuDialog(dialog);
+          window.zenPomodoroApp.distractionDump.showEndDumpConfirmation();
+        });
+      } else if (action === 'startDump') {
+        dumpBtn.addEventListener('click', () => {
+          this._closeMenuDialog(dialog);
+          window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+        });
+      }
+      menuSection.appendChild(dumpBtn);
+    }
+
+    /**
+     * Helper: Create menu for inactive timer state
+     */
+    _createTimerInactiveMenu(dialog, menuSection) {
+      // Start Pomodoro Timer button
+      const startBtn = document.createElement('button');
+      startBtn.className = 'zen-pomodoro-dialog-button';
+      startBtn.textContent = 'Start Pomodoro Timer';
+      startBtn.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        this.showConfigDialog();
+      });
+
+      // Timer Settings button
+      const settingsBtn = document.createElement('button');
+      settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
+      settingsBtn.textContent = 'Timer Settings';
+      settingsBtn.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        this.showSettingsDialog();
+      });
+
+      // Ruleset Settings button
+      const rulesetBtn = document.createElement('button');
+      rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
+      rulesetBtn.textContent = 'Ruleset Settings';
+      rulesetBtn.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        this.showRulesetSettingsDialog();
+      });
+
+      // Custom Cycles button
+      const customCyclesBtn = document.createElement('button');
+      customCyclesBtn.className = 'zen-pomodoro-dialog-button secondary';
+      customCyclesBtn.textContent = 'Custom Cycles';
+      customCyclesBtn.addEventListener('click', () => {
+        saveDialogPosition(dialog);
+        dialog.remove();
+        this.menuDialog = null;
+        if (window.zenPomodoroApp?.customCycles) {
+          window.zenPomodoroApp.customCycles.showCustomCyclesMenu();
+        }
+      });
+
+      menuSection.appendChild(startBtn);
+      menuSection.appendChild(settingsBtn);
+      menuSection.appendChild(rulesetBtn);
+      menuSection.appendChild(customCyclesBtn);
+    }
+
+    /**
+     * Helper: Create menu footer with close button, version, and countdown indicators
+     */
+    _createMenuFooter(dialog) {
       // Buttons section
       const buttonDiv = document.createElement('div');
       buttonDiv.className = 'zen-pomodoro-dialog-buttons';
@@ -7693,10 +7758,7 @@
       cancelButton.className = 'zen-pomodoro-dialog-button secondary';
       cancelButton.textContent = 'Close';
       cancelButton.addEventListener('click', () => {
-        this._stopMenuTimerUpdates();
-        this._stopReminderCountdownUpdates();
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
       });
 
       buttonDiv.appendChild(cancelButton);
@@ -7713,6 +7775,41 @@
       // First-time reminder countdown indicator
       const firstTimeCountdown = document.createElement('div');
       firstTimeCountdown.className = 'zen-pomodoro-first-time-countdown zen-pomodoro-hidden';
+
+      return { buttonDiv, postSessionCountdown, firstTimeCountdown, versionIndicator };
+    }
+
+    /**
+     * Show the main Pomodoro menu dialog
+     * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
+     */
+    showPomodoroMenu() {
+      // Issue 4: Check if any dialogs are currently open using shared constant
+      const existingDialogs = document.querySelectorAll(POMODORO_DIALOG_SELECTORS.join(', '));
+
+      if (existingDialogs.length > 0) {
+        // If any dialog exists, close them all and return (toggle behavior)
+        logger.log(LOG_CATEGORIES$4.MENU, 'Closing all dialogs (toggle behavior)');
+        this.closeAllDialogs();
+        return;
+      }
+
+      logger.log(LOG_CATEGORIES$4.MENU, 'Opening main menu');
+
+      const { dialog, h2, menuSection } = this._createMenuDialogShell();
+
+      const timerActive =
+        window.zenPomodoroApp &&
+        window.zenPomodoroApp.timer &&
+        window.zenPomodoroApp.timer.isActive;
+
+      if (timerActive) {
+        this._createTimerActiveMenu(dialog, menuSection);
+      } else {
+        this._createTimerInactiveMenu(dialog, menuSection);
+      }
+
+      const { buttonDiv, postSessionCountdown, firstTimeCountdown, versionIndicator } = this._createMenuFooter(dialog);
 
       dialog.appendChild(h2);
       dialog.appendChild(menuSection);
@@ -7738,10 +7835,7 @@
       // Close on Escape key
       const escHandler = (e) => {
         if (e.key === 'Escape') {
-          this._stopMenuTimerUpdates();
-          this._stopReminderCountdownUpdates();
-          dialog.remove();
-          this.menuDialog = null;
+          this._closeMenuDialog(dialog);
           document.removeEventListener('keydown', escHandler);
         }
       };
