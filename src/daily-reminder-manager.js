@@ -480,8 +480,9 @@ class DailyReminderManager {
   /**
    * Hide the daily reminder overlay.
    * Called when user starts a timer or successfully skips.
+   * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
    */
-  hideReminder() {
+  hideReminder(fromSync = false) {
     if (!this.reminderOverlay && !this.isShowing) {
       return;
     }
@@ -507,6 +508,11 @@ class DailyReminderManager {
     if (this.reminderOverlay) {
       this.reminderOverlay.remove();
       this.reminderOverlay = null;
+    }
+
+    // Broadcast dismissal to other windows (unless this hide is from sync)
+    if (!fromSync) {
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-dismissed' });
     }
   }
 
@@ -902,6 +908,9 @@ class DailyReminderManager {
 
     // Save state to persist across browser restarts
     this._saveState();
+
+    // Broadcast skip to other windows
+    window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-skipped' });
 
     this.hideReminder();
   }

@@ -598,10 +598,7 @@ class PomodoroTimer {
    */
   _writeSyncState() {
     const sync = window.zenPomodoroApp?.windowSync;
-    if (!sync) return;
-
-    // Only write if we own the timer
-    if (!sync.isTimerOwner) return;
+    if (!sync || !sync.isTimerOwner) return;
 
     const state = {
       isActive: this.isActive,
@@ -616,10 +613,25 @@ class PomodoroTimer {
       customCycle: this.customCycle,
       customCycleBlocks: this.customCycleBlocks,
       currentBlockIndex: this.currentBlockIndex,
+      ...this._getDumpSyncState(),
       timestamp: Date.now(),
     };
 
     sync.writeSyncState(state);
+  }
+
+  /**
+   * Get distraction dump state for cross-window sync.
+   * @returns {Object} Dump state fields for the sync payload
+   * @private
+   */
+  _getDumpSyncState() {
+    const dump = window.zenPomodoroApp?.distractionDump;
+    return {
+      dumpActive: dump?.isActive || false,
+      dumpTimeRemaining: dump?.dumpTimeRemaining || 0,
+      dumpUsedThisFocusPhase: dump?.dumpUsedThisFocusPhase || false,
+    };
   }
 
   /**
@@ -843,18 +855,7 @@ class PomodoroTimer {
    * @param {Object} syncState - Timer state from owner window
    */
   syncFromState(syncState) {
-    this.isActive = syncState.isActive;
-    this.isPaused = syncState.isPaused || false;
-    this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace || false;
-    this.remainingTime = syncState.remainingTime;
-    this.currentPhase = syncState.currentPhase;
-    this.currentCycle = syncState.currentCycle;
-    this.totalCycles = syncState.totalCycles;
-    this.mode = syncState.mode;
-    this.savedConfig = syncState.savedConfig;
-    this.customCycle = syncState.customCycle;
-    this.customCycleBlocks = syncState.customCycleBlocks;
-    this.currentBlockIndex = syncState.currentBlockIndex || 0;
+    this._restoreTimerProperties(syncState);
   }
 
   /**

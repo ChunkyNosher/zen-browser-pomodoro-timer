@@ -10,8 +10,8 @@ import {
 import UndoRedoManager from './undo-redo-manager.js';
 import {
   createDragPreview, cleanupDragVisuals, getDropIndicatorRef,
-  showGhostBlocks, updateAutoScroll, getDropTargetIndex,
-  computeAbsoluteTarget
+  showGhostBlocks, updateAutoScroll,
+  computeAbsoluteTarget, calculateBlockTransforms, calculateDropIndicatorOffset
 } from './drag-utils.js';
 
 // ============================================
@@ -1041,23 +1041,29 @@ class CustomCycleManager {
    * @private
    */
   _setupDragVisuals(container, allBlocks, dragIndices) {
-    // Mark all dragged blocks
+    // Mark all dragged blocks (now shows at reduced opacity, keeps height)
     dragIndices.forEach(idx => {
       if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
     });
 
-    // Add transition class to non-dragged blocks for smooth shifting
-    allBlocks.forEach((block, idx) => {
-      if (!dragIndices.includes(idx)) {
-        block.classList.add('drag-transition');
-      }
+    // Add transition class to ALL blocks for smooth transform animation
+    allBlocks.forEach(block => {
+      block.classList.add('drag-transition');
     });
 
-    // Create drop indicator
+    // Create drop indicator - positioned absolutely within container
     const dropIndicator = document.createElement('div');
     dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
     dropIndicator.style.display = 'none';
+    dropIndicator.style.position = 'absolute';
+    dropIndicator.style.left = '0';
+    dropIndicator.style.right = '0';
     container.appendChild(dropIndicator);
+
+    // Ensure container has position: relative for absolute indicator positioning
+    if (getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
+    }
 
     // Create ghost blocks for duplication mode
     let ghostBlocks = [];
@@ -1078,17 +1084,21 @@ class CustomCycleManager {
 
   /**
    * Create pointer move handler for drag operation.
-   * @param {HTMLElement} dragPreview - Floating drag preview element
-   * @param {number} offsetY - Y offset for drag preview positioning
-   * @param {HTMLElement} container - Blocks container
-   * @param {Array<HTMLElement>} allBlocks - All block elements
-   * @param {Array<number>} dragIndices - Indices being dragged
-   * @param {HTMLElement} dropIndicator - Drop indicator element
-   * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+   * @param {Object} dragContext - Drag operation context
+   * @param {HTMLElement} dragContext.dragPreview - Floating drag preview element
+   * @param {number} dragContext.offsetY - Y offset for drag preview positioning
+   * @param {HTMLElement} dragContext.container - Blocks container
+   * @param {Array<HTMLElement>} dragContext.allBlocks - All block elements
+   * @param {Array<number>} dragContext.dragIndices - Indices being dragged
+   * @param {HTMLElement} dragContext.dropIndicator - Drop indicator element
+   * @param {Array<HTMLElement>} dragContext.ghostBlocks - Ghost block elements
+   * @param {Array<number>} dragContext.blockHeightsWithGap - Block heights including gaps
+   * @param {Array<number>} dragContext.cachedNonDraggedMidpoints - Midpoints of non-dragged blocks
    * @returns {Object} Object with onPointerMove handler, state refs, and updateDropTarget function
    * @private
    */
-  _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks) {
+  _createPointerMoveHandler(dragContext) {
+    const { dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints } = dragContext;
     let lastTargetIndex = -1;
     let rafId = null;
     let lastPointerY;
@@ -1100,17 +1110,38 @@ class CustomCycleManager {
 
     // Shared function to update drop target position based on pointer Y
     const updateDropTarget = (clientY) => {
-      const targetIndex = getDropTargetIndex(container, clientY, dragIndices);
-      
+      // Calculate container-relative Y position
+      const containerRect = container.getBoundingClientRect();
+      const containerRelativeY = clientY - containerRect.top + container.scrollTop;
+
+      // Find target index using cached midpoints (unaffected by transforms)
+      let targetIndex = cachedNonDraggedMidpoints.length; // default: after all
+      for (let i = 0; i < cachedNonDraggedMidpoints.length; i++) {
+        if (containerRelativeY < cachedNonDraggedMidpoints[i]) {
+          targetIndex = i;
+          break;
+        }
+      }
+
       if (targetIndex === lastTargetIndex) return;
       lastTargetIndex = targetIndex;
 
-      const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-      
       if (targetIndex < 0) return;
 
-      this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+      // Calculate CSS transforms for all blocks
+      const transforms = calculateBlockTransforms(dragIndices, targetIndex, blockHeightsWithGap);
+      
+      // Apply transforms to all blocks
+      allBlocks.forEach((block, idx) => {
+        block.style.transform = transforms[idx] !== 0 ? `translateY(${transforms[idx]}px)` : '';
+      });
 
+      // Position drop indicator at the gap boundary
+      const indicatorOffset = calculateDropIndicatorOffset(dragIndices, targetIndex, blockHeightsWithGap);
+      dropIndicator.style.display = 'block';
+      dropIndicator.style.top = `${indicatorOffset}px`;
+
+      // Show ghost blocks for duplication mode
       if (this.isDuplicating && ghostBlocks.length > 0) {
         showGhostBlocks(container, dropIndicator, ghostBlocks);
       }
@@ -1146,18 +1177,20 @@ class CustomCycleManager {
 
   /**
    * Create cleanup handler for drag operation.
-   * @param {Function} onPointerMove - Pointer move handler
-   * @param {HTMLElement} dragPreview - Floating drag preview element
-   * @param {Array<HTMLElement>} allBlocks - All block elements
-   * @param {HTMLElement} dropIndicator - Drop indicator element
-   * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
-   * @param {Array<number>} dragIndices - Indices being dragged
-   * @param {boolean} isMultiSelect - Whether multi-select drag
-   * @param {Object} stateRefs - References to drag state (lastTargetIndex, rafId, scrollState)
+   * @param {Object} cleanupContext - Cleanup context
+   * @param {Function} cleanupContext.onPointerMove - Pointer move handler
+   * @param {HTMLElement} cleanupContext.dragPreview - Floating drag preview element
+   * @param {Array<HTMLElement>} cleanupContext.allBlocks - All block elements
+   * @param {HTMLElement} cleanupContext.dropIndicator - Drop indicator element
+   * @param {Array<HTMLElement>} cleanupContext.ghostBlocks - Ghost block elements
+   * @param {Array<number>} cleanupContext.dragIndices - Indices being dragged
+   * @param {boolean} cleanupContext.isMultiSelect - Whether multi-select drag
+   * @param {Object} cleanupContext.stateRefs - References to drag state
    * @returns {Function} Cleanup handler function
    * @private
    */
-  _createDragCleanup(onPointerMove, dragPreview, allBlocks, dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs) {
+  _createDragCleanup(cleanupContext) {
+    const { onPointerMove, dragPreview, allBlocks, dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs } = cleanupContext;
     return () => {
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', this.dragCleanup);
@@ -1221,33 +1254,42 @@ class CustomCycleManager {
 
     // Capture dimensions BEFORE adding dragging class
     const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+    
+    // Cache block layout info for transform-based drag (unaffected by CSS transforms)
+    const cachedBlockInfo = allBlocks.map(block => ({
+      top: block.offsetTop,
+      height: block.offsetHeight,
+    }));
+    // Calculate total height per block including gap
+    const blockHeights = cachedBlockInfo.map(info => info.height);
+    // Account for gap between blocks (CSS gap on container)
+    const containerGap = parseFloat(getComputedStyle(container).gap) || 0;
+    const blockHeightsWithGap = blockHeights.map((h, i) => h + (i < blockHeights.length - 1 ? containerGap : 0));
+
+    // Cache non-dragged midpoints for target calculation
+    const cachedNonDraggedMidpoints = [];
+    allBlocks.forEach((block, idx) => {
+      if (!dragIndices.includes(idx)) {
+        cachedNonDraggedMidpoints.push(cachedBlockInfo[idx].top + cachedBlockInfo[idx].height / 2);
+      }
+    });
+
     const { dragPreview, offsetY } = createDragPreview(e, blockDiv, allBlocks, dragIndices);
 
     // Setup visual elements
     const { dropIndicator, ghostBlocks } = this._setupDragVisuals(container, allBlocks, dragIndices);
 
     // Create pointer move handler
-    const stateRefs = this._createPointerMoveHandler(
-      dragPreview,
-      offsetY,
-      container,
-      allBlocks,
-      dragIndices,
-      dropIndicator,
-      ghostBlocks
-    );
+    const stateRefs = this._createPointerMoveHandler({
+      dragPreview, offsetY, container, allBlocks, dragIndices,
+      dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints,
+    });
 
     // Create cleanup handler
-    this.dragCleanup = this._createDragCleanup(
-      stateRefs.onPointerMove,
-      dragPreview,
-      allBlocks,
-      dropIndicator,
-      ghostBlocks,
-      dragIndices,
-      isMultiSelect,
-      stateRefs
-    );
+    this.dragCleanup = this._createDragCleanup({
+      onPointerMove: stateRefs.onPointerMove, dragPreview, allBlocks,
+      dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs,
+    });
 
     // Register event listeners
     document.addEventListener('pointermove', stateRefs.onPointerMove);

@@ -119,6 +119,9 @@ class ZenPomodoroApp {
     this.windowSync.onOwnershipTaken = (syncState) => {
       this._onOwnershipTaken(syncState);
     };
+    this.windowSync.onReminderSyncChanged = (syncData) => {
+      this._onReminderSyncReceived(syncData);
+    };
   }
 
   /**
@@ -397,6 +400,9 @@ class ZenPomodoroApp {
     // Notify Post-Session Reminder that timer started (resets idle tracking)
     this.postSessionReminder.onTimerStart();
 
+    // Broadcast timer start to other windows to hide reminders
+    this.windowSync.writeReminderSync({ action: 'timer-started' });
+
     // Double-check overlay visibility after a short delay
     // This ensures the DOM has settled after timer start
     setTimeout(() => {
@@ -432,6 +438,9 @@ class ZenPomodoroApp {
 
     // Notify Post-Session Reminder that timer started (resets idle tracking)
     this.postSessionReminder.onTimerStart();
+
+    // Broadcast timer start to other windows to hide reminders
+    this.windowSync.writeReminderSync({ action: 'timer-started' });
 
     // Double-check overlay visibility after a short delay
     // This ensures the DOM has settled after timer start
@@ -475,12 +484,55 @@ class ZenPomodoroApp {
    * @private
    */
   _syncDumpState(syncState) {
-    if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
-    const wasInDump = this.websiteBlocker.distractionDumpActive || false;
+    if (!this._canSyncDumpState(syncState)) return;
+    const wasInDump = this.distractionDump.isActive || false;
+
     if (syncState.dumpActive && !wasInDump) {
-      this.websiteBlocker.distractionDumpActive = true;
+      this._applyRemoteDumpStart(syncState);
     } else if (!syncState.dumpActive && wasInDump) {
-      this.websiteBlocker.distractionDumpActive = false;
+      this._applyRemoteDumpEnd();
+    }
+  }
+
+  /**
+   * Check if dump state sync is possible.
+   * @param {Object} syncState - Timer sync state
+   * @returns {boolean} True if dump state can be synced
+   * @private
+   */
+  _canSyncDumpState(syncState) {
+    return syncState.dumpActive !== undefined && this.websiteBlocker && this.distractionDump;
+  }
+
+  /**
+   * Apply dump-started state from the owner window to this secondary window.
+   * @param {Object} syncState - Timer sync state containing dump fields
+   * @private
+   */
+  _applyRemoteDumpStart(syncState) {
+    this.distractionDump.isActive = true;
+    this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
+    this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
+    this.websiteBlocker.distractionDumpActive = true;
+    this.websiteBlocker._checkCurrentPage();
+    this.overlay.hide();
+    if (this.overlay?.showDumpIndicator) {
+      this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
+    }
+  }
+
+  /**
+   * Apply dump-ended state from the owner window to this secondary window.
+   * @private
+   */
+  _applyRemoteDumpEnd() {
+    this.distractionDump.isActive = false;
+    this.distractionDump.dumpTimeRemaining = 0;
+    this.websiteBlocker.distractionDumpActive = false;
+    this.websiteBlocker._checkCurrentPage();
+    this.updateOverlayVisibility();
+    if (this.overlay?.hideDumpIndicator) {
+      this.overlay.hideDumpIndicator();
     }
   }
 
@@ -530,6 +582,52 @@ class ZenPomodoroApp {
     });
     if (syncState.currentPhase === 'focus') {
       this.distractionDump.resetForNewFocusPhase();
+    }
+  }
+
+  /**
+   * Handle reminder sync received from another window.
+   * Hides reminders on this window when dismissed/skipped on another window.
+   * @param {Object} syncData - Reminder action data from another window
+   * @private
+   */
+  _onReminderSyncReceived(syncData) {
+    if (!syncData || !syncData.action) return;
+    logger.log(LOG_CATEGORIES.SYNC, 'Reminder sync received', { action: syncData.action });
+
+    switch (syncData.action) {
+      case 'daily-dismissed':
+      case 'daily-skipped':
+        this._hideDailyReminderFromSync();
+        break;
+      case 'post-session-dismissed':
+      case 'post-session-skipped':
+        this._hidePostSessionReminderFromSync();
+        break;
+      case 'timer-started':
+        this._hideDailyReminderFromSync();
+        this._hidePostSessionReminderFromSync();
+        break;
+    }
+  }
+
+  /**
+   * Hide daily reminder on this window due to a sync event from another window.
+   * @private
+   */
+  _hideDailyReminderFromSync() {
+    if (this.dailyReminder?.isShowing) {
+      this.dailyReminder.hideReminder(true);
+    }
+  }
+
+  /**
+   * Hide post-session reminder on this window due to a sync event from another window.
+   * @private
+   */
+  _hidePostSessionReminderFromSync() {
+    if (this.postSessionReminder?.isShowing) {
+      this.postSessionReminder.hideReminder(true);
     }
   }
 

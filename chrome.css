@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker - CSS Styling
- * Version: 1.4.5
+ * Version: 1.4.6
  * License: MIT
  * 
  * ZEN BROWSER 1.18.X COMPATIBILITY:
@@ -229,6 +229,15 @@
   margin-top: 24px;
   flex-wrap: wrap;
   justify-content: center;
+}
+
+/* Ensure utility controls (e.g., dev bypass) inside the controls container
+   are always a full-width row below the main buttons */
+#zen-pomodoro-controls > :last-child:not(.zen-pomodoro-button) {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 12px;
+  text-align: center;
 }
 
 .zen-pomodoro-button {
@@ -1447,6 +1456,11 @@ select.zen-pomodoro-dialog-input option:checked {
    - When a new transition phase starts, the popup resets to
      this default position (dragged position is not persisted)
    ============================================ */
+/* Transition popup positioning:
+   - Always appears at top: 20px; right: 20px on each show.
+   - Users can drag/move the popup while visible.
+   - Position intentionally resets on each new transition phase
+     (does not persist previously dragged coordinates). */
 .zen-pomodoro-transition-popup {
   position: fixed !important;
   top: 20px;
@@ -2195,14 +2209,7 @@ select.zen-pomodoro-dialog-input option:checked {
 }
 
 .zen-pomodoro-cycle-block.dragging {
-  height: 0 !important;
-  min-height: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  margin: 0 !important;
-  border-width: 0 !important;
-  overflow: hidden;
-  opacity: 0;
+  opacity: 0.3;
   pointer-events: none;
 }
 
@@ -2220,12 +2227,11 @@ select.zen-pomodoro-dialog-input option:checked {
 
 /* Drop indicator line - shows where blocks will be inserted */
 .zen-pomodoro-cycle-drop-indicator {
-  position: relative;
   z-index: 5;
   height: 3px;
   background: #4a9eff;
   border-radius: 2px;
-  margin: 2px 0;
+  margin: 0;
   box-shadow: 0 0 8px rgb(74 158 255 / 50%);
   pointer-events: none;
   animation: drop-indicator-pulse 1.5s ease-in-out infinite;

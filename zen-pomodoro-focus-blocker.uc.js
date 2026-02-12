@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.5
+ * Version: 1.4.6
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.5',
+    MOD_VERSION: '1.4.6',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -248,6 +248,8 @@
     SYNC_PREF_KEY: 'timer-sync',
     /** Cross-window sync: pref key for timer owner */
     OWNER_PREF_KEY: 'timer-owner',
+    /** Cross-window sync: pref key for reminder sync state */
+    REMINDER_SYNC_PREF_KEY: 'reminder-sync',
     /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
     OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
     /** Cross-window sync: Services.obs topic for log entry broadcasting */
@@ -2634,10 +2636,7 @@
      */
     _writeSyncState() {
       const sync = window.zenPomodoroApp?.windowSync;
-      if (!sync) return;
-
-      // Only write if we own the timer
-      if (!sync.isTimerOwner) return;
+      if (!sync || !sync.isTimerOwner) return;
 
       const state = {
         isActive: this.isActive,
@@ -2652,10 +2651,25 @@
         customCycle: this.customCycle,
         customCycleBlocks: this.customCycleBlocks,
         currentBlockIndex: this.currentBlockIndex,
+        ...this._getDumpSyncState(),
         timestamp: Date.now(),
       };
 
       sync.writeSyncState(state);
+    }
+
+    /**
+     * Get distraction dump state for cross-window sync.
+     * @returns {Object} Dump state fields for the sync payload
+     * @private
+     */
+    _getDumpSyncState() {
+      const dump = window.zenPomodoroApp?.distractionDump;
+      return {
+        dumpActive: dump?.isActive || false,
+        dumpTimeRemaining: dump?.dumpTimeRemaining || 0,
+        dumpUsedThisFocusPhase: dump?.dumpUsedThisFocusPhase || false,
+      };
     }
 
     /**
@@ -2879,18 +2893,7 @@
      * @param {Object} syncState - Timer state from owner window
      */
     syncFromState(syncState) {
-      this.isActive = syncState.isActive;
-      this.isPaused = syncState.isPaused || false;
-      this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace || false;
-      this.remainingTime = syncState.remainingTime;
-      this.currentPhase = syncState.currentPhase;
-      this.currentCycle = syncState.currentCycle;
-      this.totalCycles = syncState.totalCycles;
-      this.mode = syncState.mode;
-      this.savedConfig = syncState.savedConfig;
-      this.customCycle = syncState.customCycle;
-      this.customCycleBlocks = syncState.customCycleBlocks;
-      this.currentBlockIndex = syncState.currentBlockIndex || 0;
+      this._restoreTimerProperties(syncState);
     }
 
     /**
@@ -2976,6 +2979,8 @@
       this.onOwnershipLost = null;
       /** Callback: called when this window takes over from a dead owner */
       this.onOwnershipTaken = null;
+      /** Callback: called when reminder sync is received from another window */
+      this.onReminderSyncChanged = null;
       /** Storage module reference (injected to avoid circular dependency) */
       this._storage = null;
     }
@@ -3211,19 +3216,22 @@
 
     /**
      * Set up pref observer for cross-window communication.
-     * Watches for changes to timer-sync and timer-owner prefs.
+     * Watches for changes to timer-sync, timer-owner, and reminder-sync prefs.
      * @private
      */
     _setupPrefObserver() {
       const prefPrefix = Constants.PREF_PREFIX;
       const syncPrefFull = `${prefPrefix}.${Constants.SYNC_PREF_KEY}`;
       const ownerPrefFull = `${prefPrefix}.${Constants.OWNER_PREF_KEY}`;
+      const reminderSyncPrefFull = `${prefPrefix}.${Constants.REMINDER_SYNC_PREF_KEY}`;
       this._prefObserver = {
         observe: (subject, topic, data) => {
           if (data === syncPrefFull) {
             this._handleSyncPrefChange();
           } else if (data === ownerPrefFull) {
             this._handleOwnerPrefChange();
+          } else if (data === reminderSyncPrefFull) {
+            this._handleReminderSyncPrefChange();
           }
         },
       };
@@ -3268,6 +3276,79 @@
         }
       } catch (e) {
         /* ignore */
+      }
+    }
+
+    /**
+     * Write reminder sync action to the reminder-sync pref for other windows to read.
+     * @param {Object} actionData - Action data object (must contain 'action' property)
+     */
+    writeReminderSync(actionData) {
+      // Validate actionData structure
+      if (!actionData) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is null/undefined');
+        return;
+      }
+      if (typeof actionData !== 'object') {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - actionData is not an object', {
+          type: typeof actionData,
+        });
+        return;
+      }
+      if (!actionData.action) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - missing required action property', {
+          actionData,
+        });
+        return;
+      }
+      if (typeof actionData.action !== 'string') {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - action must be a string', {
+          action: actionData.action,
+          type: typeof actionData.action,
+        });
+        return;
+      }
+
+      // Validate action value matches expected types
+      const validActions = [
+        'daily-dismissed',
+        'daily-skipped',
+        'post-session-dismissed',
+        'post-session-skipped',
+        'timer-started',
+      ];
+      if (!validActions.includes(actionData.action)) {
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Invalid reminder sync - unknown action type', {
+          action: actionData.action,
+          validActions,
+        });
+        return;
+      }
+
+      this._writePref(Constants.REMINDER_SYNC_PREF_KEY, {
+        windowId: this.windowId,
+        timestamp: Date.now(),
+        ...actionData,
+      });
+    }
+
+    /**
+     * Handle changes to the reminder-sync pref (reminder actions from other windows).
+     * @private
+     */
+    _handleReminderSyncPrefChange() {
+      if (!this._storage) return;
+      try {
+        const syncStr = this._storage.getPref(Constants.REMINDER_SYNC_PREF_KEY, '');
+        if (!syncStr) return;
+        const syncData = JSON.parse(syncStr);
+        // Ignore if the action came from this window
+        if (syncData.windowId === this.windowId) return;
+        if (this.onReminderSyncChanged) {
+          this.onReminderSyncChanged(syncData);
+        }
+      } catch (e) {
+        console.warn('Zen Pomodoro: Failed to parse reminder sync data', e);
       }
     }
 
@@ -11171,8 +11252,9 @@
     /**
      * Hide the daily reminder overlay.
      * Called when user starts a timer or successfully skips.
+     * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
      */
-    hideReminder() {
+    hideReminder(fromSync = false) {
       if (!this.reminderOverlay && !this.isShowing) {
         return;
       }
@@ -11198,6 +11280,11 @@
       if (this.reminderOverlay) {
         this.reminderOverlay.remove();
         this.reminderOverlay = null;
+      }
+
+      // Broadcast dismissal to other windows (unless this hide is from sync)
+      if (!fromSync) {
+        window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-dismissed' });
       }
     }
 
@@ -11593,6 +11680,9 @@
 
       // Save state to persist across browser restarts
       this._saveState();
+
+      // Broadcast skip to other windows
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'daily-skipped' });
 
       this.hideReminder();
     }
@@ -12278,8 +12368,9 @@
 
     /**
      * Hide the post-session reminder overlay.
+     * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
      */
-    hideReminder() {
+    hideReminder(fromSync = false) {
       if (!this.reminderOverlay && !this.isShowing) return;
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Hiding post-session reminder overlay');
@@ -12297,6 +12388,11 @@
       if (this.reminderOverlay) {
         this.reminderOverlay.remove();
         this.reminderOverlay = null;
+      }
+
+      // Broadcast dismissal to other windows (unless this hide is from sync)
+      if (!fromSync) {
+        window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-dismissed' });
       }
     }
 
@@ -12316,6 +12412,9 @@
 
       // Save state to persist across browser restarts
       this._saveState();
+
+      // Broadcast skip to other windows
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-skipped' });
 
       this.hideReminder();
     }
@@ -13151,6 +13250,7 @@
     
     allBlocks.forEach(block => {
       block.classList.remove('dragging', 'drag-transition');
+      block.style.removeProperty('transform');
     });
   }
 
@@ -13227,30 +13327,6 @@
   }
 
   /**
-   * Calculate the drop target index based on pointer Y position.
-   * Returns the index among non-dragged blocks where the drop should occur.
-   * @param {HTMLElement} container - The blocks container
-   * @param {number} clientY - Pointer Y position
-   * @param {Array<number>} dragIndices - Indices of blocks being dragged
-   * @returns {number} Target insertion index among non-dragged blocks
-   */
-  function getDropTargetIndex(container, clientY, dragIndices) {
-    const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
-    const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-
-    // Find the position among non-dragged blocks
-    for (let i = 0; i < nonDraggedBlocks.length; i++) {
-      const rect = nonDraggedBlocks[i].getBoundingClientRect();
-      const midY = rect.top + rect.height / 2;
-      if (clientY < midY) {
-        return i;
-      }
-    }
-    
-    return nonDraggedBlocks.length; // After all blocks
-  }
-
-  /**
    * Convert a relative drop target index (among non-dragged blocks) to an absolute
    * index in the full blocks array.
    * @param {number} relativeTarget - Target index among non-dragged blocks
@@ -13268,6 +13344,97 @@
     return relativeTarget >= nonDraggedIndices.length
       ? blocksLength
       : nonDraggedIndices[relativeTarget];
+  }
+
+  /**
+   * Calculate CSS translateY transforms for all blocks during a drag operation.
+   * Creates a smooth visual reorder by moving blocks to their target visual positions.
+   * 
+   * NOTE: dragIndices MUST be sorted in ascending order for correct visual order.
+   * The caller is responsible for ensuring indices are sorted before calling this function.
+   * 
+   * @param {Array<number>} dragIndices - Sorted indices of blocks being dragged (ascending order)
+   * @param {number} relativeTarget - Target index among non-dragged blocks
+   * @param {Array<number>} blockHeights - Array of heights (including gaps) for each block
+   * @returns {Array<number>} Array of translateY pixel values for each block
+   */
+  function calculateBlockTransforms(dragIndices, relativeTarget, blockHeights) {
+    const totalBlocks = blockHeights.length;
+    const transforms = new Array(totalBlocks).fill(0);
+
+    // Build non-dragged indices in original order
+    const nonDraggedIndices = [];
+    for (let i = 0; i < totalBlocks; i++) {
+      if (!dragIndices.includes(i)) {
+        nonDraggedIndices.push(i);
+      }
+    }
+
+    // Clamp target
+    const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+    // Build visual order: non-dragged before target, then dragged, then non-dragged after target
+    const visualOrder = [
+      ...nonDraggedIndices.slice(0, clampedTarget),
+      ...dragIndices,
+      ...nonDraggedIndices.slice(clampedTarget),
+    ];
+
+    // Calculate DOM tops (cumulative heights in DOM order: 0, 1, 2, ...)
+    const domTops = new Array(totalBlocks);
+    let cumTop = 0;
+    for (let i = 0; i < totalBlocks; i++) {
+      domTops[i] = cumTop;
+      cumTop += blockHeights[i];
+    }
+
+    // Calculate visual tops (cumulative heights in visual order)
+    const visualTops = {};
+    let visCumTop = 0;
+    for (const idx of visualOrder) {
+      visualTops[idx] = visCumTop;
+      visCumTop += blockHeights[idx];
+    }
+
+    // Transform = desired visual position - actual DOM position
+    for (let i = 0; i < totalBlocks; i++) {
+      transforms[i] = visualTops[i] - domTops[i];
+    }
+
+    return transforms;
+  }
+
+  /**
+   * Calculate the absolute Y position for the drop indicator within the container.
+   * The indicator should appear at the gap boundary (top edge of where dragged blocks will land).
+   * 
+   * NOTE: dragIndices MUST be sorted in ascending order for correct visual order.
+   * The caller is responsible for ensuring indices are sorted before calling this function.
+   * 
+   * @param {Array<number>} dragIndices - Sorted indices of dragged blocks (ascending order)
+   * @param {number} relativeTarget - Target index among non-dragged blocks
+   * @param {Array<number>} blockHeights - Heights of all blocks
+   * @returns {number} Y offset in pixels from container top for the indicator
+   */
+  function calculateDropIndicatorOffset(dragIndices, relativeTarget, blockHeights) {
+    const totalBlocks = blockHeights.length;
+    const nonDraggedIndices = [];
+    for (let i = 0; i < totalBlocks; i++) {
+      if (!dragIndices.includes(i)) {
+        nonDraggedIndices.push(i);
+      }
+    }
+
+    const clampedTarget = Math.max(0, Math.min(relativeTarget, nonDraggedIndices.length));
+
+    // Sum up heights of all blocks that appear BEFORE the gap in visual order
+    const beforeGap = nonDraggedIndices.slice(0, clampedTarget);
+    let offset = 0;
+    for (const idx of beforeGap) {
+      offset += blockHeights[idx];
+    }
+
+    return offset;
   }
 
   // ============================================
@@ -14297,23 +14464,29 @@
      * @private
      */
     _setupDragVisuals(container, allBlocks, dragIndices) {
-      // Mark all dragged blocks
+      // Mark all dragged blocks (now shows at reduced opacity, keeps height)
       dragIndices.forEach(idx => {
         if (allBlocks[idx]) allBlocks[idx].classList.add('dragging');
       });
 
-      // Add transition class to non-dragged blocks for smooth shifting
-      allBlocks.forEach((block, idx) => {
-        if (!dragIndices.includes(idx)) {
-          block.classList.add('drag-transition');
-        }
+      // Add transition class to ALL blocks for smooth transform animation
+      allBlocks.forEach(block => {
+        block.classList.add('drag-transition');
       });
 
-      // Create drop indicator
+      // Create drop indicator - positioned absolutely within container
       const dropIndicator = document.createElement('div');
       dropIndicator.className = 'zen-pomodoro-cycle-drop-indicator';
       dropIndicator.style.display = 'none';
+      dropIndicator.style.position = 'absolute';
+      dropIndicator.style.left = '0';
+      dropIndicator.style.right = '0';
       container.appendChild(dropIndicator);
+
+      // Ensure container has position: relative for absolute indicator positioning
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
 
       // Create ghost blocks for duplication mode
       let ghostBlocks = [];
@@ -14334,17 +14507,21 @@
 
     /**
      * Create pointer move handler for drag operation.
-     * @param {HTMLElement} dragPreview - Floating drag preview element
-     * @param {number} offsetY - Y offset for drag preview positioning
-     * @param {HTMLElement} container - Blocks container
-     * @param {Array<HTMLElement>} allBlocks - All block elements
-     * @param {Array<number>} dragIndices - Indices being dragged
-     * @param {HTMLElement} dropIndicator - Drop indicator element
-     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
+     * @param {Object} dragContext - Drag operation context
+     * @param {HTMLElement} dragContext.dragPreview - Floating drag preview element
+     * @param {number} dragContext.offsetY - Y offset for drag preview positioning
+     * @param {HTMLElement} dragContext.container - Blocks container
+     * @param {Array<HTMLElement>} dragContext.allBlocks - All block elements
+     * @param {Array<number>} dragContext.dragIndices - Indices being dragged
+     * @param {HTMLElement} dragContext.dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} dragContext.ghostBlocks - Ghost block elements
+     * @param {Array<number>} dragContext.blockHeightsWithGap - Block heights including gaps
+     * @param {Array<number>} dragContext.cachedNonDraggedMidpoints - Midpoints of non-dragged blocks
      * @returns {Object} Object with onPointerMove handler, state refs, and updateDropTarget function
      * @private
      */
-    _createPointerMoveHandler(dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks) {
+    _createPointerMoveHandler(dragContext) {
+      const { dragPreview, offsetY, container, allBlocks, dragIndices, dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints } = dragContext;
       let lastTargetIndex = -1;
       let rafId = null;
       let lastPointerY;
@@ -14356,17 +14533,38 @@
 
       // Shared function to update drop target position based on pointer Y
       const updateDropTarget = (clientY) => {
-        const targetIndex = getDropTargetIndex(container, clientY, dragIndices);
-        
+        // Calculate container-relative Y position
+        const containerRect = container.getBoundingClientRect();
+        const containerRelativeY = clientY - containerRect.top + container.scrollTop;
+
+        // Find target index using cached midpoints (unaffected by transforms)
+        let targetIndex = cachedNonDraggedMidpoints.length; // default: after all
+        for (let i = 0; i < cachedNonDraggedMidpoints.length; i++) {
+          if (containerRelativeY < cachedNonDraggedMidpoints[i]) {
+            targetIndex = i;
+            break;
+          }
+        }
+
         if (targetIndex === lastTargetIndex) return;
         lastTargetIndex = targetIndex;
 
-        const nonDraggedBlocks = allBlocks.filter((_, idx) => !dragIndices.includes(idx));
-        
         if (targetIndex < 0) return;
 
-        this._positionDropIndicator(container, dropIndicator, nonDraggedBlocks, targetIndex);
+        // Calculate CSS transforms for all blocks
+        const transforms = calculateBlockTransforms(dragIndices, targetIndex, blockHeightsWithGap);
+        
+        // Apply transforms to all blocks
+        allBlocks.forEach((block, idx) => {
+          block.style.transform = transforms[idx] !== 0 ? `translateY(${transforms[idx]}px)` : '';
+        });
 
+        // Position drop indicator at the gap boundary
+        const indicatorOffset = calculateDropIndicatorOffset(dragIndices, targetIndex, blockHeightsWithGap);
+        dropIndicator.style.display = 'block';
+        dropIndicator.style.top = `${indicatorOffset}px`;
+
+        // Show ghost blocks for duplication mode
         if (this.isDuplicating && ghostBlocks.length > 0) {
           showGhostBlocks(container, dropIndicator, ghostBlocks);
         }
@@ -14402,18 +14600,20 @@
 
     /**
      * Create cleanup handler for drag operation.
-     * @param {Function} onPointerMove - Pointer move handler
-     * @param {HTMLElement} dragPreview - Floating drag preview element
-     * @param {Array<HTMLElement>} allBlocks - All block elements
-     * @param {HTMLElement} dropIndicator - Drop indicator element
-     * @param {Array<HTMLElement>} ghostBlocks - Ghost block elements
-     * @param {Array<number>} dragIndices - Indices being dragged
-     * @param {boolean} isMultiSelect - Whether multi-select drag
-     * @param {Object} stateRefs - References to drag state (lastTargetIndex, rafId, scrollState)
+     * @param {Object} cleanupContext - Cleanup context
+     * @param {Function} cleanupContext.onPointerMove - Pointer move handler
+     * @param {HTMLElement} cleanupContext.dragPreview - Floating drag preview element
+     * @param {Array<HTMLElement>} cleanupContext.allBlocks - All block elements
+     * @param {HTMLElement} cleanupContext.dropIndicator - Drop indicator element
+     * @param {Array<HTMLElement>} cleanupContext.ghostBlocks - Ghost block elements
+     * @param {Array<number>} cleanupContext.dragIndices - Indices being dragged
+     * @param {boolean} cleanupContext.isMultiSelect - Whether multi-select drag
+     * @param {Object} cleanupContext.stateRefs - References to drag state
      * @returns {Function} Cleanup handler function
      * @private
      */
-    _createDragCleanup(onPointerMove, dragPreview, allBlocks, dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs) {
+    _createDragCleanup(cleanupContext) {
+      const { onPointerMove, dragPreview, allBlocks, dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs } = cleanupContext;
       return () => {
         document.removeEventListener('pointermove', onPointerMove);
         document.removeEventListener('pointerup', this.dragCleanup);
@@ -14477,33 +14677,42 @@
 
       // Capture dimensions BEFORE adding dragging class
       const allBlocks = Array.from(container.querySelectorAll('.zen-pomodoro-cycle-block:not(.zen-pomodoro-cycle-block-ghost)'));
+      
+      // Cache block layout info for transform-based drag (unaffected by CSS transforms)
+      const cachedBlockInfo = allBlocks.map(block => ({
+        top: block.offsetTop,
+        height: block.offsetHeight,
+      }));
+      // Calculate total height per block including gap
+      const blockHeights = cachedBlockInfo.map(info => info.height);
+      // Account for gap between blocks (CSS gap on container)
+      const containerGap = parseFloat(getComputedStyle(container).gap) || 0;
+      const blockHeightsWithGap = blockHeights.map((h, i) => h + (i < blockHeights.length - 1 ? containerGap : 0));
+
+      // Cache non-dragged midpoints for target calculation
+      const cachedNonDraggedMidpoints = [];
+      allBlocks.forEach((block, idx) => {
+        if (!dragIndices.includes(idx)) {
+          cachedNonDraggedMidpoints.push(cachedBlockInfo[idx].top + cachedBlockInfo[idx].height / 2);
+        }
+      });
+
       const { dragPreview, offsetY } = createDragPreview(e, blockDiv, allBlocks, dragIndices);
 
       // Setup visual elements
       const { dropIndicator, ghostBlocks } = this._setupDragVisuals(container, allBlocks, dragIndices);
 
       // Create pointer move handler
-      const stateRefs = this._createPointerMoveHandler(
-        dragPreview,
-        offsetY,
-        container,
-        allBlocks,
-        dragIndices,
-        dropIndicator,
-        ghostBlocks
-      );
+      const stateRefs = this._createPointerMoveHandler({
+        dragPreview, offsetY, container, allBlocks, dragIndices,
+        dropIndicator, ghostBlocks, blockHeightsWithGap, cachedNonDraggedMidpoints,
+      });
 
       // Create cleanup handler
-      this.dragCleanup = this._createDragCleanup(
-        stateRefs.onPointerMove,
-        dragPreview,
-        allBlocks,
-        dropIndicator,
-        ghostBlocks,
-        dragIndices,
-        isMultiSelect,
-        stateRefs
-      );
+      this.dragCleanup = this._createDragCleanup({
+        onPointerMove: stateRefs.onPointerMove, dragPreview, allBlocks,
+        dropIndicator, ghostBlocks, dragIndices, isMultiSelect, stateRefs,
+      });
 
       // Register event listeners
       document.addEventListener('pointermove', stateRefs.onPointerMove);
@@ -14969,6 +15178,9 @@
       this.windowSync.onOwnershipTaken = (syncState) => {
         this._onOwnershipTaken(syncState);
       };
+      this.windowSync.onReminderSyncChanged = (syncData) => {
+        this._onReminderSyncReceived(syncData);
+      };
     }
 
     /**
@@ -15247,6 +15459,9 @@
       // Notify Post-Session Reminder that timer started (resets idle tracking)
       this.postSessionReminder.onTimerStart();
 
+      // Broadcast timer start to other windows to hide reminders
+      this.windowSync.writeReminderSync({ action: 'timer-started' });
+
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
       setTimeout(() => {
@@ -15282,6 +15497,9 @@
 
       // Notify Post-Session Reminder that timer started (resets idle tracking)
       this.postSessionReminder.onTimerStart();
+
+      // Broadcast timer start to other windows to hide reminders
+      this.windowSync.writeReminderSync({ action: 'timer-started' });
 
       // Double-check overlay visibility after a short delay
       // This ensures the DOM has settled after timer start
@@ -15325,12 +15543,55 @@
      * @private
      */
     _syncDumpState(syncState) {
-      if (syncState.dumpActive === undefined || !this.websiteBlocker) return;
-      const wasInDump = this.websiteBlocker.distractionDumpActive || false;
+      if (!this._canSyncDumpState(syncState)) return;
+      const wasInDump = this.distractionDump.isActive || false;
+
       if (syncState.dumpActive && !wasInDump) {
-        this.websiteBlocker.distractionDumpActive = true;
+        this._applyRemoteDumpStart(syncState);
       } else if (!syncState.dumpActive && wasInDump) {
-        this.websiteBlocker.distractionDumpActive = false;
+        this._applyRemoteDumpEnd();
+      }
+    }
+
+    /**
+     * Check if dump state sync is possible.
+     * @param {Object} syncState - Timer sync state
+     * @returns {boolean} True if dump state can be synced
+     * @private
+     */
+    _canSyncDumpState(syncState) {
+      return syncState.dumpActive !== undefined && this.websiteBlocker && this.distractionDump;
+    }
+
+    /**
+     * Apply dump-started state from the owner window to this secondary window.
+     * @param {Object} syncState - Timer sync state containing dump fields
+     * @private
+     */
+    _applyRemoteDumpStart(syncState) {
+      this.distractionDump.isActive = true;
+      this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
+      this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
+      this.websiteBlocker.distractionDumpActive = true;
+      this.websiteBlocker._checkCurrentPage();
+      this.overlay.hide();
+      if (this.overlay?.showDumpIndicator) {
+        this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
+      }
+    }
+
+    /**
+     * Apply dump-ended state from the owner window to this secondary window.
+     * @private
+     */
+    _applyRemoteDumpEnd() {
+      this.distractionDump.isActive = false;
+      this.distractionDump.dumpTimeRemaining = 0;
+      this.websiteBlocker.distractionDumpActive = false;
+      this.websiteBlocker._checkCurrentPage();
+      this.updateOverlayVisibility();
+      if (this.overlay?.hideDumpIndicator) {
+        this.overlay.hideDumpIndicator();
       }
     }
 
@@ -15380,6 +15641,52 @@
       });
       if (syncState.currentPhase === 'focus') {
         this.distractionDump.resetForNewFocusPhase();
+      }
+    }
+
+    /**
+     * Handle reminder sync received from another window.
+     * Hides reminders on this window when dismissed/skipped on another window.
+     * @param {Object} syncData - Reminder action data from another window
+     * @private
+     */
+    _onReminderSyncReceived(syncData) {
+      if (!syncData || !syncData.action) return;
+      logger.log(LOG_CATEGORIES$4.SYNC, 'Reminder sync received', { action: syncData.action });
+
+      switch (syncData.action) {
+        case 'daily-dismissed':
+        case 'daily-skipped':
+          this._hideDailyReminderFromSync();
+          break;
+        case 'post-session-dismissed':
+        case 'post-session-skipped':
+          this._hidePostSessionReminderFromSync();
+          break;
+        case 'timer-started':
+          this._hideDailyReminderFromSync();
+          this._hidePostSessionReminderFromSync();
+          break;
+      }
+    }
+
+    /**
+     * Hide daily reminder on this window due to a sync event from another window.
+     * @private
+     */
+    _hideDailyReminderFromSync() {
+      if (this.dailyReminder?.isShowing) {
+        this.dailyReminder.hideReminder(true);
+      }
+    }
+
+    /**
+     * Hide post-session reminder on this window due to a sync event from another window.
+     * @private
+     */
+    _hidePostSessionReminderFromSync() {
+      if (this.postSessionReminder?.isShowing) {
+        this.postSessionReminder.hideReminder(true);
       }
     }
 

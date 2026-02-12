@@ -45,3 +45,13 @@ jobs:
       # Verify linting tools are properly installed
       - name: Verify linting tools are available
         run: npm run lint -- --help || echo "Linting tools installed"
+
+      # Verify Rollup bundler works correctly
+      - name: Verify Rollup build works
+        run: npm run build
+
+      # Remove the bundled uc.js file so that Copilot knows to use
+      # `npm run build` (Rollup) to regenerate it after editing src/ modules.
+      # This prevents Copilot from editing the generated file directly.
+      - name: Remove bundled output to enforce Rollup rebuild
+        run: rm -f zen-pomodoro-focus-blocker.uc.js

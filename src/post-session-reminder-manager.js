@@ -558,8 +558,9 @@ class PostSessionReminderManager {
 
   /**
    * Hide the post-session reminder overlay.
+   * @param {boolean} fromSync - If true, this is from a cross-window sync event (don't write back)
    */
-  hideReminder() {
+  hideReminder(fromSync = false) {
     if (!this.reminderOverlay && !this.isShowing) return;
 
     logger.log(LOG_CATEGORIES.TIMER, 'Hiding post-session reminder overlay');
@@ -577,6 +578,11 @@ class PostSessionReminderManager {
     if (this.reminderOverlay) {
       this.reminderOverlay.remove();
       this.reminderOverlay = null;
+    }
+
+    // Broadcast dismissal to other windows (unless this hide is from sync)
+    if (!fromSync) {
+      window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-dismissed' });
     }
   }
 
@@ -596,6 +602,9 @@ class PostSessionReminderManager {
 
     // Save state to persist across browser restarts
     this._saveState();
+
+    // Broadcast skip to other windows
+    window.zenPomodoroApp?.windowSync?.writeReminderSync({ action: 'post-session-skipped' });
 
     this.hideReminder();
   }

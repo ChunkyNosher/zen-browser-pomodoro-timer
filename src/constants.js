@@ -4,7 +4,7 @@
  */
 const Constants = {
   PREF_PREFIX: 'zen-pomodoro',
-  MOD_VERSION: '1.4.5',
+  MOD_VERSION: '1.4.6',
 
   /** Modifier keys used by the keyboard shortcut recorder */
   MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -207,6 +207,8 @@ const Constants = {
   SYNC_PREF_KEY: 'timer-sync',
   /** Cross-window sync: pref key for timer owner */
   OWNER_PREF_KEY: 'timer-owner',
+  /** Cross-window sync: pref key for reminder sync state */
+  REMINDER_SYNC_PREF_KEY: 'reminder-sync',
   /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
   OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
   /** Cross-window sync: Services.obs topic for log entry broadcasting */
