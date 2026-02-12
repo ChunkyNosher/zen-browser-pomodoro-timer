@@ -2636,10 +2636,7 @@
      */
     _writeSyncState() {
       const sync = window.zenPomodoroApp?.windowSync;
-      if (!sync) return;
-
-      // Only write if we own the timer
-      if (!sync.isTimerOwner) return;
+      if (!sync || !sync.isTimerOwner) return;
 
       const state = {
         isActive: this.isActive,
@@ -2654,13 +2651,25 @@
         customCycle: this.customCycle,
         customCycleBlocks: this.customCycleBlocks,
         currentBlockIndex: this.currentBlockIndex,
-        dumpActive: window.zenPomodoroApp?.distractionDump?.isActive || false,
-        dumpTimeRemaining: window.zenPomodoroApp?.distractionDump?.dumpTimeRemaining || 0,
-        dumpUsedThisFocusPhase: window.zenPomodoroApp?.distractionDump?.dumpUsedThisFocusPhase || false,
+        ...this._getDumpSyncState(),
         timestamp: Date.now(),
       };
 
       sync.writeSyncState(state);
+    }
+
+    /**
+     * Get distraction dump state for cross-window sync.
+     * @returns {Object} Dump state fields for the sync payload
+     * @private
+     */
+    _getDumpSyncState() {
+      const dump = window.zenPomodoroApp?.distractionDump;
+      return {
+        dumpActive: dump?.isActive || false,
+        dumpTimeRemaining: dump?.dumpTimeRemaining || 0,
+        dumpUsedThisFocusPhase: dump?.dumpUsedThisFocusPhase || false,
+      };
     }
 
     /**
@@ -2884,18 +2893,7 @@
      * @param {Object} syncState - Timer state from owner window
      */
     syncFromState(syncState) {
-      this.isActive = syncState.isActive;
-      this.isPaused = syncState.isPaused || false;
-      this.pausedOnBlockedWorkspace = syncState.pausedOnBlockedWorkspace || false;
-      this.remainingTime = syncState.remainingTime;
-      this.currentPhase = syncState.currentPhase;
-      this.currentCycle = syncState.currentCycle;
-      this.totalCycles = syncState.totalCycles;
-      this.mode = syncState.mode;
-      this.savedConfig = syncState.savedConfig;
-      this.customCycle = syncState.customCycle;
-      this.customCycleBlocks = syncState.customCycleBlocks;
-      this.currentBlockIndex = syncState.currentBlockIndex || 0;
+      this._restoreTimerProperties(syncState);
     }
 
     /**
@@ -15545,32 +15543,55 @@
      * @private
      */
     _syncDumpState(syncState) {
-      if (syncState.dumpActive === undefined || !this.websiteBlocker || !this.distractionDump) return;
+      if (!this._canSyncDumpState(syncState)) return;
       const wasInDump = this.distractionDump.isActive || false;
 
       if (syncState.dumpActive && !wasInDump) {
-        // Dump started on owner window - sync to this window
-        this.distractionDump.isActive = true;
-        this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
-        this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
-        this.websiteBlocker.distractionDumpActive = true;
-        this.websiteBlocker._checkCurrentPage();
-        this.overlay.hide();
-        // Show dump indicator on secondary window (no click handler needed, owner handles dump end)
-        if (this.overlay && this.overlay.showDumpIndicator) {
-          this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
-        }
+        this._applyRemoteDumpStart(syncState);
       } else if (!syncState.dumpActive && wasInDump) {
-        // Dump ended on owner window - sync to this window
-        this.distractionDump.isActive = false;
-        this.distractionDump.dumpTimeRemaining = 0;
-        this.websiteBlocker.distractionDumpActive = false;
-        this.websiteBlocker._checkCurrentPage();
-        this.updateOverlayVisibility();
-        // Hide dump indicator on secondary window
-        if (this.overlay && this.overlay.hideDumpIndicator) {
-          this.overlay.hideDumpIndicator();
-        }
+        this._applyRemoteDumpEnd();
+      }
+    }
+
+    /**
+     * Check if dump state sync is possible.
+     * @param {Object} syncState - Timer sync state
+     * @returns {boolean} True if dump state can be synced
+     * @private
+     */
+    _canSyncDumpState(syncState) {
+      return syncState.dumpActive !== undefined && this.websiteBlocker && this.distractionDump;
+    }
+
+    /**
+     * Apply dump-started state from the owner window to this secondary window.
+     * @param {Object} syncState - Timer sync state containing dump fields
+     * @private
+     */
+    _applyRemoteDumpStart(syncState) {
+      this.distractionDump.isActive = true;
+      this.distractionDump.dumpTimeRemaining = syncState.dumpTimeRemaining || 0;
+      this.distractionDump.dumpUsedThisFocusPhase = syncState.dumpUsedThisFocusPhase || false;
+      this.websiteBlocker.distractionDumpActive = true;
+      this.websiteBlocker._checkCurrentPage();
+      this.overlay.hide();
+      if (this.overlay?.showDumpIndicator) {
+        this.overlay.showDumpIndicator(syncState.dumpTimeRemaining || 0);
+      }
+    }
+
+    /**
+     * Apply dump-ended state from the owner window to this secondary window.
+     * @private
+     */
+    _applyRemoteDumpEnd() {
+      this.distractionDump.isActive = false;
+      this.distractionDump.dumpTimeRemaining = 0;
+      this.websiteBlocker.distractionDumpActive = false;
+      this.websiteBlocker._checkCurrentPage();
+      this.updateOverlayVisibility();
+      if (this.overlay?.hideDumpIndicator) {
+        this.overlay.hideDumpIndicator();
       }
     }
 
@@ -15636,27 +15657,36 @@
       switch (syncData.action) {
         case 'daily-dismissed':
         case 'daily-skipped':
-          // Hide daily reminder on this window (fromSync=true to prevent infinite loop)
-          if (this.dailyReminder && this.dailyReminder.isShowing) {
-            this.dailyReminder.hideReminder(true);
-          }
+          this._hideDailyReminderFromSync();
           break;
         case 'post-session-dismissed':
         case 'post-session-skipped':
-          // Hide post-session reminder on this window (fromSync=true to prevent infinite loop)
-          if (this.postSessionReminder && this.postSessionReminder.isShowing) {
-            this.postSessionReminder.hideReminder(true);
-          }
+          this._hidePostSessionReminderFromSync();
           break;
         case 'timer-started':
-          // Hide both reminders when timer starts on another window
-          if (this.dailyReminder && this.dailyReminder.isShowing) {
-            this.dailyReminder.hideReminder(true);
-          }
-          if (this.postSessionReminder && this.postSessionReminder.isShowing) {
-            this.postSessionReminder.hideReminder(true);
-          }
+          this._hideDailyReminderFromSync();
+          this._hidePostSessionReminderFromSync();
           break;
+      }
+    }
+
+    /**
+     * Hide daily reminder on this window due to a sync event from another window.
+     * @private
+     */
+    _hideDailyReminderFromSync() {
+      if (this.dailyReminder?.isShowing) {
+        this.dailyReminder.hideReminder(true);
+      }
+    }
+
+    /**
+     * Hide post-session reminder on this window due to a sync event from another window.
+     * @private
+     */
+    _hidePostSessionReminderFromSync() {
+      if (this.postSessionReminder?.isShowing) {
+        this.postSessionReminder.hideReminder(true);
       }
     }
 
