@@ -209,8 +209,10 @@ class PomodoroTimer {
 
   /**
    * Stop the timer
+   * @param {Object} options - Optional configuration
+   * @param {boolean} options.suppressCompleteCallback - If true, skip calling onComplete callback
    */
-  stop() {
+  stop(options = {}) {
     this.isActive = false;
     this.isPaused = false;
     this.pausedOnBlockedWorkspace = false;
@@ -229,8 +231,8 @@ class PomodoroTimer {
       sync.releaseOwnership();
     }
 
-    // Notify completion callback if registered
-    if (this.onComplete) {
+    // Notify completion callback if registered (unless suppressed for teardown)
+    if (this.onComplete && !options.suppressCompleteCallback) {
       this.onComplete();
     }
   }

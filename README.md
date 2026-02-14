@@ -363,6 +363,10 @@ See [LICENSE](LICENSE) file for full details.
 
 ## 📊 Changelog
 
+### Version 1.4.6
+
+- ✅ **Window Teardown Fix**: Fixed false timer-complete notifications and reminder side effects when closing secondary windows or popup windows (e.g., Google sign-in)
+
 ### Version 1.4.3
 
 - ✅ **Floating Drag Preview**: Blocks now show a floating clone following the cursor during drag instead of disappearing

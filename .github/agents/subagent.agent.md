@@ -157,6 +157,7 @@ Both `LogManager` and `WindowSyncManager` need `Storage` injected via `setStorag
 7. **Use `textContent`** instead of `innerHTML` for security
 8. **Use `crypto.getRandomValues()`** for random code generation
 9. **Memory leak prevention** - always clean up event listeners in hold-to-unlock handlers
+10. **Window teardown** - call `timer.stop({ suppressCompleteCallback: true })` during cleanup to avoid false completion notifications
 
 ## MCP Tools
 

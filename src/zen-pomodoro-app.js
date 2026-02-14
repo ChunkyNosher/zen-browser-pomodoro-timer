@@ -1246,7 +1246,8 @@ class ZenPomodoroApp {
       this.workspace.stopMonitoring();
     }
     if (this.timer && typeof this.timer.stop === 'function') {
-      this.timer.stop();
+      // Suppress completion callback during teardown to prevent false notifications
+      this.timer.stop({ suppressCompleteCallback: true });
     }
     if (this.security && typeof this.security.cleanupLockScreen === 'function') {
       this.security.cleanupLockScreen();

@@ -452,6 +452,15 @@ Allows users to pause their focus timer and capture distracting thoughts without
 - Added CSS utility control layout fix for #zen-pomodoro-controls
 - Added transition popup position reset documentation
 
+### Window Teardown Notification Bug
+
+**Issue:** Closing secondary windows or popup windows (e.g., Google sign-in) triggered false timer-complete notifications and caused reminder completion side effects, because the timer stop callback fired during app teardown.
+
+**Fix:**
+- `PomodoroTimer.stop()` now accepts `suppressCompleteCallback` parameter (default: false)
+- `ZenPomodoroApp._runCleanupActions()` calls `timer.stop({ suppressCompleteCallback: true })` during teardown
+- Prevents completion logic from running when window is closing, not when user actually completed a session
+
 ---
 
 ## Bug Fixes and Features in v1.4.5
