@@ -89,7 +89,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.6';                  // Current mod version
+const MOD_VERSION = '1.4.7';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -406,6 +406,19 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `LogManager.initSync()`                           | Initialize cross-window log sync via Services.obs             |
 | `LogManager.requestExistingLogs()`                | Request historical logs from other windows on startup         |
 | `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
+
+---
+
+## Bug Fixes and Features in v1.4.7
+
+### Sine v2.3 Compatibility Fix
+
+**Issue:** Sine v2.3 introduced a breaking change where the `scripts` metadata field must use local file path keys (e.g., `"zen-pomodoro-focus-blocker.uc.js"`) instead of URL keys. Using URL keys caused Sine to flatten them as local paths, producing invalid `chrome://sine/content/https://...` paths.
+
+**Fix:**
+- Changed `scripts` key in `theme.json` from raw GitHub URL to local file path: `"zen-pomodoro-focus-blocker.uc.js": {}`
+- Retained legacy `js` field for backward compatibility with older Sine versions
+- Updated version to 1.4.7 and `updatedAt` to 2026-02-16
 
 ---
 

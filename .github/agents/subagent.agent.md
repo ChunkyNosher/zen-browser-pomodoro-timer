@@ -105,7 +105,7 @@ Both `LogManager` and `WindowSyncManager` need `Storage` injected via `setStorag
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.4.6'`
+- `MOD_VERSION = '1.4.7'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 - `REMINDER_SYNC_PREF_KEY = 'reminder-sync'` - Cross-window reminder sync pref key
