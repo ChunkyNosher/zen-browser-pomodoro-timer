@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.6-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.7-green.svg)
 
 ## ✨ Features
 
@@ -362,6 +362,14 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.7
+
+- ✅ **Sine v2.3 Compatibility**: Fixed `scripts` metadata key format (changed from URL to local file path: `"zen-pomodoro-focus-blocker.uc.js": {}`) while retaining legacy `js` field for backward compatibility
+
+### Version 1.4.6
+
+- ✅ **Window Teardown Fix**: Fixed false timer-complete notifications and reminder side effects when closing secondary windows or popup windows (e.g., Google sign-in)
 
 ### Version 1.4.3
 

@@ -343,6 +343,27 @@ describe('PomodoroTimer', () => {
       timer.onComplete = null;
       expect(() => timer.stop()).not.toThrow();
     });
+
+    it('should NOT call onComplete when suppressCompleteCallback is true', () => {
+      const callback = vi.fn();
+      timer.onComplete = callback;
+      timer.stop({ suppressCompleteCallback: true });
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('should still call onComplete with empty options object', () => {
+      const callback = vi.fn();
+      timer.onComplete = callback;
+      timer.stop({});
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should still call onComplete when suppressCompleteCallback is false', () => {
+      const callback = vi.fn();
+      timer.onComplete = callback;
+      timer.stop({ suppressCompleteCallback: false });
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Phase Management', () => {

@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.6
+ * Version: 1.4.7
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.6',
+    MOD_VERSION: '1.4.7',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -2247,8 +2247,10 @@
 
     /**
      * Stop the timer
+     * @param {Object} options - Optional configuration
+     * @param {boolean} options.suppressCompleteCallback - If true, skip calling onComplete callback
      */
-    stop() {
+    stop(options = {}) {
       this.isActive = false;
       this.isPaused = false;
       this.pausedOnBlockedWorkspace = false;
@@ -2267,8 +2269,8 @@
         sync.releaseOwnership();
       }
 
-      // Notify completion callback if registered
-      if (this.onComplete) {
+      // Notify completion callback if registered (unless suppressed for teardown)
+      if (this.onComplete && !options.suppressCompleteCallback) {
         this.onComplete();
       }
     }
@@ -16305,7 +16307,8 @@
         this.workspace.stopMonitoring();
       }
       if (this.timer && typeof this.timer.stop === 'function') {
-        this.timer.stop();
+        // Suppress completion callback during teardown to prevent false notifications
+        this.timer.stop({ suppressCompleteCallback: true });
       }
       if (this.security && typeof this.security.cleanupLockScreen === 'function') {
         this.security.cleanupLockScreen();
