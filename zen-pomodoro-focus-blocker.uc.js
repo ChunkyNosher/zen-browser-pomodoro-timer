@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.7
+ * Version: 1.4.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.7',
+    MOD_VERSION: '1.4.8',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -7681,6 +7681,25 @@
     }
 
     /**
+     * Check if the timer indicator is currently active.
+     * @returns {boolean} True if indicator is active
+     * @private
+     */
+    _isIndicatorActive() {
+      return window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active');
+    }
+
+    /**
+     * Get button text based on indicator state.
+     * @param {boolean} isActive - Whether indicator is active
+     * @returns {string} Button text
+     * @private
+     */
+    _getToggleIndicatorText(isActive) {
+      return isActive ? 'Hide Timer Indicator' : 'Show Timer Indicator';
+    }
+
+    /**
      * Create the toggle timer indicator button.
      * @returns {HTMLElement} Toggle indicator button
      * @private
@@ -7688,19 +7707,15 @@
     _createToggleIndicatorButton() {
       const btn = document.createElement('button');
       btn.className = 'zen-pomodoro-dialog-button secondary';
-      btn.textContent =
-        window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-          ? 'Hide Timer Indicator'
-          : 'Show Timer Indicator';
+      btn.textContent = this._getToggleIndicatorText(this._isIndicatorActive());
       btn.addEventListener('click', () => {
         if (window.zenPomodoroApp?.overlay) {
-          const indicator = window.zenPomodoroApp.overlay.indicator;
-          if (indicator?.classList.contains('active')) {
+          if (this._isIndicatorActive()) {
             window.zenPomodoroApp.overlay.hideIndicator();
-            btn.textContent = 'Show Timer Indicator';
+            btn.textContent = this._getToggleIndicatorText(false);
           } else {
             window.zenPomodoroApp.overlay.showIndicator();
-            btn.textContent = 'Hide Timer Indicator';
+            btn.textContent = this._getToggleIndicatorText(true);
           }
         }
       });

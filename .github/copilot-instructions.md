@@ -89,7 +89,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.7';                  // Current mod version
+const MOD_VERSION = '1.4.8';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -406,6 +406,26 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `LogManager.initSync()`                           | Initialize cross-window log sync via Services.obs             |
 | `LogManager.requestExistingLogs()`                | Request historical logs from other windows on startup         |
 | `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
+
+---
+
+## Bug Fixes and Features in v1.4.8
+
+### Distraction Dump Start Fix
+
+**Change:** Distraction Dump now starts immediately from main menu using the settings-configured `distractionDumpDuration` value (default 25 minutes). The per-launch duration dialog was removed for streamlined UX.
+
+**Implementation:** The per-launch dump duration dialog was removed. `DistractionDumpManager.startDump()` now reads `config.distractionDumpDuration` directly to start the countdown immediately.
+
+### Window Ownership Claim during Dump
+
+**Change:** Cross-window ownership is now claimed before dump start/end to ensure proper sync state handling across all browser windows.
+
+**Implementation:** Window ownership claim logic was updated to handle dump activation/deactivation, preventing inconsistent dump state across windows.
+
+### Export Logs Menu Location
+
+**Change:** Moved "Export Logs" button from Settings dialog to main Pomodoro menu for easier access. Users can now export logs without opening full settings.
 
 ---
 
