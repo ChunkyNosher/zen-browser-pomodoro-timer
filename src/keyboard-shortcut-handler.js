@@ -602,7 +602,7 @@ class KeyboardShortcutHandler {
   }
 
   /**
-   * Create navigation buttons (Settings, Rulesets) for the active timer menu.
+   * Create navigation buttons (Settings, Rulesets, Export Logs) for the active timer menu.
    * @param {HTMLElement} dialog - Menu dialog
    * @returns {Array<HTMLElement>} Array of navigation buttons
    * @private
@@ -630,7 +630,20 @@ class KeyboardShortcutHandler {
       this.showRulesetSettingsDialog();
     });
 
-    return [settingsBtn, rulesetBtn];
+    const exportLogsBtn = document.createElement('button');
+    exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+    exportLogsBtn.textContent = 'Export Logs';
+    exportLogsBtn.addEventListener('click', () => {
+      if (window.zenPomodoroApp?.logger) {
+        window.zenPomodoroApp.logger.exportLogs();
+        window.zenPomodoroApp.showCustomAlert(
+          'Export Complete',
+          'Logs have been exported successfully.'
+        );
+      }
+    });
+
+    return [settingsBtn, rulesetBtn, exportLogsBtn];
   }
 
   /**
@@ -653,7 +666,7 @@ class KeyboardShortcutHandler {
     } else if (action === 'startDump') {
       dumpBtn.addEventListener('click', () => {
         this._closeMenuDialog(dialog);
-        window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+        window.zenPomodoroApp.distractionDump.startDump();
       });
     }
     menuSection.appendChild(dumpBtn);
@@ -709,10 +722,25 @@ class KeyboardShortcutHandler {
       }
     });
 
+    // Export Logs button
+    const exportLogsBtn = document.createElement('button');
+    exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+    exportLogsBtn.textContent = 'Export Logs';
+    exportLogsBtn.addEventListener('click', () => {
+      if (window.zenPomodoroApp?.logger) {
+        window.zenPomodoroApp.logger.exportLogs();
+        window.zenPomodoroApp.showCustomAlert(
+          'Export Complete',
+          'Logs have been exported successfully.'
+        );
+      }
+    });
+
     menuSection.appendChild(startBtn);
     menuSection.appendChild(settingsBtn);
     menuSection.appendChild(rulesetBtn);
     menuSection.appendChild(customCyclesBtn);
+    menuSection.appendChild(exportLogsBtn);
   }
 
   /**

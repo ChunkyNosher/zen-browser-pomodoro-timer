@@ -1505,7 +1505,7 @@
    * document.documentElement.appendChild(dialog);
    * setupDialogDrag(dialog);
    */
-  function setupDialogDrag(dialog) {
+  function setupDialogDrag$1(dialog) {
     const header = dialog.querySelector('h2');
     if (!header) {
       console.warn(
@@ -1736,7 +1736,7 @@
    * Call this after appending the dialog to the DOM but before setupDialogDrag.
    * @param {HTMLElement} dialog - The dialog element to position
    */
-  function applyLastDialogPosition(dialog) {
+  function applyLastDialogPosition$1(dialog) {
     if (!dialog || !lastDialogPosition) return;
 
     const { left, top } = lastDialogPosition;
@@ -6149,11 +6149,6 @@
     cancelButton.id = 'zen-pomodoro-settings-cancel';
     cancelButton.textContent = 'Cancel';
 
-    const exportLogsButton = document.createElement('button');
-    exportLogsButton.className = 'zen-pomodoro-dialog-button secondary';
-    exportLogsButton.id = 'zen-pomodoro-export-logs';
-    exportLogsButton.textContent = 'Export Logs';
-
     const saveAllSettings = () => {
       logger.log(LOG_CATEGORIES$4.SETTINGS, 'Saving settings');
       saveKeyboardShortcut(shortcutInput, config);
@@ -6182,17 +6177,6 @@
       dialog.remove();
     });
 
-    exportLogsButton.addEventListener('click', () => {
-      logger.log(LOG_CATEGORIES$4.SETTINGS, 'Export logs button clicked');
-      if (window.zenPomodoroApp?.logger) {
-        window.zenPomodoroApp.logger.exportLogs();
-        window.zenPomodoroApp.showCustomAlert(
-          'Export Complete',
-          'Logs have been exported successfully.'
-        );
-      }
-    });
-
     saveButton.addEventListener('click', () => {
       saveAllSettings();
       window.zenPomodoroApp?.showCustomAlert('Saved', 'Settings have been saved.');
@@ -6204,7 +6188,6 @@
     });
 
     buttonDiv.appendChild(cancelButton);
-    buttonDiv.appendChild(exportLogsButton);
     buttonDiv.appendChild(saveButton);
     buttonDiv.appendChild(saveCloseButton);
 
@@ -6301,8 +6284,8 @@
     };
 
     // Apply saved position and make draggable
-    applyLastDialogPosition(dialog);
-    setupDialogDrag(dialog);
+    applyLastDialogPosition$1(dialog);
+    setupDialogDrag$1(dialog);
   }
 
   /**
@@ -6458,10 +6441,10 @@
     };
 
     // Apply saved position from parent dialog before setting up drag
-    applyLastDialogPosition(dialog);
+    applyLastDialogPosition$1(dialog);
 
     // Make dialog draggable
-    setupDialogDrag(dialog);
+    setupDialogDrag$1(dialog);
 
     cancelButton.addEventListener('click', () => {
       logger.log(LOG_CATEGORIES$4.MENU, 'Ruleset settings dialog cancelled');
@@ -7725,7 +7708,7 @@
     }
 
     /**
-     * Create navigation buttons (Settings, Rulesets) for the active timer menu.
+     * Create navigation buttons (Settings, Rulesets, Export Logs) for the active timer menu.
      * @param {HTMLElement} dialog - Menu dialog
      * @returns {Array<HTMLElement>} Array of navigation buttons
      * @private
@@ -7753,7 +7736,20 @@
         this.showRulesetSettingsDialog();
       });
 
-      return [settingsBtn, rulesetBtn];
+      const exportLogsBtn = document.createElement('button');
+      exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+      exportLogsBtn.textContent = 'Export Logs';
+      exportLogsBtn.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.logger) {
+          window.zenPomodoroApp.logger.exportLogs();
+          window.zenPomodoroApp.showCustomAlert(
+            'Export Complete',
+            'Logs have been exported successfully.'
+          );
+        }
+      });
+
+      return [settingsBtn, rulesetBtn, exportLogsBtn];
     }
 
     /**
@@ -7776,7 +7772,7 @@
       } else if (action === 'startDump') {
         dumpBtn.addEventListener('click', () => {
           this._closeMenuDialog(dialog);
-          window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+          window.zenPomodoroApp.distractionDump.startDump();
         });
       }
       menuSection.appendChild(dumpBtn);
@@ -7832,10 +7828,25 @@
         }
       });
 
+      // Export Logs button
+      const exportLogsBtn = document.createElement('button');
+      exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+      exportLogsBtn.textContent = 'Export Logs';
+      exportLogsBtn.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.logger) {
+          window.zenPomodoroApp.logger.exportLogs();
+          window.zenPomodoroApp.showCustomAlert(
+            'Export Complete',
+            'Logs have been exported successfully.'
+          );
+        }
+      });
+
       menuSection.appendChild(startBtn);
       menuSection.appendChild(settingsBtn);
       menuSection.appendChild(rulesetBtn);
       menuSection.appendChild(customCyclesBtn);
+      menuSection.appendChild(exportLogsBtn);
     }
 
     /**
@@ -7916,10 +7927,10 @@
       document.documentElement.appendChild(dialog);
 
       // Apply saved position from previous dialog before setting up drag
-      applyLastDialogPosition(dialog);
+      applyLastDialogPosition$1(dialog);
 
       // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
+      setupDialogDrag$1(dialog);
 
       // Focus the dialog
       dialog.focus();
@@ -8049,8 +8060,8 @@
       };
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition(dialog);
-      setupDialogDrag(dialog);
+      applyLastDialogPosition$1(dialog);
+      setupDialogDrag$1(dialog);
 
       // Event handlers
       this._setupModeToggleHandler(modeSelect, [...durationRows, customCycleRow]);
@@ -10631,7 +10642,7 @@
       document.documentElement.appendChild(this.popup);
 
       // Make popup draggable
-      setupDialogDrag(this.popup);
+      setupDialogDrag$1(this.popup);
 
       // Start countdown
       this._startCountdown();
@@ -12824,102 +12835,6 @@
     }
 
     /**
-     * Show the configuration dialog to set dump duration before starting.
-     */
-    showDumpConfigDialog() {
-      const config = getConfig$3();
-
-      if (!config.distractionDumpEnabled) {
-        logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump feature is disabled');
-        return;
-      }
-
-      // Check if dump is available for this focus phase
-      if (this.dumpUsedThisFocusPhase) {
-        logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump already used this focus phase');
-        return;
-      }
-
-      // Create dialog
-      const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-dump-config-dialog';
-      dialog.className = 'zen-pomodoro-dialog active';
-
-      // Title
-      const title = document.createElement('h2');
-      title.className = 'zen-pomodoro-dialog-title';
-      title.textContent = '🧠 Distraction Dump';
-      dialog.appendChild(title);
-
-      // Description
-      const description = document.createElement('p');
-      description.className = 'zen-pomodoro-dialog-description';
-      description.textContent = 
-        'Take a break to capture distracting thoughts without using your focus time. ' +
-        'Your timer will pause and all blocks will be temporarily lifted.';
-      dialog.appendChild(description);
-
-      // Duration input section
-      const durationSection = document.createElement('div');
-      durationSection.className = 'zen-pomodoro-dialog-section';
-
-      const durationLabel = document.createElement('label');
-      durationLabel.className = 'zen-pomodoro-dialog-label';
-      durationLabel.textContent = 'Dump Duration (minutes):';
-      durationSection.appendChild(durationLabel);
-
-      const durationInput = document.createElement('input');
-      durationInput.type = 'number';
-      durationInput.className = 'zen-pomodoro-dialog-input';
-      durationInput.min = '1';
-      durationInput.max = config.distractionDumpMaxDuration.toString();
-      durationInput.value = config.distractionDumpDuration.toString();
-      durationSection.appendChild(durationInput);
-
-      dialog.appendChild(durationSection);
-
-      // Buttons
-      const buttonDiv = document.createElement('div');
-      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-
-      const cancelButton = document.createElement('button');
-      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-      cancelButton.textContent = 'Cancel';
-      cancelButton.addEventListener('click', () => {
-        dialog.remove();
-      });
-
-      const startButton = document.createElement('button');
-      startButton.className = 'zen-pomodoro-dialog-button';
-      startButton.textContent = 'Start Dump';
-      startButton.addEventListener('click', () => {
-        const duration = validateIntegerInput(
-          parseInt(durationInput.value, 10),
-          1,
-          config.distractionDumpMaxDuration,
-          config.distractionDumpDuration
-        );
-        dialog.remove();
-        this.startDump(duration);
-      });
-
-      buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(startButton);
-      dialog.appendChild(buttonDiv);
-
-      // Add to DOM first
-      document.documentElement.appendChild(dialog);
-
-      // Position dialog
-      applyLastDialogPosition(dialog);
-
-      // Make dialog draggable
-      setupDialogDrag(dialog);
-
-      logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump config dialog shown');
-    }
-
-    /**
      * Check if a distraction dump can be started.
      * @returns {boolean} True if dump can start
      * @private
@@ -13010,12 +12925,18 @@
     }
 
     /**
-     * Start a distraction dump session.
-     * @param {number} duration - Duration in minutes
+     * Start a distraction dump session using configured duration.
      */
-    startDump(duration) {
+    startDump() {
       if (!this._canStartDump()) return;
 
+      // CROSS-WINDOW SYNC: Claim ownership before starting dump if in secondary window
+      if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+        window.zenPomodoroApp._claimOwnershipForAction();
+      }
+
+      const config = getConfig$3();
+      const duration = config.distractionDumpDuration;
       const timer = window.zenPomodoroApp?.timer;
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Starting distraction dump', { duration });
@@ -13146,6 +13067,11 @@
      */
     endDump() {
       if (!this.isActive) return;
+
+      // CROSS-WINDOW SYNC: Claim ownership before ending dump if in secondary window
+      if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+        window.zenPomodoroApp._claimOwnershipForAction();
+      }
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Ending distraction dump');
 
@@ -13571,9 +13497,9 @@
       dialog.appendChild(cyclesContainer);
       dialog.appendChild(buttonDiv);
 
-      applyLastDialogPosition(dialog);
+      applyLastDialogPosition$1(dialog);
       document.documentElement.appendChild(dialog);
-      setupDialogDrag(dialog);
+      setupDialogDrag$1(dialog);
     }
 
     /**
@@ -13713,7 +13639,7 @@
       confirmDialog.appendChild(message);
       confirmDialog.appendChild(buttonDiv);
 
-      applyLastDialogPosition(confirmDialog);
+      applyLastDialogPosition$1(confirmDialog);
       document.documentElement.appendChild(confirmDialog);
     }
 
@@ -14156,9 +14082,9 @@
       dialog.appendChild(addBlockRow);
       dialog.appendChild(buttonDiv);
 
-      applyLastDialogPosition(dialog);
+      applyLastDialogPosition$1(dialog);
       document.documentElement.appendChild(dialog);
-      setupDialogDrag(dialog);
+      setupDialogDrag$1(dialog);
     }
 
     /**
@@ -14881,7 +14807,7 @@
       menu.appendChild(description);
       menu.appendChild(buttonsDiv);
 
-      applyLastDialogPosition(menu);
+      applyLastDialogPosition$1(menu);
       document.documentElement.appendChild(menu);
     }
 
@@ -14924,7 +14850,7 @@
         errorDialog.appendChild(message);
         errorDialog.appendChild(okButton);
 
-        applyLastDialogPosition(errorDialog);
+        applyLastDialogPosition$1(errorDialog);
         document.documentElement.appendChild(errorDialog);
         return;
       }
@@ -15018,7 +14944,7 @@
       errorDialog.appendChild(messageP);
       errorDialog.appendChild(okButton);
 
-      applyLastDialogPosition(errorDialog);
+      applyLastDialogPosition$1(errorDialog);
       document.documentElement.appendChild(errorDialog);
     }
 
@@ -16146,10 +16072,10 @@
       document.documentElement.appendChild(dialog);
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition(dialog);
+      applyLastDialogPosition$1(dialog);
 
       // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
+      setupDialogDrag$1(dialog);
 
       okButton.addEventListener('click', () => {
         dialog.remove();
@@ -16193,10 +16119,10 @@
       document.documentElement.appendChild(dialog);
 
       // Apply saved position from parent dialog before setting up drag
-      applyLastDialogPosition(dialog);
+      applyLastDialogPosition$1(dialog);
 
       // Issue 8: Make dialog draggable
-      setupDialogDrag(dialog);
+      setupDialogDrag$1(dialog);
 
       cancelButton.addEventListener('click', () => {
         dialog.remove();

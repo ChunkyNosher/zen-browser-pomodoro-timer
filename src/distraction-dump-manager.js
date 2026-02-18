@@ -1,6 +1,5 @@
 import { logger } from './log-manager.js';
-import { getConfig, validateIntegerInput, LOG_CATEGORIES } from './helpers.js';
-import { applyLastDialogPosition, setupDialogDrag } from './ui-helpers.js';
+import { getConfig, LOG_CATEGORIES } from './helpers.js';
 
 // ============================================
 // DistractionDumpManager Class
@@ -63,102 +62,6 @@ class DistractionDumpManager {
    */
   isDumpAvailable() {
     return !this.dumpUsedThisFocusPhase && !this.isActive;
-  }
-
-  /**
-   * Show the configuration dialog to set dump duration before starting.
-   */
-  showDumpConfigDialog() {
-    const config = getConfig();
-
-    if (!config.distractionDumpEnabled) {
-      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump feature is disabled');
-      return;
-    }
-
-    // Check if dump is available for this focus phase
-    if (this.dumpUsedThisFocusPhase) {
-      logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump already used this focus phase');
-      return;
-    }
-
-    // Create dialog
-    const dialog = document.createElement('div');
-    dialog.id = 'zen-pomodoro-dump-config-dialog';
-    dialog.className = 'zen-pomodoro-dialog active';
-
-    // Title
-    const title = document.createElement('h2');
-    title.className = 'zen-pomodoro-dialog-title';
-    title.textContent = '🧠 Distraction Dump';
-    dialog.appendChild(title);
-
-    // Description
-    const description = document.createElement('p');
-    description.className = 'zen-pomodoro-dialog-description';
-    description.textContent = 
-      'Take a break to capture distracting thoughts without using your focus time. ' +
-      'Your timer will pause and all blocks will be temporarily lifted.';
-    dialog.appendChild(description);
-
-    // Duration input section
-    const durationSection = document.createElement('div');
-    durationSection.className = 'zen-pomodoro-dialog-section';
-
-    const durationLabel = document.createElement('label');
-    durationLabel.className = 'zen-pomodoro-dialog-label';
-    durationLabel.textContent = 'Dump Duration (minutes):';
-    durationSection.appendChild(durationLabel);
-
-    const durationInput = document.createElement('input');
-    durationInput.type = 'number';
-    durationInput.className = 'zen-pomodoro-dialog-input';
-    durationInput.min = '1';
-    durationInput.max = config.distractionDumpMaxDuration.toString();
-    durationInput.value = config.distractionDumpDuration.toString();
-    durationSection.appendChild(durationInput);
-
-    dialog.appendChild(durationSection);
-
-    // Buttons
-    const buttonDiv = document.createElement('div');
-    buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-
-    const cancelButton = document.createElement('button');
-    cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-    cancelButton.textContent = 'Cancel';
-    cancelButton.addEventListener('click', () => {
-      dialog.remove();
-    });
-
-    const startButton = document.createElement('button');
-    startButton.className = 'zen-pomodoro-dialog-button';
-    startButton.textContent = 'Start Dump';
-    startButton.addEventListener('click', () => {
-      const duration = validateIntegerInput(
-        parseInt(durationInput.value, 10),
-        1,
-        config.distractionDumpMaxDuration,
-        config.distractionDumpDuration
-      );
-      dialog.remove();
-      this.startDump(duration);
-    });
-
-    buttonDiv.appendChild(cancelButton);
-    buttonDiv.appendChild(startButton);
-    dialog.appendChild(buttonDiv);
-
-    // Add to DOM first
-    document.documentElement.appendChild(dialog);
-
-    // Position dialog
-    applyLastDialogPosition(dialog);
-
-    // Make dialog draggable
-    setupDialogDrag(dialog);
-
-    logger.log(LOG_CATEGORIES.TIMER, 'Distraction dump config dialog shown');
   }
 
   /**
@@ -252,12 +155,18 @@ class DistractionDumpManager {
   }
 
   /**
-   * Start a distraction dump session.
-   * @param {number} duration - Duration in minutes
+   * Start a distraction dump session using configured duration.
    */
-  startDump(duration) {
+  startDump() {
     if (!this._canStartDump()) return;
 
+    // CROSS-WINDOW SYNC: Claim ownership before starting dump if in secondary window
+    if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+      window.zenPomodoroApp._claimOwnershipForAction();
+    }
+
+    const config = getConfig();
+    const duration = config.distractionDumpDuration;
     const timer = window.zenPomodoroApp?.timer;
 
     logger.log(LOG_CATEGORIES.TIMER, 'Starting distraction dump', { duration });
@@ -388,6 +297,11 @@ class DistractionDumpManager {
    */
   endDump() {
     if (!this.isActive) return;
+
+    // CROSS-WINDOW SYNC: Claim ownership before ending dump if in secondary window
+    if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+      window.zenPomodoroApp._claimOwnershipForAction();
+    }
 
     logger.log(LOG_CATEGORIES.TIMER, 'Ending distraction dump');
 
