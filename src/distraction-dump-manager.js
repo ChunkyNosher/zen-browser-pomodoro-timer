@@ -1,5 +1,6 @@
 import { logger } from './log-manager.js';
 import { getConfig, LOG_CATEGORIES } from './helpers.js';
+import { applyLastDialogPosition, setupDialogDrag } from './ui-helpers.js';
 
 // ============================================
 // DistractionDumpManager Class
@@ -158,6 +159,13 @@ class DistractionDumpManager {
    * Start a distraction dump session using configured duration.
    */
   startDump() {
+    // Check if feature is enabled
+    const config = getConfig();
+    if (!config.distractionDumpEnabled) {
+      logger.log(LOG_CATEGORIES.TIMER, 'Cannot start dump - feature is disabled');
+      return;
+    }
+
     if (!this._canStartDump()) return;
 
     // CROSS-WINDOW SYNC: Claim ownership before starting dump if in secondary window
@@ -165,7 +173,6 @@ class DistractionDumpManager {
       window.zenPomodoroApp._claimOwnershipForAction();
     }
 
-    const config = getConfig();
     const duration = config.distractionDumpDuration;
     const timer = window.zenPomodoroApp?.timer;
 

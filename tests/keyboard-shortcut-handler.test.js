@@ -4,12 +4,41 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import KeyboardShortcutHandler from '../src/keyboard-shortcut-handler.js';
 
+// Mock dependencies at module top level for proper hoisting
+vi.mock('../src/helpers.js', () => ({
+  getConfig: vi.fn(() => ({
+    keyboardShortcut: 'Alt+Shift+P',
+    toggleIndicatorShortcut: 'Alt+Shift+I',
+  })),
+  formatTime: vi.fn((seconds) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`),
+  MOD_VERSION: '1.4.8',
+  LOG_CATEGORIES: {
+    MENU: 'MENU',
+    TIMER: 'TIMER',
+  },
+}));
+
+vi.mock('../src/ui-helpers.js', () => ({
+  setupDialogDrag: vi.fn(),
+  applyLastDialogPosition: vi.fn(),
+  saveDialogPosition: vi.fn(),
+  getMenuPhaseLabel: vi.fn((phase) => phase),
+  updateCountdownElement: vi.fn(),
+  handleStopTimerWithLockout: vi.fn((callback) => callback()),
+  handleSkipFocusWithLockout: vi.fn((callback) => callback()),
+  isDistractionDumpBlocking: vi.fn(() => false),
+  handlePauseResumeTimer: vi.fn(),
+}));
+
 describe('KeyboardShortcutHandler - Export Logs', () => {
   let handler;
   let mockLogger;
   let mockApp;
 
   beforeEach(() => {
+    // Clear all mocks
+    vi.clearAllMocks();
+
     // Reset DOM
     document.documentElement.innerHTML = '';
 
@@ -26,32 +55,6 @@ describe('KeyboardShortcutHandler - Export Logs', () => {
 
     // Setup global window
     global.window = { zenPomodoroApp: mockApp };
-
-    // Mock dependencies
-    vi.mock('../src/helpers.js', () => ({
-      getConfig: vi.fn(() => ({
-        keyboardShortcut: 'Alt+Shift+P',
-        toggleIndicatorShortcut: 'Alt+Shift+I',
-      })),
-      formatTime: vi.fn((seconds) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`),
-      MOD_VERSION: '1.4.8',
-      LOG_CATEGORIES: {
-        MENU: 'MENU',
-        TIMER: 'TIMER',
-      },
-    }));
-
-    vi.mock('../src/ui-helpers.js', () => ({
-      setupDialogDrag: vi.fn(),
-      applyLastDialogPosition: vi.fn(),
-      saveDialogPosition: vi.fn(),
-      getMenuPhaseLabel: vi.fn((phase) => phase),
-      updateCountdownElement: vi.fn(),
-      handleStopTimerWithLockout: vi.fn((callback) => callback()),
-      handleSkipFocusWithLockout: vi.fn((callback) => callback()),
-      isDistractionDumpBlocking: vi.fn(() => false),
-      handlePauseResumeTimer: vi.fn(),
-    }));
 
     handler = new KeyboardShortcutHandler();
   });

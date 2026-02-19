@@ -19,7 +19,6 @@ vi.mock('../src/helpers.js', () => ({
   },
 }));
 
-import { logger } from '../src/log-manager.js';
 import { getConfig } from '../src/helpers.js';
 
 describe('DistractionDumpManager', () => {
@@ -35,6 +34,9 @@ describe('DistractionDumpManager', () => {
 
     // Reset all mocks
     vi.clearAllMocks();
+
+    // Mock setInterval/clearInterval
+    vi.useFakeTimers();
 
     // Create mock objects
     mockTimer = {
@@ -82,9 +84,6 @@ describe('DistractionDumpManager', () => {
 
     // Create fresh instance
     dumpManager = new DistractionDumpManager();
-
-    // Mock setInterval/clearInterval
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
@@ -101,6 +100,15 @@ describe('DistractionDumpManager', () => {
       expect(dumpManager.dumpTimeRemaining).toBe(mockConfig.distractionDumpDuration * 60);
       expect(mockTimer.pause).toHaveBeenCalled();
       expect(mockWebsiteBlocker.distractionDumpActive).toBe(true);
+    });
+
+    it('should not start dump if feature is disabled', () => {
+      mockConfig.distractionDumpEnabled = false;
+
+      dumpManager.startDump();
+
+      expect(mockTimer.pause).not.toHaveBeenCalled();
+      expect(dumpManager.isActive).toBe(false);
     });
 
     it('should not start dump if already active', () => {
@@ -314,6 +322,45 @@ describe('DistractionDumpManager', () => {
       expect(dumpManager.dumpTimeRemaining).toBe(300);
       expect(dumpManager.savedTimerState).toEqual({ remainingTime: 1500, isPaused: false });
       expect(dumpManager.dumpUsedThisFocusPhase).toBe(true);
+    });
+
+    it('should support countdown continuation after restore', () => {
+      // Simulate crash recovery scenario
+      const state = {
+        isActive: true,
+        dumpTimeRemaining: 60, // 1 minute remaining when browser crashed
+        savedTimerState: { remainingTime: 1500, isPaused: false },
+        dumpUsedThisFocusPhase: true,
+      };
+
+      dumpManager.restoreState(state);
+
+      // Simulate app calling _enableDumpMode and _setupDumpIndicator (as in onReady)
+      dumpManager._enableDumpMode();
+      dumpManager._setupDumpIndicator();
+
+      // Simulate app restarting countdown (as in onReady)
+      dumpManager.dumpInterval = setInterval(() => {
+        dumpManager.dumpTimeRemaining--;
+        dumpManager._updateDisplay(dumpManager.dumpTimeRemaining);
+        if (dumpManager.dumpTimeRemaining <= 0) {
+          dumpManager.endDump();
+        }
+      }, 1000);
+
+      // Verify countdown continues from restored time
+      expect(dumpManager.dumpTimeRemaining).toBe(60);
+      expect(dumpManager.isActive).toBe(true);
+
+      // Fast-forward 30 seconds
+      vi.advanceTimersByTime(30000);
+      expect(dumpManager.dumpTimeRemaining).toBe(30);
+      expect(dumpManager.isActive).toBe(true);
+
+      // Fast-forward to end
+      vi.advanceTimersByTime(31000);
+      expect(dumpManager.isActive).toBe(false);
+      expect(mockOverlay.hideDumpIndicator).toHaveBeenCalled();
     });
   });
 });

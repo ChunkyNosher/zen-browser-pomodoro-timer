@@ -645,6 +645,18 @@ class KeyboardShortcutHandler {
       this.showRulesetSettingsDialog();
     });
 
+    const exportLogsBtn = this._createExportLogsButton();
+
+    return [settingsBtn, rulesetBtn, exportLogsBtn];
+  }
+
+  /**
+   * Create an Export Logs button with click handler.
+   * The handler exports logs via LogManager and shows a success alert.
+   * @returns {HTMLElement} Export Logs button
+   * @private
+   */
+  _createExportLogsButton() {
     const exportLogsBtn = document.createElement('button');
     exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
     exportLogsBtn.textContent = 'Export Logs';
@@ -657,8 +669,7 @@ class KeyboardShortcutHandler {
         );
       }
     });
-
-    return [settingsBtn, rulesetBtn, exportLogsBtn];
+    return exportLogsBtn;
   }
 
   /**
@@ -738,18 +749,7 @@ class KeyboardShortcutHandler {
     });
 
     // Export Logs button
-    const exportLogsBtn = document.createElement('button');
-    exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
-    exportLogsBtn.textContent = 'Export Logs';
-    exportLogsBtn.addEventListener('click', () => {
-      if (window.zenPomodoroApp?.logger) {
-        window.zenPomodoroApp.logger.exportLogs();
-        window.zenPomodoroApp.showCustomAlert(
-          'Export Complete',
-          'Logs have been exported successfully.'
-        );
-      }
-    });
+    const exportLogsBtn = this._createExportLogsButton();
 
     menuSection.appendChild(startBtn);
     menuSection.appendChild(settingsBtn);
