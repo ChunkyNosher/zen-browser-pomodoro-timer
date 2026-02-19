@@ -41,38 +41,53 @@ logger.setStorage(Storage);
 // Initialize Application
 // ============================================
 
-// Create and store the app instance for cleanup
-const app = new ZenPomodoroApp();
+// BOOTSTRAP GUARD: Prevent duplicate initialization in same window
+// This guard flag prevents duplicate app initialization if the script runs multiple times
+// in the same window (e.g., duplicate script injections).
+if (window.__zenPomodoroInitialized) {
+  logger.log(
+    Constants.LOG_CATEGORIES.INIT,
+    'Zen Pomodoro already initialized in this window. Skipping duplicate initialization.'
+  );
+} else {
+  window.__zenPomodoroInitialized = true;
 
-// Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
-if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
-  app.windowSync.setStorage(Storage);
-}
+  // Create and store the app instance for cleanup
+  const app = new ZenPomodoroApp();
 
-// TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
-// This ensures state is saved even on sudden browser/PC shutdown
-window.addEventListener(
-  'beforeunload',
-  () => {
-    if (app?.timer?.isActive) {
-      app.timer.saveState();
-      logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
-    }
-    // CROSS-WINDOW SYNC: Release ownership so other windows can take over
-    if (app?.windowSync) {
-      app.windowSync.releaseOwnership();
-    }
+  // Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
+  if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
+    app.windowSync.setStorage(Storage);
   }
-);
 
-// MEMORY LEAK FIX: Register shutdown handler to cleanup resources
-// This ensures SineModBlocker and other modules are properly destroyed
-window.addEventListener(
-  'unload',
-  () => {
-    if (app) {
-      app.destroy();
+  // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
+  // This ensures state is saved even on sudden browser/PC shutdown
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      if (app?.timer?.isActive) {
+        app.timer.saveState();
+        logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+      }
+      // CROSS-WINDOW SYNC: Release ownership so other windows can take over
+      if (app?.windowSync) {
+        app.windowSync.releaseOwnership();
+      }
     }
-  },
-  { once: true }
-);
+  );
+
+  // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
+  // This ensures SineModBlocker and other modules are properly destroyed
+  window.addEventListener(
+    'unload',
+    () => {
+      if (app) {
+        app.destroy();
+      }
+      // Clear the bootstrap guard flag on unload so a reused window object can initialize cleanly.
+      // This protects edge cases where the browser keeps the JS window alive across teardown/reload.
+      delete window.__zenPomodoroInitialized;
+    },
+    { once: true }
+  );
+}

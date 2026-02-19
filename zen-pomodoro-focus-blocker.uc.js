@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.7
+ * Version: 1.4.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.7',
+    MOD_VERSION: '1.4.8',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -6149,11 +6149,6 @@
     cancelButton.id = 'zen-pomodoro-settings-cancel';
     cancelButton.textContent = 'Cancel';
 
-    const exportLogsButton = document.createElement('button');
-    exportLogsButton.className = 'zen-pomodoro-dialog-button secondary';
-    exportLogsButton.id = 'zen-pomodoro-export-logs';
-    exportLogsButton.textContent = 'Export Logs';
-
     const saveAllSettings = () => {
       logger.log(LOG_CATEGORIES$4.SETTINGS, 'Saving settings');
       saveKeyboardShortcut(shortcutInput, config);
@@ -6182,17 +6177,6 @@
       dialog.remove();
     });
 
-    exportLogsButton.addEventListener('click', () => {
-      logger.log(LOG_CATEGORIES$4.SETTINGS, 'Export logs button clicked');
-      if (window.zenPomodoroApp?.logger) {
-        window.zenPomodoroApp.logger.exportLogs();
-        window.zenPomodoroApp.showCustomAlert(
-          'Export Complete',
-          'Logs have been exported successfully.'
-        );
-      }
-    });
-
     saveButton.addEventListener('click', () => {
       saveAllSettings();
       window.zenPomodoroApp?.showCustomAlert('Saved', 'Settings have been saved.');
@@ -6204,7 +6188,6 @@
     });
 
     buttonDiv.appendChild(cancelButton);
-    buttonDiv.appendChild(exportLogsButton);
     buttonDiv.appendChild(saveButton);
     buttonDiv.appendChild(saveCloseButton);
 
@@ -7698,6 +7681,25 @@
     }
 
     /**
+     * Check if the timer indicator is currently active.
+     * @returns {boolean} True if indicator is active
+     * @private
+     */
+    _isIndicatorActive() {
+      return window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active');
+    }
+
+    /**
+     * Get button text based on indicator state.
+     * @param {boolean} isActive - Whether indicator is active
+     * @returns {string} Button text
+     * @private
+     */
+    _getToggleIndicatorText(isActive) {
+      return isActive ? 'Hide Timer Indicator' : 'Show Timer Indicator';
+    }
+
+    /**
      * Create the toggle timer indicator button.
      * @returns {HTMLElement} Toggle indicator button
      * @private
@@ -7705,19 +7707,15 @@
     _createToggleIndicatorButton() {
       const btn = document.createElement('button');
       btn.className = 'zen-pomodoro-dialog-button secondary';
-      btn.textContent =
-        window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-          ? 'Hide Timer Indicator'
-          : 'Show Timer Indicator';
+      btn.textContent = this._getToggleIndicatorText(this._isIndicatorActive());
       btn.addEventListener('click', () => {
         if (window.zenPomodoroApp?.overlay) {
-          const indicator = window.zenPomodoroApp.overlay.indicator;
-          if (indicator?.classList.contains('active')) {
+          if (this._isIndicatorActive()) {
             window.zenPomodoroApp.overlay.hideIndicator();
-            btn.textContent = 'Show Timer Indicator';
+            btn.textContent = this._getToggleIndicatorText(false);
           } else {
             window.zenPomodoroApp.overlay.showIndicator();
-            btn.textContent = 'Hide Timer Indicator';
+            btn.textContent = this._getToggleIndicatorText(true);
           }
         }
       });
@@ -7725,7 +7723,7 @@
     }
 
     /**
-     * Create navigation buttons (Settings, Rulesets) for the active timer menu.
+     * Create navigation buttons (Settings, Rulesets, Export Logs) for the active timer menu.
      * @param {HTMLElement} dialog - Menu dialog
      * @returns {Array<HTMLElement>} Array of navigation buttons
      * @private
@@ -7753,7 +7751,31 @@
         this.showRulesetSettingsDialog();
       });
 
-      return [settingsBtn, rulesetBtn];
+      const exportLogsBtn = this._createExportLogsButton();
+
+      return [settingsBtn, rulesetBtn, exportLogsBtn];
+    }
+
+    /**
+     * Create an Export Logs button with click handler.
+     * The handler exports logs via LogManager and shows a success alert.
+     * @returns {HTMLElement} Export Logs button
+     * @private
+     */
+    _createExportLogsButton() {
+      const exportLogsBtn = document.createElement('button');
+      exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+      exportLogsBtn.textContent = 'Export Logs';
+      exportLogsBtn.addEventListener('click', () => {
+        if (window.zenPomodoroApp?.logger) {
+          window.zenPomodoroApp.logger.exportLogs();
+          window.zenPomodoroApp.showCustomAlert(
+            'Export Complete',
+            'Logs have been exported successfully.'
+          );
+        }
+      });
+      return exportLogsBtn;
     }
 
     /**
@@ -7776,7 +7798,7 @@
       } else if (action === 'startDump') {
         dumpBtn.addEventListener('click', () => {
           this._closeMenuDialog(dialog);
-          window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+          window.zenPomodoroApp.distractionDump.startDump();
         });
       }
       menuSection.appendChild(dumpBtn);
@@ -7832,10 +7854,14 @@
         }
       });
 
+      // Export Logs button
+      const exportLogsBtn = this._createExportLogsButton();
+
       menuSection.appendChild(startBtn);
       menuSection.appendChild(settingsBtn);
       menuSection.appendChild(rulesetBtn);
       menuSection.appendChild(customCyclesBtn);
+      menuSection.appendChild(exportLogsBtn);
     }
 
     /**
@@ -12824,102 +12850,6 @@
     }
 
     /**
-     * Show the configuration dialog to set dump duration before starting.
-     */
-    showDumpConfigDialog() {
-      const config = getConfig$3();
-
-      if (!config.distractionDumpEnabled) {
-        logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump feature is disabled');
-        return;
-      }
-
-      // Check if dump is available for this focus phase
-      if (this.dumpUsedThisFocusPhase) {
-        logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump already used this focus phase');
-        return;
-      }
-
-      // Create dialog
-      const dialog = document.createElement('div');
-      dialog.id = 'zen-pomodoro-dump-config-dialog';
-      dialog.className = 'zen-pomodoro-dialog active';
-
-      // Title
-      const title = document.createElement('h2');
-      title.className = 'zen-pomodoro-dialog-title';
-      title.textContent = '🧠 Distraction Dump';
-      dialog.appendChild(title);
-
-      // Description
-      const description = document.createElement('p');
-      description.className = 'zen-pomodoro-dialog-description';
-      description.textContent = 
-        'Take a break to capture distracting thoughts without using your focus time. ' +
-        'Your timer will pause and all blocks will be temporarily lifted.';
-      dialog.appendChild(description);
-
-      // Duration input section
-      const durationSection = document.createElement('div');
-      durationSection.className = 'zen-pomodoro-dialog-section';
-
-      const durationLabel = document.createElement('label');
-      durationLabel.className = 'zen-pomodoro-dialog-label';
-      durationLabel.textContent = 'Dump Duration (minutes):';
-      durationSection.appendChild(durationLabel);
-
-      const durationInput = document.createElement('input');
-      durationInput.type = 'number';
-      durationInput.className = 'zen-pomodoro-dialog-input';
-      durationInput.min = '1';
-      durationInput.max = config.distractionDumpMaxDuration.toString();
-      durationInput.value = config.distractionDumpDuration.toString();
-      durationSection.appendChild(durationInput);
-
-      dialog.appendChild(durationSection);
-
-      // Buttons
-      const buttonDiv = document.createElement('div');
-      buttonDiv.className = 'zen-pomodoro-dialog-buttons';
-
-      const cancelButton = document.createElement('button');
-      cancelButton.className = 'zen-pomodoro-dialog-button secondary';
-      cancelButton.textContent = 'Cancel';
-      cancelButton.addEventListener('click', () => {
-        dialog.remove();
-      });
-
-      const startButton = document.createElement('button');
-      startButton.className = 'zen-pomodoro-dialog-button';
-      startButton.textContent = 'Start Dump';
-      startButton.addEventListener('click', () => {
-        const duration = validateIntegerInput(
-          parseInt(durationInput.value, 10),
-          1,
-          config.distractionDumpMaxDuration,
-          config.distractionDumpDuration
-        );
-        dialog.remove();
-        this.startDump(duration);
-      });
-
-      buttonDiv.appendChild(cancelButton);
-      buttonDiv.appendChild(startButton);
-      dialog.appendChild(buttonDiv);
-
-      // Add to DOM first
-      document.documentElement.appendChild(dialog);
-
-      // Position dialog
-      applyLastDialogPosition(dialog);
-
-      // Make dialog draggable
-      setupDialogDrag(dialog);
-
-      logger.log(LOG_CATEGORIES$4.TIMER, 'Distraction dump config dialog shown');
-    }
-
-    /**
      * Check if a distraction dump can be started.
      * @returns {boolean} True if dump can start
      * @private
@@ -13010,12 +12940,24 @@
     }
 
     /**
-     * Start a distraction dump session.
-     * @param {number} duration - Duration in minutes
+     * Start a distraction dump session using configured duration.
      */
-    startDump(duration) {
+    startDump() {
+      // Check if feature is enabled
+      const config = getConfig$3();
+      if (!config.distractionDumpEnabled) {
+        logger.log(LOG_CATEGORIES$4.TIMER, 'Cannot start dump - feature is disabled');
+        return;
+      }
+
       if (!this._canStartDump()) return;
 
+      // CROSS-WINDOW SYNC: Claim ownership before starting dump if in secondary window
+      if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+        window.zenPomodoroApp._claimOwnershipForAction();
+      }
+
+      const duration = config.distractionDumpDuration;
       const timer = window.zenPomodoroApp?.timer;
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Starting distraction dump', { duration });
@@ -13146,6 +13088,11 @@
      */
     endDump() {
       if (!this.isActive) return;
+
+      // CROSS-WINDOW SYNC: Claim ownership before ending dump if in secondary window
+      if (typeof window.zenPomodoroApp?._claimOwnershipForAction === 'function') {
+        window.zenPomodoroApp._claimOwnershipForAction();
+      }
 
       logger.log(LOG_CATEGORIES$4.TIMER, 'Ending distraction dump');
 
@@ -16354,40 +16301,55 @@
   // Initialize Application
   // ============================================
 
-  // Create and store the app instance for cleanup
-  const app = new ZenPomodoroApp();
+  // BOOTSTRAP GUARD: Prevent duplicate initialization in same window
+  // This guard flag prevents duplicate app initialization if the script runs multiple times
+  // in the same window (e.g., duplicate script injections).
+  if (window.__zenPomodoroInitialized) {
+    logger.log(
+      Constants.LOG_CATEGORIES.INIT,
+      'Zen Pomodoro already initialized in this window. Skipping duplicate initialization.'
+    );
+  } else {
+    window.__zenPomodoroInitialized = true;
 
-  // Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
-  if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
-    app.windowSync.setStorage(Storage);
-  }
+    // Create and store the app instance for cleanup
+    const app = new ZenPomodoroApp();
 
-  // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
-  // This ensures state is saved even on sudden browser/PC shutdown
-  window.addEventListener(
-    'beforeunload',
-    () => {
-      if (app?.timer?.isActive) {
-        app.timer.saveState();
-        logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
-      }
-      // CROSS-WINDOW SYNC: Release ownership so other windows can take over
-      if (app?.windowSync) {
-        app.windowSync.releaseOwnership();
-      }
+    // Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
+    if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
+      app.windowSync.setStorage(Storage);
     }
-  );
 
-  // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
-  // This ensures SineModBlocker and other modules are properly destroyed
-  window.addEventListener(
-    'unload',
-    () => {
-      if (app) {
-        app.destroy();
+    // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
+    // This ensures state is saved even on sudden browser/PC shutdown
+    window.addEventListener(
+      'beforeunload',
+      () => {
+        if (app?.timer?.isActive) {
+          app.timer.saveState();
+          logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
+        }
+        // CROSS-WINDOW SYNC: Release ownership so other windows can take over
+        if (app?.windowSync) {
+          app.windowSync.releaseOwnership();
+        }
       }
-    },
-    { once: true }
-  );
+    );
+
+    // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
+    // This ensures SineModBlocker and other modules are properly destroyed
+    window.addEventListener(
+      'unload',
+      () => {
+        if (app) {
+          app.destroy();
+        }
+        // Clear the bootstrap guard flag on unload so a reused window object can initialize cleanly.
+        // This protects edge cases where the browser keeps the JS window alive across teardown/reload.
+        delete window.__zenPomodoroInitialized;
+      },
+      { once: true }
+    );
+  }
 
 })();

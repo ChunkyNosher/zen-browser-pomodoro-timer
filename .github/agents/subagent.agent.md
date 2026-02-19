@@ -105,7 +105,7 @@ Both `LogManager` and `WindowSyncManager` need `Storage` injected via `setStorag
 ## Important Constants
 
 - `PREF_PREFIX = 'zen-pomodoro'`
-- `MOD_VERSION = '1.4.7'`
+- `MOD_VERSION = '1.4.8'`
 - `DEFAULT_CONFIG` - Default settings object
 - `LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' }`
 - `REMINDER_SYNC_PREF_KEY = 'reminder-sync'` - Cross-window reminder sync pref key
@@ -283,6 +283,12 @@ dialog.className = 'zen-pomodoro-dialog active';
 - `loadState()` stores dump state in `pendingDumpState` variable
 - `onReady()` restores dump state after initialization, re-enables dump mode, and restarts countdown
 - Ensures timer indicator shows correct time after restart
+
+## Version 1.4.8 Changes
+
+- **Distraction Dump Start Fix**: Dump now starts immediately from main menu using settings-configured `distractionDumpDuration` (per-launch duration dialog removed)
+- **Dump Window Ownership**: Cross-window ownership is claimed before dump start/end for proper sync handling
+- **Export Logs Location**: Moved from Settings dialog to main Pomodoro menu for easier access
 
 ## Documentation Reminder
 

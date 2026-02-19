@@ -575,6 +575,25 @@ class KeyboardShortcutHandler {
   }
 
   /**
+   * Check if the timer indicator is currently active.
+   * @returns {boolean} True if indicator is active
+   * @private
+   */
+  _isIndicatorActive() {
+    return window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active');
+  }
+
+  /**
+   * Get button text based on indicator state.
+   * @param {boolean} isActive - Whether indicator is active
+   * @returns {string} Button text
+   * @private
+   */
+  _getToggleIndicatorText(isActive) {
+    return isActive ? 'Hide Timer Indicator' : 'Show Timer Indicator';
+  }
+
+  /**
    * Create the toggle timer indicator button.
    * @returns {HTMLElement} Toggle indicator button
    * @private
@@ -582,19 +601,15 @@ class KeyboardShortcutHandler {
   _createToggleIndicatorButton() {
     const btn = document.createElement('button');
     btn.className = 'zen-pomodoro-dialog-button secondary';
-    btn.textContent =
-      window.zenPomodoroApp?.overlay?.indicator?.classList.contains('active')
-        ? 'Hide Timer Indicator'
-        : 'Show Timer Indicator';
+    btn.textContent = this._getToggleIndicatorText(this._isIndicatorActive());
     btn.addEventListener('click', () => {
       if (window.zenPomodoroApp?.overlay) {
-        const indicator = window.zenPomodoroApp.overlay.indicator;
-        if (indicator?.classList.contains('active')) {
+        if (this._isIndicatorActive()) {
           window.zenPomodoroApp.overlay.hideIndicator();
-          btn.textContent = 'Show Timer Indicator';
+          btn.textContent = this._getToggleIndicatorText(false);
         } else {
           window.zenPomodoroApp.overlay.showIndicator();
-          btn.textContent = 'Hide Timer Indicator';
+          btn.textContent = this._getToggleIndicatorText(true);
         }
       }
     });
@@ -602,7 +617,7 @@ class KeyboardShortcutHandler {
   }
 
   /**
-   * Create navigation buttons (Settings, Rulesets) for the active timer menu.
+   * Create navigation buttons (Settings, Rulesets, Export Logs) for the active timer menu.
    * @param {HTMLElement} dialog - Menu dialog
    * @returns {Array<HTMLElement>} Array of navigation buttons
    * @private
@@ -630,7 +645,31 @@ class KeyboardShortcutHandler {
       this.showRulesetSettingsDialog();
     });
 
-    return [settingsBtn, rulesetBtn];
+    const exportLogsBtn = this._createExportLogsButton();
+
+    return [settingsBtn, rulesetBtn, exportLogsBtn];
+  }
+
+  /**
+   * Create an Export Logs button with click handler.
+   * The handler exports logs via LogManager and shows a success alert.
+   * @returns {HTMLElement} Export Logs button
+   * @private
+   */
+  _createExportLogsButton() {
+    const exportLogsBtn = document.createElement('button');
+    exportLogsBtn.className = 'zen-pomodoro-dialog-button secondary';
+    exportLogsBtn.textContent = 'Export Logs';
+    exportLogsBtn.addEventListener('click', () => {
+      if (window.zenPomodoroApp?.logger) {
+        window.zenPomodoroApp.logger.exportLogs();
+        window.zenPomodoroApp.showCustomAlert(
+          'Export Complete',
+          'Logs have been exported successfully.'
+        );
+      }
+    });
+    return exportLogsBtn;
   }
 
   /**
@@ -653,7 +692,7 @@ class KeyboardShortcutHandler {
     } else if (action === 'startDump') {
       dumpBtn.addEventListener('click', () => {
         this._closeMenuDialog(dialog);
-        window.zenPomodoroApp.distractionDump.showDumpConfigDialog();
+        window.zenPomodoroApp.distractionDump.startDump();
       });
     }
     menuSection.appendChild(dumpBtn);
@@ -709,10 +748,14 @@ class KeyboardShortcutHandler {
       }
     });
 
+    // Export Logs button
+    const exportLogsBtn = this._createExportLogsButton();
+
     menuSection.appendChild(startBtn);
     menuSection.appendChild(settingsBtn);
     menuSection.appendChild(rulesetBtn);
     menuSection.appendChild(customCyclesBtn);
+    menuSection.appendChild(exportLogsBtn);
   }
 
   /**

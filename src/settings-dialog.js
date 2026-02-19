@@ -1159,11 +1159,6 @@ function createActionButtons(handler, dialog, config, elements) {
   cancelButton.id = 'zen-pomodoro-settings-cancel';
   cancelButton.textContent = 'Cancel';
 
-  const exportLogsButton = document.createElement('button');
-  exportLogsButton.className = 'zen-pomodoro-dialog-button secondary';
-  exportLogsButton.id = 'zen-pomodoro-export-logs';
-  exportLogsButton.textContent = 'Export Logs';
-
   const saveAllSettings = () => {
     logger.log(LOG_CATEGORIES.SETTINGS, 'Saving settings');
     saveKeyboardShortcut(shortcutInput, config);
@@ -1192,17 +1187,6 @@ function createActionButtons(handler, dialog, config, elements) {
     dialog.remove();
   });
 
-  exportLogsButton.addEventListener('click', () => {
-    logger.log(LOG_CATEGORIES.SETTINGS, 'Export logs button clicked');
-    if (window.zenPomodoroApp?.logger) {
-      window.zenPomodoroApp.logger.exportLogs();
-      window.zenPomodoroApp.showCustomAlert(
-        'Export Complete',
-        'Logs have been exported successfully.'
-      );
-    }
-  });
-
   saveButton.addEventListener('click', () => {
     saveAllSettings();
     window.zenPomodoroApp?.showCustomAlert('Saved', 'Settings have been saved.');
@@ -1214,7 +1198,6 @@ function createActionButtons(handler, dialog, config, elements) {
   });
 
   buttonDiv.appendChild(cancelButton);
-  buttonDiv.appendChild(exportLogsButton);
   buttonDiv.appendChild(saveButton);
   buttonDiv.appendChild(saveCloseButton);
 

@@ -9,7 +9,7 @@ export default {
     // Matches the original (() => { ... })() pattern
     banner: `/**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.7
+ * Version: 1.4.8
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
