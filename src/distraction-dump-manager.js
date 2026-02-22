@@ -44,16 +44,38 @@ class DistractionDumpManager {
   }
 
   /**
+   * Validate and restore boolean field from state.
+   * @private
+   * @param {*} value - Value from state
+   * @returns {boolean} Validated boolean value
+   */
+  _restoreBooleanField(value) {
+    return value || false;
+  }
+
+  /**
+   * Validate and restore numeric field from state.
+   * @private
+   * @param {*} value - Value from state
+   * @returns {number} Validated number (0 if invalid)
+   */
+  _restoreNumericField(value) {
+    return value || 0;
+  }
+
+  /**
    * Restore dump state from persistence.
    * @param {Object} state - Saved dump state
    * @returns {boolean} True if dump was active and restored
    */
   restoreState(state) {
     if (!state) return false;
-    this.isActive = state.isActive || false;
-    this.dumpTimeRemaining = state.dumpTimeRemaining || 0;
+    
+    this.isActive = this._restoreBooleanField(state.isActive);
+    this.dumpTimeRemaining = this._restoreNumericField(state.dumpTimeRemaining);
     this.savedTimerState = state.savedTimerState || null;
-    this.dumpUsedThisFocusPhase = state.dumpUsedThisFocusPhase || false;
+    this.dumpUsedThisFocusPhase = this._restoreBooleanField(state.dumpUsedThisFocusPhase);
+    
     return this.isActive;
   }
 

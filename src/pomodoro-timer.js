@@ -683,23 +683,50 @@ class PomodoroTimer {
   }
 
   /**
-   * Restore timer properties from saved state
+   * Restore basic timer state properties.
    * @private
    * @param {Object} state - Saved state object
    */
-  _restoreTimerProperties(state) {
+  _restoreBasicTimerState(state) {
     this.isActive = state.isActive;
     this.isPaused = state.isPaused || false;
     this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
     this.remainingTime = state.remainingTime;
     this.currentPhase = state.currentPhase;
+  }
+
+  /**
+   * Restore cycle configuration properties.
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreCycleConfig(state) {
     this.currentCycle = state.currentCycle;
     this.totalCycles = state.totalCycles;
     this.mode = state.mode;
     this.savedConfig = state.savedConfig;
+  }
+
+  /**
+   * Restore custom cycle properties.
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreCustomCycleState(state) {
     this.customCycle = state.customCycle;
     this.customCycleBlocks = state.customCycleBlocks;
     this.currentBlockIndex = state.currentBlockIndex || 0;
+  }
+
+  /**
+   * Restore timer properties from saved state
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreTimerProperties(state) {
+    this._restoreBasicTimerState(state);
+    this._restoreCycleConfig(state);
+    this._restoreCustomCycleState(state);
   }
 
   /**
