@@ -89,7 +89,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.8';                  // Current mod version
+const MOD_VERSION = '1.4.9';                  // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -408,6 +408,33 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
 
 ---
+
+## Bug Fixes and Features in v1.4.9
+
+### Lag-Resilient Timer and Dump Countdown
+
+**Issue:** During temporary browser lag or event-loop stalls, countdown values appeared to pause because both timers decremented by exactly 1 second per interval callback.
+
+**Fix:**
+- `PomodoroTimer.tick()` now computes elapsed wall-clock seconds from `Date.now()` and decrements by elapsed time
+- Distraction Dump countdown (start + restore paths) now uses the same elapsed-time pattern
+- Both timers clamp decrements to prevent negative remaining time
+
+### Cross-Window Heartbeat Stability
+
+**Issue:** Ownership handoff could flap between windows when heartbeat writes lagged behind timer sync updates.
+
+**Fix:**
+- Added periodic owner heartbeat updates during active timer ticks via `_updateHeartbeatIfNeeded()`
+- Heartbeats now use `HEARTBEAT_WRITE_INTERVAL_MS` wall-clock cadence
+
+### Restore Guard Hardening
+
+**Issue:** Malformed persisted state could leave custom cycle values or dump values in unsafe shapes.
+
+**Fix:**
+- Timer restore now validates numeric/string fields, defaults malformed custom-cycle arrays to `[]`, and clamps `currentBlockIndex`
+- Distraction dump restore validates numeric fields and only applies elapsed-time adjustment when timestamp values are valid
 
 ## Bug Fixes and Features in v1.4.8
 

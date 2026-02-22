@@ -11,7 +11,7 @@ vi.mock('../src/helpers.js', () => ({
     toggleIndicatorShortcut: 'Alt+Shift+I',
   })),
   formatTime: vi.fn((seconds) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`),
-  MOD_VERSION: '1.4.8',
+  MOD_VERSION: '1.4.9',
   LOG_CATEGORIES: {
     MENU: 'MENU',
     TIMER: 'TIMER',

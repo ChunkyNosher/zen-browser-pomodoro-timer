@@ -304,6 +304,7 @@ describe('DistractionDumpManager', () => {
         dumpTimeRemaining: 300,
         savedTimerState: { remainingTime: 1500, isPaused: false },
         dumpUsedThisFocusPhase: true,
+        lastTickTimestamp: null,
       });
     });
 
@@ -361,6 +362,35 @@ describe('DistractionDumpManager', () => {
       vi.advanceTimersByTime(31000);
       expect(dumpManager.isActive).toBe(false);
       expect(mockOverlay.hideDumpIndicator).toHaveBeenCalled();
+    });
+  });
+
+  describe('lag resilience and restore guards', () => {
+    it('persists lastTickTimestamp for dump countdown restoration', () => {
+      dumpManager.startDump();
+      const state = dumpManager.getStateForPersistence();
+      expect(typeof state.lastTickTimestamp).toBe('number');
+      expect(state.lastTickTimestamp).toBeGreaterThan(0);
+    });
+
+    it('adjusts remaining dump time by elapsed wall-clock time on restore', () => {
+      const restored = dumpManager.restoreState({
+        isActive: true,
+        dumpTimeRemaining: 100,
+        dumpUsedThisFocusPhase: true,
+        lastTickTimestamp: Date.now() - 10000,
+      });
+      expect(restored).toBe(true);
+      expect(dumpManager.dumpTimeRemaining).toBeLessThanOrEqual(90);
+    });
+
+    it('clamps invalid numeric values during restore', () => {
+      dumpManager.restoreState({
+        isActive: true,
+        dumpTimeRemaining: -50,
+        lastTickTimestamp: 'invalid',
+      });
+      expect(dumpManager.dumpTimeRemaining).toBe(0);
     });
   });
 });

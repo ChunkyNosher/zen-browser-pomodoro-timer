@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.8
+ * Version: 1.4.9
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.8',
+    MOD_VERSION: '1.4.9',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -2072,6 +2072,10 @@
       this.currentBlockIndex = 0; // Current block index in custom cycle
       /** Track which reminders have been shown for current phase to avoid duplicates */
       this.shownRemindersForCurrentPhase = new Set();
+      /** Wall-clock timestamp of last tick for lag-resilient countdown updates */
+      this.lastTickTimestamp = null;
+      /** Wall-clock timestamp of last heartbeat write for cross-window ownership */
+      this.lastHeartbeatTimestamp = null;
     }
 
     /**
@@ -2414,6 +2418,8 @@
     startInterval() {
       // Clear any existing interval
       this.stopInterval();
+      this.lastTickTimestamp = Date.now();
+      this.lastHeartbeatTimestamp = Date.now();
 
       this.intervalId = setInterval(() => {
         this.tick();
@@ -2437,8 +2443,15 @@
      */
     tick() {
       if (this.remainingTime > 0) {
-        this.remainingTime--;
-        this.tickCounter++;
+        const now = Date.now();
+        const rawElapsed = this.lastTickTimestamp
+          ? Math.floor((now - this.lastTickTimestamp) / 1000)
+          : 1;
+        const elapsed = Math.max(1, rawElapsed);
+        this.lastTickTimestamp = now;
+
+        this.remainingTime = Math.max(0, this.remainingTime - elapsed);
+        this.tickCounter += elapsed;
 
         // Call tick callback if registered
         if (this.onTick) {
@@ -2455,8 +2468,26 @@
           this.saveState();
           this._writeSyncState();
         }
-      } else {
+
+        this._updateHeartbeatIfNeeded();
+      }
+
+      if (this.remainingTime <= 0) {
         this.handlePhaseComplete();
+      }
+    }
+
+    /**
+     * Update cross-window heartbeat on a wall-clock interval while this window owns the timer.
+     * @private
+     */
+    _updateHeartbeatIfNeeded() {
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (!sync || !sync.isTimerOwner) return;
+      const now = Date.now();
+      if (now - (this.lastHeartbeatTimestamp || 0) >= Constants.HEARTBEAT_WRITE_INTERVAL_MS) {
+        sync.updateHeartbeat();
+        this.lastHeartbeatTimestamp = now;
       }
     }
 
@@ -2729,8 +2760,8 @@
       this.isActive = state.isActive;
       this.isPaused = state.isPaused || false;
       this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
-      this.remainingTime = state.remainingTime;
-      this.currentPhase = state.currentPhase;
+      this.remainingTime = typeof state.remainingTime === 'number' ? state.remainingTime : 0;
+      this.currentPhase = state.currentPhase || 'focus';
     }
 
     /**
@@ -2739,10 +2770,10 @@
      * @param {Object} state - Saved state object
      */
     _restoreCycleConfig(state) {
-      this.currentCycle = state.currentCycle;
-      this.totalCycles = state.totalCycles;
-      this.mode = state.mode;
-      this.savedConfig = state.savedConfig;
+      this.currentCycle = typeof state.currentCycle === 'number' ? state.currentCycle : 1;
+      this.totalCycles = typeof state.totalCycles === 'number' ? state.totalCycles : 4;
+      this.mode = state.mode || 'pomodoro';
+      this.savedConfig = state.savedConfig || getConfig$2();
     }
 
     /**
@@ -2751,9 +2782,13 @@
      * @param {Object} state - Saved state object
      */
     _restoreCustomCycleState(state) {
-      this.customCycle = state.customCycle;
-      this.customCycleBlocks = state.customCycleBlocks;
-      this.currentBlockIndex = state.currentBlockIndex || 0;
+      this.customCycle = state.customCycle || null;
+      this.customCycleBlocks = Array.isArray(state.customCycleBlocks) ? state.customCycleBlocks : [];
+      const rawIndex = typeof state.currentBlockIndex === 'number' ? state.currentBlockIndex : 0;
+      this.currentBlockIndex =
+        this.customCycleBlocks.length > 0
+          ? Math.max(0, Math.min(rawIndex, this.customCycleBlocks.length - 1))
+          : 0;
     }
 
     /**
@@ -12830,6 +12865,7 @@
       this.savedTimerState = null; // Stores the paused timer state
       this.dumpIndicatorClickHandler = null; // Click handler for ending dump
       this.dumpUsedThisFocusPhase = false; // Track if dump was used in current focus phase
+      this.lastTickTimestamp = null;
     }
 
     /**
@@ -12851,6 +12887,7 @@
         dumpTimeRemaining: this.dumpTimeRemaining,
         savedTimerState: this.savedTimerState,
         dumpUsedThisFocusPhase: this.dumpUsedThisFocusPhase,
+        lastTickTimestamp: this.lastTickTimestamp,
       };
     }
 
@@ -12871,7 +12908,7 @@
      * @returns {number} Validated number (0 if invalid)
      */
     _restoreNumericField(value) {
-      return typeof value === 'number' ? value : 0;
+      return typeof value === 'number' && value >= 0 ? value : 0;
     }
 
     /**
@@ -12881,12 +12918,27 @@
      */
     restoreState(state) {
       if (!state) return false;
-      
+
       this.isActive = this._restoreBooleanField(state.isActive);
       this.dumpTimeRemaining = this._restoreNumericField(state.dumpTimeRemaining);
       this.savedTimerState = state.savedTimerState || null;
       this.dumpUsedThisFocusPhase = this._restoreBooleanField(state.dumpUsedThisFocusPhase);
-      
+
+      if (
+        this.isActive &&
+        typeof state.lastTickTimestamp === 'number' &&
+        state.lastTickTimestamp > 0 &&
+        this.dumpTimeRemaining > 0
+      ) {
+        const elapsed = Math.floor((Date.now() - state.lastTickTimestamp) / 1000);
+        const clampedElapsed = Math.max(0, Math.min(elapsed, this.dumpTimeRemaining));
+        this.dumpTimeRemaining = Math.max(0, this.dumpTimeRemaining - clampedElapsed);
+        logger.log(LOG_CATEGORIES$4.TIMER, 'Adjusted dump time after restore', {
+          elapsed: clampedElapsed,
+          remaining: this.dumpTimeRemaining,
+        });
+      }
+
       return this.isActive;
     }
 
@@ -13025,10 +13077,17 @@
       
       // Set up small purple indicator with click handler to end dump
       this._setupDumpIndicator();
+      this.lastTickTimestamp = Date.now();
 
       // Start countdown
       this.dumpInterval = setInterval(() => {
-        this.dumpTimeRemaining--;
+        const now = Date.now();
+        const rawElapsed = this.lastTickTimestamp
+          ? Math.floor((now - this.lastTickTimestamp) / 1000)
+          : 1;
+        const elapsed = Math.max(1, rawElapsed);
+        this.lastTickTimestamp = now;
+        this.dumpTimeRemaining = Math.max(0, this.dumpTimeRemaining - elapsed);
         this._updateDisplay(this.dumpTimeRemaining);
 
         if (this.dumpTimeRemaining <= 0) {
@@ -15333,9 +15392,19 @@
         // Re-enable dump mode (pause timer, lift blocks)
         this.distractionDump._enableDumpMode();
         this.distractionDump._setupDumpIndicator();
+        this.distractionDump.lastTickTimestamp = Date.now();
         // Restart the dump countdown
         this.distractionDump.dumpInterval = setInterval(() => {
-          this.distractionDump.dumpTimeRemaining--;
+          const now = Date.now();
+          const rawElapsed = this.distractionDump.lastTickTimestamp
+            ? Math.floor((now - this.distractionDump.lastTickTimestamp) / 1000)
+            : 1;
+          const elapsed = Math.max(1, rawElapsed);
+          this.distractionDump.lastTickTimestamp = now;
+          this.distractionDump.dumpTimeRemaining = Math.max(
+            0,
+            this.distractionDump.dumpTimeRemaining - elapsed
+          );
           this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
           if (this.distractionDump.dumpTimeRemaining <= 0) {
             this.distractionDump.endDump();
