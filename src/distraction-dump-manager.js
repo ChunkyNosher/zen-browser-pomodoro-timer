@@ -50,7 +50,7 @@ class DistractionDumpManager {
    * @returns {boolean} Validated boolean value
    */
   _restoreBooleanField(value) {
-    return value || false;
+    return Boolean(value);
   }
 
   /**
@@ -60,7 +60,7 @@ class DistractionDumpManager {
    * @returns {number} Validated number (0 if invalid)
    */
   _restoreNumericField(value) {
-    return value || 0;
+    return typeof value === 'number' ? value : 0;
   }
 
   /**
