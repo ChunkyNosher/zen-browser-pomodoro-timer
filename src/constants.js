@@ -4,7 +4,7 @@
  */
 const Constants = {
   PREF_PREFIX: 'zen-pomodoro',
-  MOD_VERSION: '1.4.8',
+  MOD_VERSION: '1.4.9',
 
   /** Modifier keys used by the keyboard shortcut recorder */
   MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],

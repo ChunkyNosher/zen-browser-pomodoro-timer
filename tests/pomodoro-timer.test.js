@@ -486,4 +486,39 @@ describe('PomodoroTimer', () => {
       expect(timer.config.focusDuration).toBe(DEFAULT_CONFIG.focusDuration);
     });
   });
+
+  describe('Lag resilience and restore guards', () => {
+    it('uses elapsed wall-clock seconds in tick()', () => {
+      timer.start('pomodoro', 4);
+      timer.remainingTime = 100;
+      timer.lastTickTimestamp = Date.now() - 5000;
+      timer.tick();
+      expect(timer.remainingTime).toBeLessThanOrEqual(95);
+    });
+
+    it('updates heartbeat periodically while owner is active', () => {
+      const sync = {
+        isTimerOwner: true,
+        updateHeartbeat: vi.fn(),
+        claimOwnership: vi.fn(),
+        writeSyncState: vi.fn(),
+      };
+      window.zenPomodoroApp.windowSync = sync;
+      timer.start('pomodoro', 4);
+      timer.remainingTime = 100;
+      timer.lastHeartbeatTimestamp = Date.now() - Constants.HEARTBEAT_WRITE_INTERVAL_MS;
+      timer.tick();
+      expect(sync.updateHeartbeat).toHaveBeenCalledTimes(1);
+    });
+
+    it('restores malformed custom cycle blocks safely as array', () => {
+      timer._restoreTimerProperties({
+        isActive: true,
+        mode: 'custom',
+        customCycleBlocks: null,
+      });
+      expect(Array.isArray(timer.customCycleBlocks)).toBe(true);
+      expect(timer.currentBlockIndex).toBe(0);
+    });
+  });
 });

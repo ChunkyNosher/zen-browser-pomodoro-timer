@@ -19,6 +19,7 @@ class DistractionDumpManager {
     this.savedTimerState = null; // Stores the paused timer state
     this.dumpIndicatorClickHandler = null; // Click handler for ending dump
     this.dumpUsedThisFocusPhase = false; // Track if dump was used in current focus phase
+    this.lastTickTimestamp = null;
   }
 
   /**
@@ -40,7 +41,28 @@ class DistractionDumpManager {
       dumpTimeRemaining: this.dumpTimeRemaining,
       savedTimerState: this.savedTimerState,
       dumpUsedThisFocusPhase: this.dumpUsedThisFocusPhase,
+      lastTickTimestamp: this.lastTickTimestamp,
     };
+  }
+
+  /**
+   * Validate and restore boolean field from state.
+   * @private
+   * @param {*} value - Value from state
+   * @returns {boolean} Validated boolean value
+   */
+  _restoreBooleanField(value) {
+    return Boolean(value);
+  }
+
+  /**
+   * Validate and restore numeric field from state.
+   * @private
+   * @param {*} value - Value from state
+   * @returns {number} Validated number (0 if invalid)
+   */
+  _restoreNumericField(value) {
+    return typeof value === 'number' && value >= 0 ? value : 0;
   }
 
   /**
@@ -50,10 +72,27 @@ class DistractionDumpManager {
    */
   restoreState(state) {
     if (!state) return false;
-    this.isActive = state.isActive || false;
-    this.dumpTimeRemaining = state.dumpTimeRemaining || 0;
+
+    this.isActive = this._restoreBooleanField(state.isActive);
+    this.dumpTimeRemaining = this._restoreNumericField(state.dumpTimeRemaining);
     this.savedTimerState = state.savedTimerState || null;
-    this.dumpUsedThisFocusPhase = state.dumpUsedThisFocusPhase || false;
+    this.dumpUsedThisFocusPhase = this._restoreBooleanField(state.dumpUsedThisFocusPhase);
+
+    if (
+      this.isActive &&
+      typeof state.lastTickTimestamp === 'number' &&
+      state.lastTickTimestamp > 0 &&
+      this.dumpTimeRemaining > 0
+    ) {
+      const elapsed = Math.floor((Date.now() - state.lastTickTimestamp) / 1000);
+      const clampedElapsed = Math.max(0, Math.min(elapsed, this.dumpTimeRemaining));
+      this.dumpTimeRemaining = Math.max(0, this.dumpTimeRemaining - clampedElapsed);
+      logger.log(LOG_CATEGORIES.TIMER, 'Adjusted dump time after restore', {
+        elapsed: clampedElapsed,
+        remaining: this.dumpTimeRemaining,
+      });
+    }
+
     return this.isActive;
   }
 
@@ -192,10 +231,17 @@ class DistractionDumpManager {
     
     // Set up small purple indicator with click handler to end dump
     this._setupDumpIndicator();
+    this.lastTickTimestamp = Date.now();
 
     // Start countdown
     this.dumpInterval = setInterval(() => {
-      this.dumpTimeRemaining--;
+      const now = Date.now();
+      const rawElapsed = this.lastTickTimestamp
+        ? Math.floor((now - this.lastTickTimestamp) / 1000)
+        : 1;
+      const elapsed = Math.max(1, rawElapsed);
+      this.lastTickTimestamp = now;
+      this.dumpTimeRemaining = Math.max(0, this.dumpTimeRemaining - elapsed);
       this._updateDisplay(this.dumpTimeRemaining);
 
       if (this.dumpTimeRemaining <= 0) {

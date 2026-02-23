@@ -34,6 +34,10 @@ class PomodoroTimer {
     this.currentBlockIndex = 0; // Current block index in custom cycle
     /** Track which reminders have been shown for current phase to avoid duplicates */
     this.shownRemindersForCurrentPhase = new Set();
+    /** Wall-clock timestamp of last tick for lag-resilient countdown updates */
+    this.lastTickTimestamp = null;
+    /** Wall-clock timestamp of last heartbeat write for cross-window ownership */
+    this.lastHeartbeatTimestamp = null;
   }
 
   /**
@@ -376,6 +380,8 @@ class PomodoroTimer {
   startInterval() {
     // Clear any existing interval
     this.stopInterval();
+    this.lastTickTimestamp = Date.now();
+    this.lastHeartbeatTimestamp = Date.now();
 
     this.intervalId = setInterval(() => {
       this.tick();
@@ -399,8 +405,15 @@ class PomodoroTimer {
    */
   tick() {
     if (this.remainingTime > 0) {
-      this.remainingTime--;
-      this.tickCounter++;
+      const now = Date.now();
+      const rawElapsed = this.lastTickTimestamp
+        ? Math.floor((now - this.lastTickTimestamp) / 1000)
+        : 1;
+      const elapsed = Math.max(1, rawElapsed);
+      this.lastTickTimestamp = now;
+
+      this.remainingTime = Math.max(0, this.remainingTime - elapsed);
+      this.tickCounter += elapsed;
 
       // Call tick callback if registered
       if (this.onTick) {
@@ -417,8 +430,26 @@ class PomodoroTimer {
         this.saveState();
         this._writeSyncState();
       }
-    } else {
+
+      this._updateHeartbeatIfNeeded();
+    }
+
+    if (this.remainingTime <= 0) {
       this.handlePhaseComplete();
+    }
+  }
+
+  /**
+   * Update cross-window heartbeat on a wall-clock interval while this window owns the timer.
+   * @private
+   */
+  _updateHeartbeatIfNeeded() {
+    const sync = window.zenPomodoroApp?.windowSync;
+    if (!sync || !sync.isTimerOwner) return;
+    const now = Date.now();
+    if (now - (this.lastHeartbeatTimestamp || 0) >= Constants.HEARTBEAT_WRITE_INTERVAL_MS) {
+      sync.updateHeartbeat();
+      this.lastHeartbeatTimestamp = now;
     }
   }
 
@@ -683,23 +714,54 @@ class PomodoroTimer {
   }
 
   /**
+   * Restore basic timer state properties.
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreBasicTimerState(state) {
+    this.isActive = state.isActive;
+    this.isPaused = state.isPaused || false;
+    this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
+    this.remainingTime = typeof state.remainingTime === 'number' ? state.remainingTime : 0;
+    this.currentPhase = state.currentPhase || 'focus';
+  }
+
+  /**
+   * Restore cycle configuration properties.
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreCycleConfig(state) {
+    this.currentCycle = typeof state.currentCycle === 'number' ? state.currentCycle : 1;
+    this.totalCycles = typeof state.totalCycles === 'number' ? state.totalCycles : 4;
+    this.mode = state.mode || 'pomodoro';
+    this.savedConfig = state.savedConfig || getConfig();
+  }
+
+  /**
+   * Restore custom cycle properties.
+   * @private
+   * @param {Object} state - Saved state object
+   */
+  _restoreCustomCycleState(state) {
+    this.customCycle = state.customCycle || null;
+    this.customCycleBlocks = Array.isArray(state.customCycleBlocks) ? state.customCycleBlocks : [];
+    const rawIndex = typeof state.currentBlockIndex === 'number' ? state.currentBlockIndex : 0;
+    this.currentBlockIndex =
+      this.customCycleBlocks.length > 0
+        ? Math.max(0, Math.min(rawIndex, this.customCycleBlocks.length - 1))
+        : 0;
+  }
+
+  /**
    * Restore timer properties from saved state
    * @private
    * @param {Object} state - Saved state object
    */
   _restoreTimerProperties(state) {
-    this.isActive = state.isActive;
-    this.isPaused = state.isPaused || false;
-    this.pausedOnBlockedWorkspace = state.pausedOnBlockedWorkspace || false;
-    this.remainingTime = state.remainingTime;
-    this.currentPhase = state.currentPhase;
-    this.currentCycle = state.currentCycle;
-    this.totalCycles = state.totalCycles;
-    this.mode = state.mode;
-    this.savedConfig = state.savedConfig;
-    this.customCycle = state.customCycle;
-    this.customCycleBlocks = state.customCycleBlocks;
-    this.currentBlockIndex = state.currentBlockIndex || 0;
+    this._restoreBasicTimerState(state);
+    this._restoreCycleConfig(state);
+    this._restoreCustomCycleState(state);
   }
 
   /**

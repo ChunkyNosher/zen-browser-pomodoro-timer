@@ -276,9 +276,19 @@ class ZenPomodoroApp {
       // Re-enable dump mode (pause timer, lift blocks)
       this.distractionDump._enableDumpMode();
       this.distractionDump._setupDumpIndicator();
+      this.distractionDump.lastTickTimestamp = Date.now();
       // Restart the dump countdown
       this.distractionDump.dumpInterval = setInterval(() => {
-        this.distractionDump.dumpTimeRemaining--;
+        const now = Date.now();
+        const rawElapsed = this.distractionDump.lastTickTimestamp
+          ? Math.floor((now - this.distractionDump.lastTickTimestamp) / 1000)
+          : 1;
+        const elapsed = Math.max(1, rawElapsed);
+        this.distractionDump.lastTickTimestamp = now;
+        this.distractionDump.dumpTimeRemaining = Math.max(
+          0,
+          this.distractionDump.dumpTimeRemaining - elapsed
+        );
         this.distractionDump._updateDisplay(this.distractionDump.dumpTimeRemaining);
         if (this.distractionDump.dumpTimeRemaining <= 0) {
           this.distractionDump.endDump();
