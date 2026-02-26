@@ -536,6 +536,25 @@ describe('WindowSyncManager', () => {
       expect(takeOverSpy).toHaveBeenCalledWith(syncData);
     });
 
+    it.each([
+      ['corrupted owner payload', 'invalid-json'],
+      ['missing owner payload', ''],
+    ])('should take over with active sync state when %s', (_caseName, ownerPayload) => {
+      const syncData = {
+        isActive: true,
+        scopeId,
+        remainingTime: 1000,
+        currentPhase: 'focus',
+        timestamp: Date.now(),
+      };
+      mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, ownerPayload);
+
+      const takeOverSpy = vi.spyOn(manager, '_takeOverFromDeadOwner');
+      manager._checkOwnerHeartbeat();
+      expect(takeOverSpy).toHaveBeenCalledWith(syncData);
+    });
+
     it('should not take over when owner heartbeat is fresh', () => {
       const syncData = { isActive: true, scopeId, remainingTime: 1000 };
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));

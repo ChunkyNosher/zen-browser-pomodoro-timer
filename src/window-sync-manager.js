@@ -241,6 +241,8 @@ class WindowSyncManager {
         this.profileScopeId =
           typeof crypto?.randomUUID === 'function'
             ? crypto.randomUUID()
+            : typeof Services?.uuid?.generateUUID === 'function'
+              ? String(Services.uuid.generateUUID())
             : `scope-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         this._storage.setPref(Constants.PROFILE_SCOPE_PREF_KEY, this.profileScopeId);
       }

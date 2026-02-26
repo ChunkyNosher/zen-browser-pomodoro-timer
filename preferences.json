@@ -14,7 +14,7 @@
   },
   {
     "property": "zen-pomodoro.exportLogsRequest",
-    "label": "Export Logs (toggle to trigger export)",
+    "label": "Export Logs (toggle to trigger export; auto-resets)",
     "type": "checkbox",
     "defaultValue": false
   }

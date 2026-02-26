@@ -3304,6 +3304,8 @@
           this.profileScopeId =
             typeof crypto?.randomUUID === 'function'
               ? crypto.randomUUID()
+              : typeof Services?.uuid?.generateUUID === 'function'
+                ? String(Services.uuid.generateUUID())
               : `scope-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           this._storage.setPref(Constants.PROFILE_SCOPE_PREF_KEY, this.profileScopeId);
         }
@@ -7314,6 +7316,8 @@
     cmd: 'metaKey',
     command: 'metaKey',
   };
+  const KEY_CODE_PREFIX = 'KEY';
+  const DIGIT_CODE_PREFIX = 'DIGIT';
   const DEFAULT_MENU_SHORTCUT = Constants.DEFAULT_CONFIG.keyboardShortcut;
 
   class KeyboardShortcutHandler {
@@ -7548,8 +7552,10 @@
       const eventCode = typeof event.code === 'string' ? event.code.toUpperCase() : '';
       const codeFallbackMatch =
         parsed.key.length === 1 && (
-          (eventCode.startsWith('KEY') && eventCode.slice(3) === parsed.key) ||
-          (eventCode.startsWith('DIGIT') && eventCode.slice(5) === parsed.key)
+          (eventCode.startsWith(KEY_CODE_PREFIX) &&
+            eventCode.slice(KEY_CODE_PREFIX.length) === parsed.key) ||
+          (eventCode.startsWith(DIGIT_CODE_PREFIX) &&
+            eventCode.slice(DIGIT_CODE_PREFIX.length) === parsed.key)
         );
 
       return modifiersMatch && (eventKey === parsed.key || codeFallbackMatch);
