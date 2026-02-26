@@ -4,7 +4,7 @@
  */
 const Constants = {
   PREF_PREFIX: 'zen-pomodoro',
-  MOD_VERSION: '1.4.9',
+  MOD_VERSION: '1.4.10',
 
   /** Modifier keys used by the keyboard shortcut recorder */
   MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -209,6 +209,14 @@ const Constants = {
   OWNER_PREF_KEY: 'timer-owner',
   /** Cross-window sync: pref key for reminder sync state */
   REMINDER_SYNC_PREF_KEY: 'reminder-sync',
+  /** Pref key for Sine preferences trigger that requests log export */
+  EXPORT_LOGS_REQUEST_PREF_KEY: 'exportLogsRequest',
+  /** Pref key for persisted log entries */
+  PERSISTED_LOGS_PREF_KEY: 'persistedLogs',
+  /** Debounce window for Sine preference export logs trigger handling (ms) */
+  EXPORT_LOGS_TRIGGER_DEBOUNCE_MS: 500,
+  /** Cross-window sync: persistent profile scope ID used to isolate profiles */
+  PROFILE_SCOPE_PREF_KEY: 'profile-scope-id',
   /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
   OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
   /** Cross-window sync: Services.obs topic for log entry broadcasting */

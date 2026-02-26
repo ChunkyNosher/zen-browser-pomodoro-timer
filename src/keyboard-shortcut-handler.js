@@ -43,6 +43,7 @@ const SHORTCUT_MODIFIER_MAP = {
   cmd: 'metaKey',
   command: 'metaKey',
 };
+const DEFAULT_MENU_SHORTCUT = Constants.DEFAULT_CONFIG.keyboardShortcut;
 
 class KeyboardShortcutHandler {
   constructor() {
@@ -197,7 +198,19 @@ class KeyboardShortcutHandler {
    * @returns {object} - { ctrlKey, altKey, shiftKey, metaKey, key }
    */
   parseShortcut(shortcut) {
-    const parts = shortcut.split('+').map((p) => p.trim().toLowerCase());
+    if (typeof shortcut !== 'string') {
+      return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+    }
+
+    const normalizedShortcut = shortcut.trim();
+    if (normalizedShortcut === '') {
+      return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+    }
+
+    const parts = normalizedShortcut
+      .split('+')
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
     const result = {
       ctrlKey: false,
       altKey: false,
@@ -215,6 +228,10 @@ class KeyboardShortcutHandler {
       }
     }
 
+    if (!result.key) {
+      return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+    }
+
     return result;
   }
 
@@ -225,7 +242,7 @@ class KeyboardShortcutHandler {
   setupKeyboardShortcut(shortcut) {
     // Clean up existing handler
     if (this.keydownHandler) {
-      document.removeEventListener('keydown', this.keydownHandler);
+      document.removeEventListener('keydown', this.keydownHandler, true);
     }
 
     const parsed = this.parseShortcut(shortcut);
@@ -256,7 +273,15 @@ class KeyboardShortcutHandler {
       event.shiftKey === parsed.shiftKey &&
       event.metaKey === parsed.metaKey;
 
-    return modifiersMatch && event.key.toUpperCase() === parsed.key;
+    const eventKey = typeof event.key === 'string' ? event.key.toUpperCase() : '';
+    const eventCode = typeof event.code === 'string' ? event.code.toUpperCase() : '';
+    const codeFallbackMatch =
+      parsed.key.length === 1 && (
+        (eventCode.startsWith('KEY') && eventCode.slice(3) === parsed.key) ||
+        (eventCode.startsWith('DIGIT') && eventCode.slice(5) === parsed.key)
+      );
+
+    return modifiersMatch && (eventKey === parsed.key || codeFallbackMatch);
   }
 
   /**
@@ -266,7 +291,7 @@ class KeyboardShortcutHandler {
   setupToggleIndicatorShortcut(shortcut) {
     // Clean up existing handler
     if (this.toggleIndicatorHandler) {
-      document.removeEventListener('keydown', this.toggleIndicatorHandler);
+      document.removeEventListener('keydown', this.toggleIndicatorHandler, true);
     }
 
     // Don't set up handler if shortcut is empty

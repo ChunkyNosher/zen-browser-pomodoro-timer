@@ -404,6 +404,12 @@ class PomodoroTimer {
    * @private
    */
   tick() {
+    const sync = window.zenPomodoroApp?.windowSync;
+    if (this.isActive && !this.isPaused && sync && !sync.isTimerOwner) {
+      this.stopInterval();
+      return;
+    }
+
     if (this.remainingTime > 0) {
       const now = Date.now();
       const rawElapsed = this.lastTickTimestamp

@@ -168,6 +168,40 @@ describe('LogManager Module', () => {
         logManager.setStorage(null);
         expect(logManager._storage).toBeNull();
       });
+
+      it('should load persisted logs from storage on startup', () => {
+        const mockStorage = {
+          getPref: vi.fn(() => JSON.stringify([
+            { timestamp: '2024-01-01T00:00:00.000Z', category: 'INIT', message: 'Loaded 1' },
+            { timestamp: '2024-01-01T00:00:01.000Z', category: 'INIT', message: 'Loaded 2' },
+          ])),
+          setPref: vi.fn(),
+        };
+
+        logManager.setStorage(mockStorage);
+
+        expect(logManager.logs.length).toBe(2);
+        expect(logManager.logs[0].message).toBe('Loaded 1');
+      });
+
+      it('should cap persisted logs to maxLogSize when loading', () => {
+        const smallManager = new LogManager(2);
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const mockStorage = {
+          getPref: vi.fn(() => JSON.stringify([
+            { timestamp: '2024-01-01T00:00:00.000Z', category: 'INIT', message: 'A' },
+            { timestamp: '2024-01-01T00:00:01.000Z', category: 'INIT', message: 'B' },
+            { timestamp: '2024-01-01T00:00:02.000Z', category: 'INIT', message: 'C' },
+          ])),
+          setPref: vi.fn(),
+        };
+
+        smallManager.setStorage(mockStorage);
+
+        expect(smallManager.logs.length).toBe(2);
+        expect(smallManager.logs[0].message).toBe('B');
+        expect(smallManager.logs[1].message).toBe('C');
+      });
     });
 
     describe('setWindowId', () => {
@@ -322,6 +356,53 @@ describe('LogManager Module', () => {
         expect(mockAnchor.href).toBe(mockUrl);
         expect(mockAnchor.download).toMatch(/^zen-pomodoro-logs-\d+\.json$/);
         expect(mockClick).toHaveBeenCalled();
+      });
+    });
+
+    describe('persistence', () => {
+      it('should persist logs after each log entry', () => {
+        const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
+        logManager.setStorage(mockStorage);
+
+        logManager.log('TIMER', 'Persist me');
+
+        expect(mockStorage.setPref).toHaveBeenCalledWith(
+          Constants.PERSISTED_LOGS_PREF_KEY,
+          expect.any(String)
+        );
+        const persistedJson = mockStorage.setPref.mock.calls.at(-1)[1];
+        const persistedLogs = JSON.parse(persistedJson);
+        expect(persistedLogs[persistedLogs.length - 1].message).toBe('Persist me');
+      });
+
+      it('should persist empty array after clearLogs', () => {
+        const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
+        logManager.setStorage(mockStorage);
+        logManager.log('TIMER', 'Entry 1');
+
+        logManager.clearLogs();
+
+        expect(mockStorage.setPref).toHaveBeenCalledWith(
+          Constants.PERSISTED_LOGS_PREF_KEY,
+          '[]'
+        );
+      });
+
+      it('should persist capped logs when maxLogSize is exceeded', () => {
+        const smallManager = new LogManager(2);
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
+        smallManager.setStorage(mockStorage);
+
+        smallManager.log('TEST', 'Entry 1');
+        smallManager.log('TEST', 'Entry 2');
+        smallManager.log('TEST', 'Entry 3');
+
+        const persistedJson = mockStorage.setPref.mock.calls.at(-1)[1];
+        const persistedLogs = JSON.parse(persistedJson);
+        expect(persistedLogs.length).toBe(2);
+        expect(persistedLogs[0].message).toBe('Entry 2');
+        expect(persistedLogs[1].message).toBe('Entry 3');
       });
     });
   });

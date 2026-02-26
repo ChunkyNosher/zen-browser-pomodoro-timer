@@ -24,6 +24,7 @@ class LogManager {
    */
   setStorage(storage) {
     this._storage = storage;
+    this._loadPersistedLogs();
   }
 
   /**
@@ -80,6 +81,7 @@ class LogManager {
     if (this.logs.length > this.maxLogSize) {
       this.logs.shift();
     }
+    this._persistLogs();
   }
 
   /**
@@ -139,6 +141,7 @@ class LogManager {
     while (this.logs.length > this.maxLogSize) {
       this.logs.shift();
     }
+    this._persistLogs();
   }
 
   /**
@@ -215,6 +218,8 @@ class LogManager {
       this.logs.shift();
     }
 
+    this._persistLogs();
+
     // Broadcast to other windows for cross-window log sync
     this._broadcastEntry(entry);
 
@@ -286,7 +291,45 @@ class LogManager {
    */
   clearLogs() {
     this.logs = [];
+    this._persistLogs();
     console.log('[Zen Pomodoro][LOGGER] Logs cleared');
+  }
+
+  /**
+   * Load persisted logs from preferences into memory.
+   * @private
+   */
+  _loadPersistedLogs() {
+    if (!this._storage) return;
+
+    try {
+      const persisted = this._storage.getPref(Constants.PERSISTED_LOGS_PREF_KEY, '');
+      if (!persisted) return;
+
+      const parsed = JSON.parse(persisted);
+      if (!Array.isArray(parsed)) return;
+
+      this.logs = parsed.slice(-this.maxLogSize);
+    } catch (e) {
+      console.warn('[Zen Pomodoro] Failed to load persisted logs:', e.message);
+    }
+  }
+
+  /**
+   * Persist current logs to preferences.
+   * @private
+   */
+  _persistLogs() {
+    if (!this._storage) return;
+
+    try {
+      if (this.logs.length > this.maxLogSize) {
+        this.logs = this.logs.slice(-this.maxLogSize);
+      }
+      this._storage.setPref(Constants.PERSISTED_LOGS_PREF_KEY, JSON.stringify(this.logs));
+    } catch (e) {
+      console.warn('[Zen Pomodoro] Failed to persist logs:', e.message);
+    }
   }
 
   /**

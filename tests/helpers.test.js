@@ -37,7 +37,7 @@ describe('Helpers Module', () => {
 
   describe('Re-exported Constants', () => {
     it('should export MOD_VERSION', () => {
-      expect(MOD_VERSION).toBe('1.4.9');
+      expect(MOD_VERSION).toBe('1.4.10');
     });
 
     it('should export MODIFIER_KEYS', () => {

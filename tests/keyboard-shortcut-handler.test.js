@@ -11,7 +11,7 @@ vi.mock('../src/helpers.js', () => ({
     toggleIndicatorShortcut: 'Alt+Shift+I',
   })),
   formatTime: vi.fn((seconds) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`),
-  MOD_VERSION: '1.4.9',
+  MOD_VERSION: '1.4.10',
   LOG_CATEGORIES: {
     MENU: 'MENU',
     TIMER: 'TIMER',
@@ -187,5 +187,82 @@ describe('KeyboardShortcutHandler - Export Logs', () => {
 
       expect(exportLogsIndex).toBeGreaterThan(rulesetIndex);
     });
+  });
+});
+
+describe('KeyboardShortcutHandler - Shortcut reliability hardening', () => {
+  let handler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    document.documentElement.innerHTML = '';
+    global.window = {
+      zenPomodoroApp: {
+        timer: { isActive: false },
+      },
+    };
+    handler = new KeyboardShortcutHandler();
+  });
+
+  it('removes existing keydown handlers with capture=true', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+
+    handler.setupKeyboardShortcut('Alt+Shift+P');
+    handler.setupKeyboardShortcut('Alt+Shift+O');
+    handler.setupToggleIndicatorShortcut('Alt+Shift+H');
+    handler.setupToggleIndicatorShortcut('Alt+Shift+I');
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function), true);
+    expect(
+      removeEventListenerSpy.mock.calls.some(
+        (call) => call[0] === 'keydown' && call[2] === true
+      )
+    ).toBe(true);
+  });
+
+  it('falls back safely when keyboard shortcut config is malformed', () => {
+    const showMenuSpy = vi.spyOn(handler, 'showPomodoroMenu').mockImplementation(() => {});
+
+    expect(() => handler.setupKeyboardShortcut(null)).not.toThrow();
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'p',
+      code: 'KeyP',
+      altKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(event);
+
+    expect(showMenuSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('matches letter shortcuts using event.code fallback when event.key differs', () => {
+    const parsed = handler.parseShortcut('Alt+Shift+P');
+    const event = {
+      ctrlKey: false,
+      altKey: true,
+      shiftKey: true,
+      metaKey: false,
+      key: 'π',
+      code: 'KeyP',
+    };
+
+    expect(handler._isShortcutMatch(event, parsed)).toBe(true);
+  });
+
+  it('matches numeric shortcuts using event.code Digit fallback', () => {
+    const parsed = handler.parseShortcut('Alt+1');
+    const event = {
+      ctrlKey: false,
+      altKey: true,
+      shiftKey: false,
+      metaKey: false,
+      key: '&',
+      code: 'Digit1',
+    };
+
+    expect(handler._isShortcutMatch(event, parsed)).toBe(true);
   });
 });

@@ -11,5 +11,11 @@
     "label": "Enable Notifications",
     "type": "checkbox",
     "defaultValue": true
+  },
+  {
+    "property": "zen-pomodoro.exportLogsRequest",
+    "label": "Export Logs (toggle to trigger export)",
+    "type": "checkbox",
+    "defaultValue": false
   }
 ]

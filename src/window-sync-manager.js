@@ -41,6 +41,8 @@ class WindowSyncManager {
     this.onReminderSyncChanged = null;
     /** Storage module reference (injected to avoid circular dependency) */
     this._storage = null;
+    /** Persistent profile scope id for cross-window isolation */
+    this.profileScopeId = null;
   }
 
   /**
@@ -55,6 +57,7 @@ class WindowSyncManager {
    * Initialize the sync manager - set up pref observer for cross-window communication.
    */
   init() {
+    this._ensureProfileScopeId();
     this._setupPrefObserver();
   }
 
@@ -65,17 +68,9 @@ class WindowSyncManager {
    */
   isAnotherWindowActive() {
     if (!this._storage) return false;
-    try {
-      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-      if (!ownerStr) return false;
-      const owner = JSON.parse(ownerStr);
-      return (
-        owner.id !== this.windowId &&
-        Date.now() - owner.heartbeat < Constants.OWNER_HEARTBEAT_TIMEOUT_MS
-      );
-    } catch (e) {
-      return false;
-    }
+    const owner = this._readOwnerState();
+    if (!owner || owner.id === this.windowId) return false;
+    return Date.now() - owner.heartbeat < Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
   }
 
   /**
@@ -97,16 +92,9 @@ class WindowSyncManager {
   releaseOwnership() {
     if (!this.isTimerOwner || !this._storage) return;
     this.isTimerOwner = false;
-    try {
-      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-      if (ownerStr) {
-        const owner = JSON.parse(ownerStr);
-        if (owner.id === this.windowId) {
-          this._storage.setPref(Constants.OWNER_PREF_KEY, '');
-        }
-      }
-    } catch (e) {
-      /* ignore */
+    const owner = this._readOwnerState();
+    if (owner && owner.id === this.windowId) {
+      this._storage.setPref(Constants.OWNER_PREF_KEY, '');
     }
     logger.log(Constants.LOG_CATEGORIES.SYNC, 'Released timer ownership');
   }
@@ -128,6 +116,7 @@ class WindowSyncManager {
   writeSyncState(timerState) {
     this._writePref(Constants.SYNC_PREF_KEY, {
       ownerId: this.windowId,
+      scopeId: this._ensureProfileScopeId(),
       timestamp: Date.now(),
       ...timerState,
     });
@@ -142,7 +131,9 @@ class WindowSyncManager {
     try {
       const syncStr = this._storage.getPref(Constants.SYNC_PREF_KEY, '');
       if (!syncStr) return null;
-      return JSON.parse(syncStr);
+      const syncState = JSON.parse(syncStr);
+      if (!this._isPayloadInScope(syncState)) return null;
+      return syncState;
     } catch (e) {
       return null;
     }
@@ -186,6 +177,7 @@ class WindowSyncManager {
   _writeOwnership() {
     this._writePref(Constants.OWNER_PREF_KEY, {
       id: this.windowId,
+      scopeId: this._ensureProfileScopeId(),
       heartbeat: Date.now(),
     });
   }
@@ -212,19 +204,14 @@ class WindowSyncManager {
    * @private
    */
   _isOwnerHeartbeatStale() {
-    try {
-      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-      if (!ownerStr) {
-        return true;
-      }
-      const owner = JSON.parse(ownerStr);
-      if (owner.id === this.windowId) {
-        return false;
-      }
-      return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
-    } catch (e) {
+    const owner = this._readOwnerState();
+    if (!owner) {
+      return true;
+    }
+    if (owner.id === this.windowId) {
       return false;
     }
+    return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
   }
 
   /**
@@ -236,6 +223,68 @@ class WindowSyncManager {
   _writePref(key, data) {
     if (!this._storage) return;
     this._storage.setPref(key, JSON.stringify(data));
+  }
+
+  /**
+   * Get or create the persistent profile scope ID used for cross-window isolation.
+   * @returns {string|null} Profile scope ID, or null if storage is unavailable
+   * @private
+   */
+  _ensureProfileScopeId() {
+    if (this.profileScopeId) return this.profileScopeId;
+    if (!this._storage) return null;
+    try {
+      const storedScopeId = this._storage.getPref(Constants.PROFILE_SCOPE_PREF_KEY, '');
+      if (typeof storedScopeId === 'string' && storedScopeId) {
+        this.profileScopeId = storedScopeId;
+      } else {
+        this.profileScopeId =
+          typeof crypto?.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `scope-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        this._storage.setPref(Constants.PROFILE_SCOPE_PREF_KEY, this.profileScopeId);
+      }
+      return this.profileScopeId;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Check whether a sync/reminder payload belongs to this profile scope.
+   * @param {Object} payload - Parsed payload object
+   * @returns {boolean} True if payload is in current scope
+   * @private
+   */
+  _isPayloadInScope(payload) {
+    const scopeId = this._ensureProfileScopeId();
+    return (
+      payload &&
+      typeof payload === 'object' &&
+      typeof payload.scopeId === 'string' &&
+      scopeId &&
+      payload.scopeId === scopeId
+    );
+  }
+
+  /**
+   * Read and validate owner payload for this profile scope.
+   * @returns {Object|null} Valid owner state or null
+   * @private
+   */
+  _readOwnerState() {
+    if (!this._storage) return null;
+    try {
+      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+      if (!ownerStr) return null;
+      const owner = JSON.parse(ownerStr);
+      if (!this._isPayloadInScope(owner)) return null;
+      if (typeof owner.id !== 'string' || !owner.id) return null;
+      if (!Number.isFinite(owner.heartbeat)) return null;
+      return owner;
+    } catch (e) {
+      return null;
+    }
   }
 
   /**
@@ -319,21 +368,16 @@ class WindowSyncManager {
    */
   _handleOwnerPrefChange() {
     if (!this.isTimerOwner || !this._storage) return;
-    try {
-      const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-      if (!ownerStr) return;
-      const owner = JSON.parse(ownerStr);
-      if (owner.id !== this.windowId) {
-        this.isTimerOwner = false;
-        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Lost timer ownership to another window', {
-          newOwnerId: owner.id,
-        });
-        if (this.onOwnershipLost) {
-          this.onOwnershipLost();
-        }
+    const owner = this._readOwnerState();
+    if (!owner) return;
+    if (owner.id !== this.windowId) {
+      this.isTimerOwner = false;
+      logger.log(Constants.LOG_CATEGORIES.SYNC, 'Lost timer ownership to another window', {
+        newOwnerId: owner.id,
+      });
+      if (this.onOwnershipLost) {
+        this.onOwnershipLost();
       }
-    } catch (e) {
-      /* ignore */
     }
   }
 
@@ -385,6 +429,7 @@ class WindowSyncManager {
 
     this._writePref(Constants.REMINDER_SYNC_PREF_KEY, {
       windowId: this.windowId,
+      scopeId: this._ensureProfileScopeId(),
       timestamp: Date.now(),
       ...actionData,
     });
@@ -400,6 +445,7 @@ class WindowSyncManager {
       const syncStr = this._storage.getPref(Constants.REMINDER_SYNC_PREF_KEY, '');
       if (!syncStr) return;
       const syncData = JSON.parse(syncStr);
+      if (!this._isPayloadInScope(syncData)) return;
       // Ignore if the action came from this window
       if (syncData.windowId === this.windowId) return;
       if (this.onReminderSyncChanged) {

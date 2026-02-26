@@ -511,6 +511,18 @@ describe('PomodoroTimer', () => {
       expect(sync.updateHeartbeat).toHaveBeenCalledTimes(1);
     });
 
+    it('stops local ticking immediately when this window loses ownership', () => {
+      const stopIntervalSpy = vi.spyOn(timer, 'stopInterval');
+      window.zenPomodoroApp.windowSync = { isTimerOwner: false };
+      timer.isActive = true;
+      timer.isPaused = false;
+      timer.intervalId = 123;
+      timer.remainingTime = 100;
+      timer.tick();
+      expect(stopIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(timer.remainingTime).toBe(100);
+    });
+
     it('restores malformed custom cycle blocks safely as array', () => {
       timer._restoreTimerProperties({
         isActive: true,
