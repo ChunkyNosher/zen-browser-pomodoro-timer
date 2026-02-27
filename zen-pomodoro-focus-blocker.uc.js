@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.9
+ * Version: 1.4.10
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.9',
+    MOD_VERSION: '1.4.10',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -250,6 +250,14 @@
     OWNER_PREF_KEY: 'timer-owner',
     /** Cross-window sync: pref key for reminder sync state */
     REMINDER_SYNC_PREF_KEY: 'reminder-sync',
+    /** Pref key for Sine preferences trigger that requests log export */
+    EXPORT_LOGS_REQUEST_PREF_KEY: 'exportLogsRequest',
+    /** Pref key for persisted log entries */
+    PERSISTED_LOGS_PREF_KEY: 'persistedLogs',
+    /** Debounce window for Sine preference export logs trigger handling (ms) */
+    EXPORT_LOGS_TRIGGER_DEBOUNCE_MS: 500,
+    /** Cross-window sync: persistent profile scope ID used to isolate profiles */
+    PROFILE_SCOPE_PREF_KEY: 'profile-scope-id',
     /** Cross-window sync: heartbeat timeout in ms - if no heartbeat for this long, owner is dead */
     OWNER_HEARTBEAT_TIMEOUT_MS: 30000,
     /** Cross-window sync: Services.obs topic for log entry broadcasting */
@@ -316,6 +324,7 @@
      */
     setStorage(storage) {
       this._storage = storage;
+      this._loadPersistedLogs();
     }
 
     /**
@@ -372,6 +381,7 @@
       if (this.logs.length > this.maxLogSize) {
         this.logs.shift();
       }
+      this._persistLogs();
     }
 
     /**
@@ -431,6 +441,7 @@
       while (this.logs.length > this.maxLogSize) {
         this.logs.shift();
       }
+      this._persistLogs();
     }
 
     /**
@@ -507,6 +518,8 @@
         this.logs.shift();
       }
 
+      this._persistLogs();
+
       // Broadcast to other windows for cross-window log sync
       this._broadcastEntry(entry);
 
@@ -578,7 +591,45 @@
      */
     clearLogs() {
       this.logs = [];
+      this._persistLogs();
       console.log('[Zen Pomodoro][LOGGER] Logs cleared');
+    }
+
+    /**
+     * Load persisted logs from preferences into memory.
+     * @private
+     */
+    _loadPersistedLogs() {
+      if (!this._storage) return;
+
+      try {
+        const persisted = this._storage.getPref(Constants.PERSISTED_LOGS_PREF_KEY, '');
+        if (!persisted) return;
+
+        const parsed = JSON.parse(persisted);
+        if (!Array.isArray(parsed)) return;
+
+        this.logs = parsed.slice(-this.maxLogSize);
+      } catch (e) {
+        console.warn('[Zen Pomodoro] Failed to load persisted logs:', e.message);
+      }
+    }
+
+    /**
+     * Persist current logs to preferences.
+     * @private
+     */
+    _persistLogs() {
+      if (!this._storage) return;
+
+      try {
+        if (this.logs.length > this.maxLogSize) {
+          this.logs = this.logs.slice(-this.maxLogSize);
+        }
+        this._storage.setPref(Constants.PERSISTED_LOGS_PREF_KEY, JSON.stringify(this.logs));
+      } catch (e) {
+        console.warn('[Zen Pomodoro] Failed to persist logs:', e.message);
+      }
     }
 
     /**
@@ -2442,6 +2493,12 @@
      * @private
      */
     tick() {
+      const sync = window.zenPomodoroApp?.windowSync;
+      if (this.isActive && !this.isPaused && sync && !sync.isTimerOwner) {
+        this.stopInterval();
+        return;
+      }
+
       if (this.remainingTime > 0) {
         const now = Date.now();
         const rawElapsed = this.lastTickTimestamp
@@ -3047,6 +3104,8 @@
       this.onReminderSyncChanged = null;
       /** Storage module reference (injected to avoid circular dependency) */
       this._storage = null;
+      /** Persistent profile scope id for cross-window isolation */
+      this.profileScopeId = null;
     }
 
     /**
@@ -3061,6 +3120,7 @@
      * Initialize the sync manager - set up pref observer for cross-window communication.
      */
     init() {
+      this._ensureProfileScopeId();
       this._setupPrefObserver();
     }
 
@@ -3071,17 +3131,9 @@
      */
     isAnotherWindowActive() {
       if (!this._storage) return false;
-      try {
-        const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-        if (!ownerStr) return false;
-        const owner = JSON.parse(ownerStr);
-        return (
-          owner.id !== this.windowId &&
-          Date.now() - owner.heartbeat < Constants.OWNER_HEARTBEAT_TIMEOUT_MS
-        );
-      } catch (e) {
-        return false;
-      }
+      const owner = this._readOwnerState();
+      if (!owner || owner.id === this.windowId) return false;
+      return Date.now() - owner.heartbeat < Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
     }
 
     /**
@@ -3103,16 +3155,9 @@
     releaseOwnership() {
       if (!this.isTimerOwner || !this._storage) return;
       this.isTimerOwner = false;
-      try {
-        const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-        if (ownerStr) {
-          const owner = JSON.parse(ownerStr);
-          if (owner.id === this.windowId) {
-            this._storage.setPref(Constants.OWNER_PREF_KEY, '');
-          }
-        }
-      } catch (e) {
-        /* ignore */
+      const owner = this._readOwnerState();
+      if (owner && owner.id === this.windowId) {
+        this._storage.setPref(Constants.OWNER_PREF_KEY, '');
       }
       logger.log(Constants.LOG_CATEGORIES.SYNC, 'Released timer ownership');
     }
@@ -3134,6 +3179,7 @@
     writeSyncState(timerState) {
       this._writePref(Constants.SYNC_PREF_KEY, {
         ownerId: this.windowId,
+        scopeId: this._ensureProfileScopeId(),
         timestamp: Date.now(),
         ...timerState,
       });
@@ -3148,7 +3194,9 @@
       try {
         const syncStr = this._storage.getPref(Constants.SYNC_PREF_KEY, '');
         if (!syncStr) return null;
-        return JSON.parse(syncStr);
+        const syncState = JSON.parse(syncStr);
+        if (!this._isPayloadInScope(syncState)) return null;
+        return syncState;
       } catch (e) {
         return null;
       }
@@ -3192,6 +3240,7 @@
     _writeOwnership() {
       this._writePref(Constants.OWNER_PREF_KEY, {
         id: this.windowId,
+        scopeId: this._ensureProfileScopeId(),
         heartbeat: Date.now(),
       });
     }
@@ -3218,19 +3267,14 @@
      * @private
      */
     _isOwnerHeartbeatStale() {
-      try {
-        const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-        if (!ownerStr) {
-          return true;
-        }
-        const owner = JSON.parse(ownerStr);
-        if (owner.id === this.windowId) {
-          return false;
-        }
-        return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
-      } catch (e) {
+      const owner = this._readOwnerState();
+      if (!owner) {
+        return true;
+      }
+      if (owner.id === this.windowId) {
         return false;
       }
+      return Date.now() - owner.heartbeat >= Constants.OWNER_HEARTBEAT_TIMEOUT_MS;
     }
 
     /**
@@ -3242,6 +3286,70 @@
     _writePref(key, data) {
       if (!this._storage) return;
       this._storage.setPref(key, JSON.stringify(data));
+    }
+
+    /**
+     * Get or create the persistent profile scope ID used for cross-window isolation.
+     * @returns {string|null} Profile scope ID, or null if storage is unavailable
+     * @private
+     */
+    _ensureProfileScopeId() {
+      if (this.profileScopeId) return this.profileScopeId;
+      if (!this._storage) return null;
+      try {
+        const storedScopeId = this._storage.getPref(Constants.PROFILE_SCOPE_PREF_KEY, '');
+        if (typeof storedScopeId === 'string' && storedScopeId) {
+          this.profileScopeId = storedScopeId;
+        } else {
+          this.profileScopeId =
+            typeof crypto?.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : typeof Services?.uuid?.generateUUID === 'function'
+                ? String(Services.uuid.generateUUID())
+              : `scope-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          this._storage.setPref(Constants.PROFILE_SCOPE_PREF_KEY, this.profileScopeId);
+        }
+        return this.profileScopeId;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    /**
+     * Check whether a sync/reminder payload belongs to this profile scope.
+     * @param {Object} payload - Parsed payload object
+     * @returns {boolean} True if payload is in current scope
+     * @private
+     */
+    _isPayloadInScope(payload) {
+      const scopeId = this._ensureProfileScopeId();
+      return (
+        payload &&
+        typeof payload === 'object' &&
+        typeof payload.scopeId === 'string' &&
+        scopeId &&
+        payload.scopeId === scopeId
+      );
+    }
+
+    /**
+     * Read and validate owner payload for this profile scope.
+     * @returns {Object|null} Valid owner state or null
+     * @private
+     */
+    _readOwnerState() {
+      if (!this._storage) return null;
+      try {
+        const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
+        if (!ownerStr) return null;
+        const owner = JSON.parse(ownerStr);
+        if (!this._isPayloadInScope(owner)) return null;
+        if (typeof owner.id !== 'string' || !owner.id) return null;
+        if (!Number.isFinite(owner.heartbeat)) return null;
+        return owner;
+      } catch (e) {
+        return null;
+      }
     }
 
     /**
@@ -3325,21 +3433,16 @@
      */
     _handleOwnerPrefChange() {
       if (!this.isTimerOwner || !this._storage) return;
-      try {
-        const ownerStr = this._storage.getPref(Constants.OWNER_PREF_KEY, '');
-        if (!ownerStr) return;
-        const owner = JSON.parse(ownerStr);
-        if (owner.id !== this.windowId) {
-          this.isTimerOwner = false;
-          logger.log(Constants.LOG_CATEGORIES.SYNC, 'Lost timer ownership to another window', {
-            newOwnerId: owner.id,
-          });
-          if (this.onOwnershipLost) {
-            this.onOwnershipLost();
-          }
+      const owner = this._readOwnerState();
+      if (!owner) return;
+      if (owner.id !== this.windowId) {
+        this.isTimerOwner = false;
+        logger.log(Constants.LOG_CATEGORIES.SYNC, 'Lost timer ownership to another window', {
+          newOwnerId: owner.id,
+        });
+        if (this.onOwnershipLost) {
+          this.onOwnershipLost();
         }
-      } catch (e) {
-        /* ignore */
       }
     }
 
@@ -3391,6 +3494,7 @@
 
       this._writePref(Constants.REMINDER_SYNC_PREF_KEY, {
         windowId: this.windowId,
+        scopeId: this._ensureProfileScopeId(),
         timestamp: Date.now(),
         ...actionData,
       });
@@ -3406,6 +3510,7 @@
         const syncStr = this._storage.getPref(Constants.REMINDER_SYNC_PREF_KEY, '');
         if (!syncStr) return;
         const syncData = JSON.parse(syncStr);
+        if (!this._isPayloadInScope(syncData)) return;
         // Ignore if the action came from this window
         if (syncData.windowId === this.windowId) return;
         if (this.onReminderSyncChanged) {
@@ -7211,6 +7316,9 @@
     cmd: 'metaKey',
     command: 'metaKey',
   };
+  const KEY_CODE_PREFIX = 'KEY';
+  const DIGIT_CODE_PREFIX = 'DIGIT';
+  const DEFAULT_MENU_SHORTCUT = Constants.DEFAULT_CONFIG.keyboardShortcut;
 
   class KeyboardShortcutHandler {
     constructor() {
@@ -7365,7 +7473,19 @@
      * @returns {object} - { ctrlKey, altKey, shiftKey, metaKey, key }
      */
     parseShortcut(shortcut) {
-      const parts = shortcut.split('+').map((p) => p.trim().toLowerCase());
+      if (typeof shortcut !== 'string') {
+        return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+      }
+
+      const normalizedShortcut = shortcut.trim();
+      if (normalizedShortcut === '') {
+        return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+      }
+
+      const parts = normalizedShortcut
+        .split('+')
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean);
       const result = {
         ctrlKey: false,
         altKey: false,
@@ -7383,6 +7503,10 @@
         }
       }
 
+      if (!result.key) {
+        return this.parseShortcut(DEFAULT_MENU_SHORTCUT);
+      }
+
       return result;
     }
 
@@ -7393,7 +7517,7 @@
     setupKeyboardShortcut(shortcut) {
       // Clean up existing handler
       if (this.keydownHandler) {
-        document.removeEventListener('keydown', this.keydownHandler);
+        document.removeEventListener('keydown', this.keydownHandler, true);
       }
 
       const parsed = this.parseShortcut(shortcut);
@@ -7424,7 +7548,17 @@
         event.shiftKey === parsed.shiftKey &&
         event.metaKey === parsed.metaKey;
 
-      return modifiersMatch && event.key.toUpperCase() === parsed.key;
+      const eventKey = typeof event.key === 'string' ? event.key.toUpperCase() : '';
+      const eventCode = typeof event.code === 'string' ? event.code.toUpperCase() : '';
+      const codeFallbackMatch =
+        parsed.key.length === 1 && (
+          (eventCode.startsWith(KEY_CODE_PREFIX) &&
+            eventCode.slice(KEY_CODE_PREFIX.length) === parsed.key) ||
+          (eventCode.startsWith(DIGIT_CODE_PREFIX) &&
+            eventCode.slice(DIGIT_CODE_PREFIX.length) === parsed.key)
+        );
+
+      return modifiersMatch && (eventKey === parsed.key || codeFallbackMatch);
     }
 
     /**
@@ -7434,7 +7568,7 @@
     setupToggleIndicatorShortcut(shortcut) {
       // Clean up existing handler
       if (this.toggleIndicatorHandler) {
-        document.removeEventListener('keydown', this.toggleIndicatorHandler);
+        document.removeEventListener('keydown', this.toggleIndicatorHandler, true);
       }
 
       // Don't set up handler if shortcut is empty
@@ -15145,9 +15279,12 @@
   // ============================================
 
   class ZenPomodoroApp {
-    constructor() {
+    constructor({ storage = null } = {}) {
       this.timer = new PomodoroTimer();
       this.windowSync = new WindowSyncManager(); // Cross-window timer sync
+      if (storage && typeof this.windowSync.setStorage === 'function') {
+        this.windowSync.setStorage(storage);
+      }
       this.workspace = new WorkspaceDetector();
       this.overlay = new OverlayManager();
       this.keyboardShortcut = new KeyboardShortcutHandler();
@@ -15162,6 +15299,9 @@
       this.logger = logger; // Expose logger instance
       this.notificationPermissionRequested = false;
       this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
+      this._prefTriggerObserver = null;
+      this._lastExportLogsTriggerAt = 0;
+      this._isResettingExportLogsPref = false;
 
       this.init();
     }
@@ -15207,6 +15347,7 @@
       this._initCrossWindowSync();
       this._migrateBlockedWorkspacesToRulesets();
       this._initModules();
+      this._initPreferenceTriggers();
       this._restoreTimerState();
       this.requestNotificationPermission();
       this._initReminderManagers();
@@ -15292,6 +15433,109 @@
       this.workspace.onWorkspaceChange = (workspaceId, isBlocked) => {
         this.onWorkspaceChange(workspaceId, isBlocked);
       };
+    }
+
+    /**
+     * Initialize observer for Sine preference-triggered actions.
+     * @private
+     */
+    _initPreferenceTriggers() {
+      if (this._prefTriggerObserver) {
+        return;
+      }
+
+      this._prefTriggerObserver = {
+        observe: (subject, topic, data) => {
+          this._handlePreferenceTrigger(data);
+        },
+      };
+
+      try {
+        Services.prefs.addObserver(`${Constants.PREF_PREFIX}.`, this._prefTriggerObserver);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES$4.SETTINGS, 'Failed to initialize preference trigger observer', {
+          error: e.message,
+        });
+      }
+    }
+
+    /**
+     * Handle preference-triggered actions from Sine preferences.
+     * @param {string} prefName - Full preference key
+     * @private
+     */
+    _handlePreferenceTrigger(prefName) {
+      const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+      if (prefName !== exportPrefName) {
+        return;
+      }
+
+      this._handleExportLogsPreferenceTrigger();
+    }
+
+    /**
+     * Handle export logs trigger pref and reset trigger value.
+     * @private
+     */
+    _handleExportLogsPreferenceTrigger() {
+      if (this._isResettingExportLogsPref) {
+        return;
+      }
+
+      const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+      let shouldExport = false;
+
+      try {
+        const prefType = Services.prefs.getPrefType(exportPrefName);
+        if (prefType === Services.prefs.PREF_BOOL) {
+          shouldExport = Services.prefs.getBoolPref(exportPrefName, false);
+        } else if (prefType === Services.prefs.PREF_STRING) {
+          // Defensive support for string trigger values from older/manual pref edits.
+          const value = Services.prefs.getCharPref(exportPrefName, '').trim().toLowerCase();
+          shouldExport = value === 'true' || value === '1' || value === 'export';
+        }
+      } catch (e) {
+        logger.log(LOG_CATEGORIES$4.SETTINGS, 'Failed to read export logs preference trigger', {
+          error: e.message,
+        });
+      }
+
+      if (!shouldExport) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - this._lastExportLogsTriggerAt < Constants.EXPORT_LOGS_TRIGGER_DEBOUNCE_MS) {
+        this._resetExportLogsTriggerPref();
+        return;
+      }
+
+      this._lastExportLogsTriggerAt = now;
+
+      try {
+        logger.exportLogs();
+      } finally {
+        this._resetExportLogsTriggerPref();
+      }
+    }
+
+    /**
+     * Reset export logs trigger preference after handling.
+     * @private
+     */
+    _resetExportLogsTriggerPref() {
+      const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+
+      try {
+        this._isResettingExportLogsPref = true;
+        Services.prefs.setBoolPref(exportPrefName, false);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES$4.SETTINGS, 'Failed to reset export logs preference trigger', {
+          error: e.message,
+        });
+      } finally {
+        this._isResettingExportLogsPref = false;
+      }
     }
 
     /**
@@ -16341,6 +16585,7 @@
 
       // Additional cleanup
       this._runCleanupActions();
+      this._destroyPreferenceTriggerObserver();
 
       // Clean up cross-window log sync
       logger.destroySync();
@@ -16377,6 +16622,26 @@
       }
       if (this.security && typeof this.security.cleanupLockScreen === 'function') {
         this.security.cleanupLockScreen();
+      }
+    }
+
+    /**
+     * Remove preference trigger observer.
+     * @private
+     */
+    _destroyPreferenceTriggerObserver() {
+      if (!this._prefTriggerObserver) {
+        return;
+      }
+
+      try {
+        Services.prefs.removeObserver(`${Constants.PREF_PREFIX}.`, this._prefTriggerObserver);
+      } catch (e) {
+        logger.log(LOG_CATEGORIES$4.SETTINGS, 'Failed to remove preference trigger observer', {
+          error: e.message,
+        });
+      } finally {
+        this._prefTriggerObserver = null;
       }
     }
   }
@@ -16430,13 +16695,9 @@
   } else {
     window.__zenPomodoroInitialized = true;
 
-    // Create and store the app instance for cleanup
-    const app = new ZenPomodoroApp();
-
-    // Resolve circular dependency: WindowSyncManager needs Storage for cross-window timer sync
-    if (app.windowSync && typeof app.windowSync.setStorage === 'function') {
-      app.windowSync.setStorage(Storage);
-    }
+    // Create and store the app instance for cleanup.
+    // Storage is injected at construction time so WindowSync is ready before onReady() can run.
+    const app = new ZenPomodoroApp({ storage: Storage });
 
     // TIMER STATE PERSISTENCE FIX: Save timer state before browser closes
     // This ensures state is saved even on sudden browser/PC shutdown

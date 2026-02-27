@@ -1,3 +1,4 @@
+import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import {
   getConfig, saveConfig,
@@ -29,9 +30,12 @@ import CustomCycleManager from './custom-cycle-manager.js';
 // ============================================
 
 class ZenPomodoroApp {
-  constructor() {
+  constructor({ storage = null } = {}) {
     this.timer = new PomodoroTimer();
     this.windowSync = new WindowSyncManager(); // Cross-window timer sync
+    if (storage && typeof this.windowSync.setStorage === 'function') {
+      this.windowSync.setStorage(storage);
+    }
     this.workspace = new WorkspaceDetector();
     this.overlay = new OverlayManager();
     this.keyboardShortcut = new KeyboardShortcutHandler();
@@ -46,6 +50,9 @@ class ZenPomodoroApp {
     this.logger = logger; // Expose logger instance
     this.notificationPermissionRequested = false;
     this.initialized = false; // DUPLICATE FIX: Track initialization to prevent duplicate setup
+    this._prefTriggerObserver = null;
+    this._lastExportLogsTriggerAt = 0;
+    this._isResettingExportLogsPref = false;
 
     this.init();
   }
@@ -91,6 +98,7 @@ class ZenPomodoroApp {
     this._initCrossWindowSync();
     this._migrateBlockedWorkspacesToRulesets();
     this._initModules();
+    this._initPreferenceTriggers();
     this._restoreTimerState();
     this.requestNotificationPermission();
     this._initReminderManagers();
@@ -176,6 +184,109 @@ class ZenPomodoroApp {
     this.workspace.onWorkspaceChange = (workspaceId, isBlocked) => {
       this.onWorkspaceChange(workspaceId, isBlocked);
     };
+  }
+
+  /**
+   * Initialize observer for Sine preference-triggered actions.
+   * @private
+   */
+  _initPreferenceTriggers() {
+    if (this._prefTriggerObserver) {
+      return;
+    }
+
+    this._prefTriggerObserver = {
+      observe: (subject, topic, data) => {
+        this._handlePreferenceTrigger(data);
+      },
+    };
+
+    try {
+      Services.prefs.addObserver(`${Constants.PREF_PREFIX}.`, this._prefTriggerObserver);
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to initialize preference trigger observer', {
+        error: e.message,
+      });
+    }
+  }
+
+  /**
+   * Handle preference-triggered actions from Sine preferences.
+   * @param {string} prefName - Full preference key
+   * @private
+   */
+  _handlePreferenceTrigger(prefName) {
+    const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+    if (prefName !== exportPrefName) {
+      return;
+    }
+
+    this._handleExportLogsPreferenceTrigger();
+  }
+
+  /**
+   * Handle export logs trigger pref and reset trigger value.
+   * @private
+   */
+  _handleExportLogsPreferenceTrigger() {
+    if (this._isResettingExportLogsPref) {
+      return;
+    }
+
+    const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+    let shouldExport = false;
+
+    try {
+      const prefType = Services.prefs.getPrefType(exportPrefName);
+      if (prefType === Services.prefs.PREF_BOOL) {
+        shouldExport = Services.prefs.getBoolPref(exportPrefName, false);
+      } else if (prefType === Services.prefs.PREF_STRING) {
+        // Defensive support for string trigger values from older/manual pref edits.
+        const value = Services.prefs.getCharPref(exportPrefName, '').trim().toLowerCase();
+        shouldExport = value === 'true' || value === '1' || value === 'export';
+      }
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to read export logs preference trigger', {
+        error: e.message,
+      });
+    }
+
+    if (!shouldExport) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this._lastExportLogsTriggerAt < Constants.EXPORT_LOGS_TRIGGER_DEBOUNCE_MS) {
+      this._resetExportLogsTriggerPref();
+      return;
+    }
+
+    this._lastExportLogsTriggerAt = now;
+
+    try {
+      logger.exportLogs();
+    } finally {
+      this._resetExportLogsTriggerPref();
+    }
+  }
+
+  /**
+   * Reset export logs trigger preference after handling.
+   * @private
+   */
+  _resetExportLogsTriggerPref() {
+    const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
+
+    try {
+      this._isResettingExportLogsPref = true;
+      Services.prefs.setBoolPref(exportPrefName, false);
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to reset export logs preference trigger', {
+        error: e.message,
+      });
+    } finally {
+      this._isResettingExportLogsPref = false;
+    }
   }
 
   /**
@@ -1225,6 +1336,7 @@ class ZenPomodoroApp {
 
     // Additional cleanup
     this._runCleanupActions();
+    this._destroyPreferenceTriggerObserver();
 
     // Clean up cross-window log sync
     logger.destroySync();
@@ -1261,6 +1373,26 @@ class ZenPomodoroApp {
     }
     if (this.security && typeof this.security.cleanupLockScreen === 'function') {
       this.security.cleanupLockScreen();
+    }
+  }
+
+  /**
+   * Remove preference trigger observer.
+   * @private
+   */
+  _destroyPreferenceTriggerObserver() {
+    if (!this._prefTriggerObserver) {
+      return;
+    }
+
+    try {
+      Services.prefs.removeObserver(`${Constants.PREF_PREFIX}.`, this._prefTriggerObserver);
+    } catch (e) {
+      logger.log(LOG_CATEGORIES.SETTINGS, 'Failed to remove preference trigger observer', {
+        error: e.message,
+      });
+    } finally {
+      this._prefTriggerObserver = null;
     }
   }
 }

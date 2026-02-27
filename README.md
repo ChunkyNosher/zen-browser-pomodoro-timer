@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.9-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.10-green.svg)
 
 ## ✨ Features
 
@@ -362,6 +362,12 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.10
+
+- ✅ **WindowSync DI Order Fix**: Storage is now injected into `WindowSyncManager` at app construction, preventing early `onReady()` initialization from running before cross-window storage wiring.
+- ✅ **Profile-Scoped Sync + Export Pref Flow**: Cross-window payloads continue to use `profile-scope-id` isolation while export-log preference triggers and persisted log storage keys remain aligned for safe multi-window behavior.
+- 📝 **Version Metadata Update**: Updated mod metadata, docs, tests, CSS header, and bundle banner to v1.4.10.
 
 ### Version 1.4.9
 

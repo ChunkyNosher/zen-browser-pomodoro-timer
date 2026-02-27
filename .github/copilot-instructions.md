@@ -89,7 +89,7 @@ The **Zen Pomodoro Focus Blocker** is a productivity mod for Zen Browser (based 
 
 ```javascript
 const PREF_PREFIX = 'zen-pomodoro';           // Preference key prefix
-const MOD_VERSION = '1.4.9';                  // Current mod version
+const MOD_VERSION = '1.4.10';                 // Current mod version
 const DEFAULT_CONFIG = { ... };               // Default configuration object
 const LOCKOUT_METHODS = { CODE: 'code', HOLD: 'hold' };
 const TRANSITION_PHASE_DURATION_SECONDS = 5 * 60;  // 5 minutes
@@ -97,6 +97,9 @@ const DAILY_REMINDER_STARTUP_DELAY_MS = 3 * 1000;  // 3-second delay before show
 const SYNC_PREF_KEY = 'timer-sync';              // Pref key for timer sync state
 const OWNER_PREF_KEY = 'timer-owner';             // Pref key for timer owner window
 const REMINDER_SYNC_PREF_KEY = 'reminder-sync';   // Pref key for cross-window reminder sync
+const EXPORT_LOGS_REQUEST_PREF_KEY = 'exportLogsRequest'; // Pref key trigger for export logs requests
+const PERSISTED_LOGS_PREF_KEY = 'persistedLogs';  // Pref key for persisted log history
+const PROFILE_SCOPE_PREF_KEY = 'profile-scope-id'; // Pref key for persistent cross-window profile scope
 const OWNER_HEARTBEAT_TIMEOUT_MS = 30000;         // Heartbeat timeout (30 seconds)
 const HEARTBEAT_WRITE_INTERVAL_MS = 5000;         // Owner writes heartbeat every 5 seconds (wall-clock)
 const LOG_BROADCAST_TOPIC = 'zen-pomodoro-log';   // Services.obs topic for log broadcast
@@ -408,6 +411,21 @@ Allows users to pause their focus timer and capture distracting thoughts without
 | `LogManager.destroySync()`                        | Clean up cross-window log sync observers                      |
 
 ---
+
+## Bug Fixes and Features in v1.4.10
+
+### WindowSync Storage Injection Order
+
+**Issue:** `onReady()` could run early enough that cross-window sync initialized before `WindowSyncManager` had `Storage` injected.
+
+**Fix:**
+- Inject `Storage` into `WindowSyncManager` during `ZenPomodoroApp` construction (before `init()`/`onReady()` path can run).
+- `src/index.js` now passes storage into `new ZenPomodoroApp({ storage: Storage })`.
+
+### Profile Scope + Export Logs Preference Context
+
+- Keep `PROFILE_SCOPE_PREF_KEY` (`'profile-scope-id'`) as the isolation key for cross-window payloads.
+- Keep `EXPORT_LOGS_REQUEST_PREF_KEY` (`'exportLogsRequest'`) and `PERSISTED_LOGS_PREF_KEY` (`'persistedLogs'`) as the preference keys for export trigger + log persistence behavior.
 
 ## Bug Fixes and Features in v1.4.9
 

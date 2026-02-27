@@ -19,6 +19,7 @@ function createMockStorage() {
 describe('WindowSyncManager', () => {
   let manager;
   let mockStorage;
+  let scopeId;
 
   beforeEach(() => {
     clearMockPrefs();
@@ -26,6 +27,8 @@ describe('WindowSyncManager', () => {
     manager = new WindowSyncManager();
     mockStorage = createMockStorage();
     manager.setStorage(mockStorage);
+    scopeId = manager._ensureProfileScopeId();
+    mockStorage.setPref.mockClear();
   });
 
   afterEach(() => {
@@ -95,6 +98,20 @@ describe('WindowSyncManager', () => {
     });
   });
 
+  describe('profile scope isolation', () => {
+    it('should persist and reuse profile scope ID across manager instances', () => {
+      const firstScope = manager._ensureProfileScopeId();
+      const anotherManager = new WindowSyncManager();
+      anotherManager.setStorage(mockStorage);
+      const secondScope = anotherManager._ensureProfileScopeId();
+
+      expect(secondScope).toBe(firstScope);
+      expect(mockStorage._prefs.get(Constants.PROFILE_SCOPE_PREF_KEY)).toBe(firstScope);
+
+      anotherManager.destroy();
+    });
+  });
+
   describe('init', () => {
     it('should set up pref observer', () => {
       const addObserverSpy = vi.spyOn(Services.prefs, 'addObserver');
@@ -130,6 +147,7 @@ describe('WindowSyncManager', () => {
     it('should return false when owner is same window', () => {
       const ownerData = {
         id: manager.windowId,
+        scopeId,
         heartbeat: Date.now(),
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -139,6 +157,7 @@ describe('WindowSyncManager', () => {
     it('should return false when owner heartbeat is stale', () => {
       const ownerData = {
         id: 'other-window-id',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS - 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -148,6 +167,7 @@ describe('WindowSyncManager', () => {
     it('should return true when another window has fresh heartbeat', () => {
       const ownerData = {
         id: 'other-window-id',
+        scopeId,
         heartbeat: Date.now(),
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -157,6 +177,7 @@ describe('WindowSyncManager', () => {
     it('should return true when heartbeat is at threshold boundary', () => {
       const ownerData = {
         id: 'other-window-id',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS + 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -172,6 +193,25 @@ describe('WindowSyncManager', () => {
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, '');
       expect(manager.isAnotherWindowActive()).toBe(false);
     });
+
+    it('should return false for owner payload from another profile scope', () => {
+      const ownerData = {
+        id: 'other-window-id',
+        scopeId: 'foreign-scope',
+        heartbeat: Date.now(),
+      };
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
+      expect(manager.isAnotherWindowActive()).toBe(false);
+    });
+
+    it('should return false for malformed owner payload missing heartbeat', () => {
+      const ownerData = {
+        id: 'other-window-id',
+        scopeId,
+      };
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
+      expect(manager.isAnotherWindowActive()).toBe(false);
+    });
   });
 
   describe('claimOwnership', () => {
@@ -185,6 +225,7 @@ describe('WindowSyncManager', () => {
       expect(mockStorage.setPref).toHaveBeenCalled();
       const ownerData = JSON.parse(mockStorage._prefs.get(Constants.OWNER_PREF_KEY));
       expect(ownerData.id).toBe(manager.windowId);
+      expect(ownerData.scopeId).toBe(scopeId);
       expect(ownerData.heartbeat).toBeGreaterThan(0);
     });
 
@@ -233,6 +274,7 @@ describe('WindowSyncManager', () => {
     it('should not clear owner pref when another window is the registered owner', () => {
       const otherOwnerData = {
         id: 'other-window-id',
+        scopeId,
         heartbeat: Date.now(),
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(otherOwnerData));
@@ -300,6 +342,7 @@ describe('WindowSyncManager', () => {
 
       const syncData = JSON.parse(mockStorage._prefs.get(Constants.SYNC_PREF_KEY));
       expect(syncData.ownerId).toBe(manager.windowId);
+      expect(syncData.scopeId).toBe(scopeId);
       expect(syncData.timestamp).toBe(now);
       expect(syncData.isActive).toBe(true);
       expect(syncData.remainingTime).toBe(1500);
@@ -312,6 +355,7 @@ describe('WindowSyncManager', () => {
       manager.writeSyncState(timerState);
       const syncData = JSON.parse(mockStorage._prefs.get(Constants.SYNC_PREF_KEY));
       expect(syncData.ownerId).toBe(manager.windowId);
+      expect(syncData.scopeId).toBe(scopeId);
       expect(syncData.timestamp).toBeDefined();
       expect(syncData.phase).toBe('break');
       expect(syncData.time).toBe(300);
@@ -340,6 +384,7 @@ describe('WindowSyncManager', () => {
     it('should return parsed sync state', () => {
       const syncData = {
         ownerId: 'test-window',
+        scopeId,
         timestamp: Date.now(),
         isActive: true,
         remainingTime: 1200,
@@ -356,6 +401,17 @@ describe('WindowSyncManager', () => {
 
     it('should return null for empty string', () => {
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, '');
+      expect(manager.readSyncState()).toBeNull();
+    });
+
+    it('should return null for sync state from another profile scope', () => {
+      const syncData = {
+        ownerId: 'test-window',
+        scopeId: 'foreign-scope',
+        timestamp: Date.now(),
+        isActive: true,
+      };
+      mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
       expect(manager.readSyncState()).toBeNull();
     });
   });
@@ -451,6 +507,7 @@ describe('WindowSyncManager', () => {
 
     it('should do nothing when timer is not active', () => {
       const syncData = { isActive: false, remainingTime: 1000 };
+      syncData.scopeId = scopeId;
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
       const takeOverSpy = vi.spyOn(manager, '_takeOverFromDeadOwner');
       manager._checkOwnerHeartbeat();
@@ -460,6 +517,7 @@ describe('WindowSyncManager', () => {
     it('should take over when owner heartbeat is stale', () => {
       const syncData = {
         isActive: true,
+        scopeId,
         remainingTime: 1000,
         currentPhase: 'focus',
         timestamp: Date.now(),
@@ -468,6 +526,7 @@ describe('WindowSyncManager', () => {
 
       const staleOwnerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS - 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(staleOwnerData));
@@ -477,12 +536,32 @@ describe('WindowSyncManager', () => {
       expect(takeOverSpy).toHaveBeenCalledWith(syncData);
     });
 
+    it.each([
+      ['corrupted owner payload', 'invalid-json'],
+      ['missing owner payload', ''],
+    ])('should take over with active sync state when %s', (_caseName, ownerPayload) => {
+      const syncData = {
+        isActive: true,
+        scopeId,
+        remainingTime: 1000,
+        currentPhase: 'focus',
+        timestamp: Date.now(),
+      };
+      mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, ownerPayload);
+
+      const takeOverSpy = vi.spyOn(manager, '_takeOverFromDeadOwner');
+      manager._checkOwnerHeartbeat();
+      expect(takeOverSpy).toHaveBeenCalledWith(syncData);
+    });
+
     it('should not take over when owner heartbeat is fresh', () => {
-      const syncData = { isActive: true, remainingTime: 1000 };
+      const syncData = { isActive: true, scopeId, remainingTime: 1000 };
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
 
       const freshOwnerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now(),
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(freshOwnerData));
@@ -501,6 +580,7 @@ describe('WindowSyncManager', () => {
     it('should return false when this window is the owner', () => {
       const ownerData = {
         id: manager.windowId,
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS - 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -510,6 +590,7 @@ describe('WindowSyncManager', () => {
     it('should return true when owner heartbeat is stale', () => {
       const ownerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS - 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -519,6 +600,7 @@ describe('WindowSyncManager', () => {
     it('should return false when owner heartbeat is fresh', () => {
       const ownerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now(),
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -528,6 +610,7 @@ describe('WindowSyncManager', () => {
     it('should return true when owner heartbeat is exactly at timeout', () => {
       const ownerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
@@ -537,19 +620,31 @@ describe('WindowSyncManager', () => {
     it('should return false when owner heartbeat is just before timeout', () => {
       const ownerData = {
         id: 'other-window',
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS + 1,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
       expect(manager._isOwnerHeartbeatStale()).toBe(false);
     });
 
-    it('should return false when owner pref has invalid JSON', () => {
+    it('should return true when owner pref has invalid JSON', () => {
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, 'invalid-json');
-      expect(manager._isOwnerHeartbeatStale()).toBe(false);
+      // Invalid/foreign owner payloads are treated as missing owner so takeover can proceed.
+      expect(manager._isOwnerHeartbeatStale()).toBe(true);
     });
 
     it('should return true when owner pref is empty string', () => {
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, '');
+      expect(manager._isOwnerHeartbeatStale()).toBe(true);
+    });
+
+    it('should return true when owner payload is from another profile scope', () => {
+      const ownerData = {
+        id: 'other-window',
+        scopeId: 'foreign-scope',
+        heartbeat: Date.now(),
+      };
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
       expect(manager._isOwnerHeartbeatStale()).toBe(true);
     });
   });
@@ -662,7 +757,7 @@ describe('WindowSyncManager', () => {
       const callback = vi.fn();
       manager.onSyncStateChanged = callback;
 
-      const syncData = { ownerId: 'other-window', isActive: true };
+      const syncData = { ownerId: 'other-window', scopeId, isActive: true };
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
       manager._handleSyncPrefChange();
       expect(callback).not.toHaveBeenCalled();
@@ -679,7 +774,7 @@ describe('WindowSyncManager', () => {
       const callback = vi.fn();
       manager.onSyncStateChanged = callback;
 
-      const syncData = { ownerId: manager.windowId, isActive: true };
+      const syncData = { ownerId: manager.windowId, scopeId, isActive: true };
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
       manager._handleSyncPrefChange();
       expect(callback).not.toHaveBeenCalled();
@@ -691,6 +786,7 @@ describe('WindowSyncManager', () => {
 
       const syncData = {
         ownerId: 'other-window',
+        scopeId,
         isActive: true,
         remainingTime: 1000,
       };
@@ -701,9 +797,18 @@ describe('WindowSyncManager', () => {
 
     it('should not call callback when callback is null', () => {
       manager.onSyncStateChanged = null;
-      const syncData = { ownerId: 'other-window', isActive: true };
+      const syncData = { ownerId: 'other-window', scopeId, isActive: true };
       mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
       expect(() => manager._handleSyncPrefChange()).not.toThrow();
+    });
+
+    it('should ignore sync updates from another profile scope', () => {
+      const callback = vi.fn();
+      manager.onSyncStateChanged = callback;
+      const syncData = { ownerId: 'other-window', scopeId: 'foreign-scope', isActive: true };
+      mockStorage._prefs.set(Constants.SYNC_PREF_KEY, JSON.stringify(syncData));
+      manager._handleSyncPrefChange();
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 
@@ -717,7 +822,7 @@ describe('WindowSyncManager', () => {
       const callback = vi.fn();
       manager.onOwnershipLost = callback;
 
-      const ownerData = { id: 'other-window', heartbeat: Date.now() };
+      const ownerData = { id: 'other-window', scopeId, heartbeat: Date.now() };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(ownerData));
       manager._handleOwnerPrefChange();
       expect(callback).not.toHaveBeenCalled();
@@ -754,7 +859,7 @@ describe('WindowSyncManager', () => {
       const callback = vi.fn();
       manager.onOwnershipLost = callback;
 
-      const newOwnerData = { id: 'other-window', heartbeat: Date.now() };
+      const newOwnerData = { id: 'other-window', scopeId, heartbeat: Date.now() };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(newOwnerData));
       manager._handleOwnerPrefChange();
 
@@ -774,9 +879,43 @@ describe('WindowSyncManager', () => {
     it('should not call callback when callback is null', () => {
       manager.claimOwnership();
       manager.onOwnershipLost = null;
-      const newOwnerData = { id: 'other-window', heartbeat: Date.now() };
+      const newOwnerData = { id: 'other-window', scopeId, heartbeat: Date.now() };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(newOwnerData));
       expect(() => manager._handleOwnerPrefChange()).not.toThrow();
+    });
+
+    it('should ignore ownership changes from another profile scope', () => {
+      manager.claimOwnership();
+      const callback = vi.fn();
+      manager.onOwnershipLost = callback;
+      const newOwnerData = { id: 'other-window', scopeId: 'foreign-scope', heartbeat: Date.now() };
+      mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(newOwnerData));
+      manager._handleOwnerPrefChange();
+      expect(manager.isTimerOwner).toBe(true);
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reminder sync scope isolation', () => {
+    it('should include profile scope ID in reminder payload writes', () => {
+      manager.writeReminderSync({ action: 'timer-started' });
+      const reminderData = JSON.parse(mockStorage._prefs.get(Constants.REMINDER_SYNC_PREF_KEY));
+      expect(reminderData.scopeId).toBe(scopeId);
+      expect(reminderData.windowId).toBe(manager.windowId);
+    });
+
+    it('should ignore reminder sync payloads from another profile scope', () => {
+      const callback = vi.fn();
+      manager.onReminderSyncChanged = callback;
+      const reminderData = {
+        windowId: 'other-window',
+        scopeId: 'foreign-scope',
+        action: 'timer-started',
+        timestamp: Date.now(),
+      };
+      mockStorage._prefs.set(Constants.REMINDER_SYNC_PREF_KEY, JSON.stringify(reminderData));
+      manager._handleReminderSyncPrefChange();
+      expect(callback).not.toHaveBeenCalled();
     });
   });
 
@@ -874,9 +1013,11 @@ describe('WindowSyncManager', () => {
 
       const ownerData = JSON.parse(mockStorage._prefs.get(Constants.OWNER_PREF_KEY));
       expect(ownerData.id).toBe(manager.windowId);
+      expect(ownerData.scopeId).toBe(scopeId);
 
       const syncData = JSON.parse(mockStorage._prefs.get(Constants.SYNC_PREF_KEY));
       expect(syncData.ownerId).toBe(manager.windowId);
+      expect(syncData.scopeId).toBe(scopeId);
       expect(syncData.remainingTime).toBe(1500);
     });
 
@@ -926,6 +1067,7 @@ describe('WindowSyncManager', () => {
 
       const timerState = {
         isActive: true,
+        scopeId,
         remainingTime: 1000,
         isPaused: false,
         timestamp: Date.now() - 10000,
@@ -935,6 +1077,7 @@ describe('WindowSyncManager', () => {
       // Simulate dead owner by making heartbeat stale
       const staleOwnerData = {
         id: deadOwner.windowId,
+        scopeId,
         heartbeat: Date.now() - Constants.OWNER_HEARTBEAT_TIMEOUT_MS - 1000,
       };
       mockStorage._prefs.set(Constants.OWNER_PREF_KEY, JSON.stringify(staleOwnerData));
