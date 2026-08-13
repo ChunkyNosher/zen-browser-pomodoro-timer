@@ -61,7 +61,7 @@ if (window.__zenPomodoroInitialized) {
   window.addEventListener(
     'beforeunload',
     () => {
-      if (app?.timer?.isActive) {
+      if (app?.timer?.isActive && app?.windowSync?.isTimerOwner) {
         app.timer.saveState();
         logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
       }

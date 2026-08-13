@@ -115,3 +115,63 @@ describe('ZenPomodoroApp teardown', () => {
     expect(app.timer.stop).not.toHaveBeenCalled();
   });
 });
+
+describe('ZenPomodoroApp synchronized ticks', () => {
+  function createSyncApp() {
+    const app = Object.create(ZenPomodoroApp.prototype);
+    app.timer = {
+      isActive: true,
+      isPaused: false,
+      currentPhase: 'focus',
+      syncFromState: vi.fn(function (state) {
+        this.isActive = state.isActive;
+        this.isPaused = state.isPaused;
+        this.currentPhase = state.currentPhase;
+      }),
+    };
+    app.distractionDump = { isActive: false };
+    app.overlay = {
+      updateDisplay: vi.fn(),
+      updateIndicatorPausedState: vi.fn(),
+    };
+    app._syncDumpState = vi.fn();
+    app._handleRemoteTimerStop = vi.fn();
+    app._handleRemoteTimerStart = vi.fn();
+    app._handleRemotePhaseChange = vi.fn();
+    app.updateOverlayVisibility = vi.fn();
+    return app;
+  }
+
+  it('does not recalculate visibility for time-only sync updates', () => {
+    const app = createSyncApp();
+
+    app._onSyncStateReceived({
+      isActive: true,
+      isPaused: false,
+      currentPhase: 'focus',
+      currentCycle: 1,
+      totalCycles: 4,
+      remainingTime: 120,
+      dumpActive: false,
+    });
+
+    expect(app.overlay.updateDisplay).toHaveBeenCalled();
+    expect(app.updateOverlayVisibility).not.toHaveBeenCalled();
+  });
+
+  it('recalculates visibility when synchronized pause state changes', () => {
+    const app = createSyncApp();
+
+    app._onSyncStateReceived({
+      isActive: true,
+      isPaused: true,
+      currentPhase: 'focus',
+      currentCycle: 1,
+      totalCycles: 4,
+      remainingTime: 120,
+      dumpActive: false,
+    });
+
+    expect(app.updateOverlayVisibility).toHaveBeenCalledTimes(1);
+  });
+});

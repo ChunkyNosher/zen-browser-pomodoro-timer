@@ -108,7 +108,7 @@ describe('WorkspaceDetector', () => {
 
   describe('getActiveWorkspace', () => {
     it('should prefer the native active workspace ID', () => {
-      globalThis.gZenWorkspaces = { activeWorkspace: { uuid: 'native-workspace' } };
+      globalThis.gZenWorkspaces = { activeWorkspace: 'native-workspace' };
 
       expect(detector.getActiveWorkspace()).toBe('native-workspace');
       expect(querySelectorSpy).not.toHaveBeenCalled();

@@ -1456,6 +1456,7 @@ select.zen-pomodoro-dialog-input option:checked {
    - When a new transition phase starts, the popup resets to
      this default position (dragged position is not persisted)
    ============================================ */
+
 /* Transition popup positioning:
    - Always appears at top: 20px; right: 20px on each show.
    - Users can drag/move the popup while visible.

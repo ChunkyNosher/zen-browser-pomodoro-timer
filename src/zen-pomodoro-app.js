@@ -591,6 +591,8 @@ class ZenPomodoroApp {
   _onSyncStateReceived(syncState) {
     const wasActive = this.timer.isActive;
     const oldPhase = this.timer.currentPhase;
+    const wasPaused = this.timer.isPaused;
+    const wasDumpActive = Boolean(this.distractionDump?.isActive);
 
     // Update timer state
     this.timer.syncFromState(syncState);
@@ -603,9 +605,20 @@ class ZenPomodoroApp {
       syncState.totalCycles
     );
     this.overlay.updateIndicatorPausedState(syncState.isPaused);
-    this.updateOverlayVisibility();
 
     this._syncDumpState(syncState);
+    const dumpStateChanged =
+      syncState.dumpActive !== undefined &&
+      wasDumpActive !== Boolean(syncState.dumpActive);
+    const visibilityStateChanged =
+      wasActive !== Boolean(syncState.isActive) ||
+      oldPhase !== syncState.currentPhase ||
+      wasPaused !== Boolean(syncState.isPaused);
+    // Dump start/end handlers update visibility themselves. For ordinary sync
+    // ticks, only recalculate when a state that can affect blocking changed.
+    if (!dumpStateChanged && visibilityStateChanged) {
+      this.updateOverlayVisibility();
+    }
     this._handleRemoteTimerStop(wasActive, syncState);
     this._handleRemoteTimerStart(wasActive, syncState);
     this._handleRemotePhaseChange(oldPhase, syncState);

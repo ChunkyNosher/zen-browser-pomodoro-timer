@@ -4533,7 +4533,7 @@
      * @private
      */
     _handleIndicatorMouseMove(e) {
-      if (!this._dragState.isDragging) return;
+      if (!this._dragState?.isDragging) return;
 
       const deltaX = e.clientX - this._dragState.startX;
       const deltaY = e.clientY - this._dragState.startY;
@@ -15865,6 +15865,8 @@
     _onSyncStateReceived(syncState) {
       const wasActive = this.timer.isActive;
       const oldPhase = this.timer.currentPhase;
+      const wasPaused = this.timer.isPaused;
+      const wasDumpActive = Boolean(this.distractionDump?.isActive);
 
       // Update timer state
       this.timer.syncFromState(syncState);
@@ -15877,9 +15879,20 @@
         syncState.totalCycles
       );
       this.overlay.updateIndicatorPausedState(syncState.isPaused);
-      this.updateOverlayVisibility();
 
       this._syncDumpState(syncState);
+      const dumpStateChanged =
+        syncState.dumpActive !== undefined &&
+        wasDumpActive !== Boolean(syncState.dumpActive);
+      const visibilityStateChanged =
+        wasActive !== Boolean(syncState.isActive) ||
+        oldPhase !== syncState.currentPhase ||
+        wasPaused !== Boolean(syncState.isPaused);
+      // Dump start/end handlers update visibility themselves. For ordinary sync
+      // ticks, only recalculate when a state that can affect blocking changed.
+      if (!dumpStateChanged && visibilityStateChanged) {
+        this.updateOverlayVisibility();
+      }
       this._handleRemoteTimerStop(wasActive, syncState);
       this._handleRemoteTimerStart(wasActive, syncState);
       this._handleRemotePhaseChange(oldPhase, syncState);
@@ -16761,7 +16774,7 @@
     window.addEventListener(
       'beforeunload',
       () => {
-        if (app?.timer?.isActive) {
+        if (app?.timer?.isActive && app?.windowSync?.isTimerOwner) {
           app.timer.saveState();
           logger.log(Constants.LOG_CATEGORIES.TIMER, 'Timer state saved before browser close');
         }

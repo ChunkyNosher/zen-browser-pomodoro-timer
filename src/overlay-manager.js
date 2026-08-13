@@ -444,7 +444,7 @@ class OverlayManager {
    * @private
    */
   _handleIndicatorMouseMove(e) {
-    if (!this._dragState.isDragging) return;
+    if (!this._dragState?.isDragging) return;
 
     const deltaX = e.clientX - this._dragState.startX;
     const deltaY = e.clientY - this._dragState.startY;
