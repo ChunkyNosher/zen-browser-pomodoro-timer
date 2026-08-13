@@ -20,8 +20,8 @@ describe('Constants Module', () => {
     });
 
     it('should have correct MOD_VERSION', () => {
-      expect(Constants.MOD_VERSION).toBe('1.4.10');
-      expect(MOD_VERSION).toBe('1.4.10');
+      expect(Constants.MOD_VERSION).toBe('1.4.11');
+      expect(MOD_VERSION).toBe('1.4.11');
     });
 
     it('should have MODIFIER_KEYS array', () => {
