@@ -69,7 +69,8 @@ if (window.__zenPomodoroInitialized) {
       if (app?.windowSync) {
         app.windowSync.releaseOwnership();
       }
-    }
+    },
+    { once: true }
   );
 
   // MEMORY LEAK FIX: Register shutdown handler to cleanup resources

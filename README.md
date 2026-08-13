@@ -3,7 +3,7 @@
 Transform Zen Browser into a productivity powerhouse with customizable Pomodoro timers and workspace blocking capabilities. This mod helps you stay focused by blocking distracting workspaces during focus periods with a full-screen overlay.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-1.4.10-green.svg)
+![Version](https://img.shields.io/badge/version-1.4.11-green.svg)
 
 ## ✨ Features
 
@@ -362,6 +362,13 @@ See [LICENSE](LICENSE) file for full details.
 - 🌐 **Zen Browser Community**: [Zen Browser Website](https://zen-browser.app/)
 
 ## 📊 Changelog
+
+### Version 1.4.11
+
+- ✅ **Zen 1.21.14b Compatibility**: Workspace detection now prefers Zen's current `gZenWorkspaces` API and native change callbacks while retaining DOM fallbacks for older builds.
+- ⚡ **Lower Runtime Overhead**: Timer ticks no longer re-evaluate workspace visibility, repeated workspace/paused-state logs are deduplicated, and log persistence is batched instead of synchronously rewriting the full history every second.
+- ⚡ **Targeted Website Monitoring**: Keyword rules now react to selected-tab title events instead of observing every DOM mutation in dynamic webpages.
+- 🧹 **Lifecycle Cleanup**: Menu Escape handlers, dialog drag observers, overlay animation frames, transient timeouts, and drag listeners are now removed deterministically.
 
 ### Version 1.4.10
 

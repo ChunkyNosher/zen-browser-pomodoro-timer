@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import WorkspaceDetector from '../src/workspace-detector.js';
-import { clearMockPrefs, setMockPref } from './setup.js';
+import { clearMockPrefs } from './setup.js';
 
 // Mock Storage module
 vi.mock('../src/storage.js', () => ({
@@ -75,6 +75,7 @@ describe('WorkspaceDetector', () => {
     }
     vi.restoreAllMocks();
     vi.useRealTimers();
+    delete globalThis.gZenWorkspaces;
   });
 
   describe('Constructor', () => {
@@ -106,6 +107,13 @@ describe('WorkspaceDetector', () => {
   });
 
   describe('getActiveWorkspace', () => {
+    it('should prefer the native active workspace ID', () => {
+      globalThis.gZenWorkspaces = { activeWorkspace: { uuid: 'native-workspace' } };
+
+      expect(detector.getActiveWorkspace()).toBe('native-workspace');
+      expect(querySelectorSpy).not.toHaveBeenCalled();
+    });
+
     it('should return ID from modern zen-workspace element', () => {
       const mockElement = { id: 'workspace-123' };
       querySelectorSpy.mockImplementation((selector) => {
@@ -378,11 +386,7 @@ describe('WorkspaceDetector', () => {
       detector.config.rulesets = [
         { id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] },
       ];
-      Storage.loadConfig.mockReturnValue({
-        blockedWorkspaces: [],
-        rulesets: [{ id: 'r1', enabled: true, blockedWorkspaces: ['ws2'] }],
-        activeRulesets: ['r1'],
-      });
+      detector.config.activeRulesets = ['r1'];
 
       const result = detector.isWorkspaceIdBlocked('ws2');
 
@@ -408,14 +412,7 @@ describe('WorkspaceDetector', () => {
         { id: 'r1', enabled: false, blockedWorkspaces: ['ws1'] },
         { id: 'r2', enabled: true, blockedWorkspaces: ['ws2'] },
       ];
-      Storage.loadConfig.mockReturnValue({
-        blockedWorkspaces: [],
-        rulesets: [
-          { id: 'r1', enabled: false, blockedWorkspaces: ['ws1'] },
-          { id: 'r2', enabled: true, blockedWorkspaces: ['ws2'] },
-        ],
-        activeRulesets: ['r1', 'r2'],
-      });
+      detector.config.activeRulesets = ['r1', 'r2'];
 
       expect(detector.isWorkspaceIdBlocked('ws1')).toBe(false);
       expect(detector.isWorkspaceIdBlocked('ws2')).toBe(true);
@@ -526,6 +523,59 @@ describe('WorkspaceDetector', () => {
   });
 
   describe('startMonitoring', () => {
+    it('should use native workspace listeners when available', () => {
+      const addChangeListeners = vi.fn();
+      const removeChangeListeners = vi.fn();
+      globalThis.gZenWorkspaces = {
+        activeWorkspace: 'ws1',
+        addChangeListeners,
+        removeChangeListeners,
+      };
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      detector.startMonitoring();
+
+      expect(addChangeListeners).toHaveBeenCalledTimes(1);
+      expect(detector.workspaceObserver).toBeNull();
+      expect(addEventListenerSpy).toHaveBeenCalledWith('ZenWorkspaceDataChanged', detector.workspaceDataChangeListener);
+    });
+
+    it('should handle native workspace changes and remove listeners when stopped', () => {
+      const addChangeListeners = vi.fn();
+      const removeChangeListeners = vi.fn();
+      globalThis.gZenWorkspaces = {
+        activeWorkspace: 'ws1',
+        addChangeListeners,
+        removeChangeListeners,
+      };
+      detector.onWorkspaceChange = vi.fn();
+      vi.spyOn(detector, 'validateBlockedWorkspaces').mockImplementation(() => {});
+
+      detector.startMonitoring();
+      addChangeListeners.mock.calls[0][0]({ workspace: { uuid: 'ws2' } });
+      detector.stopMonitoring();
+
+      expect(detector.activeWorkspace).toBe('ws2');
+      expect(detector.onWorkspaceChange).toHaveBeenCalledWith('ws2', false);
+      expect(removeChangeListeners).toHaveBeenCalledWith(addChangeListeners.mock.calls[0][0]);
+    });
+
+    it('should refresh and validate when native workspace data changes', () => {
+      globalThis.gZenWorkspaces = {
+        activeWorkspace: 'ws1',
+        addChangeListeners: vi.fn(),
+        removeChangeListeners: vi.fn(),
+      };
+      const refreshConfig = vi.spyOn(detector, 'refreshConfig');
+      const validateBlockedWorkspaces = vi.spyOn(detector, 'validateBlockedWorkspaces').mockImplementation(() => {});
+
+      detector.startMonitoring();
+      window.dispatchEvent(new Event('ZenWorkspaceDataChanged'));
+
+      expect(refreshConfig).toHaveBeenCalledTimes(1);
+      expect(validateBlockedWorkspaces).toHaveBeenCalledTimes(1);
+    });
+
     it('should set initial workspace', () => {
       vi.spyOn(detector, 'getActiveWorkspace').mockReturnValue('ws1');
       querySelectorSpy.mockReturnValue(document.createElement('div'));
@@ -546,7 +596,7 @@ describe('WorkspaceDetector', () => {
       expect(mockObserver.disconnect).toHaveBeenCalled();
     });
 
-    it('should create new MutationObserver', () => {
+    it('should create a fallback MutationObserver when native APIs are unavailable', () => {
       vi.spyOn(detector, 'getActiveWorkspace').mockReturnValue('ws1');
       querySelectorSpy.mockReturnValue(document.createElement('div'));
 
@@ -561,7 +611,7 @@ describe('WorkspaceDetector', () => {
       querySelectorSpy.mockReturnValue(mockContainer);
       
       const observeSpy = vi.fn();
-      const MockMutationObserver = vi.fn(function(callback) {
+      const MockMutationObserver = vi.fn(function() {
         this.observe = observeSpy;
         this.disconnect = vi.fn();
       });
@@ -627,29 +677,16 @@ describe('WorkspaceDetector', () => {
   });
 
   describe('getAllWorkspaces', () => {
-    it('should try ZenWorkspaces API first', () => {
+    it('should prefer gZenWorkspaces API', () => {
       const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockReturnValue(mockWorkspaces);
+      globalThis.gZenWorkspaces = { getWorkspaces: vi.fn(() => mockWorkspaces) };
 
-      const result = detector.getAllWorkspaces();
-
-      expect(result).toEqual(mockWorkspaces);
+      expect(detector.getAllWorkspaces()).toEqual(mockWorkspaces);
+      expect(globalThis.gZenWorkspaces.getWorkspaces).toHaveBeenCalledTimes(1);
     });
 
-    it('should try legacy API if ZenWorkspaces fails', () => {
+    it('should try DOM buttons if the native API is unavailable', () => {
       const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockReturnValue(null);
-      vi.spyOn(detector, '_tryLegacyWorkspacesApi').mockReturnValue(mockWorkspaces);
-
-      const result = detector.getAllWorkspaces();
-
-      expect(result).toEqual(mockWorkspaces);
-    });
-
-    it('should try DOM buttons if APIs fail', () => {
-      const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockReturnValue(null);
-      vi.spyOn(detector, '_tryLegacyWorkspacesApi').mockReturnValue(null);
       vi.spyOn(detector, '_tryDomWorkspaceButtons').mockReturnValue(mockWorkspaces);
 
       const result = detector.getAllWorkspaces();
@@ -659,8 +696,6 @@ describe('WorkspaceDetector', () => {
 
     it('should try workspace container if DOM buttons fail', () => {
       const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockReturnValue(null);
-      vi.spyOn(detector, '_tryLegacyWorkspacesApi').mockReturnValue(null);
       vi.spyOn(detector, '_tryDomWorkspaceButtons').mockReturnValue(null);
       vi.spyOn(detector, '_tryWorkspaceContainer').mockReturnValue(mockWorkspaces);
 
@@ -670,8 +705,6 @@ describe('WorkspaceDetector', () => {
     });
 
     it('should return empty array when nothing found', () => {
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockReturnValue(null);
-      vi.spyOn(detector, '_tryLegacyWorkspacesApi').mockReturnValue(null);
       vi.spyOn(detector, '_tryDomWorkspaceButtons').mockReturnValue(null);
       vi.spyOn(detector, '_tryWorkspaceContainer').mockReturnValue(null);
 
@@ -681,7 +714,7 @@ describe('WorkspaceDetector', () => {
     });
 
     it('should handle errors gracefully', () => {
-      vi.spyOn(detector, '_tryZenWorkspacesApi').mockImplementation(() => {
+      vi.spyOn(detector, '_tryGZenWorkspacesApi').mockImplementation(() => {
         throw new Error('API error');
       });
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -694,116 +727,29 @@ describe('WorkspaceDetector', () => {
     });
   });
 
-  describe('_tryZenWorkspacesApi', () => {
-    it('should return null if ZenWorkspaces undefined', () => {
-      const result = detector._tryZenWorkspacesApi();
-      expect(result).toBeNull();
-    });
-
-    it('should use _getWorkspacesFromObject', () => {
-      const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      globalThis.ZenWorkspaces = { workspaces: mockWorkspaces };
-      vi.spyOn(detector, '_getWorkspacesFromObject').mockReturnValue(mockWorkspaces);
-      isValidWorkspaceArray.mockReturnValue(true);
-      formatWorkspacesFromApi.mockReturnValue(mockWorkspaces);
-
-      const result = detector._tryZenWorkspacesApi();
-
-      expect(detector._getWorkspacesFromObject).toHaveBeenCalledWith(globalThis.ZenWorkspaces);
-      expect(result).toEqual(mockWorkspaces);
-      
-      delete globalThis.ZenWorkspaces;
-    });
-
-    it('should return null if workspaces invalid', () => {
-      globalThis.ZenWorkspaces = { workspaces: [] };
-      vi.spyOn(detector, '_getWorkspacesFromObject').mockReturnValue([]);
-      isValidWorkspaceArray.mockReturnValue(false);
-
-      const result = detector._tryZenWorkspacesApi();
-
-      expect(result).toBeNull();
-      
-      delete globalThis.ZenWorkspaces;
-    });
-  });
-
-  describe('_tryLegacyWorkspacesApi', () => {
+  describe('_tryGZenWorkspacesApi', () => {
     it('should return null if gZenWorkspaces undefined', () => {
-      const result = detector._tryLegacyWorkspacesApi();
+      const result = detector._tryGZenWorkspacesApi();
       expect(result).toBeNull();
     });
 
-    it('should use _getWorkspacesFromObject', () => {
+    it('should use getWorkspaces()', () => {
       const mockWorkspaces = [{ id: 'ws1', name: 'Workspace 1' }];
-      globalThis.gZenWorkspaces = { workspaces: mockWorkspaces };
-      vi.spyOn(detector, '_getWorkspacesFromObject').mockReturnValue(mockWorkspaces);
+      globalThis.gZenWorkspaces = { getWorkspaces: vi.fn(() => mockWorkspaces) };
       isValidWorkspaceArray.mockReturnValue(true);
       formatWorkspacesFromApi.mockReturnValue(mockWorkspaces);
 
-      const result = detector._tryLegacyWorkspacesApi();
+      const result = detector._tryGZenWorkspacesApi();
 
-      expect(detector._getWorkspacesFromObject).toHaveBeenCalledWith(globalThis.gZenWorkspaces);
+      expect(globalThis.gZenWorkspaces.getWorkspaces).toHaveBeenCalledTimes(1);
       expect(result).toEqual(mockWorkspaces);
-      
-      delete globalThis.gZenWorkspaces;
     });
 
     it('should return null if workspaces invalid', () => {
-      globalThis.gZenWorkspaces = { workspaces: [] };
-      vi.spyOn(detector, '_getWorkspacesFromObject').mockReturnValue([]);
+      globalThis.gZenWorkspaces = { getWorkspaces: vi.fn(() => []) };
       isValidWorkspaceArray.mockReturnValue(false);
 
-      const result = detector._tryLegacyWorkspacesApi();
-
-      expect(result).toBeNull();
-      
-      delete globalThis.gZenWorkspaces;
-    });
-  });
-
-  describe('_getWorkspacesFromObject', () => {
-    it('should use getWorkspaces() method if available', () => {
-      const mockWorkspaces = [{ id: 'ws1' }];
-      const wsObject = {
-        getWorkspaces: vi.fn(() => mockWorkspaces),
-        _workspaces: [],
-        workspaces: [],
-      };
-
-      const result = detector._getWorkspacesFromObject(wsObject);
-
-      expect(wsObject.getWorkspaces).toHaveBeenCalled();
-      expect(result).toEqual(mockWorkspaces);
-    });
-
-    it('should use _workspaces property if method not available', () => {
-      const mockWorkspaces = [{ id: 'ws1' }];
-      const wsObject = {
-        _workspaces: mockWorkspaces,
-        workspaces: [],
-      };
-
-      const result = detector._getWorkspacesFromObject(wsObject);
-
-      expect(result).toEqual(mockWorkspaces);
-    });
-
-    it('should use workspaces property if _workspaces not available', () => {
-      const mockWorkspaces = [{ id: 'ws1' }];
-      const wsObject = {
-        workspaces: mockWorkspaces,
-      };
-
-      const result = detector._getWorkspacesFromObject(wsObject);
-
-      expect(result).toEqual(mockWorkspaces);
-    });
-
-    it('should return null if nothing available', () => {
-      const wsObject = {};
-
-      const result = detector._getWorkspacesFromObject(wsObject);
+      const result = detector._tryGZenWorkspacesApi();
 
       expect(result).toBeNull();
     });
@@ -1029,7 +975,7 @@ describe('WorkspaceDetector', () => {
 
       expect(result).toBe(mockContainer);
       expect(querySelectorSpy).toHaveBeenCalledWith(
-        '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
+        '#zen-workspaces-button, [id*="workspace"]'
       );
     });
 
@@ -1063,6 +1009,15 @@ describe('WorkspaceDetector', () => {
 
       expect(Storage.loadConfig).toHaveBeenCalled();
       expect(result).toBe(true);
+    });
+
+    it('should load config once per blocked workspace check', () => {
+      Storage.loadConfig.mockClear();
+      Storage.loadConfig.mockReturnValue({ blockedWorkspaces: ['ws1'], rulesets: [] });
+      vi.spyOn(detector, 'getActiveWorkspace').mockReturnValue('ws1');
+
+      expect(detector.isCurrentWorkspaceBlocked()).toBe(true);
+      expect(Storage.loadConfig).toHaveBeenCalledTimes(1);
     });
 
     it('should handle multiple debounced calls correctly', () => {

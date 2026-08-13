@@ -266,3 +266,68 @@ describe('KeyboardShortcutHandler - Shortcut reliability hardening', () => {
     expect(handler._isShortcutMatch(event, parsed)).toBe(true);
   });
 });
+
+describe('KeyboardShortcutHandler - menu Escape cleanup', () => {
+  let handler;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    document.documentElement.innerHTML = '';
+    global.window = {
+      zenPomodoroApp: {
+        timer: { isActive: false },
+      },
+    };
+    handler = new KeyboardShortcutHandler();
+  });
+
+  afterEach(() => {
+    handler.destroy();
+    vi.restoreAllMocks();
+  });
+
+  it('removes the Escape handler when Close is clicked', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+    handler.showPomodoroMenu();
+    const escHandler = handler.menuEscHandler;
+
+    Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'Close').click();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', escHandler);
+    expect(handler.menuEscHandler).toBeNull();
+  });
+
+  it('removes the Escape handler when the menu is toggled closed', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+    handler.showPomodoroMenu();
+    const escHandler = handler.menuEscHandler;
+
+    handler.showPomodoroMenu();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', escHandler);
+    expect(handler.menuEscHandler).toBeNull();
+  });
+
+  it('removes the Escape handler during destroy', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+    handler.showPomodoroMenu();
+    const escHandler = handler.menuEscHandler;
+
+    handler.destroy();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', escHandler);
+    expect(handler.menuEscHandler).toBeNull();
+  });
+
+  it('closes the menu and removes its handler on Escape', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
+    handler.showPomodoroMenu();
+    const escHandler = handler.menuEscHandler;
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(document.getElementById('zen-pomodoro-menu-dialog')).toBeNull();
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', escHandler);
+    expect(handler.menuEscHandler).toBeNull();
+  });
+});

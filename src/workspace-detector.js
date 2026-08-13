@@ -19,9 +19,8 @@ const saveConfig = (config) => Storage.saveConfig(config);
  * Only includes rulesets that are both enabled AND listed in config.activeRulesets.
  * @returns {string[]} Array of blocked workspace IDs
  */
-function getActiveBlockedWorkspaces() {
-  const config = Storage.loadConfig();
-  const blocked = new Set([...config.blockedWorkspaces]); // Start with global blocked list
+function getActiveBlockedWorkspaces(config) {
+  const blocked = new Set(config.blockedWorkspaces || []); // Start with global blocked list
   const activeRulesetIds = new Set(config.activeRulesets || []);
 
   // Add blocked workspaces from rulesets that are both enabled and active
@@ -43,6 +42,9 @@ class WorkspaceDetector {
     this.workspaceObserver = null; // Store observer for cleanup
     this.needsValidation = true; // Flag to track if validation is needed
     this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
+    this.workspaceApi = null;
+    this.workspaceChangeListener = null;
+    this.workspaceDataChangeListener = null;
   }
 
   /**
@@ -50,6 +52,15 @@ class WorkspaceDetector {
    */
   getActiveWorkspace() {
     try {
+      const workspaceApi = globalThis.gZenWorkspaces;
+      const activeWorkspace = workspaceApi?.activeWorkspace;
+      if (typeof activeWorkspace === 'string') {
+        return activeWorkspace;
+      }
+      if (activeWorkspace?.uuid || activeWorkspace?.id) {
+        return activeWorkspace.uuid || activeWorkspace.id;
+      }
+
       // BUG FIX: Workspace blocking stopped working correctly on newer Zen Browser versions
       // because the DOM structure for workspaces changed. Modern Zen builds expose the active
       // workspace as a <zen-workspace> element, while older versions and some custom setups
@@ -154,7 +165,7 @@ class WorkspaceDetector {
    */
   _checkWorkspaceBlocked(logMessage) {
     // Reload config to get latest blocked workspaces
-    this.config = getConfig();
+    this.refreshConfig();
 
     const activeWorkspace = this.getActiveWorkspace();
     if (!activeWorkspace) {
@@ -162,7 +173,7 @@ class WorkspaceDetector {
     }
 
     // Get blocked workspaces from all active rulesets
-    const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+    const activeBlockedWorkspaces = getActiveBlockedWorkspaces(this.config);
     const isBlocked = activeBlockedWorkspaces.includes(activeWorkspace);
 
     logger.log(LOG_CATEGORIES.WORKSPACE, logMessage, {
@@ -182,11 +193,16 @@ class WorkspaceDetector {
   isWorkspaceIdBlocked(workspaceId) {
     // Use cached config if available, otherwise reload
     if (!this.config) {
-      this.config = getConfig();
+      this.refreshConfig();
     }
     // Get blocked workspaces from all active rulesets
-    const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+    const activeBlockedWorkspaces = getActiveBlockedWorkspaces(this.config);
     return activeBlockedWorkspaces.includes(workspaceId);
+  }
+
+  refreshConfig() {
+    this.config = getConfig();
+    return this.config;
   }
 
   /**
@@ -229,21 +245,52 @@ class WorkspaceDetector {
     }, WORKSPACE_MUTATION_DELAY_MS);
   }
 
+  _handleNativeWorkspaceChange({ workspace } = {}) {
+    const newWorkspace =
+      typeof workspace === 'string'
+        ? workspace
+        : workspace?.uuid || workspace?.id || this.getActiveWorkspace();
+    if (newWorkspace === this.activeWorkspace) return;
+
+    this.activeWorkspace = newWorkspace;
+    this.refreshConfig();
+    this.needsValidation = true;
+    this.validateBlockedWorkspaces();
+
+    if (this.onWorkspaceChange) {
+      const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
+      this.onWorkspaceChange(newWorkspace, isBlocked);
+    }
+  }
+
+  _handleWorkspaceDataChange() {
+    this.refreshConfig();
+    this.needsValidation = true;
+    this.validateBlockedWorkspaces();
+  }
+
   /**
    * Start monitoring workspace changes
    * MEMORY LEAK FIX: Store observer for cleanup
    * PERFORMANCE FIX: Validate workspaces on change, not on every check
    */
   startMonitoring() {
+    this.stopMonitoring();
     this.activeWorkspace = this.getActiveWorkspace();
 
     logger.log(LOG_CATEGORIES.WORKSPACE, 'Starting workspace monitoring', {
       initialWorkspace: this.activeWorkspace,
     });
 
-    // Clean up existing observer if any
-    if (this.workspaceObserver) {
-      this.workspaceObserver.disconnect();
+    const workspaceApi = globalThis.gZenWorkspaces;
+    if (typeof workspaceApi?.addChangeListeners === 'function' &&
+        typeof workspaceApi.removeChangeListeners === 'function') {
+      this.workspaceApi = workspaceApi;
+      this.workspaceChangeListener = (change) => this._handleNativeWorkspaceChange(change);
+      this.workspaceDataChangeListener = () => this._handleWorkspaceDataChange();
+      workspaceApi.addChangeListeners(this.workspaceChangeListener);
+      window.addEventListener('ZenWorkspaceDataChanged', this.workspaceDataChangeListener);
+      return;
     }
 
     // Use MutationObserver to detect workspace changes
@@ -302,30 +349,35 @@ class WorkspaceDetector {
       clearTimeout(this.mutationDebounceTimer);
       this.mutationDebounceTimer = null;
     }
+    if (this.workspaceApi && this.workspaceChangeListener) {
+      this.workspaceApi.removeChangeListeners(this.workspaceChangeListener);
+    }
+    if (this.workspaceDataChangeListener) {
+      window.removeEventListener('ZenWorkspaceDataChanged', this.workspaceDataChangeListener);
+    }
+    this.workspaceApi = null;
+    this.workspaceChangeListener = null;
+    this.workspaceDataChangeListener = null;
   }
 
   /**
    * Get all available workspaces
    * Uses multiple methods to retrieve workspace names:
-   * 1. Try to get from ZenWorkspaces API (multiple possible APIs)
+   * 1. Try to get from gZenWorkspaces API
    * 2. Fall back to DOM attributes (label, tooltiptext, aria-label)
    * 3. Try to extract from workspace panel if available
    */
   getAllWorkspaces() {
     try {
-      // Method 1: Try ZenWorkspaces API (most reliable)
-      const zenResult = this._tryZenWorkspacesApi();
-      if (zenResult) return zenResult;
+      // Method 1: Try gZenWorkspaces API (most reliable)
+      const nativeResult = this._tryGZenWorkspacesApi();
+      if (nativeResult) return nativeResult;
 
-      // Method 2: Try legacy gZenWorkspaces API
-      const legacyResult = this._tryLegacyWorkspacesApi();
-      if (legacyResult) return legacyResult;
-
-      // Method 3: Query DOM buttons
+      // Method 2: Query DOM buttons
       const domResult = this._tryDomWorkspaceButtons();
       if (domResult) return domResult;
 
-      // Method 4: Try workspace container elements
+      // Method 3: Try workspace container elements
       const containerResult = this._tryWorkspaceContainer();
       if (containerResult) return containerResult;
 
@@ -338,59 +390,19 @@ class WorkspaceDetector {
   }
 
   /**
-   * Try to get workspaces from ZenWorkspaces API.
+   * Try to get workspaces from gZenWorkspaces API.
    * @returns {Array|null} Workspaces array or null if not available
    * @private
    */
-  _tryZenWorkspacesApi() {
-    // eslint-disable-next-line no-undef
-    if (typeof ZenWorkspaces === 'undefined') return null;
+  _tryGZenWorkspacesApi() {
+    const workspaceApi = globalThis.gZenWorkspaces;
+    if (typeof workspaceApi?.getWorkspaces !== 'function') return null;
 
-    // eslint-disable-next-line no-undef
-    const workspaces = this._getWorkspacesFromObject(ZenWorkspaces);
-
-    if (isValidWorkspaceArray(workspaces)) {
-      console.log('Zen Pomodoro: Got workspaces from ZenWorkspaces API');
-      return formatWorkspacesFromApi(workspaces);
-    }
-    return null;
-  }
-
-  /**
-   * Try to get workspaces from legacy gZenWorkspaces API.
-   * @returns {Array|null} Workspaces array or null if not available
-   * @private
-   */
-  _tryLegacyWorkspacesApi() {
-    // eslint-disable-next-line no-undef
-    if (typeof gZenWorkspaces === 'undefined') return null;
-
-    // eslint-disable-next-line no-undef
-    const workspaces = this._getWorkspacesFromObject(gZenWorkspaces);
+    const workspaces = workspaceApi.getWorkspaces();
 
     if (isValidWorkspaceArray(workspaces)) {
       console.log('Zen Pomodoro: Got workspaces from gZenWorkspaces API');
       return formatWorkspacesFromApi(workspaces);
-    }
-    return null;
-  }
-
-  /**
-   * Extract workspaces from a workspace API object.
-   * Tries multiple property/method names.
-   * @param {Object} wsObject - The workspace API object
-   * @returns {Array|null} Workspaces array or null
-   * @private
-   */
-  _getWorkspacesFromObject(wsObject) {
-    if (typeof wsObject.getWorkspaces === 'function') {
-      return wsObject.getWorkspaces();
-    }
-    if (wsObject._workspaces !== undefined) {
-      return wsObject._workspaces;
-    }
-    if (wsObject.workspaces !== undefined) {
-      return wsObject.workspaces;
     }
     return null;
   }
@@ -484,7 +496,7 @@ class WorkspaceDetector {
    */
   _findLegacyWorkspaceContainer() {
     return document.querySelector(
-      '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
+      '#zen-workspaces-button, [id*="workspace"]'
     );
   }
 

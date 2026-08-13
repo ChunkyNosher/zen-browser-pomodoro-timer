@@ -57,7 +57,6 @@ describe('Constants Module', () => {
       expect(Constants.RESTORATION_NOTIFICATION_DELAY_MS).toBe(500);
       expect(Constants.MAX_OVERLAY_Z_INDEX).toBe('2147483647');
       expect(Constants.MIN_CONTENT_AREA_DIMENSION).toBe(100);
-      expect(Constants.CONTENT_OBSERVER_DEBOUNCE_DELAY_MS).toBe(500);
       expect(Constants.POST_SESSION_ESCALATION_FACTOR).toBe(1.5);
       expect(Constants.POST_SESSION_CHECK_INTERVAL_MS).toBe(60000);
       expect(Constants.DAILY_REMINDER_ESCALATION_FACTOR).toBe(1.5);
@@ -234,12 +233,16 @@ describe('Constants Module', () => {
       expect(Array.isArray(WORKSPACE_CONTAINER_SELECTORS)).toBe(true);
       expect(WORKSPACE_CONTAINER_SELECTORS.length).toBeGreaterThan(0);
       expect(WORKSPACE_CONTAINER_SELECTORS[0]).toBe('#tabbrowser-arrowscrollbox');
+      expect(WORKSPACE_CONTAINER_SELECTORS).toContain('#zen-workspaces-button');
+      expect(WORKSPACE_CONTAINER_SELECTORS).not.toContain('#zen-workspace-button-container');
+      expect(WORKSPACE_CONTAINER_SELECTORS).not.toContain('#zen-workspaces-button-container');
     });
 
     it('should have CONTENT_AREA_SELECTORS array', () => {
       expect(Array.isArray(CONTENT_AREA_SELECTORS)).toBe(true);
       expect(CONTENT_AREA_SELECTORS.length).toBeGreaterThan(0);
       expect(CONTENT_AREA_SELECTORS[0]).toBe('#tabbrowser-tabbox');
+      expect(CONTENT_AREA_SELECTORS).not.toContain('#zen-main-view');
     });
 
     it('should have WORKSPACE_NAME_ATTRIBUTES array', () => {

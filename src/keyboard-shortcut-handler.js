@@ -51,6 +51,7 @@ class KeyboardShortcutHandler {
   constructor() {
     this.keydownHandler = null;
     this.toggleIndicatorHandler = null; // Handler for toggle indicator visibility shortcut
+    this.menuEscHandler = null;
     this.menuDialog = null;
     this.menuTimerUpdateInterval = null;
     this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
@@ -167,6 +168,7 @@ class KeyboardShortcutHandler {
 
     // Stop any running reminder countdown updates
     this._stopReminderCountdownUpdates();
+    this._removeMenuEscHandler();
 
     // Clean up lock screen resources if the security manager exists
     if (window.zenPomodoroApp?.security) {
@@ -401,8 +403,16 @@ class KeyboardShortcutHandler {
   _closeMenuDialog(dialog) {
     this._stopMenuTimerUpdates();
     this._stopReminderCountdownUpdates();
-    dialog.remove();
+    this._removeMenuEscHandler();
+    dialog?.remove();
     this.menuDialog = null;
+  }
+
+  _removeMenuEscHandler() {
+    if (this.menuEscHandler) {
+      document.removeEventListener('keydown', this.menuEscHandler);
+      this.menuEscHandler = null;
+    }
   }
 
   /**
@@ -656,10 +666,8 @@ class KeyboardShortcutHandler {
     settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
     settingsBtn.textContent = 'Timer Settings';
     settingsBtn.addEventListener('click', () => {
-      this._stopMenuTimerUpdates();
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       this.showSettingsDialog();
     });
 
@@ -667,10 +675,8 @@ class KeyboardShortcutHandler {
     rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
     rulesetBtn.textContent = 'Ruleset Settings';
     rulesetBtn.addEventListener('click', () => {
-      this._stopMenuTimerUpdates();
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       this.showRulesetSettingsDialog();
     });
 
@@ -737,8 +743,7 @@ class KeyboardShortcutHandler {
     startBtn.textContent = 'Start Pomodoro Timer';
     startBtn.addEventListener('click', () => {
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       this.showConfigDialog();
     });
 
@@ -748,8 +753,7 @@ class KeyboardShortcutHandler {
     settingsBtn.textContent = 'Timer Settings';
     settingsBtn.addEventListener('click', () => {
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       this.showSettingsDialog();
     });
 
@@ -759,8 +763,7 @@ class KeyboardShortcutHandler {
     rulesetBtn.textContent = 'Ruleset Settings';
     rulesetBtn.addEventListener('click', () => {
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       this.showRulesetSettingsDialog();
     });
 
@@ -770,8 +773,7 @@ class KeyboardShortcutHandler {
     customCyclesBtn.textContent = 'Custom Cycles';
     customCyclesBtn.addEventListener('click', () => {
       saveDialogPosition(dialog);
-      dialog.remove();
-      this.menuDialog = null;
+      this._closeMenuDialog(dialog);
       if (window.zenPomodoroApp?.customCycles) {
         window.zenPomodoroApp.customCycles.showCustomCyclesMenu();
       }
@@ -825,6 +827,8 @@ class KeyboardShortcutHandler {
    * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
    */
   showPomodoroMenu() {
+    this._removeMenuEscHandler();
+
     // Issue 4: Check if any dialogs are currently open using shared constant
     const existingDialogs = document.querySelectorAll(POMODORO_DIALOG_SELECTORS.join(', '));
 
@@ -874,13 +878,12 @@ class KeyboardShortcutHandler {
     dialog.focus();
 
     // Close on Escape key
-    const escHandler = (e) => {
+    this.menuEscHandler = (e) => {
       if (e.key === 'Escape') {
         this._closeMenuDialog(dialog);
-        document.removeEventListener('keydown', escHandler);
       }
     };
-    document.addEventListener('keydown', escHandler);
+    document.addEventListener('keydown', this.menuEscHandler);
   }
 
   /**
@@ -892,6 +895,7 @@ class KeyboardShortcutHandler {
 
     // Stop any running reminder countdown updates
     this._stopReminderCountdownUpdates();
+    this._removeMenuEscHandler();
 
     if (this.keydownHandler) {
       document.removeEventListener('keydown', this.keydownHandler, true);

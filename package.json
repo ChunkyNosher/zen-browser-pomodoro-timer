@@ -1,8 +1,8 @@
 {
   "name": "zen-pomodoro-blocker",
-  "version": "1.0.0",
+  "version": "1.4.11",
   "description": "A productivity mod implementing Pomodoro timer with workspace blocking",
-  "main": "userChrome.uc.mjs",
+  "main": "zen-pomodoro-focus-blocker.uc.js",
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
     "test": "vitest run",
@@ -33,5 +33,5 @@
     "timer"
   ],
   "author": "ChunkyNosher",
-  "license": "MPL-2.0"
+  "license": "MIT"
 }

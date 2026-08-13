@@ -179,26 +179,35 @@ export function setupDialogDrag(dialog) {
  * @private
  */
 export function _setupDragCleanupObserver(dialog, header, startDrag, removeDragListeners) {
+  let isCleanedUp = false;
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const removedNode of mutation.removedNodes) {
         if (removedNode === dialog) {
-          removeDragListeners();
-          header.removeEventListener('mousedown', startDrag);
-          header.removeEventListener('touchstart', startDrag);
-          observer.disconnect();
+          cleanup();
           return;
         }
       }
     }
   });
 
-  // Observe a stable ancestor (documentElement) to ensure observer always sees dialog removal
-  const targetNode = dialog.ownerDocument && dialog.ownerDocument.documentElement;
+  const cleanup = () => {
+    if (isCleanedUp) return;
+
+    isCleanedUp = true;
+    removeDragListeners();
+    header.removeEventListener('mousedown', startDrag);
+    header.removeEventListener('touchstart', startDrag);
+    observer.disconnect();
+    dialog._dragCleanupObserver = null;
+  };
+
+  dialog._dragCleanupObserver = observer;
+  dialog._dragCleanup = cleanup;
+
+  const targetNode = dialog.parentNode;
   if (targetNode) {
-    observer.observe(targetNode, { childList: true, subtree: true });
-  } else if (dialog.parentNode) {
-    observer.observe(dialog.parentNode, { childList: true, subtree: false });
+    observer.observe(targetNode, { childList: true, subtree: false });
   }
 }
 

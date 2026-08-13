@@ -318,6 +318,9 @@ describe('LogManager Module', () => {
 
     describe('exportLogs', () => {
       it('should create export data with metadata', () => {
+        vi.useFakeTimers();
+        const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
+        logManager.setStorage(mockStorage);
         logManager.log('TIMER', 'Entry 1');
         logManager.log('TIMER', 'Entry 2');
 
@@ -356,15 +359,28 @@ describe('LogManager Module', () => {
         expect(mockAnchor.href).toBe(mockUrl);
         expect(mockAnchor.download).toMatch(/^zen-pomodoro-logs-\d+\.json$/);
         expect(mockClick).toHaveBeenCalled();
+        expect(mockStorage.setPref).toHaveBeenCalledWith(
+          Constants.PERSISTED_LOGS_PREF_KEY,
+          expect.stringContaining('Logs exported')
+        );
+        vi.useRealTimers();
       });
     });
 
     describe('persistence', () => {
-      it('should persist logs after each log entry', () => {
+      it('should debounce routine log persistence', () => {
+        vi.useFakeTimers();
         const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
         logManager.setStorage(mockStorage);
 
         logManager.log('TIMER', 'Persist me');
+
+        expect(mockStorage.setPref).not.toHaveBeenCalled();
+
+        vi.advanceTimersByTime(4999);
+        expect(mockStorage.setPref).not.toHaveBeenCalled();
+
+        vi.advanceTimersByTime(1);
 
         expect(mockStorage.setPref).toHaveBeenCalledWith(
           Constants.PERSISTED_LOGS_PREF_KEY,
@@ -373,9 +389,13 @@ describe('LogManager Module', () => {
         const persistedJson = mockStorage.setPref.mock.calls.at(-1)[1];
         const persistedLogs = JSON.parse(persistedJson);
         expect(persistedLogs[persistedLogs.length - 1].message).toBe('Persist me');
+        vi.advanceTimersByTime(5000);
+        expect(mockStorage.setPref).toHaveBeenCalledTimes(1);
+        vi.useRealTimers();
       });
 
-      it('should persist empty array after clearLogs', () => {
+      it('should immediately persist an empty array and cancel pending writes after clearLogs', () => {
+        vi.useFakeTimers();
         const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
         logManager.setStorage(mockStorage);
         logManager.log('TIMER', 'Entry 1');
@@ -386,9 +406,13 @@ describe('LogManager Module', () => {
           Constants.PERSISTED_LOGS_PREF_KEY,
           '[]'
         );
+        vi.advanceTimersByTime(5000);
+        expect(mockStorage.setPref).toHaveBeenCalledTimes(1);
+        vi.useRealTimers();
       });
 
       it('should persist capped logs when maxLogSize is exceeded', () => {
+        vi.useFakeTimers();
         const smallManager = new LogManager(2);
         vi.spyOn(console, 'log').mockImplementation(() => {});
         const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
@@ -398,11 +422,29 @@ describe('LogManager Module', () => {
         smallManager.log('TEST', 'Entry 2');
         smallManager.log('TEST', 'Entry 3');
 
+        vi.advanceTimersByTime(5000);
+
         const persistedJson = mockStorage.setPref.mock.calls.at(-1)[1];
         const persistedLogs = JSON.parse(persistedJson);
         expect(persistedLogs.length).toBe(2);
         expect(persistedLogs[0].message).toBe('Entry 2');
         expect(persistedLogs[1].message).toBe('Entry 3');
+        vi.useRealTimers();
+      });
+
+      it('should immediately flush pending logs on destroy', () => {
+        vi.useFakeTimers();
+        const mockStorage = { getPref: vi.fn(() => ''), setPref: vi.fn() };
+        logManager.setStorage(mockStorage);
+        logManager.log('TIMER', 'Final entry');
+
+        logManager.destroy();
+
+        expect(mockStorage.setPref).toHaveBeenCalledWith(
+          Constants.PERSISTED_LOGS_PREF_KEY,
+          expect.stringContaining('Final entry')
+        );
+        vi.useRealTimers();
       });
     });
   });
@@ -525,6 +567,39 @@ describe('LogManager Module', () => {
 
         expect(logManager.logs.length).toBe(0);
       });
+    });
+
+    it('broadcasts local entries immediately but does not rebroadcast received entries', () => {
+      vi.useFakeTimers();
+      const notifySpy = vi.spyOn(Services.obs, 'notifyObservers');
+      logManager.setWindowId('window-123');
+      logManager.initSync();
+
+      logManager.log('TIMER', 'Local entry');
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        null,
+        Constants.LOG_BROADCAST_TOPIC,
+        expect.stringContaining('Local entry')
+      );
+
+      const broadcastsBeforeReceive = notifySpy.mock.calls.length;
+      logManager._logObserver.observe(
+        null,
+        Constants.LOG_BROADCAST_TOPIC,
+        JSON.stringify({
+          timestamp: '2024-01-01T00:00:00.000Z',
+          category: 'TIMER',
+          message: 'Remote entry',
+          _sourceWindowId: 'window-456',
+        })
+      );
+
+      expect(notifySpy).toHaveBeenCalledTimes(broadcastsBeforeReceive);
+      expect(logManager.logs.at(-1).message).toBe('Remote entry');
+      vi.advanceTimersByTime(5000);
+      expect(mockStorage.setPref).toHaveBeenCalledTimes(1);
+      vi.useRealTimers();
     });
   });
 });

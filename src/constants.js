@@ -4,7 +4,7 @@
  */
 const Constants = {
   PREF_PREFIX: 'zen-pomodoro',
-  MOD_VERSION: '1.4.10',
+  MOD_VERSION: '1.4.11',
 
   /** Modifier keys used by the keyboard shortcut recorder */
   MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -39,9 +39,6 @@ const Constants = {
 
   /** Minimum content area dimension for valid overlay bounds (in pixels) */
   MIN_CONTENT_AREA_DIMENSION: 100,
-
-  /** Debounce delay for content observer checks (in milliseconds) */
-  CONTENT_OBSERVER_DEBOUNCE_DELAY_MS: 500,
 
   /** Transition phase duration in seconds (5 minutes warning before focus resumes) */
   TRANSITION_PHASE_DURATION_SECONDS: 5 * 60,
@@ -100,8 +97,7 @@ const Constants = {
   /** Selectors to try for workspace container for MutationObserver (order matters) */
   WORKSPACE_CONTAINER_SELECTORS: [
     '#tabbrowser-arrowscrollbox',
-    '#zen-workspace-button-container',
-    '#zen-workspaces-button-container',
+    '#zen-workspaces-button',
     '[id*="workspace"]',
     '#navigator-toolbox',
   ],
@@ -111,7 +107,6 @@ const Constants = {
     '#tabbrowser-tabbox',
     '#tabbrowser-tabpanels',
     '#appcontent',
-    '#zen-main-view',
     '#browser',
     '#main-window',
   ],

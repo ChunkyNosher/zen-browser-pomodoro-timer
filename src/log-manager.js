@@ -1,5 +1,7 @@
 import Constants from './constants.js';
 
+const DEFAULT_PERSISTENCE_DEBOUNCE_MS = 5000;
+
 /**
  * LogManager class for comprehensive logging with export functionality.
  * Stores log entries in memory with timestamps and provides export capabilities.
@@ -9,13 +11,16 @@ class LogManager {
    * Create a LogManager instance.
    * @param {number} maxLogSize - Maximum number of log entries to store (default: 1000)
    */
-  constructor(maxLogSize = 1000) {
+  constructor(maxLogSize = 1000, persistenceDebounceMs = DEFAULT_PERSISTENCE_DEBOUNCE_MS) {
     this.logs = [];
     this.maxLogSize = maxLogSize;
+    this.persistenceDebounceMs = persistenceDebounceMs;
     this.windowId = null;
     this._logObserver = null;
     this._logRequestObserver = null;
     this._storage = null; // Will be injected to avoid circular dependency
+    this._persistTimer = null;
+    this._isDirty = false;
   }
 
   /**
@@ -81,7 +86,7 @@ class LogManager {
     if (this.logs.length > this.maxLogSize) {
       this.logs.shift();
     }
-    this._persistLogs();
+    this._markDirty();
   }
 
   /**
@@ -132,16 +137,19 @@ class LogManager {
     if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
 
     const existingKeys = new Set(this.logs.map((l) => this._logDedupeKey(l)));
+    let changed = false;
     for (const entry of sharedLogs) {
       if (!existingKeys.has(this._logDedupeKey(entry))) {
         this.logs.push(entry);
+        changed = true;
       }
     }
+    if (!changed) return;
     this.logs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     while (this.logs.length > this.maxLogSize) {
       this.logs.shift();
     }
-    this._persistLogs();
+    this._markDirty();
   }
 
   /**
@@ -218,7 +226,7 @@ class LogManager {
       this.logs.shift();
     }
 
-    this._persistLogs();
+    this._markDirty();
 
     // Broadcast to other windows for cross-window log sync
     this._broadcastEntry(entry);
@@ -291,7 +299,8 @@ class LogManager {
    */
   clearLogs() {
     this.logs = [];
-    this._persistLogs();
+    this._isDirty = true;
+    this.flush();
     console.log('[Zen Pomodoro][LOGGER] Logs cleared');
   }
 
@@ -320,16 +329,49 @@ class LogManager {
    * @private
    */
   _persistLogs() {
-    if (!this._storage) return;
+    if (!this._storage) return false;
 
     try {
       if (this.logs.length > this.maxLogSize) {
         this.logs = this.logs.slice(-this.maxLogSize);
       }
       this._storage.setPref(Constants.PERSISTED_LOGS_PREF_KEY, JSON.stringify(this.logs));
+      return true;
     } catch (e) {
       console.warn('[Zen Pomodoro] Failed to persist logs:', e.message);
+      return false;
     }
+  }
+
+  _markDirty() {
+    this._isDirty = true;
+    this._schedulePersist();
+  }
+
+  _schedulePersist() {
+    if (!this._storage || !this._isDirty || this._persistTimer) return;
+
+    this._persistTimer = setTimeout(() => {
+      this._persistTimer = null;
+      this.flush();
+    }, this.persistenceDebounceMs);
+  }
+
+  flush() {
+    if (this._persistTimer) {
+      clearTimeout(this._persistTimer);
+      this._persistTimer = null;
+    }
+    if (!this._isDirty || !this._storage) return;
+
+    if (this._persistLogs()) {
+      this._isDirty = false;
+    }
+  }
+
+  destroy() {
+    this.flush();
+    this.destroySync();
   }
 
   /**
@@ -339,6 +381,7 @@ class LogManager {
   exportLogs() {
     // Log the export event before creating export data for accurate count
     this.log(Constants.LOG_CATEGORIES.SETTINGS, 'Logs exported', { entryCount: this.logs.length });
+    this.flush();
 
     const exportData = {
       exportedAt: new Date().toISOString(),

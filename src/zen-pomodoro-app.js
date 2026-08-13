@@ -53,6 +53,7 @@ class ZenPomodoroApp {
     this._prefTriggerObserver = null;
     this._lastExportLogsTriggerAt = 0;
     this._isResettingExportLogsPref = false;
+    this._lastWorkspaceVisibilityLog = null;
 
     this.init();
   }
@@ -217,11 +218,22 @@ class ZenPomodoroApp {
    */
   _handlePreferenceTrigger(prefName) {
     const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
-    if (prefName !== exportPrefName) {
+    if (prefName === exportPrefName) {
+      this._handleExportLogsPreferenceTrigger();
       return;
     }
 
-    this._handleExportLogsPreferenceTrigger();
+    if (prefName === `${Constants.PREF_PREFIX}.config`) {
+      if (typeof this.workspace?.refreshConfig === 'function') {
+        this.workspace.refreshConfig();
+      }
+      const workspaceId = this.workspace?.getActiveWorkspace?.() ?? null;
+      const isBlocked =
+        workspaceId && typeof this.workspace?.isWorkspaceIdBlocked === 'function'
+          ? this.workspace.isWorkspaceIdBlocked(workspaceId)
+          : null;
+      this.updateOverlayVisibility(workspaceId, isBlocked);
+    }
   }
 
   /**
@@ -842,7 +854,6 @@ class ZenPomodoroApp {
    */
   onTimerTick(time, phase, cycle, total) {
     this.overlay.updateDisplay(time, phase, cycle, total);
-    this.updateOverlayVisibility();
   }
 
   /**
@@ -969,6 +980,7 @@ class ZenPomodoroApp {
   updateOverlayVisibility(workspaceId = null, isBlocked = null) {
     // Handle timer inactive state
     if (!this.timer.isActive) {
+      this._resetWorkspaceVisibilityLog();
       this._hideOverlayAndIndicator();
       return;
     }
@@ -976,6 +988,7 @@ class ZenPomodoroApp {
     // Handle distraction dump active - all blocking should be lifted
     const dumpManager = window.zenPomodoroApp?.distractionDump;
     if (dumpManager?.isActive) {
+      this._resetWorkspaceVisibilityLog();
       this.overlay.hide();
       // Keep dump indicator visible (it's managed by DistractionDumpManager)
       return;
@@ -983,18 +996,21 @@ class ZenPomodoroApp {
 
     // Handle paused during break phase
     if (this._isPausedDuringBreak()) {
+      this._resetWorkspaceVisibilityLog();
       this._handlePausedBreakPhase(isBlocked);
       return;
     }
 
     // Handle active break phase
     if (this._isInActiveBreakPhase()) {
+      this._resetWorkspaceVisibilityLog();
       this._hideOverlayKeepIndicator();
       return;
     }
 
     // Handle transition phase
     if (this._isInTransitionPhase()) {
+      this._resetWorkspaceVisibilityLog();
       this._hideOverlayKeepIndicator();
       return;
     }
@@ -1102,6 +1118,7 @@ class ZenPomodoroApp {
    * @private
    */
   _logBlockedWorkspace(workspaceId, isBlocked) {
+    if (!this._shouldLogWorkspaceVisibility(workspaceId, true)) return;
     logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is blocked - showing overlay', {
       workspaceId: workspaceId,
       isPaused: this.timer.isPaused,
@@ -1117,12 +1134,28 @@ class ZenPomodoroApp {
    * @private
    */
   _logUnblockedWorkspace(workspaceId, isBlocked) {
+    if (!this._shouldLogWorkspaceVisibility(workspaceId, false)) return;
     logger.log(LOG_CATEGORIES.OVERLAY, 'Current workspace is unblocked - hiding overlay', {
       workspaceId: workspaceId,
       isPaused: this.timer.isPaused,
       workspaceBlocked: false,
       isBlockedParam: isBlocked,
     });
+  }
+
+  _shouldLogWorkspaceVisibility(workspaceId, isBlocked) {
+    if (
+      this._lastWorkspaceVisibilityLog?.workspaceId === workspaceId &&
+      this._lastWorkspaceVisibilityLog?.isBlocked === isBlocked
+    ) {
+      return false;
+    }
+    this._lastWorkspaceVisibilityLog = { workspaceId, isBlocked };
+    return true;
+  }
+
+  _resetWorkspaceVisibilityLog() {
+    this._lastWorkspaceVisibilityLog = null;
   }
 
   /**
@@ -1338,12 +1371,10 @@ class ZenPomodoroApp {
     this._runCleanupActions();
     this._destroyPreferenceTriggerObserver();
 
-    // Clean up cross-window log sync
-    logger.destroySync();
-
     this.initialized = false;
 
     logger.log(LOG_CATEGORIES.INIT, 'Application cleanup complete');
+    logger.destroy();
   }
 
   /**
@@ -1367,9 +1398,10 @@ class ZenPomodoroApp {
     if (this.workspace && typeof this.workspace.stopMonitoring === 'function') {
       this.workspace.stopMonitoring();
     }
-    if (this.timer && typeof this.timer.stop === 'function') {
-      // Suppress completion callback during teardown to prevent false notifications
-      this.timer.stop({ suppressCompleteCallback: true });
+    if (this.timer && typeof this.timer.stopInterval === 'function') {
+      // Window teardown must not clear the shared/persisted timer state. The
+      // beforeunload handler saves it so another window or a future session can resume it.
+      this.timer.stopInterval();
     }
     if (this.security && typeof this.security.cleanupLockScreen === 'function') {
       this.security.cleanupLockScreen();

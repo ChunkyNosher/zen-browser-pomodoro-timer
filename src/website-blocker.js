@@ -1,8 +1,7 @@
 import Constants from './constants.js';
 import { logger } from './log-manager.js';
 import {
-  getConfig, LOG_CATEGORIES, REGEX_ESCAPE_PATTERN, REGEX_ESCAPE_PATTERN_KEEP_ASTERISK,
-  CONTENT_OBSERVER_DEBOUNCE_DELAY_MS
+  getConfig, LOG_CATEGORIES, REGEX_ESCAPE_PATTERN, REGEX_ESCAPE_PATTERN_KEEP_ASTERISK
 } from './helpers.js';
 import { handleStopTimerWithLockout } from './ui-helpers.js';
 import { isInBreakPhase } from './break-phase-utils.js';
@@ -59,10 +58,9 @@ class WebsiteBlocker {
     this.currentlyBlockedReason = null;
     this.tabSelectHandler = null;
     this.pageShowHandler = null;
+    this.titleChangeHandler = null;
     this.progressListener = null;
     this._timerStatusInterval = null;
-    this.contentObserver = null; // MutationObserver for dynamic page content
-    this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
     this._goBackCooldownActive = false; // Cooldown flag to prevent re-blocking after "Go Back"
     this._goBackCooldownTimeout = null; // Timeout ID for cooldown cleanup
     this.distractionDumpActive = false; // Flag to disable blocking during distraction dump
@@ -85,6 +83,21 @@ class WebsiteBlocker {
    */
   _setupListeners() {
     setupBrowserListeners(this, () => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
+
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser === 'undefined' || !gBrowser.tabContainer) return;
+
+    this.titleChangeHandler = (event) => {
+      // eslint-disable-next-line no-undef
+      if (event.target !== gBrowser.selectedTab) return;
+
+      const changed = event.detail?.changed;
+      if (!changed?.includes('label') && !changed?.includes('titlechanged')) return;
+
+      this._checkCurrentPage();
+    };
+    // eslint-disable-next-line no-undef
+    gBrowser.tabContainer.addEventListener('TabAttrModified', this.titleChangeHandler);
   }
 
   /**
@@ -144,26 +157,6 @@ class WebsiteBlocker {
   }
 
   /**
-   * Try to setup content observer for the current page.
-   * @private
-   */
-  _trySetupContentObserver() {
-    try {
-      // eslint-disable-next-line no-undef
-      if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
-        // eslint-disable-next-line no-undef
-        const contentDoc = gBrowser.selectedBrowser.contentDocument;
-        if (contentDoc?.body) {
-          this._setupContentObserver(contentDoc);
-        }
-      }
-    } catch (e) {
-      // Log content access denied errors for debugging
-      logger.log(LOG_CATEGORIES.SECURITY, 'Content document access denied', { error: e.message });
-    }
-  }
-
-  /**
    * Evaluate URL against rulesets and update blocker state.
    * @param {string} url - URL to evaluate
    * @private
@@ -217,9 +210,6 @@ class WebsiteBlocker {
       return;
     }
 
-    // Setup content observer for dynamic pages (keyword checking)
-    this._trySetupContentObserver();
-
     // Evaluate URL against rulesets and update blocker
     this._evaluateUrlAndUpdateBlocker(currentUrl);
 
@@ -249,52 +239,6 @@ class WebsiteBlocker {
   }
 
   /**
-   * Setup content observer for dynamic pages.
-   * Re-checks keywords when page content changes significantly.
-   *
-   * NOTE: Due to browser security restrictions (cross-origin), this observer
-   * can only monitor DOM changes for URL-based blocking. Keyword content scanning
-   * is limited to tab titles only (see _getPageText). The observer still triggers
-   * re-checks which will verify the tab title against keyword rules.
-   *
-   * Refactored to reduce cyclomatic complexity by extracting helper methods.
-   *
-   * @param {Document} contentDoc - Content document to observe
-   * @private
-   */
-  _setupContentObserver(contentDoc) {
-    this._cleanupExistingObserver();
-
-    if (!contentDoc?.body) return;
-
-    if (!this._hasActiveKeywordRules()) {
-      logger.log(
-        LOG_CATEGORIES.SECURITY,
-        'Skipping content observer - no keyword rules configured'
-      );
-      return;
-    }
-
-    this._createContentObserver(contentDoc);
-  }
-
-  /**
-   * Clean up any existing content observer and debounce timeout.
-   * @private
-   */
-  _cleanupExistingObserver() {
-    if (this.contentObserver) {
-      this.contentObserver.disconnect();
-      this.contentObserver = null;
-    }
-
-    if (this._contentObserverDebounceTimeout) {
-      clearTimeout(this._contentObserverDebounceTimeout);
-      this._contentObserverDebounceTimeout = null;
-    }
-  }
-
-  /**
    * Check if any active ruleset has keyword rules configured.
    * @returns {boolean} True if keyword rules exist in active rulesets
    * @private
@@ -311,31 +255,6 @@ class WebsiteBlocker {
       }
     }
     return false;
-  }
-
-  /**
-   * Create and attach a MutationObserver to the content document.
-   * @param {Document} contentDoc - Content document to observe
-   * @private
-   */
-  _createContentObserver(contentDoc) {
-    this.contentObserver = new MutationObserver(() => {
-      // Debounce to avoid excessive checks
-      if (this._contentObserverDebounceTimeout) {
-        clearTimeout(this._contentObserverDebounceTimeout);
-      }
-      this._contentObserverDebounceTimeout = setTimeout(() => {
-        if (window.zenPomodoroApp?.timer?.isActive) {
-          this._checkCurrentPage();
-        }
-      }, CONTENT_OBSERVER_DEBOUNCE_DELAY_MS);
-    });
-
-    this.contentObserver.observe(contentDoc.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
   }
 
   /**
@@ -593,7 +512,7 @@ class WebsiteBlocker {
 
   /**
    * Get the current tab title from available browser sources.
-   * Due to cross-origin security restrictions, we cannot access contentDocument.body.
+   * Due to cross-origin security restrictions, we cannot access the page body.
    * Only the tab title is accessible from the browser chrome context.
    * @returns {string} The current tab title, or empty string if unavailable
    * @private
@@ -879,12 +798,6 @@ class WebsiteBlocker {
       this._timerStatusInterval = null;
     }
 
-    // Disconnect content observer
-    if (this.contentObserver) {
-      this.contentObserver.disconnect();
-      this.contentObserver = null;
-    }
-
     if (this.blockerOverlay) {
       this.blockerOverlay.remove();
       this.blockerOverlay = null;
@@ -914,8 +827,8 @@ class WebsiteBlocker {
    */
   destroy() {
     this._removeGBrowserListeners();
+    this._removeTitleChangeListener();
     this._clearIntervals();
-    this._disconnectContentObserver();
     this._clearGoBackCooldown();
     this._clearKeywordRecheckTimeout();
     this._removeBlockerOverlay();
@@ -946,22 +859,20 @@ class WebsiteBlocker {
   }
 
   /**
-   * Disconnect the content observer if active.
-   * @private
-   */
-  _disconnectContentObserver() {
-    if (this.contentObserver) {
-      this.contentObserver.disconnect();
-      this.contentObserver = null;
-    }
-  }
-
-  /**
    * Remove gBrowser event listeners.
    * @private
    */
   _removeGBrowserListeners() {
     removeBrowserListeners(this);
+  }
+
+  _removeTitleChangeListener() {
+    // eslint-disable-next-line no-undef
+    if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer && this.titleChangeHandler) {
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.removeEventListener('TabAttrModified', this.titleChangeHandler);
+    }
+    this.titleChangeHandler = null;
   }
 
   /**

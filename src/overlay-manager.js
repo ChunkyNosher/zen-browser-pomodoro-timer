@@ -24,6 +24,12 @@ class OverlayManager {
     this.indicatorDidDrag = false; // Track if indicator was dragged (to suppress click events)
     this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
     this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
+    this.phaseTransitionTimeout = null;
+    this.indicatorDragResetTimeout = null;
+    this.showAnimationFrame = null;
+    this._onMouseMove = null;
+    this._onMouseUp = null;
+    this._dragState = null;
   }
 
   /**
@@ -405,12 +411,7 @@ class OverlayManager {
     e.preventDefault();
 
     // Clean up any existing handlers from previous drag (defensive)
-    if (this._onMouseMove) {
-      document.removeEventListener('mousemove', this._onMouseMove);
-    }
-    if (this._onMouseUp) {
-      document.removeEventListener('mouseup', this._onMouseUp);
-    }
+    this._cleanupIndicatorDragListeners();
 
     this._dragState.isDragging = true;
     this.indicatorDidDrag = false; // Reset drag state on new mousedown
@@ -465,7 +466,7 @@ class OverlayManager {
    * @private
    */
   _handleIndicatorMouseUp() {
-    if (!this._dragState.isDragging) return;
+    if (!this._dragState?.isDragging) return;
 
     this._dragState.isDragging = false;
 
@@ -475,18 +476,37 @@ class OverlayManager {
     }
 
     // Save position to preferences
-    const rect = this.indicator.getBoundingClientRect();
-    setPref('indicatorPosX', Math.round(rect.left));
-    setPref('indicatorPosY', Math.round(rect.top));
+    if (this.indicator) {
+      const rect = this.indicator.getBoundingClientRect();
+      setPref('indicatorPosX', Math.round(rect.left));
+      setPref('indicatorPosY', Math.round(rect.top));
+    }
 
-    document.removeEventListener('mousemove', this._onMouseMove);
-    document.removeEventListener('mouseup', this._onMouseUp);
+    this._cleanupIndicatorDragListeners();
 
     // Reset drag flag after a delay to allow click event to check it
     // 100ms is sufficient since click events fire immediately after mouseup
-    setTimeout(() => {
+    if (this.indicatorDragResetTimeout !== null) {
+      clearTimeout(this.indicatorDragResetTimeout);
+    }
+    this.indicatorDragResetTimeout = setTimeout(() => {
       this.indicatorDidDrag = false;
+      this.indicatorDragResetTimeout = null;
     }, 100);
+  }
+
+  _cleanupIndicatorDragListeners() {
+    if (this._onMouseMove) {
+      document.removeEventListener('mousemove', this._onMouseMove);
+      this._onMouseMove = null;
+    }
+    if (this._onMouseUp) {
+      document.removeEventListener('mouseup', this._onMouseUp);
+      this._onMouseUp = null;
+    }
+    if (this._dragState) {
+      this._dragState.isDragging = false;
+    }
   }
 
   /**
@@ -668,7 +688,12 @@ class OverlayManager {
 
       // Deferred visibility check - runs once per show() after next paint
       // Using getComputedStyle inside rAF is appropriate as it's after layout
-      requestAnimationFrame(() => {
+      if (this.showAnimationFrame !== null) {
+        cancelAnimationFrame(this.showAnimationFrame);
+      }
+      this.showAnimationFrame = requestAnimationFrame(() => {
+        this.showAnimationFrame = null;
+        if (!this.overlay) return;
         const computedStyle = window.getComputedStyle(this.overlay);
         if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
           logger.log(
@@ -835,10 +860,14 @@ class OverlayManager {
 
     // Trigger transition animation
     this.overlay.setAttribute('data-transitioning', 'true');
-    setTimeout(() => {
+    if (this.phaseTransitionTimeout !== null) {
+      clearTimeout(this.phaseTransitionTimeout);
+    }
+    this.phaseTransitionTimeout = setTimeout(() => {
       if (this.overlay) {
         this.overlay.removeAttribute('data-transitioning');
       }
+      this.phaseTransitionTimeout = null;
     }, 500);
   }
 
@@ -862,10 +891,12 @@ class OverlayManager {
    * @private
    */
   _resetIndicatorDisplay() {
+    const timer = window.zenPomodoroApp?.timer;
+    this.updateIndicatorPausedState(timer?.isPaused || false);
+
     const indicatorText = this.indicator?.querySelector('#zen-pomodoro-indicator-text');
     if (!indicatorText) return;
 
-    const timer = window.zenPomodoroApp?.timer;
     if (!timer || timer.remainingTime === undefined) return;
 
     const timeStr = formatTime(timer.remainingTime);
@@ -875,8 +906,6 @@ class OverlayManager {
     indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
     this.indicator.setAttribute('data-phase', phase);
 
-    // Note: Paused state is set by actual pause/resume handlers in handlePauseResumeTimer(),
-    // not here during indicator initialization. This prevents incorrect initial state.
   }
 
   /**
@@ -898,7 +927,10 @@ class OverlayManager {
   updateIndicatorPausedState(isPaused) {
     if (!this.indicator) return;
 
-    this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
+    const pausedValue = isPaused ? 'true' : 'false';
+    if (this.indicator.getAttribute('data-paused') === pausedValue) return;
+
+    this.indicator.setAttribute('data-paused', pausedValue);
     logger.log(LOG_CATEGORIES.OVERLAY, 'Indicator paused state attribute updated', {
       isPaused: isPaused,
     });
@@ -976,10 +1008,29 @@ class OverlayManager {
    * MEMORY LEAK FIX: Clean up ResizeObserver and event listeners on destroy
    */
   destroy() {
+    this._cleanupTransientResources();
     this._cleanupContentAreaObserver();
     this._cleanupContentAreaReference();
     this._cleanupIndicatorEventListener();
     this._removeOverlayElements();
+  }
+
+  _cleanupTransientResources() {
+    if (this.phaseTransitionTimeout !== null) {
+      clearTimeout(this.phaseTransitionTimeout);
+      this.phaseTransitionTimeout = null;
+    }
+    if (this.indicatorDragResetTimeout !== null) {
+      clearTimeout(this.indicatorDragResetTimeout);
+      this.indicatorDragResetTimeout = null;
+    }
+    if (this.showAnimationFrame !== null) {
+      cancelAnimationFrame(this.showAnimationFrame);
+      this.showAnimationFrame = null;
+    }
+    this._cleanupIndicatorDragListeners();
+    this.indicatorDidDrag = false;
+    this._dragState = null;
   }
 
   /**

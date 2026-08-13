@@ -6,7 +6,7 @@ module.exports = {
   extends: ['eslint:recommended'],
   plugins: ['no-unsanitized'],
   parserOptions: {
-    ecmaVersion: 2021,
+    ecmaVersion: 2022,
     sourceType: 'module',
   },
   rules: {

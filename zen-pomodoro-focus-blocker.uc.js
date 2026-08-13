@@ -1,6 +1,6 @@
 /**
  * Zen Pomodoro Focus Blocker Mod
- * Version: 1.4.10
+ * Version: 1.4.11
  * License: MIT
  *
  * A productivity mod that implements customizable Pomodoro timer with workspace blocking
@@ -45,7 +45,7 @@
    */
   const Constants = {
     PREF_PREFIX: 'zen-pomodoro',
-    MOD_VERSION: '1.4.10',
+    MOD_VERSION: '1.4.11',
 
     /** Modifier keys used by the keyboard shortcut recorder */
     MODIFIER_KEYS: ['Control', 'Alt', 'Shift', 'Meta'],
@@ -80,9 +80,6 @@
 
     /** Minimum content area dimension for valid overlay bounds (in pixels) */
     MIN_CONTENT_AREA_DIMENSION: 100,
-
-    /** Debounce delay for content observer checks (in milliseconds) */
-    CONTENT_OBSERVER_DEBOUNCE_DELAY_MS: 500,
 
     /** Transition phase duration in seconds (5 minutes warning before focus resumes) */
     TRANSITION_PHASE_DURATION_SECONDS: 5 * 60,
@@ -141,8 +138,7 @@
     /** Selectors to try for workspace container for MutationObserver (order matters) */
     WORKSPACE_CONTAINER_SELECTORS: [
       '#tabbrowser-arrowscrollbox',
-      '#zen-workspace-button-container',
-      '#zen-workspaces-button-container',
+      '#zen-workspaces-button',
       '[id*="workspace"]',
       '#navigator-toolbox',
     ],
@@ -152,7 +148,6 @@
       '#tabbrowser-tabbox',
       '#tabbrowser-tabpanels',
       '#appcontent',
-      '#zen-main-view',
       '#browser',
       '#main-window',
     ],
@@ -300,6 +295,8 @@
     WORKSPACE_NAME_ATTRIBUTES,
   } = Constants;
 
+  const DEFAULT_PERSISTENCE_DEBOUNCE_MS = 5000;
+
   /**
    * LogManager class for comprehensive logging with export functionality.
    * Stores log entries in memory with timestamps and provides export capabilities.
@@ -309,13 +306,16 @@
      * Create a LogManager instance.
      * @param {number} maxLogSize - Maximum number of log entries to store (default: 1000)
      */
-    constructor(maxLogSize = 1000) {
+    constructor(maxLogSize = 1000, persistenceDebounceMs = DEFAULT_PERSISTENCE_DEBOUNCE_MS) {
       this.logs = [];
       this.maxLogSize = maxLogSize;
+      this.persistenceDebounceMs = persistenceDebounceMs;
       this.windowId = null;
       this._logObserver = null;
       this._logRequestObserver = null;
       this._storage = null; // Will be injected to avoid circular dependency
+      this._persistTimer = null;
+      this._isDirty = false;
     }
 
     /**
@@ -381,7 +381,7 @@
       if (this.logs.length > this.maxLogSize) {
         this.logs.shift();
       }
-      this._persistLogs();
+      this._markDirty();
     }
 
     /**
@@ -432,16 +432,19 @@
       if (!Array.isArray(sharedLogs) || sharedLogs.length === 0) return;
 
       const existingKeys = new Set(this.logs.map((l) => this._logDedupeKey(l)));
+      let changed = false;
       for (const entry of sharedLogs) {
         if (!existingKeys.has(this._logDedupeKey(entry))) {
           this.logs.push(entry);
+          changed = true;
         }
       }
+      if (!changed) return;
       this.logs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
       while (this.logs.length > this.maxLogSize) {
         this.logs.shift();
       }
-      this._persistLogs();
+      this._markDirty();
     }
 
     /**
@@ -518,7 +521,7 @@
         this.logs.shift();
       }
 
-      this._persistLogs();
+      this._markDirty();
 
       // Broadcast to other windows for cross-window log sync
       this._broadcastEntry(entry);
@@ -591,7 +594,8 @@
      */
     clearLogs() {
       this.logs = [];
-      this._persistLogs();
+      this._isDirty = true;
+      this.flush();
       console.log('[Zen Pomodoro][LOGGER] Logs cleared');
     }
 
@@ -620,16 +624,49 @@
      * @private
      */
     _persistLogs() {
-      if (!this._storage) return;
+      if (!this._storage) return false;
 
       try {
         if (this.logs.length > this.maxLogSize) {
           this.logs = this.logs.slice(-this.maxLogSize);
         }
         this._storage.setPref(Constants.PERSISTED_LOGS_PREF_KEY, JSON.stringify(this.logs));
+        return true;
       } catch (e) {
         console.warn('[Zen Pomodoro] Failed to persist logs:', e.message);
+        return false;
       }
+    }
+
+    _markDirty() {
+      this._isDirty = true;
+      this._schedulePersist();
+    }
+
+    _schedulePersist() {
+      if (!this._storage || !this._isDirty || this._persistTimer) return;
+
+      this._persistTimer = setTimeout(() => {
+        this._persistTimer = null;
+        this.flush();
+      }, this.persistenceDebounceMs);
+    }
+
+    flush() {
+      if (this._persistTimer) {
+        clearTimeout(this._persistTimer);
+        this._persistTimer = null;
+      }
+      if (!this._isDirty || !this._storage) return;
+
+      if (this._persistLogs()) {
+        this._isDirty = false;
+      }
+    }
+
+    destroy() {
+      this.flush();
+      this.destroySync();
     }
 
     /**
@@ -639,6 +676,7 @@
     exportLogs() {
       // Log the export event before creating export data for accurate count
       this.log(Constants.LOG_CATEGORIES.SETTINGS, 'Logs exported', { entryCount: this.logs.length });
+      this.flush();
 
       const exportData = {
         exportedAt: new Date().toISOString(),
@@ -1423,7 +1461,6 @@
   const RESTORATION_NOTIFICATION_DELAY_MS = Constants.RESTORATION_NOTIFICATION_DELAY_MS;
   Constants.MAX_OVERLAY_Z_INDEX;
   Constants.MIN_CONTENT_AREA_DIMENSION;
-  const CONTENT_OBSERVER_DEBOUNCE_DELAY_MS = Constants.CONTENT_OBSERVER_DEBOUNCE_DELAY_MS;
   const TRANSITION_PHASE_DURATION_SECONDS$1 = Constants.TRANSITION_PHASE_DURATION_SECONDS;
   const POST_SESSION_ESCALATION_FACTOR = Constants.POST_SESSION_ESCALATION_FACTOR;
   const POST_SESSION_CHECK_INTERVAL_MS = Constants.POST_SESSION_CHECK_INTERVAL_MS;
@@ -1673,26 +1710,35 @@
    * @private
    */
   function _setupDragCleanupObserver(dialog, header, startDrag, removeDragListeners) {
+    let isCleanedUp = false;
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const removedNode of mutation.removedNodes) {
           if (removedNode === dialog) {
-            removeDragListeners();
-            header.removeEventListener('mousedown', startDrag);
-            header.removeEventListener('touchstart', startDrag);
-            observer.disconnect();
+            cleanup();
             return;
           }
         }
       }
     });
 
-    // Observe a stable ancestor (documentElement) to ensure observer always sees dialog removal
-    const targetNode = dialog.ownerDocument && dialog.ownerDocument.documentElement;
+    const cleanup = () => {
+      if (isCleanedUp) return;
+
+      isCleanedUp = true;
+      removeDragListeners();
+      header.removeEventListener('mousedown', startDrag);
+      header.removeEventListener('touchstart', startDrag);
+      observer.disconnect();
+      dialog._dragCleanupObserver = null;
+    };
+
+    dialog._dragCleanupObserver = observer;
+    dialog._dragCleanup = cleanup;
+
+    const targetNode = dialog.parentNode;
     if (targetNode) {
-      observer.observe(targetNode, { childList: true, subtree: true });
-    } else if (dialog.parentNode) {
-      observer.observe(dialog.parentNode, { childList: true, subtree: false });
+      observer.observe(targetNode, { childList: true, subtree: false });
     }
   }
 
@@ -3549,9 +3595,8 @@
    * Only includes rulesets that are both enabled AND listed in config.activeRulesets.
    * @returns {string[]} Array of blocked workspace IDs
    */
-  function getActiveBlockedWorkspaces() {
-    const config = Storage.loadConfig();
-    const blocked = new Set([...config.blockedWorkspaces]); // Start with global blocked list
+  function getActiveBlockedWorkspaces(config) {
+    const blocked = new Set(config.blockedWorkspaces || []); // Start with global blocked list
     const activeRulesetIds = new Set(config.activeRulesets || []);
 
     // Add blocked workspaces from rulesets that are both enabled and active
@@ -3573,6 +3618,9 @@
       this.workspaceObserver = null; // Store observer for cleanup
       this.needsValidation = true; // Flag to track if validation is needed
       this.mutationDebounceTimer = null; // Timer for debouncing workspace mutations
+      this.workspaceApi = null;
+      this.workspaceChangeListener = null;
+      this.workspaceDataChangeListener = null;
     }
 
     /**
@@ -3580,6 +3628,15 @@
      */
     getActiveWorkspace() {
       try {
+        const workspaceApi = globalThis.gZenWorkspaces;
+        const activeWorkspace = workspaceApi?.activeWorkspace;
+        if (typeof activeWorkspace === 'string') {
+          return activeWorkspace;
+        }
+        if (activeWorkspace?.uuid || activeWorkspace?.id) {
+          return activeWorkspace.uuid || activeWorkspace.id;
+        }
+
         // BUG FIX: Workspace blocking stopped working correctly on newer Zen Browser versions
         // because the DOM structure for workspaces changed. Modern Zen builds expose the active
         // workspace as a <zen-workspace> element, while older versions and some custom setups
@@ -3684,7 +3741,7 @@
      */
     _checkWorkspaceBlocked(logMessage) {
       // Reload config to get latest blocked workspaces
-      this.config = getConfig$1();
+      this.refreshConfig();
 
       const activeWorkspace = this.getActiveWorkspace();
       if (!activeWorkspace) {
@@ -3692,7 +3749,7 @@
       }
 
       // Get blocked workspaces from all active rulesets
-      const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+      const activeBlockedWorkspaces = getActiveBlockedWorkspaces(this.config);
       const isBlocked = activeBlockedWorkspaces.includes(activeWorkspace);
 
       logger.log(LOG_CATEGORIES$2.WORKSPACE, logMessage, {
@@ -3712,11 +3769,16 @@
     isWorkspaceIdBlocked(workspaceId) {
       // Use cached config if available, otherwise reload
       if (!this.config) {
-        this.config = getConfig$1();
+        this.refreshConfig();
       }
       // Get blocked workspaces from all active rulesets
-      const activeBlockedWorkspaces = getActiveBlockedWorkspaces();
+      const activeBlockedWorkspaces = getActiveBlockedWorkspaces(this.config);
       return activeBlockedWorkspaces.includes(workspaceId);
+    }
+
+    refreshConfig() {
+      this.config = getConfig$1();
+      return this.config;
     }
 
     /**
@@ -3759,21 +3821,52 @@
       }, WORKSPACE_MUTATION_DELAY_MS);
     }
 
+    _handleNativeWorkspaceChange({ workspace } = {}) {
+      const newWorkspace =
+        typeof workspace === 'string'
+          ? workspace
+          : workspace?.uuid || workspace?.id || this.getActiveWorkspace();
+      if (newWorkspace === this.activeWorkspace) return;
+
+      this.activeWorkspace = newWorkspace;
+      this.refreshConfig();
+      this.needsValidation = true;
+      this.validateBlockedWorkspaces();
+
+      if (this.onWorkspaceChange) {
+        const isBlocked = newWorkspace ? this.isWorkspaceIdBlocked(newWorkspace) : false;
+        this.onWorkspaceChange(newWorkspace, isBlocked);
+      }
+    }
+
+    _handleWorkspaceDataChange() {
+      this.refreshConfig();
+      this.needsValidation = true;
+      this.validateBlockedWorkspaces();
+    }
+
     /**
      * Start monitoring workspace changes
      * MEMORY LEAK FIX: Store observer for cleanup
      * PERFORMANCE FIX: Validate workspaces on change, not on every check
      */
     startMonitoring() {
+      this.stopMonitoring();
       this.activeWorkspace = this.getActiveWorkspace();
 
       logger.log(LOG_CATEGORIES$2.WORKSPACE, 'Starting workspace monitoring', {
         initialWorkspace: this.activeWorkspace,
       });
 
-      // Clean up existing observer if any
-      if (this.workspaceObserver) {
-        this.workspaceObserver.disconnect();
+      const workspaceApi = globalThis.gZenWorkspaces;
+      if (typeof workspaceApi?.addChangeListeners === 'function' &&
+          typeof workspaceApi.removeChangeListeners === 'function') {
+        this.workspaceApi = workspaceApi;
+        this.workspaceChangeListener = (change) => this._handleNativeWorkspaceChange(change);
+        this.workspaceDataChangeListener = () => this._handleWorkspaceDataChange();
+        workspaceApi.addChangeListeners(this.workspaceChangeListener);
+        window.addEventListener('ZenWorkspaceDataChanged', this.workspaceDataChangeListener);
+        return;
       }
 
       // Use MutationObserver to detect workspace changes
@@ -3832,30 +3925,35 @@
         clearTimeout(this.mutationDebounceTimer);
         this.mutationDebounceTimer = null;
       }
+      if (this.workspaceApi && this.workspaceChangeListener) {
+        this.workspaceApi.removeChangeListeners(this.workspaceChangeListener);
+      }
+      if (this.workspaceDataChangeListener) {
+        window.removeEventListener('ZenWorkspaceDataChanged', this.workspaceDataChangeListener);
+      }
+      this.workspaceApi = null;
+      this.workspaceChangeListener = null;
+      this.workspaceDataChangeListener = null;
     }
 
     /**
      * Get all available workspaces
      * Uses multiple methods to retrieve workspace names:
-     * 1. Try to get from ZenWorkspaces API (multiple possible APIs)
+     * 1. Try to get from gZenWorkspaces API
      * 2. Fall back to DOM attributes (label, tooltiptext, aria-label)
      * 3. Try to extract from workspace panel if available
      */
     getAllWorkspaces() {
       try {
-        // Method 1: Try ZenWorkspaces API (most reliable)
-        const zenResult = this._tryZenWorkspacesApi();
-        if (zenResult) return zenResult;
+        // Method 1: Try gZenWorkspaces API (most reliable)
+        const nativeResult = this._tryGZenWorkspacesApi();
+        if (nativeResult) return nativeResult;
 
-        // Method 2: Try legacy gZenWorkspaces API
-        const legacyResult = this._tryLegacyWorkspacesApi();
-        if (legacyResult) return legacyResult;
-
-        // Method 3: Query DOM buttons
+        // Method 2: Query DOM buttons
         const domResult = this._tryDomWorkspaceButtons();
         if (domResult) return domResult;
 
-        // Method 4: Try workspace container elements
+        // Method 3: Try workspace container elements
         const containerResult = this._tryWorkspaceContainer();
         if (containerResult) return containerResult;
 
@@ -3868,59 +3966,19 @@
     }
 
     /**
-     * Try to get workspaces from ZenWorkspaces API.
+     * Try to get workspaces from gZenWorkspaces API.
      * @returns {Array|null} Workspaces array or null if not available
      * @private
      */
-    _tryZenWorkspacesApi() {
-      // eslint-disable-next-line no-undef
-      if (typeof ZenWorkspaces === 'undefined') return null;
+    _tryGZenWorkspacesApi() {
+      const workspaceApi = globalThis.gZenWorkspaces;
+      if (typeof workspaceApi?.getWorkspaces !== 'function') return null;
 
-      // eslint-disable-next-line no-undef
-      const workspaces = this._getWorkspacesFromObject(ZenWorkspaces);
-
-      if (isValidWorkspaceArray(workspaces)) {
-        console.log('Zen Pomodoro: Got workspaces from ZenWorkspaces API');
-        return formatWorkspacesFromApi(workspaces);
-      }
-      return null;
-    }
-
-    /**
-     * Try to get workspaces from legacy gZenWorkspaces API.
-     * @returns {Array|null} Workspaces array or null if not available
-     * @private
-     */
-    _tryLegacyWorkspacesApi() {
-      // eslint-disable-next-line no-undef
-      if (typeof gZenWorkspaces === 'undefined') return null;
-
-      // eslint-disable-next-line no-undef
-      const workspaces = this._getWorkspacesFromObject(gZenWorkspaces);
+      const workspaces = workspaceApi.getWorkspaces();
 
       if (isValidWorkspaceArray(workspaces)) {
         console.log('Zen Pomodoro: Got workspaces from gZenWorkspaces API');
         return formatWorkspacesFromApi(workspaces);
-      }
-      return null;
-    }
-
-    /**
-     * Extract workspaces from a workspace API object.
-     * Tries multiple property/method names.
-     * @param {Object} wsObject - The workspace API object
-     * @returns {Array|null} Workspaces array or null
-     * @private
-     */
-    _getWorkspacesFromObject(wsObject) {
-      if (typeof wsObject.getWorkspaces === 'function') {
-        return wsObject.getWorkspaces();
-      }
-      if (wsObject._workspaces !== undefined) {
-        return wsObject._workspaces;
-      }
-      if (wsObject.workspaces !== undefined) {
-        return wsObject.workspaces;
       }
       return null;
     }
@@ -4014,7 +4072,7 @@
      */
     _findLegacyWorkspaceContainer() {
       return document.querySelector(
-        '#zen-workspaces-button-container, #zen-workspace-button-container, [id*="workspace"]'
+        '#zen-workspaces-button, [id*="workspace"]'
       );
     }
 
@@ -4055,6 +4113,12 @@
       this.indicatorDidDrag = false; // Track if indicator was dragged (to suppress click events)
       this.contentArea = null; // Reference to content area element for bounds calculation and cleanup
       this._overlayUpdateScheduled = false; // Debounce flag for ResizeObserver
+      this.phaseTransitionTimeout = null;
+      this.indicatorDragResetTimeout = null;
+      this.showAnimationFrame = null;
+      this._onMouseMove = null;
+      this._onMouseUp = null;
+      this._dragState = null;
     }
 
     /**
@@ -4436,12 +4500,7 @@
       e.preventDefault();
 
       // Clean up any existing handlers from previous drag (defensive)
-      if (this._onMouseMove) {
-        document.removeEventListener('mousemove', this._onMouseMove);
-      }
-      if (this._onMouseUp) {
-        document.removeEventListener('mouseup', this._onMouseUp);
-      }
+      this._cleanupIndicatorDragListeners();
 
       this._dragState.isDragging = true;
       this.indicatorDidDrag = false; // Reset drag state on new mousedown
@@ -4496,7 +4555,7 @@
      * @private
      */
     _handleIndicatorMouseUp() {
-      if (!this._dragState.isDragging) return;
+      if (!this._dragState?.isDragging) return;
 
       this._dragState.isDragging = false;
 
@@ -4506,18 +4565,37 @@
       }
 
       // Save position to preferences
-      const rect = this.indicator.getBoundingClientRect();
-      setPref$1('indicatorPosX', Math.round(rect.left));
-      setPref$1('indicatorPosY', Math.round(rect.top));
+      if (this.indicator) {
+        const rect = this.indicator.getBoundingClientRect();
+        setPref$1('indicatorPosX', Math.round(rect.left));
+        setPref$1('indicatorPosY', Math.round(rect.top));
+      }
 
-      document.removeEventListener('mousemove', this._onMouseMove);
-      document.removeEventListener('mouseup', this._onMouseUp);
+      this._cleanupIndicatorDragListeners();
 
       // Reset drag flag after a delay to allow click event to check it
       // 100ms is sufficient since click events fire immediately after mouseup
-      setTimeout(() => {
+      if (this.indicatorDragResetTimeout !== null) {
+        clearTimeout(this.indicatorDragResetTimeout);
+      }
+      this.indicatorDragResetTimeout = setTimeout(() => {
         this.indicatorDidDrag = false;
+        this.indicatorDragResetTimeout = null;
       }, 100);
+    }
+
+    _cleanupIndicatorDragListeners() {
+      if (this._onMouseMove) {
+        document.removeEventListener('mousemove', this._onMouseMove);
+        this._onMouseMove = null;
+      }
+      if (this._onMouseUp) {
+        document.removeEventListener('mouseup', this._onMouseUp);
+        this._onMouseUp = null;
+      }
+      if (this._dragState) {
+        this._dragState.isDragging = false;
+      }
     }
 
     /**
@@ -4699,7 +4777,12 @@
 
         // Deferred visibility check - runs once per show() after next paint
         // Using getComputedStyle inside rAF is appropriate as it's after layout
-        requestAnimationFrame(() => {
+        if (this.showAnimationFrame !== null) {
+          cancelAnimationFrame(this.showAnimationFrame);
+        }
+        this.showAnimationFrame = requestAnimationFrame(() => {
+          this.showAnimationFrame = null;
+          if (!this.overlay) return;
           const computedStyle = window.getComputedStyle(this.overlay);
           if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
             logger.log(
@@ -4866,10 +4949,14 @@
 
       // Trigger transition animation
       this.overlay.setAttribute('data-transitioning', 'true');
-      setTimeout(() => {
+      if (this.phaseTransitionTimeout !== null) {
+        clearTimeout(this.phaseTransitionTimeout);
+      }
+      this.phaseTransitionTimeout = setTimeout(() => {
         if (this.overlay) {
           this.overlay.removeAttribute('data-transitioning');
         }
+        this.phaseTransitionTimeout = null;
       }, 500);
     }
 
@@ -4893,10 +4980,12 @@
      * @private
      */
     _resetIndicatorDisplay() {
+      const timer = window.zenPomodoroApp?.timer;
+      this.updateIndicatorPausedState(timer?.isPaused || false);
+
       const indicatorText = this.indicator?.querySelector('#zen-pomodoro-indicator-text');
       if (!indicatorText) return;
 
-      const timer = window.zenPomodoroApp?.timer;
       if (!timer || timer.remainingTime === undefined) return;
 
       const timeStr = formatTime(timer.remainingTime);
@@ -4906,8 +4995,6 @@
       indicatorText.textContent = `${phaseLabel}: ${timeStr}`;
       this.indicator.setAttribute('data-phase', phase);
 
-      // Note: Paused state is set by actual pause/resume handlers in handlePauseResumeTimer(),
-      // not here during indicator initialization. This prevents incorrect initial state.
     }
 
     /**
@@ -4929,7 +5016,10 @@
     updateIndicatorPausedState(isPaused) {
       if (!this.indicator) return;
 
-      this.indicator.setAttribute('data-paused', isPaused ? 'true' : 'false');
+      const pausedValue = isPaused ? 'true' : 'false';
+      if (this.indicator.getAttribute('data-paused') === pausedValue) return;
+
+      this.indicator.setAttribute('data-paused', pausedValue);
       logger.log(LOG_CATEGORIES$1.OVERLAY, 'Indicator paused state attribute updated', {
         isPaused: isPaused,
       });
@@ -5007,10 +5097,29 @@
      * MEMORY LEAK FIX: Clean up ResizeObserver and event listeners on destroy
      */
     destroy() {
+      this._cleanupTransientResources();
       this._cleanupContentAreaObserver();
       this._cleanupContentAreaReference();
       this._cleanupIndicatorEventListener();
       this._removeOverlayElements();
+    }
+
+    _cleanupTransientResources() {
+      if (this.phaseTransitionTimeout !== null) {
+        clearTimeout(this.phaseTransitionTimeout);
+        this.phaseTransitionTimeout = null;
+      }
+      if (this.indicatorDragResetTimeout !== null) {
+        clearTimeout(this.indicatorDragResetTimeout);
+        this.indicatorDragResetTimeout = null;
+      }
+      if (this.showAnimationFrame !== null) {
+        cancelAnimationFrame(this.showAnimationFrame);
+        this.showAnimationFrame = null;
+      }
+      this._cleanupIndicatorDragListeners();
+      this.indicatorDidDrag = false;
+      this._dragState = null;
     }
 
     /**
@@ -7324,6 +7433,7 @@
     constructor() {
       this.keydownHandler = null;
       this.toggleIndicatorHandler = null; // Handler for toggle indicator visibility shortcut
+      this.menuEscHandler = null;
       this.menuDialog = null;
       this.menuTimerUpdateInterval = null;
       this.reminderCountdownUpdateInterval = null; // For post-session reminder countdown
@@ -7440,6 +7550,7 @@
 
       // Stop any running reminder countdown updates
       this._stopReminderCountdownUpdates();
+      this._removeMenuEscHandler();
 
       // Clean up lock screen resources if the security manager exists
       if (window.zenPomodoroApp?.security) {
@@ -7674,8 +7785,16 @@
     _closeMenuDialog(dialog) {
       this._stopMenuTimerUpdates();
       this._stopReminderCountdownUpdates();
-      dialog.remove();
+      this._removeMenuEscHandler();
+      dialog?.remove();
       this.menuDialog = null;
+    }
+
+    _removeMenuEscHandler() {
+      if (this.menuEscHandler) {
+        document.removeEventListener('keydown', this.menuEscHandler);
+        this.menuEscHandler = null;
+      }
     }
 
     /**
@@ -7929,10 +8048,8 @@
       settingsBtn.className = 'zen-pomodoro-dialog-button secondary';
       settingsBtn.textContent = 'Timer Settings';
       settingsBtn.addEventListener('click', () => {
-        this._stopMenuTimerUpdates();
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         this.showSettingsDialog();
       });
 
@@ -7940,10 +8057,8 @@
       rulesetBtn.className = 'zen-pomodoro-dialog-button secondary';
       rulesetBtn.textContent = 'Ruleset Settings';
       rulesetBtn.addEventListener('click', () => {
-        this._stopMenuTimerUpdates();
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         this.showRulesetSettingsDialog();
       });
 
@@ -8010,8 +8125,7 @@
       startBtn.textContent = 'Start Pomodoro Timer';
       startBtn.addEventListener('click', () => {
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         this.showConfigDialog();
       });
 
@@ -8021,8 +8135,7 @@
       settingsBtn.textContent = 'Timer Settings';
       settingsBtn.addEventListener('click', () => {
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         this.showSettingsDialog();
       });
 
@@ -8032,8 +8145,7 @@
       rulesetBtn.textContent = 'Ruleset Settings';
       rulesetBtn.addEventListener('click', () => {
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         this.showRulesetSettingsDialog();
       });
 
@@ -8043,8 +8155,7 @@
       customCyclesBtn.textContent = 'Custom Cycles';
       customCyclesBtn.addEventListener('click', () => {
         saveDialogPosition(dialog);
-        dialog.remove();
-        this.menuDialog = null;
+        this._closeMenuDialog(dialog);
         if (window.zenPomodoroApp?.customCycles) {
           window.zenPomodoroApp.customCycles.showCustomCyclesMenu();
         }
@@ -8098,6 +8209,8 @@
      * Issue 4: Toggle behavior - if any dialog is open, close it instead of creating new
      */
     showPomodoroMenu() {
+      this._removeMenuEscHandler();
+
       // Issue 4: Check if any dialogs are currently open using shared constant
       const existingDialogs = document.querySelectorAll(POMODORO_DIALOG_SELECTORS.join(', '));
 
@@ -8147,13 +8260,12 @@
       dialog.focus();
 
       // Close on Escape key
-      const escHandler = (e) => {
+      this.menuEscHandler = (e) => {
         if (e.key === 'Escape') {
           this._closeMenuDialog(dialog);
-          document.removeEventListener('keydown', escHandler);
         }
       };
-      document.addEventListener('keydown', escHandler);
+      document.addEventListener('keydown', this.menuEscHandler);
     }
 
     /**
@@ -8165,6 +8277,7 @@
 
       // Stop any running reminder countdown updates
       this._stopReminderCountdownUpdates();
+      this._removeMenuEscHandler();
 
       if (this.keydownHandler) {
         document.removeEventListener('keydown', this.keydownHandler, true);
@@ -9884,10 +9997,9 @@
       this.currentlyBlockedReason = null;
       this.tabSelectHandler = null;
       this.pageShowHandler = null;
+      this.titleChangeHandler = null;
       this.progressListener = null;
       this._timerStatusInterval = null;
-      this.contentObserver = null; // MutationObserver for dynamic page content
-      this._contentObserverDebounceTimeout = null; // Debounce timeout for content observer
       this._goBackCooldownActive = false; // Cooldown flag to prevent re-blocking after "Go Back"
       this._goBackCooldownTimeout = null; // Timeout ID for cooldown cleanup
       this.distractionDumpActive = false; // Flag to disable blocking during distraction dump
@@ -9910,6 +10022,21 @@
      */
     _setupListeners() {
       setupBrowserListeners(this, () => this._checkCurrentPage(), WEBSITE_BLOCKER_CHECK_DELAY_MS);
+
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser === 'undefined' || !gBrowser.tabContainer) return;
+
+      this.titleChangeHandler = (event) => {
+        // eslint-disable-next-line no-undef
+        if (event.target !== gBrowser.selectedTab) return;
+
+        const changed = event.detail?.changed;
+        if (!changed?.includes('label') && !changed?.includes('titlechanged')) return;
+
+        this._checkCurrentPage();
+      };
+      // eslint-disable-next-line no-undef
+      gBrowser.tabContainer.addEventListener('TabAttrModified', this.titleChangeHandler);
     }
 
     /**
@@ -9969,26 +10096,6 @@
     }
 
     /**
-     * Try to setup content observer for the current page.
-     * @private
-     */
-    _trySetupContentObserver() {
-      try {
-        // eslint-disable-next-line no-undef
-        if (typeof gBrowser !== 'undefined' && gBrowser.selectedBrowser) {
-          // eslint-disable-next-line no-undef
-          const contentDoc = gBrowser.selectedBrowser.contentDocument;
-          if (contentDoc?.body) {
-            this._setupContentObserver(contentDoc);
-          }
-        }
-      } catch (e) {
-        // Log content access denied errors for debugging
-        logger.log(LOG_CATEGORIES$4.SECURITY, 'Content document access denied', { error: e.message });
-      }
-    }
-
-    /**
      * Evaluate URL against rulesets and update blocker state.
      * @param {string} url - URL to evaluate
      * @private
@@ -10042,9 +10149,6 @@
         return;
       }
 
-      // Setup content observer for dynamic pages (keyword checking)
-      this._trySetupContentObserver();
-
       // Evaluate URL against rulesets and update blocker
       this._evaluateUrlAndUpdateBlocker(currentUrl);
 
@@ -10074,52 +10178,6 @@
     }
 
     /**
-     * Setup content observer for dynamic pages.
-     * Re-checks keywords when page content changes significantly.
-     *
-     * NOTE: Due to browser security restrictions (cross-origin), this observer
-     * can only monitor DOM changes for URL-based blocking. Keyword content scanning
-     * is limited to tab titles only (see _getPageText). The observer still triggers
-     * re-checks which will verify the tab title against keyword rules.
-     *
-     * Refactored to reduce cyclomatic complexity by extracting helper methods.
-     *
-     * @param {Document} contentDoc - Content document to observe
-     * @private
-     */
-    _setupContentObserver(contentDoc) {
-      this._cleanupExistingObserver();
-
-      if (!contentDoc?.body) return;
-
-      if (!this._hasActiveKeywordRules()) {
-        logger.log(
-          LOG_CATEGORIES$4.SECURITY,
-          'Skipping content observer - no keyword rules configured'
-        );
-        return;
-      }
-
-      this._createContentObserver(contentDoc);
-    }
-
-    /**
-     * Clean up any existing content observer and debounce timeout.
-     * @private
-     */
-    _cleanupExistingObserver() {
-      if (this.contentObserver) {
-        this.contentObserver.disconnect();
-        this.contentObserver = null;
-      }
-
-      if (this._contentObserverDebounceTimeout) {
-        clearTimeout(this._contentObserverDebounceTimeout);
-        this._contentObserverDebounceTimeout = null;
-      }
-    }
-
-    /**
      * Check if any active ruleset has keyword rules configured.
      * @returns {boolean} True if keyword rules exist in active rulesets
      * @private
@@ -10136,31 +10194,6 @@
         }
       }
       return false;
-    }
-
-    /**
-     * Create and attach a MutationObserver to the content document.
-     * @param {Document} contentDoc - Content document to observe
-     * @private
-     */
-    _createContentObserver(contentDoc) {
-      this.contentObserver = new MutationObserver(() => {
-        // Debounce to avoid excessive checks
-        if (this._contentObserverDebounceTimeout) {
-          clearTimeout(this._contentObserverDebounceTimeout);
-        }
-        this._contentObserverDebounceTimeout = setTimeout(() => {
-          if (window.zenPomodoroApp?.timer?.isActive) {
-            this._checkCurrentPage();
-          }
-        }, CONTENT_OBSERVER_DEBOUNCE_DELAY_MS);
-      });
-
-      this.contentObserver.observe(contentDoc.body, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
     }
 
     /**
@@ -10418,7 +10451,7 @@
 
     /**
      * Get the current tab title from available browser sources.
-     * Due to cross-origin security restrictions, we cannot access contentDocument.body.
+     * Due to cross-origin security restrictions, we cannot access the page body.
      * Only the tab title is accessible from the browser chrome context.
      * @returns {string} The current tab title, or empty string if unavailable
      * @private
@@ -10704,12 +10737,6 @@
         this._timerStatusInterval = null;
       }
 
-      // Disconnect content observer
-      if (this.contentObserver) {
-        this.contentObserver.disconnect();
-        this.contentObserver = null;
-      }
-
       if (this.blockerOverlay) {
         this.blockerOverlay.remove();
         this.blockerOverlay = null;
@@ -10739,8 +10766,8 @@
      */
     destroy() {
       this._removeGBrowserListeners();
+      this._removeTitleChangeListener();
       this._clearIntervals();
-      this._disconnectContentObserver();
       this._clearGoBackCooldown();
       this._clearKeywordRecheckTimeout();
       this._removeBlockerOverlay();
@@ -10771,22 +10798,20 @@
     }
 
     /**
-     * Disconnect the content observer if active.
-     * @private
-     */
-    _disconnectContentObserver() {
-      if (this.contentObserver) {
-        this.contentObserver.disconnect();
-        this.contentObserver = null;
-      }
-    }
-
-    /**
      * Remove gBrowser event listeners.
      * @private
      */
     _removeGBrowserListeners() {
       removeBrowserListeners(this);
+    }
+
+    _removeTitleChangeListener() {
+      // eslint-disable-next-line no-undef
+      if (typeof gBrowser !== 'undefined' && gBrowser.tabContainer && this.titleChangeHandler) {
+        // eslint-disable-next-line no-undef
+        gBrowser.tabContainer.removeEventListener('TabAttrModified', this.titleChangeHandler);
+      }
+      this.titleChangeHandler = null;
     }
 
     /**
@@ -15302,6 +15327,7 @@
       this._prefTriggerObserver = null;
       this._lastExportLogsTriggerAt = 0;
       this._isResettingExportLogsPref = false;
+      this._lastWorkspaceVisibilityLog = null;
 
       this.init();
     }
@@ -15466,11 +15492,22 @@
      */
     _handlePreferenceTrigger(prefName) {
       const exportPrefName = `${Constants.PREF_PREFIX}.${Constants.EXPORT_LOGS_REQUEST_PREF_KEY}`;
-      if (prefName !== exportPrefName) {
+      if (prefName === exportPrefName) {
+        this._handleExportLogsPreferenceTrigger();
         return;
       }
 
-      this._handleExportLogsPreferenceTrigger();
+      if (prefName === `${Constants.PREF_PREFIX}.config`) {
+        if (typeof this.workspace?.refreshConfig === 'function') {
+          this.workspace.refreshConfig();
+        }
+        const workspaceId = this.workspace?.getActiveWorkspace?.() ?? null;
+        const isBlocked =
+          workspaceId && typeof this.workspace?.isWorkspaceIdBlocked === 'function'
+            ? this.workspace.isWorkspaceIdBlocked(workspaceId)
+            : null;
+        this.updateOverlayVisibility(workspaceId, isBlocked);
+      }
     }
 
     /**
@@ -16091,7 +16128,6 @@
      */
     onTimerTick(time, phase, cycle, total) {
       this.overlay.updateDisplay(time, phase, cycle, total);
-      this.updateOverlayVisibility();
     }
 
     /**
@@ -16218,6 +16254,7 @@
     updateOverlayVisibility(workspaceId = null, isBlocked = null) {
       // Handle timer inactive state
       if (!this.timer.isActive) {
+        this._resetWorkspaceVisibilityLog();
         this._hideOverlayAndIndicator();
         return;
       }
@@ -16225,6 +16262,7 @@
       // Handle distraction dump active - all blocking should be lifted
       const dumpManager = window.zenPomodoroApp?.distractionDump;
       if (dumpManager?.isActive) {
+        this._resetWorkspaceVisibilityLog();
         this.overlay.hide();
         // Keep dump indicator visible (it's managed by DistractionDumpManager)
         return;
@@ -16232,18 +16270,21 @@
 
       // Handle paused during break phase
       if (this._isPausedDuringBreak()) {
+        this._resetWorkspaceVisibilityLog();
         this._handlePausedBreakPhase(isBlocked);
         return;
       }
 
       // Handle active break phase
       if (this._isInActiveBreakPhase()) {
+        this._resetWorkspaceVisibilityLog();
         this._hideOverlayKeepIndicator();
         return;
       }
 
       // Handle transition phase
       if (this._isInTransitionPhase()) {
+        this._resetWorkspaceVisibilityLog();
         this._hideOverlayKeepIndicator();
         return;
       }
@@ -16351,6 +16392,7 @@
      * @private
      */
     _logBlockedWorkspace(workspaceId, isBlocked) {
+      if (!this._shouldLogWorkspaceVisibility(workspaceId, true)) return;
       logger.log(LOG_CATEGORIES$4.OVERLAY, 'Current workspace is blocked - showing overlay', {
         workspaceId: workspaceId,
         isPaused: this.timer.isPaused,
@@ -16366,12 +16408,28 @@
      * @private
      */
     _logUnblockedWorkspace(workspaceId, isBlocked) {
+      if (!this._shouldLogWorkspaceVisibility(workspaceId, false)) return;
       logger.log(LOG_CATEGORIES$4.OVERLAY, 'Current workspace is unblocked - hiding overlay', {
         workspaceId: workspaceId,
         isPaused: this.timer.isPaused,
         workspaceBlocked: false,
         isBlockedParam: isBlocked,
       });
+    }
+
+    _shouldLogWorkspaceVisibility(workspaceId, isBlocked) {
+      if (
+        this._lastWorkspaceVisibilityLog?.workspaceId === workspaceId &&
+        this._lastWorkspaceVisibilityLog?.isBlocked === isBlocked
+      ) {
+        return false;
+      }
+      this._lastWorkspaceVisibilityLog = { workspaceId, isBlocked };
+      return true;
+    }
+
+    _resetWorkspaceVisibilityLog() {
+      this._lastWorkspaceVisibilityLog = null;
     }
 
     /**
@@ -16587,12 +16645,10 @@
       this._runCleanupActions();
       this._destroyPreferenceTriggerObserver();
 
-      // Clean up cross-window log sync
-      logger.destroySync();
-
       this.initialized = false;
 
       logger.log(LOG_CATEGORIES$4.INIT, 'Application cleanup complete');
+      logger.destroy();
     }
 
     /**
@@ -16616,9 +16672,10 @@
       if (this.workspace && typeof this.workspace.stopMonitoring === 'function') {
         this.workspace.stopMonitoring();
       }
-      if (this.timer && typeof this.timer.stop === 'function') {
-        // Suppress completion callback during teardown to prevent false notifications
-        this.timer.stop({ suppressCompleteCallback: true });
+      if (this.timer && typeof this.timer.stopInterval === 'function') {
+        // Window teardown must not clear the shared/persisted timer state. The
+        // beforeunload handler saves it so another window or a future session can resume it.
+        this.timer.stopInterval();
       }
       if (this.security && typeof this.security.cleanupLockScreen === 'function') {
         this.security.cleanupLockScreen();
@@ -16712,7 +16769,8 @@
         if (app?.windowSync) {
           app.windowSync.releaseOwnership();
         }
-      }
+      },
+      { once: true }
     );
 
     // MEMORY LEAK FIX: Register shutdown handler to cleanup resources
